@@ -1,0 +1,52 @@
+# ---------------------------------------------------------------------------
+# Build outputs
+# ---------------------------------------------------------------------------
+.gradle/
+build/
+**/build/
+captures/
+.externalNativeBuild/
+.cxx/
+.kotlin/
+*.aab
+*.ap_
+*.dex
+*.class
+# Only the published release APKs in /releases are tracked
+*.apk
+!releases/*.apk
+
+# ---------------------------------------------------------------------------
+# Secrets & signing material — NEVER commit
+# ---------------------------------------------------------------------------
+keystore/
+*.jks
+*.keystore
+*.p12
+*.pfx
+*.pem
+*.key
+keystore.properties
+signing.properties
+secrets.properties
+*.env
+.env
+.env.*
+google-services.json
+GoogleService-Info.plist
+
+# Machine-specific paths (contains local SDK location)
+local.properties
+
+# ---------------------------------------------------------------------------
+# IDE / OS
+# ---------------------------------------------------------------------------
+.idea/
+*.iml
+.vscode/
+*.swp
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log

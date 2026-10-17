@@ -1,0 +1,10 @@
+<resources>
+    <style name="Theme.BlackLab" parent="android:Theme.Material.NoActionBar">
+        <item name="android:windowBackground">@color/bl_black</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+        <item name="android:windowSplashScreenBackground">@color/bl_black</item>
+        <item name="android:windowSplashScreenAnimatedIcon">@drawable/ic_launcher_foreground</item>
+        <item name="android:windowLightStatusBar">false</item>
+    </style>
+</resources>

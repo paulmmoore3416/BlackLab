@@ -1,0 +1,376 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<style>
+  :root { --page: #ffffff; --ink: #1b1b1f; --desk: #15171b; --accent: #4f8cff; }
+  html, body { margin: 0; padding: 0; background: var(--desk); -webkit-tap-highlight-color: transparent; }
+  body.light { --desk: #e9ebef; }
+  #page { background: var(--page); color: var(--ink); min-height: calc(100vh - 24px); margin: 12px 10px 120px 10px;
+          border-radius: 6px; box-shadow: 0 2px 14px rgba(0,0,0,.35); padding: 26px 22px 60px 22px; box-sizing: border-box; }
+  #editor { outline: none; min-height: 60vh; font-family: Calibri, 'Segoe UI', Roboto, Arial, sans-serif; font-size: 11pt;
+            line-height: 1.45; word-wrap: break-word; overflow-wrap: anywhere; caret-color: var(--accent); }
+  #editor:empty:before, #editor.is-empty:before { content: attr(data-placeholder); color: #9aa0a6; pointer-events: none; display: block; }
+  #editor p { margin: 0 0 8px 0; }
+  #editor h1.title { font-size: 26pt; font-weight: 300; margin: 4px 0 10px; color: #111; }
+  #editor h1 { font-size: 20pt; margin: 16px 0 6px; color: #1f3864; border-bottom: 1px solid #d0d5dd; padding-bottom: 2px; }
+  #editor h1.title { border: none; }
+  #editor h2 { font-size: 16pt; margin: 14px 0 6px; color: #2f5496; }
+  #editor h3 { font-size: 13.5pt; margin: 12px 0 4px; color: #2f5496; }
+  #editor h4 { font-size: 12pt; margin: 10px 0 4px; color: #2f5496; }
+  #editor blockquote { border-left: 3px solid var(--accent); margin: 8px 0; padding: 4px 12px; color: #444; font-style: italic; }
+  #editor pre { background: #f3f4f6; padding: 8px 10px; border-radius: 4px; font-family: 'Courier New', monospace; font-size: 9.5pt; white-space: pre-wrap; }
+  #editor code { background: #f1f3f4; padding: 0 3px; border-radius: 3px; font-family: 'Courier New', monospace; }
+  #editor table { border-collapse: collapse; width: 100%; margin: 8px 0; table-layout: fixed; }
+  #editor td, #editor th { border: 1px solid #9aa0a6; padding: 6px 7px; vertical-align: top; min-width: 30px; }
+  #editor th { background: #eef1f5; font-weight: bold; }
+  #editor td.sel, #editor th.sel { outline: 2px solid var(--accent); outline-offset: -2px; }
+  #editor img { max-width: 100%; height: auto; border-radius: 2px; }
+  #editor img.selected { outline: 3px solid var(--accent); }
+  #editor a { color: #0563c1; }
+  #editor ul, #editor ol { padding-left: 26px; margin: 4px 0 8px; }
+  #editor ul.checklist { list-style: none; padding-left: 6px; }
+  #editor ul.checklist li { position: relative; padding-left: 28px; margin: 3px 0; }
+  #editor ul.checklist li::before { content: ''; position: absolute; left: 0; top: 2px; width: 16px; height: 16px; border: 2px solid #5f6368; border-radius: 4px; box-sizing: border-box; }
+  #editor ul.checklist li.checked::before { background: var(--accent); border-color: var(--accent); }
+  #editor ul.checklist li.checked::after { content: ''; position: absolute; left: 5px; top: 4px; width: 5px; height: 9px; border: solid #fff; border-width: 0 2px 2px 0; transform: rotate(45deg); }
+  #editor ul.checklist li.checked { color: #80868b; text-decoration: line-through; }
+  #editor .page-break { border-top: 2px dashed #b0b6be; margin: 18px -22px; height: 0; position: relative; }
+  #editor .page-break::after { content: 'Page break'; position: absolute; top: -9px; left: 50%; transform: translateX(-50%); background: #fff; color: #8a9099; font: 10px sans-serif; padding: 0 6px; }
+  #editor hr { border: none; border-top: 1px solid #9aa0a6; margin: 12px 0; }
+  ::highlight(bl-find) { background-color: #fff176; color: #000; }
+  ::highlight(bl-current) { background-color: #ff9800; color: #000; }
+</style>
+</head>
+<body>
+<div id="page"><div id="editor" contenteditable="true" spellcheck="true"></div></div>
+<script>
+(function () {
+  const ed = document.getElementById('editor');
+  const A = window.Android || { getInitialHtml: () => '', getPlaceholder: () => '', onState: () => {}, onChange: () => {}, onImageSelected: () => {}, onFind: () => {}, onReady: () => {} };
+  let savedRange = null;
+  let selectedImg = null;
+  let changeTimer = null, stateTimer = null;
+  let findRanges = [], findIndex = -1;
+
+  function init() {
+    const html = A.getInitialHtml();
+    ed.innerHTML = html && html.trim() ? html : '<p><br></p>';
+    ed.setAttribute('data-placeholder', A.getPlaceholder() || 'Start writing…');
+    document.execCommand('styleWithCSS', false, true);
+    document.execCommand('defaultParagraphSeparator', false, 'p');
+    updateEmpty();
+    A.onReady();
+    reportChange(true);
+  }
+
+  function updateEmpty() {
+    const empty = ed.innerText.trim() === '' && !ed.querySelector('img,table,hr,li');
+    ed.classList.toggle('is-empty', empty);
+  }
+
+  function inEditor(node) { return node && (node === ed || ed.contains(node)); }
+
+  function saveSel() {
+    const s = window.getSelection();
+    if (s.rangeCount && inEditor(s.anchorNode)) savedRange = s.getRangeAt(0).cloneRange();
+  }
+
+  function restoreSel() {
+    if (document.activeElement !== ed) ed.focus({ preventScroll: true });
+    if (savedRange) {
+      const s = window.getSelection();
+      s.removeAllRanges(); s.addRange(savedRange);
+    }
+  }
+
+  function anchorEl() {
+    const s = window.getSelection();
+    let n = s.rangeCount ? s.anchorNode : (savedRange ? savedRange.startContainer : null);
+    if (!n) return null;
+    if (n.nodeType === 3) n = n.parentNode;
+    return inEditor(n) ? n : null;
+  }
+
+  function closest(tagList) {
+    let n = anchorEl();
+    while (n && n !== ed) { if (tagList.indexOf(n.nodeName) >= 0) return n; n = n.parentNode; }
+    return null;
+  }
+
+  function blockEl() { return closest(['P','DIV','H1','H2','H3','H4','H5','H6','LI','BLOCKQUOTE','PRE','TD','TH']); }
+
+  function selectedBlocks() {
+    const s = window.getSelection();
+    if (!s.rangeCount) { const b = blockEl(); return b ? [b] : []; }
+    const r = s.getRangeAt(0);
+    const all = Array.from(ed.querySelectorAll('p,div,h1,h2,h3,h4,h5,h6,li,blockquote,pre'));
+    const hit = all.filter(b => r.intersectsNode(b) && !b.querySelector('p,div,h1,h2,h3,h4,h5,h6,li,blockquote,pre'));
+    if (hit.length) return hit;
+    const b = blockEl(); return b ? [b] : [];
+  }
+
+  function reportChange(immediate) {
+    clearTimeout(changeTimer);
+    changeTimer = setTimeout(() => {
+      updateEmpty();
+      const text = ed.innerText || '';
+      const words = (text.match(/[\p{L}\p{N}'’]+/gu) || []).length;
+      A.onChange(words, text.replace(/\s/g, '').length, immediate ? 0 : 1);
+    }, immediate ? 0 : 250);
+  }
+
+  function reportState() {
+    clearTimeout(stateTimer);
+    stateTimer = setTimeout(() => {
+      const q = c => { try { return document.queryCommandState(c); } catch (e) { return false; } };
+      const el = anchorEl();
+      const b = blockEl();
+      let size = 11, family = 'Calibri';
+      if (el) {
+        const cs = getComputedStyle(el);
+        size = Math.round(parseFloat(cs.fontSize) * 0.75 * 2) / 2;
+        family = (cs.fontFamily || '').split(',')[0].replace(/["']/g, '').trim();
+      }
+      const align = b ? (getComputedStyle(b).textAlign || 'left') : 'left';
+      const a = closest(['A']);
+      const st = {
+        bold: q('bold'), italic: q('italic'), underline: q('underline'), strike: q('strikeThrough'),
+        sup: q('superscript'), sub: q('subscript'), ul: q('insertUnorderedList'), ol: q('insertOrderedList'),
+        check: !!(closest(['UL']) && closest(['UL']).classList.contains('checklist')),
+        align: align === 'start' ? 'left' : (align === 'end' ? 'right' : align),
+        block: b ? (b.nodeName === 'H1' && b.classList.contains('title') ? 'TITLE' : b.nodeName) : 'P',
+        size: size, family: family, table: !!closest(['TD','TH']), link: a ? a.getAttribute('href') : '',
+        image: !!selectedImg, lineHeight: b ? (b.style.lineHeight || '') : ''
+      };
+      A.onState(JSON.stringify(st));
+    }, 40);
+  }
+
+  // ---------- public API ----------
+  window.bl = {
+    getHtml: function () {
+      ed.querySelectorAll('.sel').forEach(n => n.classList.remove('sel'));
+      ed.querySelectorAll('img.selected').forEach(n => n.classList.remove('selected'));
+      return ed.innerHTML;
+    },
+    setHtml: function (h) { ed.innerHTML = h || '<p><br></p>'; reportChange(true); },
+    focus: function () { restoreSel(); },
+    exec: function (cmd, val) {
+      restoreSel();
+      document.execCommand(cmd, false, val === undefined ? null : val);
+      saveSel(); reportChange(); reportState();
+    },
+    block: function (tag) {
+      restoreSel();
+      if (tag === 'TITLE') {
+        document.execCommand('formatBlock', false, 'h1');
+        const b = blockEl(); if (b) b.classList.add('title');
+      } else {
+        document.execCommand('formatBlock', false, tag.toLowerCase());
+        const b = blockEl(); if (b) b.classList.remove('title');
+      }
+      saveSel(); reportChange(); reportState();
+    },
+    fontSize: function (pt) {
+      restoreSel();
+      document.execCommand('styleWithCSS', false, false);
+      document.execCommand('fontSize', false, '7');
+      document.execCommand('styleWithCSS', false, true);
+      ed.querySelectorAll('font[size="7"]').forEach(f => {
+        const span = document.createElement('span');
+        span.style.fontSize = pt + 'pt';
+        while (f.firstChild) span.appendChild(f.firstChild);
+        f.parentNode.replaceChild(span, f);
+        // normalize nested sizes so the new size wins
+        span.querySelectorAll('[style*="font-size"]').forEach(n => n.style.fontSize = '');
+      });
+      ed.querySelectorAll('span[style*="xxx-large"]').forEach(n => n.style.fontSize = pt + 'pt');
+      saveSel(); reportChange(); reportState();
+    },
+    fontName: function (name) { this.exec('fontName', name); },
+    checklist: function () {
+      restoreSel();
+      const ul = closest(['UL']);
+      if (ul && ul.classList.contains('checklist')) { document.execCommand('insertUnorderedList'); }
+      else {
+        if (!ul) document.execCommand('insertUnorderedList');
+        const list = closest(['UL']); if (list) list.classList.add('checklist');
+      }
+      saveSel(); reportChange(); reportState();
+    },
+    indent: function (dir) {
+      restoreSel();
+      if (closest(['LI'])) { document.execCommand(dir > 0 ? 'indent' : 'outdent'); }
+      else {
+        selectedBlocks().forEach(b => {
+          const cur = parseInt(b.style.marginLeft || '0', 10) || 0;
+          const next = Math.max(0, cur + dir * 40);
+          b.style.marginLeft = next ? next + 'px' : '';
+        });
+      }
+      saveSel(); reportChange(); reportState();
+    },
+    lineHeight: function (v) {
+      restoreSel();
+      selectedBlocks().forEach(b => b.style.lineHeight = v);
+      reportChange(); reportState();
+    },
+    insertHtml: function (h) { restoreSel(); document.execCommand('insertHTML', false, h); saveSel(); reportChange(); reportState(); },
+    insertText: function (t) { restoreSel(); document.execCommand('insertText', false, t); saveSel(); reportChange(); },
+    table: function (rows, cols, header) {
+      let h = '<table><tbody>';
+      for (let r = 0; r < rows; r++) {
+        h += '<tr>';
+        for (let c = 0; c < cols; c++) h += (header && r === 0) ? '<th><br></th>' : '<td><br></td>';
+        h += '</tr>';
+      }
+      h += '</tbody></table><p><br></p>';
+      this.insertHtml(h);
+    },
+    tableOp: function (op) {
+      restoreSel();
+      const cell = closest(['TD','TH']); if (!cell) return;
+      const row = cell.parentNode, table = row.closest('table');
+      const idx = Array.prototype.indexOf.call(row.children, cell);
+      if (op === 'rowBelow' || op === 'rowAbove') {
+        const nr = document.createElement('tr');
+        for (let i = 0; i < row.children.length; i++) { const td = document.createElement('td'); td.innerHTML = '<br>'; nr.appendChild(td); }
+        row.parentNode.insertBefore(nr, op === 'rowBelow' ? row.nextSibling : row);
+      } else if (op === 'colRight' || op === 'colLeft') {
+        table.querySelectorAll('tr').forEach(tr => {
+          const ref = tr.children[idx];
+          const tag = (ref && ref.nodeName === 'TH') ? 'th' : 'td';
+          const td = document.createElement(tag); td.innerHTML = '<br>';
+          if (op === 'colRight') tr.insertBefore(td, ref ? ref.nextSibling : null); else tr.insertBefore(td, ref || null);
+        });
+      } else if (op === 'delRow') {
+        if (row.parentNode.children.length <= 1 && table.querySelectorAll('tr').length <= 1) table.remove(); else row.remove();
+      } else if (op === 'delCol') {
+        table.querySelectorAll('tr').forEach(tr => { if (tr.children[idx]) tr.children[idx].remove(); });
+        if (!table.querySelector('td,th')) table.remove();
+      } else if (op === 'delTable') {
+        table.remove();
+      } else if (op === 'header') {
+        const first = table.querySelector('tr');
+        Array.from(first.children).forEach(c => {
+          const n = document.createElement(c.nodeName === 'TH' ? 'td' : 'th');
+          n.innerHTML = c.innerHTML; first.replaceChild(n, c);
+        });
+      }
+      reportChange(); reportState();
+    },
+    image: function (dataUri) { this.insertHtml('<img src="' + dataUri + '"><br>'); },
+    imageOp: function (op, val) {
+      if (!selectedImg) return;
+      if (op === 'width') { selectedImg.style.width = val; selectedImg.removeAttribute('width'); }
+      else if (op === 'align') {
+        let p = selectedImg.parentNode;
+        if (p === ed || p.nodeName === 'TD' || p.nodeName === 'LI') {
+          const wrap = document.createElement('p'); p.insertBefore(wrap, selectedImg); wrap.appendChild(selectedImg); p = wrap;
+        }
+        p.style.textAlign = val;
+      } else if (op === 'delete') { selectedImg.remove(); selectedImg = null; A.onImageSelected(false); }
+      reportChange(); reportState();
+    },
+    link: function (url, text) {
+      restoreSel();
+      const s = window.getSelection();
+      const existing = closest(['A']);
+      if (existing) { existing.setAttribute('href', url); if (text) existing.textContent = text; }
+      else if (s.rangeCount && !s.isCollapsed) document.execCommand('createLink', false, url);
+      else {
+        const a = '<a href="' + url.replace(/"/g, '&quot;') + '">' + (text || url).replace(/</g, '&lt;') + '</a>&nbsp;';
+        document.execCommand('insertHTML', false, a);
+      }
+      saveSel(); reportChange(); reportState();
+    },
+    unlink: function () { restoreSel(); const a = closest(['A']); if (a) { const r = document.createRange(); r.selectNodeContents(a); const s = window.getSelection(); s.removeAllRanges(); s.addRange(r); } document.execCommand('unlink'); reportChange(); reportState(); },
+    pageBreak: function () { this.insertHtml('<div class="page-break" contenteditable="false"></div><p><br></p>'); },
+    selectedText: function () { const s = window.getSelection(); return s ? s.toString() : ''; },
+    plainText: function () { return ed.innerText; },
+    // ---------- find / replace ----------
+    find: function (term, matchCase) {
+      findRanges = []; findIndex = -1;
+      if (CSS.highlights) { CSS.highlights.delete('bl-find'); CSS.highlights.delete('bl-current'); }
+      if (!term) { A.onFind(0, -1); return; }
+      const walker = document.createTreeWalker(ed, NodeFilter.SHOW_TEXT);
+      const needle = matchCase ? term : term.toLowerCase();
+      let node;
+      while ((node = walker.nextNode())) {
+        const hay = matchCase ? node.nodeValue : node.nodeValue.toLowerCase();
+        let i = hay.indexOf(needle);
+        while (i >= 0) {
+          const r = document.createRange(); r.setStart(node, i); r.setEnd(node, i + term.length);
+          findRanges.push(r); i = hay.indexOf(needle, i + term.length);
+        }
+      }
+      if (CSS.highlights && findRanges.length) CSS.highlights.set('bl-find', new Highlight(...findRanges));
+      if (findRanges.length) this.findStep(1); else A.onFind(0, -1);
+    },
+    findStep: function (dir) {
+      if (!findRanges.length) return;
+      findIndex = (findIndex + dir + findRanges.length) % findRanges.length;
+      const r = findRanges[findIndex];
+      if (CSS.highlights) CSS.highlights.set('bl-current', new Highlight(r));
+      const rect = r.getBoundingClientRect();
+      window.scrollBy({ top: rect.top - window.innerHeight / 3, behavior: 'smooth' });
+      A.onFind(findRanges.length, findIndex);
+    },
+    replaceCurrent: function (rep, term, matchCase) {
+      if (findIndex < 0 || !findRanges[findIndex]) return;
+      const r = findRanges[findIndex];
+      const s = window.getSelection(); s.removeAllRanges(); s.addRange(r);
+      document.execCommand('insertText', false, rep);
+      this.find(term, matchCase);
+      reportChange();
+    },
+    replaceAll: function (term, rep, matchCase) {
+      if (!term) return 0;
+      const walker = document.createTreeWalker(ed, NodeFilter.SHOW_TEXT);
+      const nodes = []; let n; while ((n = walker.nextNode())) nodes.push(n);
+      const esc = term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const re = new RegExp(esc, matchCase ? 'g' : 'gi');
+      let count = 0;
+      nodes.forEach(t => { const v = t.nodeValue; const nv = v.replace(re, () => { count++; return rep; }); if (nv !== v) t.nodeValue = nv; });
+      this.find('', false);
+      reportChange();
+      return count;
+    },
+    clearFind: function () { this.find('', false); },
+    setLight: function (on) { document.body.classList.toggle('light', !!on); }
+  };
+
+  // ---------- events ----------
+  document.addEventListener('selectionchange', () => { saveSel(); reportState(); });
+  ed.addEventListener('input', () => { reportChange(); reportState(); });
+  ed.addEventListener('keyup', reportState);
+  ed.addEventListener('click', (e) => {
+    const t = e.target;
+    ed.querySelectorAll('img.selected').forEach(n => n.classList.remove('selected'));
+    if (t.nodeName === 'IMG') { selectedImg = t; t.classList.add('selected'); A.onImageSelected(true); }
+    else if (selectedImg) { selectedImg = null; A.onImageSelected(false); }
+    if (t.nodeName === 'LI' && t.parentNode.classList.contains('checklist')) {
+      const rect = t.getBoundingClientRect();
+      if (e.clientX - rect.left < 26) { t.classList.toggle('checked'); e.preventDefault(); reportChange(); }
+    }
+    if (t.nodeName === 'A' && e.detail === 1) { /* allow caret placement inside links */ }
+    reportState();
+  });
+  ed.addEventListener('paste', (e) => {
+    // Images pasted from clipboard become inline data URIs
+    const items = (e.clipboardData && e.clipboardData.items) || [];
+    for (const it of items) {
+      if (it.type && it.type.indexOf('image') === 0) {
+        const f = it.getAsFile(); const rd = new FileReader();
+        rd.onload = () => window.bl.image(rd.result); rd.readAsDataURL(f); e.preventDefault(); return;
+      }
+    }
+  });
+
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init); else init();
+})();
+</script>
+</body>
+</html>
