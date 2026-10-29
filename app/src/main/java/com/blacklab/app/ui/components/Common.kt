@@ -67,6 +67,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -182,11 +184,15 @@ fun BlCard(
     contentPadding: PaddingValues = PaddingValues(14.dp),
     content: @Composable ColumnScope.() -> Unit,
 ) {
-    val shape = RoundedCornerShape(18.dp)
+    val shape = RoundedCornerShape(22.dp)
     val colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer)
-    val border = BorderStroke(1.dp, accent?.copy(alpha = 0.45f) ?: MaterialTheme.colorScheme.outlineVariant)
+    val border = BorderStroke(1.dp, accent?.copy(alpha = 0.4f) ?: MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.7f))
     if (onClick != null) {
-        Card(onClick = onClick, modifier = modifier, shape = shape, colors = colors, border = border) {
+        // soft press feedback: the card sinks slightly while touched
+        val interaction = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
+        val pressed by interaction.collectIsPressedAsState()
+        val scale by animateFloatAsState(if (pressed) 0.975f else 1f, androidx.compose.animation.core.spring(dampingRatio = 0.7f, stiffness = 500f), label = "press")
+        Card(onClick = onClick, modifier = modifier.graphicsLayer { scaleX = scale; scaleY = scale }, shape = shape, colors = colors, border = border, interactionSource = interaction) {
             Column(Modifier.padding(contentPadding), content = content)
         }
     } else {

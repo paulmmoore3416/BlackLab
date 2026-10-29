@@ -129,7 +129,7 @@ class WavSink(file: File, private val rate: Int, private val channels: Int) : Au
 }
 
 /** Real-time AAC-LC encoder → MPEG-4 (.m4a) via MediaCodec + MediaMuxer. */
-class AacSink(private val file: File, private val rate: Int, private val channels: Int, bitrate: Int) : AudioSink {
+class AacSink(private val file: File, private val rate: Int, private val channels: Int, bitrate: Int, location: Pair<Float, Float>? = null) : AudioSink {
     private val codec = MediaCodec.createEncoderByType(MediaFormat.MIMETYPE_AUDIO_AAC)
     private val muxer = MediaMuxer(file.path, MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4)
     private var track = -1
@@ -145,6 +145,8 @@ class AacSink(private val file: File, private val rate: Int, private val channel
         }
         codec.configure(fmt, null, null, MediaCodec.CONFIGURE_FLAG_ENCODE)
         codec.start()
+        // ISO 6709 location atom so the recording itself carries where it was made
+        location?.let { (lat, lon) -> runCatching { muxer.setLocation(lat, lon) } }
     }
 
     private fun pts() = frames * 1_000_000L / rate
@@ -213,6 +215,9 @@ class AudioEngine(
     private val file: File,
     private val onLevel: (level: Float, db: Float) -> Unit,
     private val transcriber: LiveTranscriber?,
+    private val location: Pair<Float, Float>? = null,
+    /** Keep feeding the recogniser while paused so spoken commands ("resume recording") still work. */
+    private val listenWhilePaused: Boolean = false,
 ) {
     @Volatile var paused = false
     @Volatile private var running = false
@@ -253,7 +258,7 @@ class AudioEngine(
         if (config.echoCancel && AcousticEchoCanceler.isAvailable()) AcousticEchoCanceler.create(session)?.let { it.enabled = true; effects += it }
 
         sink = try {
-            if (config.format == "WAV") WavSink(file, actualRate, config.channels) else AacSink(file, actualRate, config.channels, config.bitrate)
+            if (config.format == "WAV") WavSink(file, actualRate, config.channels) else AacSink(file, actualRate, config.channels, config.bitrate, location)
         } catch (e: Exception) {
             r.release(); return "Encoder error: ${e.message}"
         }
@@ -288,6 +293,8 @@ class AudioEngine(
                 runCatching { sink?.write(buf, n) }
                 framesWritten += n / config.channels
                 transcriber?.feed(buf, n, config.channels, actualRate)
+            } else if (listenWhilePaused) {
+                transcriber?.feed(buf, n, config.channels, actualRate)
             }
         }
     }
@@ -307,7 +314,17 @@ class AudioEngine(
  * On-device speech recognition fed from our own PCM stream (Android 13+ EXTRA_AUDIO_SOURCE),
  * so recording and transcription happen simultaneously. Falls back gracefully if unsupported.
  */
-class LiveTranscriber(private val context: Context, private val listener: Listener) {
+/** Speech-recognition tuning. */
+data class SttOptions(
+    /** Ask the recogniser for punctuation & capitalisation (Android 13+). */
+    val formatting: Boolean = true,
+    /** Names, jargon and acronyms the recogniser should favour. */
+    val vocabulary: List<String> = emptyList(),
+    /** On-device (private, offline) recogniser when available; otherwise the system speech service. */
+    val preferOnDevice: Boolean = true,
+)
+
+class LiveTranscriber(private val context: Context, private val listener: Listener, private val options: SttOptions = SttOptions()) {
     interface Listener {
         fun onPartial(text: String)
         fun onFinal(text: String)
@@ -324,6 +341,8 @@ class LiveTranscriber(private val context: Context, private val listener: Listen
     @Volatile private var blocking = false
     private var feeder: Thread? = null
     private var restarts = 0
+    private var formattingOff = false
+    private val resampler = Downsampler16k()
 
     fun start(blockingFeed: Boolean = false) {
         if (!SpeechRecognizer.isRecognitionAvailable(context)) { listener.onError("Speech recognition isn't available on this device."); return }
@@ -341,7 +360,7 @@ class LiveTranscriber(private val context: Context, private val listener: Listen
     private fun openSession() {
         if (!active) return
         runCatching { recognizer?.destroy() }
-        val r = if (SpeechRecognizer.isOnDeviceRecognitionAvailable(context)) SpeechRecognizer.createOnDeviceSpeechRecognizer(context)
+        val r = if (options.preferOnDevice && SpeechRecognizer.isOnDeviceRecognitionAvailable(context)) SpeechRecognizer.createOnDeviceSpeechRecognizer(context)
         else SpeechRecognizer.createSpeechRecognizer(context)
         recognizer = r
         val pipe = ParcelFileDescriptor.createPipe()
@@ -369,8 +388,10 @@ class LiveTranscriber(private val context: Context, private val listener: Listen
             }
             override fun onError(error: Int) {
                 val recoverable = error == SpeechRecognizer.ERROR_NO_MATCH || error == SpeechRecognizer.ERROR_SPEECH_TIMEOUT || error == SpeechRecognizer.ERROR_RECOGNIZER_BUSY
-                if (active && recoverable && restarts++ < 500) { main.postDelayed({ openSession() }, 250); return }
+                if (active && recoverable && restarts++ < 5000) { main.postDelayed({ openSession() }, 250); return }
                 if (!active) return
+                // Some recognisers reject the formatting/biasing extras — retry once without them.
+                if (options.formatting && !formattingOff && error != SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS) { formattingOff = true; main.postDelayed({ openSession() }, 250); return }
                 val msg = when (error) {
                     SpeechRecognizer.ERROR_LANGUAGE_NOT_SUPPORTED, SpeechRecognizer.ERROR_LANGUAGE_UNAVAILABLE ->
                         "Offline speech pack not installed. Settings › System › Languages › Speech › On-device recognition."
@@ -391,26 +412,21 @@ class LiveTranscriber(private val context: Context, private val listener: Listen
             putExtra(RecognizerIntent.EXTRA_AUDIO_SOURCE_ENCODING, AudioFormat.ENCODING_PCM_16BIT)
             putExtra(RecognizerIntent.EXTRA_AUDIO_SOURCE_SAMPLING_RATE, 16_000)
             putExtra(RecognizerIntent.EXTRA_SEGMENTED_SESSION, RecognizerIntent.EXTRA_AUDIO_SOURCE)
+            putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 1)
+            if (!formattingOff) {
+                if (options.formatting) putExtra(RecognizerIntent.EXTRA_ENABLE_FORMATTING, RecognizerIntent.FORMATTING_OPTIMIZE_QUALITY)
+                putExtra(RecognizerIntent.EXTRA_MASK_OFFENSIVE_WORDS, false)
+                if (options.vocabulary.isNotEmpty()) putStringArrayListExtra(RecognizerIntent.EXTRA_BIASING_STRINGS, ArrayList(options.vocabulary.take(100)))
+            }
         }
         runCatching { r.startListening(intent) }.onFailure { active = false; listener.onError("Couldn't start transcription: ${it.message}") }
     }
 
-    /** Downmix + resample to 16 kHz mono 16-bit and queue for the recognizer. */
+    /** Downmix + anti-aliased resample to 16 kHz mono 16-bit and queue for the recognizer. */
     fun feed(buf: ShortArray, n: Int, channels: Int, rate: Int) {
         if (!active) return
-        val frames = n / channels
-        val ratio = rate / 16_000.0
-        val outFrames = (frames / ratio).toInt()
-        if (outFrames <= 0) return
-        val bytes = ByteArray(outFrames * 2)
-        for (i in 0 until outFrames) {
-            val src = (i * ratio).toInt().coerceAtMost(frames - 1)
-            var sum = 0
-            for (c in 0 until channels) sum += buf[src * channels + c]
-            val v = sum / channels
-            bytes[i * 2] = (v and 0xFF).toByte()
-            bytes[i * 2 + 1] = ((v shr 8) and 0xFF).toByte()
-        }
+        val bytes = resampler.process(buf, n, channels, rate)
+        if (bytes.isEmpty()) return
         if (blocking) queue.put(bytes) else queue.offer(bytes)
     }
 
@@ -422,6 +438,77 @@ class LiveTranscriber(private val context: Context, private val listener: Listen
             runCatching { recognizer?.stopListening() }
             main.postDelayed({ runCatching { recognizer?.destroy() }; recognizer = null; runCatching { readEnd?.close() } }, 4000)
         }, 300)
+    }
+}
+
+/**
+ * Streaming downmix + low-pass (31-tap Blackman-windowed sinc, 7.4 kHz) + fractional resample to 16 kHz.
+ * Speech recognisers are trained on band-limited 16 kHz audio; feeding them aliased audio (plain
+ * sample-dropping) noticeably hurts word accuracy, especially on sibilants and in noisy rooms.
+ */
+class Downsampler16k {
+    private val nTaps = 31
+    private var rate = 0
+    private var taps = FloatArray(0)
+    private val hist = FloatArray(nTaps - 1)
+    private var mono = FloatArray(0)
+    private var filtered = FloatArray(0)
+    private var phase = 0.0
+    private var prevLast = 0f
+
+    private fun design(r: Int) {
+        rate = r
+        val fc = 7400.0 / r
+        val m = (nTaps - 1) / 2.0
+        val t = DoubleArray(nTaps) { k ->
+            val x = k - m
+            val sinc = if (x == 0.0) 2 * fc else kotlin.math.sin(2 * Math.PI * fc * x) / (Math.PI * x)
+            val w = 0.42 - 0.5 * kotlin.math.cos(2 * Math.PI * k / (nTaps - 1)) + 0.08 * kotlin.math.cos(4 * Math.PI * k / (nTaps - 1))
+            sinc * w
+        }
+        val sum = t.sum()
+        taps = FloatArray(nTaps) { (t[it] / sum).toFloat() }
+        hist.fill(0f); phase = 0.0; prevLast = 0f
+    }
+
+    fun process(buf: ShortArray, n: Int, channels: Int, inRate: Int): ByteArray {
+        val frames = n / channels
+        if (frames <= 0) return ByteArray(0)
+        if (mono.size < frames) { mono = FloatArray(frames); filtered = FloatArray(frames) }
+        for (i in 0 until frames) { var sum = 0; for (c in 0 until channels) sum += buf[i * channels + c]; mono[i] = sum.toFloat() / channels }
+        if (inRate == 16_000) {
+            val out = ByteArray(frames * 2)
+            for (i in 0 until frames) { val v = mono[i].toInt().coerceIn(-32768, 32767); out[i * 2] = (v and 0xFF).toByte(); out[i * 2 + 1] = ((v shr 8) and 0xFF).toByte() }
+            return out
+        }
+        if (inRate != rate) design(inRate)
+        val h = nTaps - 1
+        for (i in 0 until frames) {
+            var acc = 0f
+            for (k in 0 until nTaps) {
+                val idx = i - k
+                acc += taps[k] * (if (idx >= 0) mono[idx] else hist[h + idx])
+            }
+            filtered[i] = acc
+        }
+        // keep the tail for the next chunk
+        if (frames >= h) System.arraycopy(mono, frames - h, hist, 0, h)
+        else { System.arraycopy(hist, frames, hist, 0, h - frames); System.arraycopy(mono, 0, hist, h - frames, frames) }
+        val ratio = inRate / 16_000.0
+        val est = ((frames - phase) / ratio).toInt() + 2
+        val out = java.io.ByteArrayOutputStream(est * 2)
+        while (phase < frames - 1) {
+            val i0 = kotlin.math.floor(phase).toInt()
+            val f = (phase - i0).toFloat()
+            val a = if (i0 < 0) prevLast else filtered[i0]
+            val b = filtered[i0 + 1]
+            val v = (a + (b - a) * f).toInt().coerceIn(-32768, 32767)
+            out.write(v and 0xFF); out.write((v shr 8) and 0xFF)
+            phase += ratio
+        }
+        prevLast = filtered[frames - 1]
+        phase -= frames
+        return out.toByteArray()
     }
 }
 

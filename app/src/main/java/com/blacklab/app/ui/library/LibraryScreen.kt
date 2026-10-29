@@ -77,12 +77,13 @@ import com.blacklab.app.ui.components.TextInputDialog
 import com.blacklab.app.ui.components.rememberApp
 import com.blacklab.app.ui.components.rememberDocumentScanner
 import com.blacklab.app.ui.components.settingsState
+import com.blacklab.app.ui.components.pressable
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.util.Locale
 
-private val Tabs = listOf("PHOTOS" to "Photos", "VIDEOS" to "Videos", "SCANS" to "Scans", "RECORDINGS" to "Audio", "EXPORTS" to "Exports", "IMPORTS" to "Imports", "BROWSE" to "All files")
+private val Tabs = listOf("PHOTOS" to "Photos", "VIDEOS" to "Videos", "SCANS" to "Scans", "RECORDINGS" to "Audio", "DICTATION" to "Dictation", "EXPORTS" to "Exports", "IMPORTS" to "Imports", "BROWSE" to "All files")
 private val imageExt = setOf("jpg", "jpeg", "png", "webp", "heic", "heif", "gif", "dng")
 private val videoExt = setOf("mp4", "mov", "3gp", "mkv", "webm")
 
@@ -131,6 +132,13 @@ fun LibraryScreen(initialTab: String) {
                     }
                     FileList(app.storage.dir(s.activeProfile, Folder.RECORDINGS), refresh, browse = false) { refresh++ }
                 }
+                "DICTATION" -> {
+                    Column(Modifier.padding(16.dp)) {
+                        Text("Dictation sessions — each in its own dated folder with audio, transcript and location.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        TextButton(onClick = { shell.go("dictation") }) { Text("Open Dictation") }
+                    }
+                    FileList(app.storage.dir(s.activeProfile, Folder.DICTATION), refresh, browse = false) { refresh++ }
+                }
                 "SCANS" -> FileList(app.storage.dir(s.activeProfile, Folder.SCANS), refresh, browse = false) { refresh++ }
                 "EXPORTS" -> FileList(app.storage.dir(s.activeProfile, Folder.EXPORTS), refresh, browse = false) { refresh++ }
                 "IMPORTS" -> FileList(app.storage.dir(s.activeProfile, Folder.IMPORTS), refresh, browse = false) { refresh++ }
@@ -143,6 +151,7 @@ fun LibraryScreen(initialTab: String) {
 
 @Composable
 private fun MediaGrid(dir: File, refresh: Int, onChanged: () -> Unit) {
+    val haptics = androidx.compose.ui.platform.LocalHapticFeedback.current
     val app = rememberApp()
     val shell = LocalShell.current
     val ctx = LocalContext.current
@@ -151,11 +160,14 @@ private fun MediaGrid(dir: File, refresh: Int, onChanged: () -> Unit) {
     }
     var selected by remember { mutableStateOf(setOf<File>()) }
     var confirmDelete by remember { mutableStateOf(false) }
+    var menuFile by remember { mutableStateOf<File?>(null) }
+    FileActionHost(menuFile, onDismiss = { menuFile = null }, onChanged = onChanged, onSelect = { selected = selected + it })
     if (files.isEmpty()) { EmptyState(Icons.Default.PhotoLibrary, "Nothing here yet", "Capture with the BlackLab camera — everything is saved to ${dir.name}.") ; return }
     Column {
         if (selected.isNotEmpty()) Row(Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.surfaceContainerHigh).padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) {
             IconButton(onClick = { selected = emptySet() }) { Icon(Icons.Default.Close, "Clear") }
             Text("${selected.size} selected", Modifier.weight(1f))
+            IconButton(onClick = { selected = if (selected.size == files.size) emptySet() else files.toSet() }) { Icon(Icons.Default.SelectAll, "Select all") }
             IconButton(onClick = { Files.share(ctx, selected.toList()) }) { Icon(Icons.Default.Share, "Share") }
             IconButton(onClick = { confirmDelete = true }) { Icon(Icons.Default.Delete, "Delete") }
         }
@@ -168,7 +180,7 @@ private fun MediaGrid(dir: File, refresh: Int, onChanged: () -> Unit) {
                     Box(Modifier.aspectRatio(1f).clip(RoundedCornerShape(6.dp)).background(MaterialTheme.colorScheme.surfaceContainerHigh)
                         .combinedClickable(
                             onClick = { if (selected.isNotEmpty()) selected = if (sel) selected - f else selected + f else shell.go("media?path=" + Uri.encode(app.storage.relative(f))) },
-                            onLongClick = { selected = selected + f },
+                            onLongClick = { haptics.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress); if (selected.isNotEmpty()) selected = if (sel) selected - f else selected + f else menuFile = f },
                         )
                         .then(if (sel) Modifier.border(3.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(6.dp)) else Modifier)) {
                         AsyncImage(
@@ -203,10 +215,8 @@ private fun FileList(start: File, refresh: Int, browse: Boolean, onChanged: () -
         value = if (browse) withContext(Dispatchers.IO) { dir.walkTopDown().filter { it.isFile }.let { seq -> seq.sumOf { it.length() } to seq.count() } } else null
     }
     var menu by remember { mutableStateOf<File?>(null) }
-    var rename by remember { mutableStateOf<File?>(null) }
-    var delete by remember { mutableStateOf<File?>(null) }
-    var ocr by remember { mutableStateOf<Pair<String, String>?>(null) }
 
+    FileActionHost(menu, onDismiss = { menu = null }, onChanged = onChanged)
     LazyColumn(contentPadding = PaddingValues(start = 12.dp, end = 12.dp, bottom = 96.dp)) {
         if (browse) item {
             BlCard(Modifier.fillMaxWidth().padding(vertical = 6.dp)) {
@@ -225,13 +235,13 @@ private fun FileList(start: File, refresh: Int, browse: Boolean, onChanged: () -
         if (entries.isEmpty()) item { EmptyState(Icons.Default.FolderOpen, "Empty folder", "Files saved here will appear in this list.") }
         items(entries, key = { it.path }) { f ->
             Row(
-                Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).clickable {
+                Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).pressable(onClick = {
                     when {
                         f.isDirectory -> dir = f
                         f.isImage() || f.isVideo() -> shell.go("media?path=" + Uri.encode(app.storage.relative(f)))
                         else -> Files.open(ctx, f)
                     }
-                }.padding(horizontal = 8.dp, vertical = 10.dp),
+                }, onLongClick = { if (f.isFile) menu = f else dir = f }).padding(horizontal = 8.dp, vertical = 10.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 if (f.isImage()) AsyncImage(f, null, contentScale = ContentScale.Crop, modifier = Modifier.size(40.dp).clip(RoundedCornerShape(8.dp)))
@@ -244,32 +254,10 @@ private fun FileList(start: File, refresh: Int, browse: Boolean, onChanged: () -
                     Text(if (f.isDirectory) "${f.listFiles()?.size ?: 0} items" else "${Files.formatSize(f.length())} · ${Time.ago(f.lastModified())}",
                         style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
-                if (f.isFile) Box {
-                    IconButton(onClick = { menu = f }) { Icon(Icons.Default.MoreVert, "More") }
-                    DropdownMenu(menu == f, { menu = null }) {
-                        DropdownMenuItem(text = { Text("Open with…") }, onClick = { menu = null; Files.open(ctx, f) })
-                        DropdownMenuItem(text = { Text("Share") }, onClick = { menu = null; Files.share(ctx, listOf(f)) })
-                        DropdownMenuItem(text = { Text("Rename") }, onClick = { menu = null; rename = f })
-                        if (f.isImage()) DropdownMenuItem(text = { Text("Extract text (OCR)") }, onClick = {
-                            menu = null
-                            app.io { val t = Ocr.recognize(ctx, f); withContext(Dispatchers.Main) { ocr = t to f.nameWithoutExtension } }
-                        })
-                        DropdownMenuItem(text = { Text("Delete") }, onClick = { menu = null; delete = f })
-                    }
-                }
+                if (f.isFile) IconButton(onClick = { menu = f }) { Icon(Icons.Default.MoreVert, "More") }
             }
         }
     }
-    rename?.let { f ->
-        TextInputDialog("Rename", f.nameWithoutExtension, "Name", onDismiss = { rename = null }) { n ->
-            val target = Files.unique(f.parentFile!!, n, f.extension)
-            if (f.renameTo(target)) { app.storage.scan(target); onChanged() }
-        }
-    }
-    delete?.let { f ->
-        ConfirmDialog("Delete file?", "“${f.name}” will be permanently deleted.", onDismiss = { delete = null }) { f.delete(); app.storage.scan(f); onChanged() }
-    }
-    ocr?.let { (t, name) -> OcrResultDialog(t, name) { ocr = null } }
 }
 
 fun iconFor(f: File) = when {

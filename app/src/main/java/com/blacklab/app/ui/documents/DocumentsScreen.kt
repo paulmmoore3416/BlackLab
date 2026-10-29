@@ -69,6 +69,7 @@ import com.blacklab.app.docs.DocImporter
 import com.blacklab.app.docs.ExportFormat
 import com.blacklab.app.docs.PageSetup
 import com.blacklab.app.docs.Printer
+import com.blacklab.app.ui.components.pressable
 import com.blacklab.app.ui.components.BlTopBar
 import com.blacklab.app.ui.components.ConfirmDialog
 import com.blacklab.app.ui.components.EmptyState
@@ -238,7 +239,8 @@ fun DocumentsScreen() {
 
 @Composable
 private fun DocCard(d: DocumentEntity, grid: Boolean, onClick: () -> Unit, onMenu: () -> Unit) {
-    Surface(onClick = onClick, shape = RoundedCornerShape(16.dp), color = MaterialTheme.colorScheme.surfaceContainer) {
+    Surface(shape = RoundedCornerShape(18.dp), color = MaterialTheme.colorScheme.surfaceContainer,
+        modifier = Modifier.clip(RoundedCornerShape(18.dp)).pressable(onClick = onClick, onLongClick = onMenu)) {
         Column(Modifier.padding(12.dp)) {
             if (grid) {
                 // mini "page" preview

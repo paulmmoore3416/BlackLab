@@ -80,12 +80,14 @@ fun MediaViewerScreen(relPath: String) {
     var chrome by remember { mutableStateOf(true) }
     var dialog by remember { mutableStateOf<String?>(null) }
     var ocrText by remember { mutableStateOf<String?>(null) }
+    var menu by remember { mutableStateOf<File?>(null) }
     val current = siblings.getOrNull(pager.currentPage) ?: start
+    FileActionHost(menu, onDismiss = { menu = null }, onChanged = { version++ }, onDeleted = { if (siblings.size <= 1) shell.back() })
 
     Box(Modifier.fillMaxSize().background(Color.Black)) {
         HorizontalPager(pager, Modifier.fillMaxSize(), key = { siblings.getOrNull(it)?.path ?: it }) { page ->
             val f = siblings.getOrNull(page) ?: return@HorizontalPager
-            if (f.isVideo()) VideoPage(f, active = page == pager.currentPage) else ZoomableImage(f) { chrome = !chrome }
+            if (f.isVideo()) VideoPage(f, active = page == pager.currentPage) else ZoomableImage(f, onLongPress = { menu = f }) { chrome = !chrome }
         }
         if (chrome) {
             Row(Modifier.fillMaxWidth().background(Color.Black.copy(alpha = 0.45f)).statusBarsPadding().padding(4.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -95,10 +97,12 @@ fun MediaViewerScreen(relPath: String) {
                     Text("${Time.dateTime(current.lastModified())} · ${Files.formatSize(current.length())}", color = Color.White.copy(alpha = 0.7f), style = MaterialTheme.typography.labelSmall)
                 }
                 IconButton(onClick = { dialog = "info" }) { Icon(Icons.Default.Info, "Info", tint = Color.White) }
+                IconButton(onClick = { menu = current }) { Icon(Icons.Default.MoreVert, "More", tint = Color.White) }
             }
             Row(Modifier.align(Alignment.BottomCenter).fillMaxWidth().background(Color.Black.copy(alpha = 0.45f)).navigationBarsPadding().padding(8.dp),
                 horizontalArrangement = androidx.compose.foundation.layout.Arrangement.SpaceEvenly) {
                 ViewerAction(Icons.Default.Share, "Share") { Files.share(ctx, listOf(current)) }
+                if (current.isImage()) ViewerAction(Icons.Default.Edit, "Edit") { shell.go("imgedit?path=" + android.net.Uri.encode(app.storage.relative(current)) + "&tab=draw") }
                 if (current.isImage()) ViewerAction(Icons.Default.TextSnippet, "Text") {
                     app.io { val t = Ocr.recognize(ctx, current); withContext(Dispatchers.Main) { ocrText = t } }
                 }
@@ -113,8 +117,6 @@ fun MediaViewerScreen(relPath: String) {
                         withContext(Dispatchers.Main) { shell.go("doc/$id") }
                     }
                 }
-                ViewerAction(Icons.Default.DriveFileRenameOutline, "Rename") { dialog = "rename" }
-                ViewerAction(Icons.Default.OpenInNew, "Open") { Files.open(ctx, current) }
                 ViewerAction(Icons.Default.Delete, "Delete") { dialog = "delete" }
             }
         }
@@ -141,7 +143,7 @@ fun MediaViewerScreen(relPath: String) {
     ocrText?.let { OcrResultDialog(it, current.nameWithoutExtension) { ocrText = null } }
 }
 
-private fun mediaInfo(f: File): List<Pair<String, String>> {
+internal fun mediaInfo(f: File): List<Pair<String, String>> {
     val out = mutableListOf("Name" to f.name, "Size" to Files.formatSize(f.length()), "Modified" to Time.dateTime(f.lastModified()), "Location" to f.parent.orEmpty())
     if (f.isImage()) {
         val o = BitmapFactory.Options().apply { inJustDecodeBounds = true }
@@ -156,6 +158,7 @@ private fun mediaInfo(f: File): List<Pair<String, String>> {
                 "Focal length" to exif.getAttribute(androidx.exifinterface.media.ExifInterface.TAG_FOCAL_LENGTH),
             ).forEach { (k, v) -> if (!v.isNullOrBlank()) out += k to v }
         }
+        out += com.blacklab.app.imaging.PhotoMeta.read(f)
     } else if (f.isVideo()) {
         runCatching {
             MediaMetadataRetriever().use { r ->
@@ -181,14 +184,14 @@ private fun ViewerAction(icon: androidx.compose.ui.graphics.vector.ImageVector, 
 }
 
 @Composable
-private fun ZoomableImage(f: File, onTap: () -> Unit) {
+private fun ZoomableImage(f: File, onLongPress: () -> Unit, onTap: () -> Unit) {
     var scale by remember { mutableFloatStateOf(1f) }
     var offset by remember { mutableStateOf(Offset.Zero) }
     AsyncImage(
-        model = f, contentDescription = f.name, contentScale = ContentScale.Fit,
+        model = coil.request.ImageRequest.Builder(LocalContext.current).data(f).memoryCacheKey(f.path + f.lastModified()).build(), contentDescription = f.name, contentScale = ContentScale.Fit,
         modifier = Modifier.fillMaxSize()
             .pointerInput(f) {
-                detectTapGestures(onTap = { onTap() }, onDoubleTap = { if (scale > 1f) { scale = 1f; offset = Offset.Zero } else scale = 2.5f })
+                detectTapGestures(onTap = { onTap() }, onLongPress = { onLongPress() }, onDoubleTap = { if (scale > 1f) { scale = 1f; offset = Offset.Zero } else scale = 2.5f })
             }
             .pointerInput(f) {
                 detectTransformGestures { _, pan, zoom, _ ->

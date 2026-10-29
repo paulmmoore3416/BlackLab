@@ -5,15 +5,15 @@
 # BlackLab
 
 **A private, all-in-one personal & professional workspace for Android.**
-Pro camera · audio recorder · Word-class documents · journal · to-do · calendar · education & certification tracking — in one app, with every file saved to a real folder on your phone.
+Pro camera & photo editor · dictation · audio recorder · Word-class documents · journal · to-do · calendar · education & certification tracking — in one app, with every file saved to a real folder on your phone.
 
-[![Version](https://img.shields.io/badge/version-3.0.0-2BD9A8)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-3.1.0-2BD9A8)](CHANGELOG.md)
 [![Android](https://img.shields.io/badge/Android-15%2B-3DDC84?logo=android&logoColor=white)](#requirements)
 [![Kotlin](https://img.shields.io/badge/Kotlin-2.1-7F52FF?logo=kotlin&logoColor=white)](https://kotlinlang.org)
 [![Jetpack Compose](https://img.shields.io/badge/Jetpack%20Compose-Material%203-4285F4?logo=jetpackcompose&logoColor=white)](https://developer.android.com/compose)
 [![Android CI](https://github.com/paulmmoore3416/BlackLab/actions/workflows/android.yml/badge.svg)](https://github.com/paulmmoore3416/BlackLab/actions/workflows/android.yml)
 
-[Download APK](releases/BlackLab-v3.0.0.apk) · [Features](#features) · [Install](#install) · [Build from source](#build-from-source) · [Architecture](docs/ARCHITECTURE.md)
+[Download APK](releases/BlackLab-v3.1.0.apk) · [Features](#features) · [Install](#install) · [Build from source](#build-from-source) · [Architecture](docs/ARCHITECTURE.md)
 
 </div>
 
@@ -40,12 +40,27 @@ Optimized for the **Google Pixel 10 Pro XL** and newer (Android 15+).
 ## Features
 
 ### 📷 Camera
+- **Geotagged photos** — GPS plus street address, compass heading, altitude and author/copyright written to EXIF; optional burned-in info stamp
+- **Looks** with live preview: **1970s** film, Vivid, Noir, Silver, Golden hour, Arctic, Cinematic, Matte fade, Cross-process
+- **Pro mode** (manual ISO, shutter, focus, white balance) and **exposure bracketing** (3 or 5 shots)
+- **Panorama** — full-resolution, gyro + image-registered strip stitching with cylindrical projection, seam blending, locked exposure, auto-crop, looks and **Tiny Planet**
 - CameraX pipeline with **Night**, **Portrait (bokeh)** and **HDR** extension modes when the device supports them
 - **Ultra HDR** (JPEG_R) photos and optional **maximum-resolution** capture (full sensor)
 - **4K / 1080p / 720p** video at 24/30/**60 fps**, **10-bit HLG HDR video**, preview & video **stabilization**
 - Tap-to-focus/meter, exposure compensation, pinch & preset zoom (ultra-wide → telephoto), flash/torch, grid, 3 s/10 s timer, 4:3 / 16:9
 - **Document scanner** (edge detection, perspective correction → PDF) and **QR / barcode scanner** for asset tags, both on-device via Google Play services
 - **OCR** — extract text from any photo into an editable document
+
+### 🗣️ Dictation
+- Record and transcribe meetings, conferences and interviews; on-device recognition with punctuation and custom vocabulary
+- **Voice commands**: “pause recording”, “resume / start recording”, “stop recording”, “new paragraph”, “new line”, “mark that”; hands-free standby
+- Every session in its own dated folder (`Dictation/Dictation_YYYY-MM-DD_HH-MM-SS/`) with audio, transcript `.txt` and GPS + address
+
+### 🖌️ Photo editor
+- Finger drawing — pen, highlighter, line, arrow, box, circle, eraser; color, thickness, opacity, dashed; undo/redo
+- Text — color, size, 8 fonts, bold, italic, underline, cursive, box, outline
+- Watermarks (text/logo, tiled), looks, and on-device **background removal**
+- **Long-press** any photo, file, document, recording, dictation, journal entry or task for its full action menu
 
 ### 🎙️ Recorder
 - `AudioRecord` engine with real-time **AAC (M4A)** encoding or **lossless WAV** (16 – 96 kHz, mono/stereo, 64 – 320 kbps)
@@ -104,6 +119,7 @@ Internal storage/BlackLab/
 │   ├── Photos/        Camera photos (Ultra HDR JPEG)
 │   ├── Videos/        Camera videos (MP4)
 │   ├── Recordings/    Audio (M4A / WAV) + transcripts (.txt)
+│   ├── Dictation/     One dated folder per session: audio + transcript + meta.json
 │   ├── Scans/         Document scans (PDF + page images)
 │   ├── Documents/     Documents as .html (open in any browser or Word)
 │   ├── Journal/       Entries by year/month
@@ -115,13 +131,13 @@ Internal storage/BlackLab/
 
 ## Install
 
-1. Download **[`BlackLab-v3.0.0.apk`](releases/BlackLab-v3.0.0.apk)** (also attached to the [v3.0.0 release](https://github.com/paulmmoore3416/BlackLab/releases/tag/v3.0.0)).
-   Verify it with the published SHA-256: [`BlackLab-v3.0.0.apk.sha256`](releases/BlackLab-v3.0.0.apk.sha256).
+1. Download **[`BlackLab-v3.1.0.apk`](releases/BlackLab-v3.1.0.apk)** (also attached to the [v3.1.0 release](https://github.com/paulmmoore3416/BlackLab/releases/tag/v3.1.0)).
+   Verify it with the published SHA-256: [`BlackLab-v3.1.0.apk.sha256`](releases/BlackLab-v3.1.0.apk.sha256).
 2. On the phone, allow your browser/Files app to **install unknown apps** when prompted.
 3. Open BlackLab and follow onboarding: name & title, account names, then grant
    **All-files access** (creates the BlackLab folder), **camera & microphone**, **notifications** and optionally **calendars**.
 
-Or with USB debugging: `adb install releases/BlackLab-v3.0.0.apk`
+Or with USB debugging: `adb install releases/BlackLab-v3.1.0.apk`
 
 ### Requirements
 - Android **15+** (API 35); targets Android 16 (API 36). Tested on an Android 16 emulator; installed and launched on a Pixel 10 Pro XL running Android 17

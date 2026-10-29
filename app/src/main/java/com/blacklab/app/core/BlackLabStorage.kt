@@ -21,6 +21,7 @@ enum class Folder(val dirName: String) {
     PHOTOS("Photos"),
     VIDEOS("Videos"),
     RECORDINGS("Recordings"),
+    DICTATION("Dictation"),
     SCANS("Scans"),
     DOCUMENTS("Documents"),
     JOURNAL("Journal"),
@@ -73,6 +74,7 @@ class BlackLabStorage(private val context: Context) {
                       Photos/       Camera photos
                       Videos/       Camera videos
                       Recordings/   Audio recordings (+ transcripts)
+                      Dictation/    Dictation sessions (audio + transcript + location), one folder each
                       Scans/        Document scans (PDF)
                       Documents/    Documents (.html, open in any browser or Word)
                       Journal/      Journal entries by year/month

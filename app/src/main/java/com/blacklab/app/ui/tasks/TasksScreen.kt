@@ -73,6 +73,7 @@ import com.blacklab.app.data.SubtaskEntity
 import com.blacklab.app.data.TaskEntity
 import com.blacklab.app.data.TaskListEntity
 import com.blacklab.app.data.TaskOps
+import com.blacklab.app.ui.components.pressable
 import com.blacklab.app.ui.components.BlTopBar
 import com.blacklab.app.ui.components.ColorPickerRow
 import com.blacklab.app.ui.components.ConfirmDialog
@@ -302,11 +303,37 @@ fun TaskRow(t: TaskEntity, steps: List<SubtaskEntity>, list: TaskListEntity?, sh
     val shell = LocalShell.current
     val today = Time.today().toEpochDay()
     val pc = PriorityColors[t.priority.coerceIn(0, 4)]
+    var menu by remember { mutableStateOf(false) }
+    if (menu) com.blacklab.app.ui.components.ActionSheet(
+        title = t.title, subtitle = listOfNotNull(t.dueDay?.let { "Due " + Time.relativeDay(java.time.LocalDate.ofEpochDay(it)) }, list?.name).joinToString(" · ").ifBlank { null },
+        onDismiss = { menu = false },
+        quick = listOf(
+            com.blacklab.app.ui.components.SheetAction(if (t.completed) "Reopen" else "Complete", Icons.Default.Check) { app.io { TaskOps.setCompleted(app, t, !t.completed) } },
+            com.blacklab.app.ui.components.SheetAction(if (t.important) "Unstar" else "Important", Icons.Default.Star) { app.io { TaskOps.save(app, t.copy(important = !t.important)) } },
+            com.blacklab.app.ui.components.SheetAction(if (t.myDayDay == today) "Off My Day" else "My Day", Icons.Default.WbSunny) { app.io { TaskOps.save(app, t.copy(myDayDay = if (t.myDayDay == today) null else today)) } },
+            com.blacklab.app.ui.components.SheetAction("Delete", Icons.Default.Delete, destructive = true) {
+                app.io { TaskOps.delete(app, t) }
+                shell.toast("Task deleted", "Undo") { app.io { app.db.tasks().insert(t); steps.forEach { app.db.tasks().insertSubtask(it) } } }
+            },
+        ),
+        actions = listOf(
+            com.blacklab.app.ui.components.SheetAction("Open details", Icons.Default.OpenInFull) { shell.go("task/${t.id}") },
+            com.blacklab.app.ui.components.SheetAction("Due today", Icons.Default.Today) { app.io { TaskOps.save(app, t.copy(dueDay = today)) } },
+            com.blacklab.app.ui.components.SheetAction("Due tomorrow", Icons.Default.EventAvailable) { app.io { TaskOps.save(app, t.copy(dueDay = today + 1)) } },
+            com.blacklab.app.ui.components.SheetAction("Raise priority", Icons.Default.PriorityHigh, hint = "Now: " + listOf("none", "low", "medium", "high", "urgent")[t.priority.coerceIn(0, 4)]) {
+                app.io { TaskOps.save(app, t.copy(priority = (t.priority + 1).coerceAtMost(4))) }
+            },
+            com.blacklab.app.ui.components.SheetAction("Duplicate", Icons.Default.ContentCopy) { app.io { TaskOps.save(app, t.copy(id = 0, completed = false, createdAt = Time.now(), updatedAt = Time.now())) } },
+            com.blacklab.app.ui.components.SheetAction("Share", Icons.Default.Share) {
+                com.blacklab.app.core.Files.shareText(shell.nav.context, buildString { append(t.title); if (t.notes.isNotBlank()) append("\n\n").append(t.notes); steps.forEach { append("\n• ").append(it.title) } }, t.title)
+            },
+        ),
+    )
     Surface(
-        onClick = { shell.go("task/${t.id}") },
-        shape = RoundedCornerShape(16.dp),
+        shape = RoundedCornerShape(18.dp),
         color = MaterialTheme.colorScheme.surfaceContainer,
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 3.dp),
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 3.dp).clip(RoundedCornerShape(18.dp))
+            .pressable(onClick = { shell.go("task/${t.id}") }, onLongClick = { menu = true }),
     ) {
         Row(Modifier.padding(start = 6.dp, end = 4.dp, top = 8.dp, bottom = 8.dp), verticalAlignment = Alignment.CenterVertically) {
             // completion circle tinted by priority

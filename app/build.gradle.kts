@@ -21,8 +21,8 @@ android {
         applicationId = "com.blacklab.app"
         minSdk = 35
         targetSdk = 36
-        versionCode = 3
-        versionName = "3.0.0"
+        versionCode = 4
+        versionName = "3.1.0"
         vectorDrawables { useSupportLibrary = true }
     }
 
@@ -75,6 +75,7 @@ kotlin {
             "androidx.compose.foundation.ExperimentalFoundationApi",
             "androidx.compose.foundation.layout.ExperimentalLayoutApi",
             "androidx.compose.ui.ExperimentalComposeUiApi",
+            "androidx.camera.camera2.interop.ExperimentalCamera2Interop",
         )
     }
 }
@@ -128,4 +129,5 @@ dependencies {
     implementation("com.google.android.gms:play-services-mlkit-document-scanner:16.0.0")
     implementation("com.google.android.gms:play-services-code-scanner:16.1.0")
     implementation("com.google.android.gms:play-services-mlkit-text-recognition:19.0.1")
+    implementation("com.google.android.gms:play-services-mlkit-subject-segmentation:16.0.0-beta1")
 }

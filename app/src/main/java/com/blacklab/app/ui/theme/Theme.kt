@@ -15,6 +15,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.blacklab.app.core.Profile
 
@@ -40,7 +41,7 @@ val LocalBlColors = staticCompositionLocalOf { BlColors(Mint, Mint.copy(alpha = 
 private fun dark(accent: Color): ColorScheme = darkColorScheme(
     primary = accent,
     onPrimary = Color(0xFF00140E),
-    primaryContainer = accent.copy(alpha = 0.22f).compositeOver(Color(0xFF0B0D10)),
+    primaryContainer = accent.copy(alpha = 0.22f).compositeOver(Color(0xFF0E1014)),
     onPrimaryContainer = Color(0xFFE6FFF6),
     secondary = Violet,
     onSecondary = Color(0xFF14002E),
@@ -50,19 +51,19 @@ private fun dark(accent: Color): ColorScheme = darkColorScheme(
     onTertiary = Color(0xFF2A1700),
     tertiaryContainer = Color(0xFF3A2A12),
     onTertiaryContainer = Color(0xFFFFE6C4),
-    background = Color(0xFF0B0D10),
-    onBackground = Color(0xFFE8EAED),
-    surface = Color(0xFF0B0D10),
-    onSurface = Color(0xFFE8EAED),
-    surfaceVariant = Color(0xFF1C1F25),
-    onSurfaceVariant = Color(0xFFA9AFB8),
-    surfaceContainerLowest = Color(0xFF07080A),
-    surfaceContainerLow = Color(0xFF111317),
-    surfaceContainer = Color(0xFF15181D),
-    surfaceContainerHigh = Color(0xFF1B1E24),
-    surfaceContainerHighest = Color(0xFF22262D),
-    outline = Color(0xFF3A3F47),
-    outlineVariant = Color(0xFF2A2E35),
+    background = Color(0xFF0E1014),
+    onBackground = Color(0xFFE9EBEF),
+    surface = Color(0xFF0E1014),
+    onSurface = Color(0xFFE9EBEF),
+    surfaceVariant = Color(0xFF1D2027),
+    onSurfaceVariant = Color(0xFFA6ADB8),
+    surfaceContainerLowest = Color(0xFF0A0B0E),
+    surfaceContainerLow = Color(0xFF13161B),
+    surfaceContainer = Color(0xFF171A20),
+    surfaceContainerHigh = Color(0xFF1D2128),
+    surfaceContainerHighest = Color(0xFF242830),
+    outline = Color(0xFF363B44),
+    outlineVariant = Color(0xFF22262D),
     error = Danger,
     onError = Color.White,
     inverseSurface = Color(0xFFE8EAED),
@@ -87,8 +88,8 @@ private fun light(accent: Color): ColorScheme = lightColorScheme(
     surfaceContainer = Color(0xFFF0F2F5),
     surfaceContainerHigh = Color(0xFFEAECF0),
     surfaceContainerHighest = Color(0xFFE3E6EA),
-    outline = Color(0xFFC3C8D0),
-    outlineVariant = Color(0xFFDDE1E6),
+    outline = Color(0xFFC8CDD5),
+    outlineVariant = Color(0xFFE3E6EB),
     error = Color(0xFFD32F2F),
 )
 
@@ -97,8 +98,20 @@ private fun Color.compositeOver(bg: Color): Color {
     return Color(red * a + bg.red * (1 - a), green * a + bg.green * (1 - a), blue * a + bg.blue * (1 - a), 1f)
 }
 
+/** Rounder, softer corners everywhere (chips, fields, cards, dialogs, sheets). */
+private val BlShapes = androidx.compose.material3.Shapes(
+    extraSmall = androidx.compose.foundation.shape.RoundedCornerShape(10.dp),
+    small = androidx.compose.foundation.shape.RoundedCornerShape(14.dp),
+    medium = androidx.compose.foundation.shape.RoundedCornerShape(20.dp),
+    large = androidx.compose.foundation.shape.RoundedCornerShape(26.dp),
+    extraLarge = androidx.compose.foundation.shape.RoundedCornerShape(32.dp),
+)
+
 private val BlTypography = Typography().let { t ->
     t.copy(
+        bodyLarge = t.bodyLarge.copy(lineHeight = 25.sp, letterSpacing = 0.2.sp),
+        bodyMedium = t.bodyMedium.copy(lineHeight = 21.sp),
+        titleSmall = t.titleSmall.copy(fontWeight = FontWeight.SemiBold, letterSpacing = 0.05.sp),
         displaySmall = t.displaySmall.copy(fontWeight = FontWeight.Light, letterSpacing = (-0.5).sp),
         headlineLarge = t.headlineLarge.copy(fontWeight = FontWeight.SemiBold, letterSpacing = (-0.5).sp),
         headlineMedium = t.headlineMedium.copy(fontWeight = FontWeight.SemiBold, letterSpacing = (-0.25).sp),
@@ -110,6 +123,13 @@ private val BlTypography = Typography().let { t ->
 }
 
 val MonoDigits = TextStyle(fontFeatureSettings = "tnum")
+
+/** Shared motion: gentle ease-out for screen and content transitions. */
+object Motion {
+    val ease = androidx.compose.animation.core.CubicBezierEasing(0.2f, 0f, 0f, 1f)
+    fun <T> enter(ms: Int = 360) = androidx.compose.animation.core.tween<T>(ms, easing = ease)
+    fun <T> exit(ms: Int = 220) = androidx.compose.animation.core.tween<T>(ms, easing = androidx.compose.animation.core.FastOutLinearInEasing)
+}
 
 @Composable
 fun BlackLabTheme(themeMode: String, dynamic: Boolean, profile: Profile, content: @Composable () -> Unit) {
@@ -135,7 +155,7 @@ fun BlackLabTheme(themeMode: String, dynamic: Boolean, profile: Profile, content
         isDark = dark,
     )
     androidx.compose.runtime.CompositionLocalProvider(LocalBlColors provides bl) {
-        MaterialTheme(colorScheme = scheme, typography = BlTypography) {
+        MaterialTheme(colorScheme = scheme, typography = BlTypography, shapes = BlShapes) {
             // Root surface so every screen inherits the correct background and on-background text color
             androidx.compose.material3.Surface(
                 modifier = androidx.compose.ui.Modifier.fillMaxSize(),

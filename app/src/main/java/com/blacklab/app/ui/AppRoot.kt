@@ -106,6 +106,7 @@ import com.blacklab.app.ui.settings.SettingsScreen
 import com.blacklab.app.ui.tasks.TaskDetailScreen
 import com.blacklab.app.ui.tasks.TasksScreen
 import com.blacklab.app.ui.theme.profileAccent
+import com.blacklab.app.ui.theme.Motion
 import kotlinx.coroutines.launch
 import java.io.File
 
@@ -134,6 +135,7 @@ private val drawerDests = listOf(
     Dest("home", "Home", Icons.Default.Dashboard),
     Dest("camera", "Camera", Icons.Default.PhotoCamera),
     Dest("recorder", "Recorder", Icons.Default.Mic),
+    Dest("dictation", "Dictation", Icons.Default.RecordVoiceOver),
     Dest("library", "Library & Files", Icons.Default.Folder),
     Dest("documents", "Documents", Icons.Default.Description),
     Dest("journal", "Journal", Icons.AutoMirrored.Filled.MenuBook),
@@ -262,14 +264,15 @@ private fun AppShell(activity: MainActivity) {
             Scaffold(
                 snackbarHost = { SnackbarHost(snackbar) },
                 bottomBar = {
-                    AnimatedVisibility(showBottom, enter = slideInVertically { it } + fadeIn(), exit = slideOutVertically { it } + fadeOut()) {
-                        NavigationBar(containerColor = MaterialTheme.colorScheme.surfaceContainerLow) {
+                    AnimatedVisibility(showBottom, enter = slideInVertically(Motion.enter()) { it } + fadeIn(Motion.enter()), exit = slideOutVertically(Motion.exit()) { it } + fadeOut(Motion.exit())) {
+                        NavigationBar(containerColor = MaterialTheme.colorScheme.surfaceContainerLow, tonalElevation = 0.dp) {
                             bottomDests.forEach { d ->
                                 NavigationBarItem(
                                     selected = route == d.route,
                                     onClick = { nav.navigate(d.route) { popUpTo("home") { saveState = true }; launchSingleTop = true; restoreState = true } },
                                     icon = { Icon(d.icon, d.label) },
                                     label = { Text(d.label) },
+                                    colors = androidx.compose.material3.NavigationBarItemDefaults.colors(indicatorColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.16f)),
                                 )
                             }
                         }
@@ -288,12 +291,25 @@ private fun AppShell(activity: MainActivity) {
 
 @Composable
 private fun NavGraph(nav: androidx.navigation.NavHostController) {
-    NavHost(nav, startDestination = "home") {
+    NavHost(
+        nav, startDestination = "home",
+        enterTransition = { fadeIn(Motion.enter(320)) + androidx.compose.animation.slideInHorizontally(Motion.enter()) { it / 12 } },
+        exitTransition = { fadeOut(Motion.exit(200)) + androidx.compose.animation.slideOutHorizontally(Motion.enter()) { -it / 24 } },
+        popEnterTransition = { fadeIn(Motion.enter(320)) + androidx.compose.animation.slideInHorizontally(Motion.enter()) { -it / 24 } },
+        popExitTransition = { fadeOut(Motion.exit(200)) + androidx.compose.animation.slideOutHorizontally(Motion.enter()) { it / 12 } },
+    ) {
         composable("home") { HomeScreen() }
         composable("camera?mode={mode}", arguments = listOf(navArgument("mode") { defaultValue = "photo" })) {
             CameraScreen(it.arguments?.getString("mode") ?: "photo")
         }
         composable("recorder") { RecorderScreen() }
+        composable("dictation") { com.blacklab.app.ui.dictation.DictationScreen() }
+        composable("dictation/session?path={path}", arguments = listOf(navArgument("path") { defaultValue = "" })) {
+            com.blacklab.app.ui.dictation.DictationDetailScreen(Uri.decode(it.arguments?.getString("path") ?: ""))
+        }
+        composable("imgedit?path={path}&tab={tab}", arguments = listOf(navArgument("path") { defaultValue = "" }, navArgument("tab") { defaultValue = "draw" })) {
+            com.blacklab.app.ui.editor.ImageEditorScreen(Uri.decode(it.arguments?.getString("path") ?: ""), it.arguments?.getString("tab") ?: "draw")
+        }
         composable("recording/{id}", arguments = listOf(navArgument("id") { type = NavType.LongType })) {
             RecordingDetailScreen(it.arguments?.getLong("id") ?: 0)
         }

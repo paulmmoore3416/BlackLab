@@ -48,6 +48,9 @@ import com.blacklab.app.data.CalendarLogic
 import com.blacklab.app.data.TaskOps
 import com.blacklab.app.recorder.RecState
 import com.blacklab.app.recorder.RecorderService
+import com.blacklab.app.ui.components.pressable
+import com.blacklab.app.dictation.DictationService
+import com.blacklab.app.ui.components.SheetAction as SA
 import com.blacklab.app.ui.components.BlCard
 import com.blacklab.app.ui.components.CodeResultDialog
 import com.blacklab.app.ui.components.LocalShell
@@ -73,7 +76,7 @@ import com.blacklab.app.ui.theme.Violet
 import com.google.mlkit.vision.barcode.common.Barcode
 import java.time.LocalDate
 
-private data class QuickAction(val label: String, val icon: ImageVector, val color: Color, val onClick: () -> Unit)
+private data class QuickAction(val label: String, val icon: ImageVector, val color: Color, val more: List<com.blacklab.app.ui.components.SheetAction> = emptyList(), val onClick: () -> Unit)
 
 @Composable
 fun HomeScreen() {
@@ -83,6 +86,8 @@ fun HomeScreen() {
     val profile = s.activeProfile
     val today = Time.today()
     val rec by RecorderService.state.collectAsState()
+    val dict by DictationService.state.collectAsState()
+    val ctx = androidx.compose.ui.platform.LocalContext.current
     val tasks by remember(profile) { app.db.tasks().observe(profile.name) }.collectAsState(emptyList())
     val docs by remember(profile) { app.db.documents().observe(profile.name) }.collectAsState(emptyList())
     val agenda = rememberCalendarItems(today, today)
@@ -99,17 +104,55 @@ fun HomeScreen() {
     val overdue = open.count { it.dueDay != null && it.dueDay < todayEpoch }
 
     val actions = listOf(
-        QuickAction("Photo", Icons.Default.PhotoCamera, Mint) { shell.go("camera?mode=photo") },
-        QuickAction("Video", Icons.Default.Videocam, Coral) { shell.go("camera?mode=video") },
-        QuickAction("Record", Icons.Default.Mic, Color(0xFFE53935)) { shell.go("recorder") },
-        QuickAction("Scan", Icons.Default.DocumentScanner, Cobalt) { docScanner() },
-        QuickAction("Document", Icons.Default.NoteAdd, Violet) { shell.go("documents") },
-        QuickAction("Journal", Icons.Default.AutoStories, Amber) { shell.go("journal/0") },
-        QuickAction("Task", Icons.Default.AddTask, Mint) { shell.go("task/0") },
-        QuickAction("Event", Icons.Default.EventAvailable, Cobalt) { shell.go("event/0?start=${Time.millis(today, ((java.time.LocalTime.now().hour + 1) * 60).coerceAtMost(23 * 60))}") },
-        QuickAction("QR / Asset", Icons.Default.QrCodeScanner, Coral) { codeScanner() },
-        QuickAction("Focus", Icons.Default.Timer, Violet) { shell.go("education?tab=Study") },
+        QuickAction("Photo", Icons.Default.PhotoCamera, Mint, more = listOf(
+            SA("Photo", Icons.Default.PhotoCamera) { shell.go("camera?mode=photo") },
+            SA("Panorama", Icons.Default.Panorama, hint = "Stitched, full-resolution sweep") { shell.go("camera?mode=pano") },
+            SA("Pro mode", Icons.Default.Tune, hint = "Manual ISO, shutter, focus, white balance") { shell.go("camera?mode=pro") },
+            SA("Photo library", Icons.Default.PhotoLibrary) { shell.go("library?tab=PHOTOS") },
+        )) { shell.go("camera?mode=photo") },
+        QuickAction("Video", Icons.Default.Videocam, Coral, more = listOf(
+            SA("Record video", Icons.Default.Videocam) { shell.go("camera?mode=video") },
+            SA("Video library", Icons.Default.VideoLibrary) { shell.go("library?tab=VIDEOS") },
+        )) { shell.go("camera?mode=video") },
+        QuickAction("Dictate", Icons.Default.RecordVoiceOver, Color(0xFF8B6CFF), more = listOf(
+            SA("Start dictating now", Icons.Default.Mic) { DictationService.send(ctx, DictationService.ACTION_START); shell.go("dictation") },
+            SA("Hands-free standby", Icons.Default.Hearing, hint = "Waits for “start recording”") { DictationService.send(ctx, DictationService.ACTION_STANDBY); shell.go("dictation") },
+            SA("Audio recorder", Icons.Default.Mic) { shell.go("recorder") },
+        )) { shell.go("dictation") },
+        QuickAction("Record", Icons.Default.Mic, Color(0xFFE53935), more = listOf(
+            SA("Recorder", Icons.Default.Mic) { shell.go("recorder") },
+            SA("Dictation", Icons.Default.RecordVoiceOver) { shell.go("dictation") },
+            SA("Audio files", Icons.Default.AudioFile) { shell.go("library?tab=RECORDINGS") },
+        )) { shell.go("recorder") },
+        QuickAction("Scan", Icons.Default.DocumentScanner, Cobalt, more = listOf(
+            SA("Scan a document", Icons.Default.DocumentScanner) { docScanner() },
+            SA("QR / barcode", Icons.Default.QrCodeScanner) { codeScanner() },
+            SA("Saved scans", Icons.Default.FolderOpen) { shell.go("library?tab=SCANS") },
+        )) { docScanner() },
+        QuickAction("Document", Icons.Default.NoteAdd, Violet, more = listOf(
+            SA("All documents", Icons.Default.Description) { shell.go("documents") },
+            SA("Blank document", Icons.Default.NoteAdd) { shell.go("doc/0?template=blank") },
+            SA("Meeting minutes", Icons.Default.Groups) { shell.go("doc/0?template=meeting") },
+        )) { shell.go("documents") },
+        QuickAction("Journal", Icons.Default.AutoStories, Amber, more = listOf(
+            SA("New entry", Icons.Default.Add) { shell.go("journal/0") },
+            SA("Journal", Icons.Default.AutoStories) { shell.go("journal") },
+        )) { shell.go("journal/0") },
+        QuickAction("Task", Icons.Default.AddTask, Mint, more = listOf(
+            SA("New task", Icons.Default.AddTask) { shell.go("task/0") },
+            SA("All tasks", Icons.Default.Checklist) { shell.go("tasks") },
+        )) { shell.go("task/0") },
+        QuickAction("Event", Icons.Default.EventAvailable, Cobalt, more = listOf(
+            SA("New event", Icons.Default.EventAvailable) { shell.go("event/0?start=${Time.millis(today, ((java.time.LocalTime.now().hour + 1) * 60).coerceAtMost(23 * 60))}") },
+            SA("Schedule", Icons.Default.CalendarMonth) { shell.go("schedule") },
+        )) { shell.go("event/0?start=${Time.millis(today, ((java.time.LocalTime.now().hour + 1) * 60).coerceAtMost(23 * 60))}") },
+        QuickAction("Focus", Icons.Default.Timer, Violet, more = listOf(
+            SA("Focus timer", Icons.Default.Timer) { shell.go("education?tab=Study") },
+            SA("QR / asset tag", Icons.Default.QrCodeScanner) { codeScanner() },
+        )) { shell.go("education?tab=Study") },
     )
+    var quickMenu by remember { mutableStateOf<QuickAction?>(null) }
+    quickMenu?.let { q -> com.blacklab.app.ui.components.ActionSheet(q.label, "Shortcuts", onDismiss = { quickMenu = null }, actions = q.more) }
 
     LazyColumn(Modifier.fillMaxSize().statusBarsPadding(), contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 24.dp)) {
         item {
@@ -123,6 +166,16 @@ fun HomeScreen() {
                 style = MaterialTheme.typography.headlineMedium, modifier = Modifier.padding(top = 4.dp))
             Text(Time.longDate(today) + (s.jobTitle.takeIf { it.isNotBlank() && profile.name == "PROFESSIONAL" }?.let { " · $it" } ?: ""),
                 style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        if (dict.active) item {
+            Surface(onClick = { shell.go("dictation") }, shape = RoundedCornerShape(18.dp), color = Color(0xFF8B6CFF).copy(alpha = 0.18f), modifier = Modifier.fillMaxWidth().padding(top = 12.dp)) {
+                Row(Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Box(Modifier.size(10.dp).clip(CircleShape).background(Color(0xFF8B6CFF)))
+                    Spacer(Modifier.width(10.dp))
+                    Text(when (dict.status) { com.blacklab.app.dictation.DictState.Status.STANDBY -> "Dictation standby"; com.blacklab.app.dictation.DictState.Status.PAUSED -> "Dictation paused"; else -> "Dictating" }, Modifier.weight(1f), fontWeight = FontWeight.SemiBold)
+                    Text(Time.duration(dict.elapsedMs), fontWeight = FontWeight.Bold)
+                }
+            }
         }
         if (rec.status != RecState.Status.IDLE) item {
             Surface(onClick = { shell.go("recorder") }, shape = RoundedCornerShape(16.dp), color = Color(0xFFE53935).copy(alpha = 0.18f), modifier = Modifier.fillMaxWidth().padding(top = 12.dp)) {
@@ -140,7 +193,7 @@ fun HomeScreen() {
             actions.chunked(5).forEach { row ->
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                     row.forEach { a ->
-                        Column(Modifier.weight(1f).clip(RoundedCornerShape(14.dp)).clickable(onClick = a.onClick).padding(vertical = 8.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                        Column(Modifier.weight(1f).clip(RoundedCornerShape(16.dp)).pressable(onClick = a.onClick, onLongClick = { if (a.more.isNotEmpty()) quickMenu = a else a.onClick() }).padding(vertical = 8.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                             Box(Modifier.size(50.dp).clip(RoundedCornerShape(16.dp)).background(a.color.copy(alpha = 0.16f)), contentAlignment = Alignment.Center) {
                                 Icon(a.icon, a.label, tint = a.color)
                             }

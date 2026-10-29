@@ -53,6 +53,7 @@ import androidx.compose.ui.unit.sp
 import com.blacklab.app.core.Profile
 import com.blacklab.app.core.Time
 import com.blacklab.app.data.JournalEntity
+import com.blacklab.app.ui.components.pressable
 import com.blacklab.app.ui.components.BlCard
 import com.blacklab.app.ui.components.BlTopBar
 import com.blacklab.app.ui.components.EmptyState
@@ -262,8 +263,32 @@ private fun StatBox(emoji: String, value: String, label: String, modifier: Modif
 private fun EntryCard(e: JournalEntity) {
     val shell = LocalShell.current
     val d = LocalDate.ofEpochDay(e.entryDay)
-    Surface(onClick = { shell.go("journal/${e.id}") }, shape = RoundedCornerShape(16.dp), color = MaterialTheme.colorScheme.surfaceContainer,
-        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
+    val app = com.blacklab.app.ui.components.rememberApp()
+    val ctx = androidx.compose.ui.platform.LocalContext.current
+    var menu by remember { mutableStateOf(false) }
+    var confirmDelete by remember { mutableStateOf(false) }
+    if (menu) com.blacklab.app.ui.components.ActionSheet(
+        title = e.title.ifBlank { "Untitled entry" }, subtitle = Time.longDate(d) + if (e.wordCount > 0) " · ${e.wordCount} words" else "",
+        onDismiss = { menu = false },
+        quick = listOf(
+            com.blacklab.app.ui.components.SheetAction("Open", Icons.Default.Edit) { shell.go("journal/${e.id}") },
+            com.blacklab.app.ui.components.SheetAction(if (e.favorite) "Unfavorite" else "Favorite", Icons.Default.Star) { app.io { app.db.journal().update(e.copy(favorite = !e.favorite)) } },
+            com.blacklab.app.ui.components.SheetAction("Share", Icons.Default.Share) {
+                app.io { val text = com.blacklab.app.data.ContentStore.plainText(app.content.readBody(e.filePath)); kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) { com.blacklab.app.core.Files.shareText(ctx, text, e.title) } }
+            },
+            com.blacklab.app.ui.components.SheetAction("Delete", Icons.Default.Delete, destructive = true) { confirmDelete = true },
+        ),
+        actions = listOf(
+            com.blacklab.app.ui.components.SheetAction("Open .html file", Icons.Default.Html) { com.blacklab.app.core.Files.open(ctx, app.content.file(e.filePath)) },
+            com.blacklab.app.ui.components.SheetAction("New entry for this day", Icons.Default.Add) { shell.go("journal/0?day=${e.entryDay}") },
+        ),
+    )
+    if (confirmDelete) com.blacklab.app.ui.components.ConfirmDialog("Delete entry?", "“${e.title.ifBlank { "Untitled entry" }}” will be permanently deleted.", onDismiss = { confirmDelete = false }) {
+        app.io { app.content.delete(e.filePath); app.db.journal().delete(e) }
+    }
+    Surface(shape = RoundedCornerShape(18.dp), color = MaterialTheme.colorScheme.surfaceContainer,
+        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp).clip(RoundedCornerShape(18.dp))
+            .pressable(onClick = { shell.go("journal/${e.id}") }, onLongClick = { menu = true })) {
         Row(Modifier.padding(12.dp)) {
             Column(Modifier.width(48.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                 Text(Time.dayShort(d.dayOfWeek).uppercase(), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)

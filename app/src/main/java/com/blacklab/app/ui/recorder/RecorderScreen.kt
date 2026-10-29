@@ -72,6 +72,11 @@ import com.blacklab.app.data.RecordingEntity
 import com.blacklab.app.recorder.RecConfig
 import com.blacklab.app.recorder.RecState
 import com.blacklab.app.recorder.RecorderService
+import com.blacklab.app.ui.components.ActionSheet
+import com.blacklab.app.ui.components.SheetAction
+import com.blacklab.app.ui.components.pressable
+import com.blacklab.app.ui.components.TextInputDialog
+import com.blacklab.app.ui.components.ConfirmDialog
 import com.blacklab.app.ui.components.BlCard
 import com.blacklab.app.ui.components.BlTopBar
 import com.blacklab.app.ui.components.DropdownField
@@ -256,7 +261,42 @@ fun Waveform(levels: List<Float>, color: Color, modifier: Modifier) {
 private fun RecordingRow(r: RecordingEntity, onClick: () -> Unit) {
     val app = rememberApp()
     val f = app.storage.resolve(r.filePath)
-    Surface(onClick = onClick, shape = RoundedCornerShape(16.dp), color = MaterialTheme.colorScheme.surfaceContainer, modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
+    val ctx = LocalContext.current
+    val shell = LocalShell.current
+    var menu by remember { mutableStateOf(false) }
+    var step by remember { mutableStateOf<String?>(null) }
+    if (menu) ActionSheet(
+        title = r.title, subtitle = "${Time.dateTime(r.createdAt)} · ${Time.duration(r.durationMs)}", onDismiss = { menu = false },
+        quick = listOf(
+            SheetAction("Play", Icons.Default.PlayArrow) { onClick() },
+            SheetAction("Share", Icons.Default.Share) { Files.share(ctx, listOf(f), r.title) },
+            SheetAction("Rename", Icons.Default.DriveFileRenameOutline) { step = "rename" },
+            SheetAction("Delete", Icons.Default.Delete, destructive = true) { step = "delete" },
+        ),
+        actions = buildList {
+            if (r.transcript.isNotBlank()) {
+                add(SheetAction("Share transcript", Icons.Default.Subject) { Files.shareText(ctx, r.transcript, r.title) })
+                add(SheetAction("Transcript to document", Icons.Default.NoteAdd) {
+                    app.io {
+                        val profile = app.settings.current.activeProfile
+                        val html = "<h1>${com.blacklab.app.data.ContentStore.escape(r.title)}</h1><p><i>${Time.dateTime(r.createdAt)} · ${Time.duration(r.durationMs)}</i></p>" + com.blacklab.app.data.ContentStore.textToHtml(r.transcript)
+                        val rel = app.content.writeDocument(profile, r.title, "Meetings", "", html)
+                        val id = app.db.documents().insert(com.blacklab.app.data.DocumentEntity(profile = profile.name, title = r.title, folder = "Meetings", filePath = rel, preview = r.transcript.take(200)))
+                        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) { shell.go("doc/$id") }
+                    }
+                })
+            }
+            add(SheetAction("Open with…", Icons.Default.OpenInNew) { Files.open(ctx, f) })
+        },
+    )
+    when (step) {
+        "rename" -> TextInputDialog("Rename", r.title, "Title", onDismiss = { step = null }) { t -> app.io { app.db.recordings().update(r.copy(title = t)) } }
+        "delete" -> ConfirmDialog("Delete recording?", "“${r.title}” and its audio file will be permanently deleted.", onDismiss = { step = null }) {
+            app.io { f.delete(); java.io.File(f.parentFile, f.nameWithoutExtension + ".txt").delete(); app.storage.scan(f); app.db.recordings().delete(r) }
+        }
+    }
+    Surface(shape = RoundedCornerShape(18.dp), color = MaterialTheme.colorScheme.surfaceContainer,
+        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp).clip(RoundedCornerShape(18.dp)).pressable(onClick = onClick, onLongClick = { menu = true })) {
         Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
             Box(Modifier.size(44.dp).clip(CircleShape).background(MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)), contentAlignment = Alignment.Center) {
                 Icon(Icons.Default.PlayArrow, null, tint = MaterialTheme.colorScheme.primary)
