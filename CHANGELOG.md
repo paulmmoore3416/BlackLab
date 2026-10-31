@@ -2,6 +2,28 @@
 
 All notable changes to BlackLab are documented here. The project follows [Semantic Versioning](https://semver.org/).
 
+## [4.1.0] — 2026-10-31
+
+### Added
+- **Open anything in BlackLab** — one universal viewer opens PDF, Word (.docx), RTF, OpenDocument text, PowerPoint (.pptx), EPUB e-books, Excel (.xlsx) and CSV/TSV, Markdown, HTML, JSON, XML, code, logs, calendar (.ics) files and ZIP archives, plus a hex view for anything else. Every file in the Library now opens in-app, and BlackLab registers as an **“Open with”** target for documents, media and archives from other apps (those open from a temporary copy; saving puts the result in BlackLab › Imports).
+- **PDF viewer & tools** — continuous scroll with pinch/double-tap zoom, page thumbnails, go-to-page, night mode, full-text search and copy. Tools: **mark up & sign** (pen, highlighter, text, saved finger signature, white-out, boxes, check marks), **organize pages** (reorder, rotate, duplicate, delete, extract), **merge** with other PDFs or photos, **split** by ranges, **fill forms** (with optional flattening), **watermark**, **page numbers**, **password protect** (AES-256) / unlock, save pages as pictures, reduce file size, export text, edit properties. Every change offers “save as copy” or “replace original”.
+- **Text & code editor** — undo/redo, find & replace (match case, whole word, regex), go to line, line numbers, word wrap, font size, Markdown/HTML live preview, JSON format/minify, text tools (case, sort, de-duplicate, trim, number lines…), save as, export to PDF, convert to a BlackLab document. Read-only fast viewer for very large logs.
+- **Spreadsheet editor** — CSV/TSV/XLSX with multiple sheets, a formula bar and formula engine (SUM, AVERAGE, MIN, MAX, COUNT, MEDIAN, ROUND, IF, AND/OR, CONCAT, LEN… with cell ranges), insert/delete rows and columns, sort, filter, column statistics, Σ sum, save as Excel or CSV, export to PDF.
+- **Document reader** — Word/RTF/ODT/PowerPoint/EPUB with text size, light/sepia/dark themes, EPUB chapter navigation, “Edit in Documents” and export to PDF/Word/text.
+- **ZIP archives** — browse folders, open entries directly, extract all or selected (protected against path-escape entries), and compress any file or selection to ZIP.
+- **Music player** — songs, albums, artists, playlists (with Favorites and .m3u8 export) and BlackLab's own audio; background playback with notification, lock-screen and Bluetooth controls; app-wide mini player; shuffle/repeat, queue, speed & pitch, A–B repeat, sleep timer with fade-out, and an equalizer with presets, bass boost, surround and loudness.
+- **Audio editor** — waveform with drag-to-select and zoom; cut/copy/paste, trim, delete, silence, insert silence, duplicate, split into files; fade in/out, gain, normalize, mono/stereo; reverse, echo, noise gate, rumble and hiss filters; tempo (pitch kept) and pitch (tempo kept); append, insert or mix in another audio file; export to M4A or lossless WAV (or the selection only). Also extracts audio from video.
+- **Video editor & creator** — multi-clip timeline of videos and photos, trim with a range slider, split at the playhead, reorder/duplicate/remove, 9 looks plus brightness/contrast/saturation, titles and a corner watermark, rotate, crop to 16:9 / 9:16 / 1:1 / 4:5 / 4:3, resolution up to 4K, speed 0.25–4×, mute or adjust the original sound, looping background music, H.264 or HEVC, HDR→SDR, audio-only export, and “frame → photo”. Effects preview live on the player.
+- **Photo editor** — new **Crop** (free or fixed aspect ratios, rotate, flip, straighten) and **Adjust** (exposure, brightness, contrast, saturation, warmth, tint, fade, vignette, auto-enhance) tabs.
+- **Create & Edit hub** — new document, spreadsheet, text or Markdown note, CSV, drawing canvas, PDF from photos, blank PDF, video montage, audio recording, photo/video; or open/edit any file from the phone. Library multi-select adds “Make a PDF”, “Make a video” and “Compress to ZIP”.
+
+### Fixed
+- Word import no longer drops the spaces between differently formatted words.
+
+### Notes
+- New libraries: Media3 Transformer, Effect and Session 1.9.0 and PdfBox-Android 2.0.27 (Apache-2.0). The APK grows from about 10 MB to about 18 MB.
+- Unit tests for the formula engine, CSV/XLSX round trips, page ranges, file types and ZIP extraction safety.
+
 ## [4.0.0] — 2026-10-31
 
 ### Added

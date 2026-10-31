@@ -107,12 +107,13 @@ private val InkColors = listOf(
 ).map { it.toInt() }
 
 private enum class EditTab(val label: String, val icon: androidx.compose.ui.graphics.vector.ImageVector) {
-    DRAW("Draw", Icons.Default.Brush), TEXT("Text", Icons.Default.TextFields), LOOKS("Looks", Icons.Default.AutoAwesome),
+    CROP("Crop", Icons.Default.Crop), ADJUST("Adjust", Icons.Default.Tune), DRAW("Draw", Icons.Default.Brush), TEXT("Text", Icons.Default.TextFields), LOOKS("Looks", Icons.Default.AutoAwesome),
     WATERMARK("Watermark", Icons.Default.BrandingWatermark), CUTOUT("Remove BG", Icons.Default.ContentCut),
 }
 
 /**
- * Photo editor: finger drawing & shapes, styled text, film looks, watermarks and background removal.
+ * Photo editor: crop/rotate/straighten, light & color adjustments, finger drawing & shapes, styled text,
+ * film looks, watermarks and background removal.
  * Edits are previewed on a working copy and re-rendered at full resolution on save.
  */
 @Composable
@@ -157,13 +158,26 @@ fun ImageEditorScreen(relPath: String, initialTab: String) {
     var saving by remember { mutableStateOf(false) }
     var saveMenu by remember { mutableStateOf(false) }
     var confirmExit by remember { mutableStateOf(false) }
-    val dirty = marks.isNotEmpty() || !filter.isIdentity || mask != null || watermarkOn
+    // crop / adjust
+    var geo by remember { mutableStateOf(com.blacklab.app.imaging.Geometry()) }
+    var adjust by remember { mutableStateOf(com.blacklab.app.imaging.Adjust()) }
+    var cropAspect by remember { mutableStateOf(0f) } // 0 = free
+    var cropDraft by remember { mutableStateOf(RectF(0f, 0f, 1f, 1f)) }
+    var geoBase by remember { mutableStateOf<Bitmap?>(null) }
+    fun setGeo(g: com.blacklab.app.imaging.Geometry) { if (mask != null) mask = null; geo = g }
+    val dirty = marks.isNotEmpty() || !filter.isIdentity || mask != null || watermarkOn || !geo.isIdentity || !adjust.isIdentity
 
     LaunchedEffect(Unit) { Cutout.prefetch(ctx) }
     // rebuild the working copy when the look or cutout changes (same order as the full-res export)
-    LaunchedEffect(original, filter, mask, cutoutBg) {
+    val cropping = tab == EditTab.CROP
+    LaunchedEffect(cropping) { if (cropping) cropDraft = RectF(geo.crop) else if (cropDraft != geo.crop) setGeo(geo.copy(crop = RectF(cropDraft))) }
+    LaunchedEffect(original, filter, mask, cutoutBg, geo, adjust, cropping) {
         val o = original ?: return@LaunchedEffect
-        working = withContext(Dispatchers.Default) { render(o, filter, s.camVintageDate, mask, cutoutBg) }
+        working = withContext(Dispatchers.Default) {
+            val g = geo.apply(o, withCrop = !cropping)
+            if (!cropping) geoBase = g
+            render(adjust.apply(g), filter, s.camVintageDate, mask, cutoutBg)
+        }
     }
     val logoPicker = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri: Uri? ->
         if (uri != null) scope.launch {
@@ -182,13 +196,15 @@ fun ImageEditorScreen(relPath: String, initialTab: String) {
             val out = withContext(Dispatchers.Default) {
                 runCatching {
                     val full = BitmapIO.decode(file) ?: error("Couldn't open the photo")
-                    val base = render(full, filter, s.camVintageDate, mask, cutoutBg)
+                    val g = geo.copy(crop = if (cropping) RectF(cropDraft) else geo.crop)
+                    val base = render(adjust.apply(g.apply(full)), filter, s.camVintageDate, mask, cutoutBg)
                     val canvasBmp = if (base.isMutable) base else base.copy(Bitmap.Config.ARGB_8888, true)
                     MarkupRenderer.draw(android.graphics.Canvas(canvasBmp), canvasBmp.width.toFloat(), canvasBmp.height.toFloat(), marks.toList(), if (watermarkOn) watermark else null)
                     val transparent = mask != null && cutoutBg == CutoutBackground.Transparent
                     val ext = if (transparent) "png" else "jpg"
-                    val dir = file.parentFile!!
-                    val target = if (!asCopy && ext.equals(file.extension, true)) file else Files.unique(dir, file.nameWithoutExtension.removeSuffix("_edit") + "_edit", ext)
+                    val inside = app.storage.contains(file)
+                    val dir = if (inside) file.parentFile!! else app.storage.dir(app.settings.current.activeProfile, com.blacklab.app.core.Folder.PHOTOS)
+                    val target = if (!asCopy && inside && ext.equals(file.extension, true)) file else Files.unique(dir, file.nameWithoutExtension.removeSuffix("_edit") + "_edit", ext)
                     val tmp = File(dir, ".edit_${System.currentTimeMillis()}.$ext")
                     if (transparent) BitmapIO.savePng(canvasBmp, tmp) else { BitmapIO.saveJpeg(canvasBmp, tmp, 95); PhotoMeta.copy(file, tmp) }
                     if (target.exists()) target.delete()
@@ -242,6 +258,39 @@ fun ImageEditorScreen(relPath: String, initialTab: String) {
                 val checker = remember { checkerboard() }
                 Canvas(
                     Modifier.fillMaxSize()
+                        .pointerInput(tab, bmp, cropAspect) {
+                            if (tab != EditTab.CROP) return@pointerInput
+                            var handle = -1 // 0..3 corners TL,TR,BR,BL; 4 = move
+                            var startRect = RectF(); var start = Offset.Zero
+                            val ratio = if (cropAspect > 0f) cropAspect * dh / dw else 0f // normalized w/h for the chosen pixel aspect
+                            detectDragGestures(
+                                onDragStart = { o ->
+                                    val r = cropDraft
+                                    val corners = listOf(r.left to r.top, r.right to r.top, r.right to r.bottom, r.left to r.bottom).map { (x, y) -> Offset(left + x * dw, top + y * dh) }
+                                    handle = corners.indexOfFirst { (it - o).getDistance() < 70f }
+                                    if (handle < 0 && RectF(left + r.left * dw, top + r.top * dh, left + r.right * dw, top + r.bottom * dh).contains(o.x, o.y)) handle = 4
+                                    startRect = RectF(r); start = o
+                                },
+                                onDrag = { ch, _ ->
+                                    val dx = (ch.position.x - start.x) / dw; val dy = (ch.position.y - start.y) / dh
+                                    val r = RectF(startRect); val min = 0.06f
+                                    when (handle) {
+                                        4 -> { val w = r.width(); val h = r.height(); r.left = (startRect.left + dx).coerceIn(0f, 1f - w); r.top = (startRect.top + dy).coerceIn(0f, 1f - h); r.right = r.left + w; r.bottom = r.top + h }
+                                        0 -> { r.left = (startRect.left + dx).coerceIn(0f, r.right - min); r.top = (startRect.top + dy).coerceIn(0f, r.bottom - min) }
+                                        1 -> { r.right = (startRect.right + dx).coerceIn(r.left + min, 1f); r.top = (startRect.top + dy).coerceIn(0f, r.bottom - min) }
+                                        2 -> { r.right = (startRect.right + dx).coerceIn(r.left + min, 1f); r.bottom = (startRect.bottom + dy).coerceIn(r.top + min, 1f) }
+                                        3 -> { r.left = (startRect.left + dx).coerceIn(0f, r.right - min); r.bottom = (startRect.bottom + dy).coerceIn(r.top + min, 1f) }
+                                    }
+                                    if (ratio > 0f && handle in 0..3) {
+                                        // keep the aspect: height follows width, anchored at the opposite corner
+                                        var h = r.width() / ratio
+                                        if (handle == 0 || handle == 1) { if (r.bottom - h < 0f) { h = r.bottom; r.left = if (handle == 0) r.right - h * ratio else r.left; r.right = if (handle == 1) r.left + h * ratio else r.right }; r.top = r.bottom - h }
+                                        else { if (r.top + h > 1f) { h = 1f - r.top; r.left = if (handle == 3) r.right - h * ratio else r.left; r.right = if (handle == 2) r.left + h * ratio else r.right }; r.bottom = r.top + h }
+                                    }
+                                    cropDraft = r
+                                },
+                            )
+                        }
                         .pointerInput(tab, tool, ink, thickness, opacity, dashed, bmp) {
                             var dragging: TextMark? = null
                             var dragStart = Offset.Zero
@@ -302,7 +351,18 @@ fun ImageEditorScreen(relPath: String, initialTab: String) {
                         })
                         nc.drawBitmap(bmp, null, RectF(0f, 0f, dw, dh), android.graphics.Paint(android.graphics.Paint.FILTER_BITMAP_FLAG))
                         nc.clipRect(0f, 0f, dw, dh)
-                        MarkupRenderer.draw(nc, dw, dh, marks.toList(), if (watermarkOn) watermark else null, live, if (tab == EditTab.TEXT) selectedText else null)
+                        if (tab == EditTab.CROP) {
+                            val r = cropDraft
+                            val shade = android.graphics.Paint().apply { color = 0xAA000000.toInt() }
+                            nc.drawRect(0f, 0f, dw, r.top * dh, shade); nc.drawRect(0f, r.bottom * dh, dw, dh, shade)
+                            nc.drawRect(0f, r.top * dh, r.left * dw, r.bottom * dh, shade); nc.drawRect(r.right * dw, r.top * dh, dw, r.bottom * dh, shade)
+                            val line = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply { color = 0xFFFFFFFF.toInt(); style = android.graphics.Paint.Style.STROKE; strokeWidth = 3f }
+                            nc.drawRect(r.left * dw, r.top * dh, r.right * dw, r.bottom * dh, line)
+                            line.strokeWidth = 1f; line.alpha = 140
+                            for (k in 1..2) { val x = (r.left + r.width() * k / 3) * dw; val y = (r.top + r.height() * k / 3) * dh; nc.drawLine(x, r.top * dh, x, r.bottom * dh, line); nc.drawLine(r.left * dw, y, r.right * dw, y, line) }
+                            val knob = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply { color = 0xFFFFD54F.toInt() }
+                            listOf(r.left to r.top, r.right to r.top, r.right to r.bottom, r.left to r.bottom).forEach { (x, y) -> nc.drawCircle(x * dw, y * dh, 14f, knob) }
+                        } else MarkupRenderer.draw(nc, dw, dh, marks.toList(), if (watermarkOn) watermark else null, live, if (tab == EditTab.TEXT) selectedText else null)
                         nc.restore()
                     }
                 }
@@ -316,6 +376,41 @@ fun ImageEditorScreen(relPath: String, initialTab: String) {
             // ---------------- tool panel
             Column(Modifier.fillMaxWidth().heightIn(max = 260.dp).verticalScroll(rememberScrollState()).padding(horizontal = 12.dp)) {
                 when (tab) {
+                    EditTab.CROP -> {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            PanelButton(Icons.Default.RotateLeft, "Left") { setGeo(geo.copy(rotate = (geo.rotate + 270) % 360, crop = RectF(0f, 0f, 1f, 1f))); cropDraft = RectF(0f, 0f, 1f, 1f) }
+                            PanelButton(Icons.Default.RotateRight, "Right") { setGeo(geo.copy(rotate = (geo.rotate + 90) % 360, crop = RectF(0f, 0f, 1f, 1f))); cropDraft = RectF(0f, 0f, 1f, 1f) }
+                            PanelButton(Icons.Default.Flip, "Flip") { setGeo(geo.copy(flipH = !geo.flipH)) }
+                        }
+                        val o = original
+                        val pic = if (o != null) geo.rotatedAspect(o.width, o.height) else 1f
+                        Chips(listOf(0f to "Free", pic to "Original", 1f to "1:1", 4f / 3 to "4:3", 3f / 4 to "3:4", 16f / 9 to "16:9", 9f / 16 to "9:16", 4f / 5 to "4:5", 3f / 2 to "3:2"), cropAspect) { a ->
+                            cropAspect = a
+                            if (a > 0f) {
+                                // largest centered box of that aspect
+                                val nr = a / pic // normalized w/h
+                                val (w, h) = if (nr >= 1f) 1f to 1f / nr else nr to 1f
+                                cropDraft = RectF((1 - w) / 2, (1 - h) / 2, (1 + w) / 2, (1 + h) / 2)
+                            }
+                        }
+                        LabeledSlider("Straighten", geo.straighten, -15f..15f) { setGeo(geo.copy(straighten = (it * 2).toInt() / 2f)) }
+                        Text("Drag the corners to crop, or drag inside to move the frame. Straighten: ${geo.straighten}°", color = Color.White.copy(alpha = 0.7f), fontSize = 12.sp)
+                        TextButton(onClick = { setGeo(com.blacklab.app.imaging.Geometry()); cropDraft = RectF(0f, 0f, 1f, 1f); cropAspect = 0f }) { Text("Reset crop & rotation", color = Color.White) }
+                    }
+                    EditTab.ADJUST -> {
+                        LabeledSlider("Exposure", adjust.exposure, -1f..1f) { adjust = adjust.copy(exposure = it) }
+                        LabeledSlider("Brightness", adjust.brightness, -1f..1f) { adjust = adjust.copy(brightness = it) }
+                        LabeledSlider("Contrast", adjust.contrast, -1f..1f) { adjust = adjust.copy(contrast = it) }
+                        LabeledSlider("Saturation", adjust.saturation, -1f..1f) { adjust = adjust.copy(saturation = it) }
+                        LabeledSlider("Warmth", adjust.warmth, -1f..1f) { adjust = adjust.copy(warmth = it) }
+                        LabeledSlider("Tint", adjust.tint, -1f..1f) { adjust = adjust.copy(tint = it) }
+                        LabeledSlider("Fade", adjust.fade, 0f..1f) { adjust = adjust.copy(fade = it) }
+                        LabeledSlider("Vignette", adjust.vignette, -1f..1f) { adjust = adjust.copy(vignette = it) }
+                        Row {
+                            TextButton(onClick = { adjust = com.blacklab.app.imaging.Adjust(contrast = 0.15f, saturation = 0.15f, warmth = 0.05f, vignette = 0.15f) }) { Text("Auto enhance", color = Color(0xFFFFD54F)) }
+                            TextButton(onClick = { adjust = com.blacklab.app.imaging.Adjust() }) { Text("Reset", color = Color.White) }
+                        }
+                    }
                     EditTab.DRAW -> {
                         Chips(DrawTool.entries.map { it to it.label }, tool, icons = { toolIcon(it) }) { tool = it }
                         Swatches(ink) { ink = it }
@@ -380,7 +475,7 @@ fun ImageEditorScreen(relPath: String, initialTab: String) {
                     EditTab.CUTOUT -> {
                         if (mask == null) {
                             PanelButton(Icons.Default.AutoFixHigh, "Remove background") {
-                                val o = original ?: return@PanelButton
+                                val o = geoBase ?: original ?: return@PanelButton
                                 cutoutBusy = true
                                 scope.launch {
                                     val r = Cutout.mask(ctx, o)
@@ -405,7 +500,7 @@ fun ImageEditorScreen(relPath: String, initialTab: String) {
                 }
             }
             // ---------------- tabs
-            Row(Modifier.fillMaxWidth().padding(vertical = 6.dp), horizontalArrangement = Arrangement.SpaceEvenly) {
+            Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(vertical = 6.dp, horizontal = 6.dp), horizontalArrangement = Arrangement.spacedBy(2.dp)) {
                 EditTab.entries.forEach { t ->
                     val sel = t == tab
                     Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.clip(RoundedCornerShape(14.dp)).clickable { tab = t }

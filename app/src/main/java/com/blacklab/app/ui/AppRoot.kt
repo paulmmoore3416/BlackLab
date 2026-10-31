@@ -136,8 +136,10 @@ private val drawerDests = listOf(
     Dest("assistant", "Assistant", Icons.Default.AutoAwesome),
     Dest("camera", "Camera", Icons.Default.PhotoCamera),
     Dest("recorder", "Recorder", Icons.Default.Mic),
+    Dest("music", "Music", Icons.Default.LibraryMusic),
     Dest("dictation", "Dictation", Icons.Default.RecordVoiceOver),
     Dest("library", "Library & Files", Icons.Default.Folder),
+    Dest("create", "Create & Edit", Icons.Default.AddCircle),
     Dest("documents", "Documents", Icons.Default.Description),
     Dest("journal", "Journal", Icons.AutoMirrored.Filled.MenuBook),
     Dest("tasks", "To-Do", Icons.Default.TaskAlt),
@@ -264,7 +266,9 @@ private fun AppShell(activity: MainActivity) {
         ) {
             Scaffold(
                 snackbarHost = { SnackbarHost(snackbar) },
-                bottomBar = {
+                bottomBar = { Column {
+                    val musicOn by com.blacklab.app.media.PlaybackService.running.collectAsState()
+                    if (showBottom && musicOn) com.blacklab.app.ui.music.MiniPlayer(com.blacklab.app.ui.music.rememberPlayer(), bottomInset = false) { nav.navigate("nowplaying") { launchSingleTop = true } }
                     AnimatedVisibility(showBottom, enter = slideInVertically(Motion.enter()) { it } + fadeIn(Motion.enter()), exit = slideOutVertically(Motion.exit()) { it } + fadeOut(Motion.exit())) {
                         NavigationBar(containerColor = MaterialTheme.colorScheme.surfaceContainerLow, tonalElevation = 0.dp) {
                             bottomDests.forEach { d ->
@@ -278,7 +282,7 @@ private fun AppShell(activity: MainActivity) {
                             }
                         }
                     }
-                },
+                } },
                 contentWindowInsets = androidx.compose.foundation.layout.WindowInsets(0, 0, 0, 0),
             ) { pad ->
                 Box(Modifier.fillMaxSize().padding(bottom = if (showBottom) pad.calculateBottomPadding() else 0.dp).background(MaterialTheme.colorScheme.background)) {
@@ -319,6 +323,21 @@ private fun NavGraph(nav: androidx.navigation.NavHostController) {
         }
         composable("media?path={path}", arguments = listOf(navArgument("path") { defaultValue = "" })) {
             MediaViewerScreen(Uri.decode(it.arguments?.getString("path") ?: ""))
+        }
+        composable("view?path={path}&text={text}", arguments = listOf(navArgument("path") { defaultValue = "" }, navArgument("text") { type = NavType.BoolType; defaultValue = false })) {
+            com.blacklab.app.ui.viewer.FileViewerScreen(Uri.decode(it.arguments?.getString("path") ?: ""), it.arguments?.getBoolean("text") ?: false)
+        }
+        composable("player?path={path}", arguments = listOf(navArgument("path") { defaultValue = "" })) {
+            com.blacklab.app.ui.music.PlayFileScreen(Uri.decode(it.arguments?.getString("path") ?: ""))
+        }
+        composable("nowplaying") { com.blacklab.app.ui.music.NowPlayingScreen() }
+        composable("music") { com.blacklab.app.ui.music.MusicScreen() }
+        composable("create") { com.blacklab.app.ui.create.CreateScreen() }
+        composable("audioedit?path={path}", arguments = listOf(navArgument("path") { defaultValue = "" })) {
+            com.blacklab.app.ui.audioedit.AudioEditorScreen(Uri.decode(it.arguments?.getString("path") ?: ""))
+        }
+        composable("videoedit?path={path}&paths={paths}", arguments = listOf(navArgument("path") { defaultValue = "" }, navArgument("paths") { defaultValue = "" })) {
+            com.blacklab.app.ui.videoedit.VideoEditorScreen(Uri.decode(it.arguments?.getString("path") ?: ""), it.arguments?.getString("paths") ?: "")
         }
         composable("documents") { DocumentsScreen() }
         composable(

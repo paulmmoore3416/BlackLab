@@ -100,10 +100,25 @@ class MainActivity : FragmentActivity() {
                 val uri = intent.getParcelableExtra<Uri>(Intent.EXTRA_STREAM)
                 pendingShare.value = SharePayload(listOfNotNull(uri), intent.getStringExtra(Intent.EXTRA_TEXT), intent.getStringExtra(Intent.EXTRA_SUBJECT))
             }
+            Intent.ACTION_VIEW, Intent.ACTION_EDIT -> intent.data?.takeIf { it.scheme == "content" || it.scheme == "file" }?.let { uri -> openExternal(uri, intent.type) }
             Intent.ACTION_SEND_MULTIPLE -> {
                 @Suppress("DEPRECATION")
                 val uris = intent.getParcelableArrayListExtra<Uri>(Intent.EXTRA_STREAM) ?: arrayListOf()
                 pendingShare.value = SharePayload(uris, null, null)
+            }
+        }
+    }
+
+    /** Copies a file another app asked us to open into BlackLab's "opened" area, then shows it. */
+    private fun openExternal(uri: Uri, type: String?) {
+        val app = app
+        app.appScope.launch {
+            val mime = type ?: runCatching { contentResolver.getType(uri) }.getOrNull()
+            var name = com.blacklab.app.core.Files.displayName(this@MainActivity, uri)
+            if (!name.contains('.')) name += "." + com.blacklab.app.files.FileKinds.extFor(mime)
+            val dest = java.io.File(app.storage.openedDir, com.blacklab.app.core.Files.sanitize(name))
+            if (com.blacklab.app.core.Files.copyFromUri(this@MainActivity, uri, dest)) {
+                pendingRoute.value = com.blacklab.app.files.FileKinds.route(dest, dest.absolutePath)
             }
         }
     }

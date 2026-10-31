@@ -6,3 +6,5 @@
 -keepattributes *Annotation*, Signature, InnerClasses, EnclosingMethod
 -dontwarn org.jspecify.annotations.**
 -dontwarn com.google.re2j.**
+# PdfBox-Android: optional JPEG 2000 codec isn't bundled
+-dontwarn com.gemalto.jp2.**

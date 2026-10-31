@@ -78,14 +78,32 @@ fun FileActionHost(file: File?, onDismiss: () -> Unit, onChanged: () -> Unit = {
                     contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
             }) else ({ Icon(iconFor(f), null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.fillMaxSize()) }),
             quick = buildList {
-                if (image) add(SheetAction("Edit", Icons.Default.Edit) { edit("draw") })
+                if (image) add(SheetAction("Edit", Icons.Default.Edit) { edit("crop") })
                 add(SheetAction("Share", Icons.Default.Share) { Files.share(ctx, listOf(f)) })
                 add(SheetAction("Details", Icons.Default.Info) { step = "info" })
                 add(SheetAction("Delete", Icons.Default.Delete, destructive = true) { step = "delete" })
             },
             actions = buildList {
-                if (image || video) add(SheetAction(if (video) "Play" else "Open", if (video) Icons.Default.PlayArrow else Icons.Default.OpenInFull) { shell.go("media?path=" + Uri.encode(rel)) })
+                val kind = com.blacklab.app.files.FileKinds.of(f)
+                add(SheetAction(when (kind) { com.blacklab.app.files.FileKind.VIDEO, com.blacklab.app.files.FileKind.AUDIO -> "Play"; else -> "Open in BlackLab" },
+                    when (kind) { com.blacklab.app.files.FileKind.VIDEO, com.blacklab.app.files.FileKind.AUDIO -> Icons.Default.PlayArrow; else -> Icons.Default.OpenInFull },
+                    hint = kind.label + if (kind.editable) " · view & edit" else " · view") { com.blacklab.app.ui.viewer.openInApp(shell, app, f) })
+                if (video) {
+                    add(SheetAction("Edit video", Icons.Default.VideoSettings, hint = "Trim, split, filters, titles, music, speed") { shell.go("videoedit?path=" + Uri.encode(rel)) })
+                    add(SheetAction("Extract audio", Icons.Default.AudioFile, hint = "Save the soundtrack as .m4a") { shell.go("audioedit?path=" + Uri.encode(rel)) })
+                }
+                if (kind == com.blacklab.app.files.FileKind.AUDIO) add(SheetAction("Edit audio", Icons.Default.GraphicEq, hint = "Trim, fade, normalize, speed, effects") { shell.go("audioedit?path=" + Uri.encode(rel)) })
+                if (kind == com.blacklab.app.files.FileKind.SHEET || com.blacklab.app.files.FileKinds.isTextLike(kind)) add(SheetAction("Edit as text", Icons.Default.Code) { shell.go("view?path=" + Uri.encode(rel) + "&text=true") })
+                if (kind != com.blacklab.app.files.FileKind.ARCHIVE) add(SheetAction("Compress to ZIP", Icons.Default.FolderZip) {
+                    app.io {
+                        val out = Files.unique(f.parentFile!!, f.nameWithoutExtension, "zip")
+                        val ok = runCatching { com.blacklab.app.files.FileOps.zip(listOf(f), out); app.storage.scan(out) }.isSuccess
+                        withContext(Dispatchers.Main) { shell.toast(if (ok) "Created ${out.name}" else "Couldn't create the ZIP"); onChanged() }
+                    }
+                })
                 if (image) {
+                    add(SheetAction("Crop & rotate", Icons.Default.Crop, hint = "Aspect ratios, straighten, flip") { edit("crop") })
+                    add(SheetAction("Adjust light & color", Icons.Default.Tune, hint = "Exposure, contrast, warmth, vignette") { edit("adjust") })
                     add(SheetAction("Draw & mark up", Icons.Default.Brush, hint = "Pen, highlighter, arrows, boxes, circles") { edit("draw") })
                     add(SheetAction("Add text", Icons.Default.TextFields, hint = "Fonts, colors, bold, italic, underline, cursive") { edit("text") })
                     add(SheetAction("Looks & filters", Icons.Default.AutoAwesome, hint = "1970s, Noir, Cinematic and more") { edit("looks") })

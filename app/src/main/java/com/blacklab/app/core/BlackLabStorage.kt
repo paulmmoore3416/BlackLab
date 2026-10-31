@@ -105,7 +105,17 @@ class BlackLabStorage(private val context: Context) {
         marker.writeText("migrated")
     }
 
-    fun relative(file: File): String = file.absoluteFile.relativeTo(root.absoluteFile).path
+    /** Path relative to [root]; files outside BlackLab (opened from other apps) keep their absolute path. */
+    fun relative(file: File): String {
+        val r = root.absoluteFile
+        return if (file.absolutePath.startsWith(r.path + "/") || file.absoluteFile == r) file.absoluteFile.relativeTo(r).path else file.absolutePath
+    }
+
+    /** True for files that live inside the BlackLab folder (as opposed to a temporary copy from another app). */
+    fun contains(file: File): Boolean = file.absolutePath.startsWith(root.absolutePath + "/")
+
+    /** Where files opened from other apps are copied so BlackLab can view and edit them. */
+    val openedDir: File get() = File(context.externalCacheDir ?: context.cacheDir, "Opened").also { it.mkdirs() }
 
     fun resolve(relativePath: String): File =
         if (relativePath.startsWith("/")) File(relativePath) else File(root, relativePath)

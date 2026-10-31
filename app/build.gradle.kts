@@ -21,8 +21,8 @@ android {
         applicationId = "com.blacklab.app"
         minSdk = 35
         targetSdk = 36
-        versionCode = 5
-        versionName = "4.0.0"
+        versionCode = 6
+        versionName = "4.1.0"
         vectorDrawables { useSupportLibrary = true }
     }
 
@@ -121,8 +121,15 @@ dependencies {
     implementation("androidx.camera:camera-view:$camerax")
     implementation("androidx.camera:camera-extensions:$camerax")
 
-    implementation("androidx.media3:media3-exoplayer:1.7.1")
-    implementation("androidx.media3:media3-ui:1.7.1")
+    val media3 = "1.9.0"
+    implementation("androidx.media3:media3-exoplayer:$media3")
+    implementation("androidx.media3:media3-ui:$media3")
+    // Background music playback (notification / lock-screen controls) and the video & audio editors
+    implementation("androidx.media3:media3-session:$media3")
+    implementation("androidx.media3:media3-transformer:$media3")
+    implementation("androidx.media3:media3-effect:$media3")
+    // PDF editing: merge, split, rotate, reorder, text extraction, stamping, forms, passwords
+    implementation("com.tom-roush:pdfbox-android:2.0.27.0")
 
     implementation("io.coil-kt:coil-compose:2.7.0")
     implementation("io.coil-kt:coil-video:2.7.0")

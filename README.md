@@ -70,7 +70,22 @@ Optimized for the **Google Pixel 10 Pro XL** and newer (Android 15+).
 - **Voice commands**: “pause recording”, “resume / start recording”, “stop recording”, “new paragraph”, “new line”, “mark that”; hands-free standby
 - Every session in its own dated folder (`Dictation/Dictation_YYYY-MM-DD_HH-MM-SS/`) with audio, transcript `.txt` and GPS + address
 
+### 📂 Open, view & edit any file
+- **PDF** — continuous scroll, zoom, thumbnails, search, night mode; mark up & **sign**, organize/rotate/delete pages, **merge**, **split**, **fill forms**, watermark, page numbers, **password protect**, compress, pages → pictures
+- **Office & e-books** — Word, RTF, ODT, PowerPoint and EPUB readers (themes, chapters) with “Edit in Documents” and export
+- **Spreadsheets** — CSV/TSV/XLSX editor with multiple sheets, formulas, sort, filter, column stats; saves Excel or CSV
+- **Text & code** — editor with find & replace (regex), line numbers, Markdown/HTML preview, JSON formatting and text tools
+- **ZIP** — browse, open entries, extract; compress files to ZIP
+- BlackLab is an **“Open with”** choice for documents, media and archives from any app
+
+### 🎵 Music, audio & video
+- **Music player** — songs, albums, artists, playlists; background playback with lock-screen controls, queue, speed/pitch, A–B repeat, sleep timer, equalizer
+- **Audio editor** — waveform cut/copy/paste, trim, fades, gain, normalize, reverse, echo, noise gate, filters, tempo & pitch, mix in other files; M4A or WAV
+- **Video editor** — multi-clip timeline (videos + photos), trim/split, looks, titles, crop & rotate, resolution, speed, background music, HEVC, audio-only export
+- **Create & Edit** hub — new documents, spreadsheets, notes, drawings, PDFs and video montages in one place
+
 ### 🖌️ Photo editor
+- **Crop** (aspect ratios, rotate, flip, straighten) and **Adjust** (exposure, contrast, saturation, warmth, tint, fade, vignette)
 - Finger drawing — pen, highlighter, line, arrow, box, circle, eraser; color, thickness, opacity, dashed; undo/redo
 - Text — color, size, 8 fonts, bold, italic, underline, cursive, box, outline
 - Watermarks (text/logo, tiled), looks, and on-device **background removal**
@@ -145,13 +160,13 @@ Internal storage/BlackLab/
 
 ## Install
 
-1. Download **[`BlackLab-v4.0.0.apk`](releases/BlackLab-v4.0.0.apk)** (also attached to the [v4.0.0 release](https://github.com/paulmmoore3416/BlackLab/releases/tag/v4.0.0)).
-   Verify it with the published SHA-256: [`BlackLab-v4.0.0.apk.sha256`](releases/BlackLab-v4.0.0.apk.sha256).
+1. Download **[`BlackLab-v4.1.0.apk`](releases/BlackLab-v4.1.0.apk)** (also attached to the [v4.1.0 release](https://github.com/paulmmoore3416/BlackLab/releases/tag/v4.1.0)).
+   Verify it with the published SHA-256: [`BlackLab-v4.1.0.apk.sha256`](releases/BlackLab-v4.1.0.apk.sha256).
 2. On the phone, allow your browser/Files app to **install unknown apps** when prompted.
 3. Open BlackLab and follow onboarding: name & title, account names, then grant
    **All-files access** (creates the BlackLab folder), **camera & microphone**, **notifications** and optionally **calendars**.
 
-Or with USB debugging: `adb install releases/BlackLab-v4.0.0.apk`
+Or with USB debugging: `adb install releases/BlackLab-v4.1.0.apk`
 
 ### Requirements
 - Android **15+** (API 35); targets Android 16 (API 36). Tested on an Android 16 emulator; installed and launched on a Pixel 10 Pro XL running Android 17
@@ -190,7 +205,8 @@ keyPassword=…
 | Persistence | Room (SQLite), SharedPreferences, plain files in the BlackLab folder |
 | Camera | CameraX 1.4 (core, video, extensions) |
 | Audio | AudioRecord, MediaCodec AAC + MediaMuxer, audio effects, SpeechRecognizer |
-| Media playback | Media3 ExoPlayer |
+| Media | Media3 ExoPlayer, Session (background music), Transformer + Effect (video editing) |
+| PDF | Platform `PdfRenderer` for display, PdfBox-Android for editing, forms, encryption and text |
 | Documents | WebView `contenteditable` editor, jsoup, custom OOXML (DOCX) writer/reader, native `PdfDocument` renderer |
 | On-device ML | ML Kit document scanner, code scanner, text recognition (Play services) |
 | Reminders | Exact alarms (single self-rescheduling alarm), notifications with actions |
@@ -207,6 +223,8 @@ app/src/main/java/com/blacklab/app/
 ├── data/        Room entities/DAOs, calendar logic, task ops, grades, SRS
 ├── link/        Desktop link server, data snapshot, Google Drive cloud sync
 ├── docs/        HTML ⇄ blocks model, DOCX writer/reader, PDF writer, Markdown
+├── files/       File types, PDF tools, spreadsheet engine, Office/EPUB readers, ZIP
+├── media/       Music service & library, audio editor engine, video export
 ├── recorder/    Audio engine, encoders, transcription, foreground service
 ├── reminders/   Alarm scheduler, receivers, notifications
 ├── study/       Pomodoro timer

@@ -84,11 +84,8 @@ import java.io.File
 import java.util.Locale
 
 private val Tabs = listOf("PHOTOS" to "Photos", "VIDEOS" to "Videos", "SCANS" to "Scans", "RECORDINGS" to "Audio", "DICTATION" to "Dictation", "EXPORTS" to "Exports", "IMPORTS" to "Imports", "BROWSE" to "All files")
-private val imageExt = setOf("jpg", "jpeg", "png", "webp", "heic", "heif", "gif", "dng")
-private val videoExt = setOf("mp4", "mov", "3gp", "mkv", "webm")
-
-fun File.isImage() = extension.lowercase(Locale.US) in imageExt
-fun File.isVideo() = extension.lowercase(Locale.US) in videoExt
+fun File.isImage() = extension.lowercase(Locale.US) in com.blacklab.app.files.FileKinds.image
+fun File.isVideo() = com.blacklab.app.files.FileKinds.of(this) == com.blacklab.app.files.FileKind.VIDEO
 
 @Composable
 fun LibraryScreen(initialTab: String) {
@@ -113,6 +110,8 @@ fun LibraryScreen(initialTab: String) {
 
     Scaffold(topBar = {
         BlTopBar("Library", subtitle = if (app.storage.isPublic) "Internal storage › BlackLab › ${app.settings.profileName(s.activeProfile)}" else "App storage", actions = {
+            IconButton(onClick = { shell.go("create") }) { Icon(Icons.Default.AddCircle, "Create & edit") }
+            IconButton(onClick = { shell.go("music") }) { Icon(Icons.Default.LibraryMusic, "Music") }
             IconButton(onClick = { shell.go("camera") }) { Icon(Icons.Default.PhotoCamera, "Camera") }
             IconButton(onClick = { scanner() }) { Icon(Icons.Default.DocumentScanner, "Scan") }
             IconButton(onClick = { importer.launch(arrayOf("*/*")) }) { Icon(Icons.Default.Upload, "Import") }
@@ -169,6 +168,7 @@ private fun MediaGrid(dir: File, refresh: Int, onChanged: () -> Unit) {
             Text("${selected.size} selected", Modifier.weight(1f))
             IconButton(onClick = { selected = if (selected.size == files.size) emptySet() else files.toSet() }) { Icon(Icons.Default.SelectAll, "Select all") }
             IconButton(onClick = { Files.share(ctx, selected.toList()) }) { Icon(Icons.Default.Share, "Share") }
+            SelectionMore(selected.toList(), onDone = { selected = emptySet(); onChanged() })
             IconButton(onClick = { confirmDelete = true }) { Icon(Icons.Default.Delete, "Delete") }
         }
         val grouped = files.groupBy { Time.monthYear(Time.toDate(it.lastModified())) }
@@ -238,8 +238,7 @@ private fun FileList(start: File, refresh: Int, browse: Boolean, onChanged: () -
                 Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).pressable(onClick = {
                     when {
                         f.isDirectory -> dir = f
-                        f.isImage() || f.isVideo() -> shell.go("media?path=" + Uri.encode(app.storage.relative(f)))
-                        else -> Files.open(ctx, f)
+                        else -> com.blacklab.app.ui.viewer.openInApp(shell, app, f)
                     }
                 }, onLongClick = { if (f.isFile) menu = f else dir = f }).padding(horizontal = 8.dp, vertical = 10.dp),
                 verticalAlignment = Alignment.CenterVertically,
@@ -260,15 +259,55 @@ private fun FileList(start: File, refresh: Int, browse: Boolean, onChanged: () -
     }
 }
 
-fun iconFor(f: File) = when {
-    f.isDirectory -> Icons.Default.Folder
-    f.isImage() -> Icons.Default.Image
-    f.isVideo() -> Icons.Default.Movie
-    f.extension.lowercase(Locale.US) in setOf("m4a", "wav", "mp3", "aac", "ogg", "flac", "opus") -> Icons.Default.AudioFile
-    f.extension.equals("pdf", true) -> Icons.Default.PictureAsPdf
-    f.extension.lowercase(Locale.US) in setOf("doc", "docx", "html", "htm", "md", "txt", "rtf") -> Icons.Default.Description
-    f.extension.lowercase(Locale.US) in setOf("xls", "xlsx", "csv") -> Icons.Default.TableChart
-    f.extension.equals("zip", true) -> Icons.Default.FolderZip
-    f.extension.equals("ics", true) -> Icons.Default.Event
+fun iconFor(f: File) = when (com.blacklab.app.files.FileKinds.of(f)) {
+    com.blacklab.app.files.FileKind.FOLDER -> Icons.Default.Folder
+    com.blacklab.app.files.FileKind.IMAGE -> Icons.Default.Image
+    com.blacklab.app.files.FileKind.VIDEO -> Icons.Default.Movie
+    com.blacklab.app.files.FileKind.AUDIO -> Icons.Default.AudioFile
+    com.blacklab.app.files.FileKind.PDF -> Icons.Default.PictureAsPdf
+    com.blacklab.app.files.FileKind.WORD, com.blacklab.app.files.FileKind.RTF, com.blacklab.app.files.FileKind.ODT, com.blacklab.app.files.FileKind.TEXT -> Icons.Default.Description
+    com.blacklab.app.files.FileKind.MARKDOWN, com.blacklab.app.files.FileKind.CODE, com.blacklab.app.files.FileKind.HTML -> Icons.Default.Code
+    com.blacklab.app.files.FileKind.SHEET -> Icons.Default.TableChart
+    com.blacklab.app.files.FileKind.SLIDES -> Icons.Default.Slideshow
+    com.blacklab.app.files.FileKind.EPUB -> Icons.Default.MenuBook
+    com.blacklab.app.files.FileKind.ARCHIVE -> Icons.Default.FolderZip
+    com.blacklab.app.files.FileKind.CALENDAR -> Icons.Default.Event
     else -> Icons.Default.InsertDriveFile
+}
+
+/** Overflow for multi-selected photos/videos: one PDF, one video montage, or a ZIP. */
+@Composable
+private fun SelectionMore(files: List<File>, onDone: () -> Unit) {
+    val app = rememberApp()
+    val shell = LocalShell.current
+    val ctx = LocalContext.current
+    var open by remember { mutableStateOf(false) }
+    IconButton(onClick = { open = true }) { Icon(Icons.Default.MoreVert, "More") }
+    DropdownMenu(open, { open = false }) {
+        if (files.all { it.isImage() }) DropdownMenuItem(text = { Text("Make a PDF") }, leadingIcon = { Icon(Icons.Default.PictureAsPdf, null) }, onClick = {
+            open = false
+            app.io {
+                val out = runCatching {
+                    com.blacklab.app.files.PdfTools.init(ctx)
+                    Files.unique(app.storage.dir(app.settings.current.activeProfile, Folder.SCANS), "Photos ${Time.date(System.currentTimeMillis())}", "pdf").also {
+                        com.blacklab.app.files.PdfTools.imagesToPdf(files.sortedBy { f -> f.lastModified() }, it, "LETTER"); app.storage.scan(it)
+                    }
+                }.getOrNull()
+                withContext(Dispatchers.Main) { onDone(); if (out != null) com.blacklab.app.ui.viewer.openInApp(shell, app, out) else shell.toast("Couldn't build the PDF") }
+            }
+        })
+        DropdownMenuItem(text = { Text("Make a video") }, leadingIcon = { Icon(Icons.Default.Movie, null) }, onClick = {
+            open = false
+            val paths = files.sortedBy { it.lastModified() }.joinToString("|") { Uri.encode(app.storage.relative(it)) }
+            onDone(); shell.go("videoedit?paths=" + Uri.encode(paths))
+        })
+        DropdownMenuItem(text = { Text("Compress to ZIP") }, leadingIcon = { Icon(Icons.Default.FolderZip, null) }, onClick = {
+            open = false
+            app.io {
+                val out = Files.unique(app.storage.dir(app.settings.current.activeProfile, Folder.EXPORTS), "BlackLab ${files.size} items", "zip")
+                val ok = runCatching { com.blacklab.app.files.FileOps.zip(files, out); app.storage.scan(out) }.isSuccess
+                withContext(Dispatchers.Main) { onDone(); shell.toast(if (ok) "Saved ${out.name} to Exports" else "Couldn't create the ZIP") }
+            }
+        })
+    }
 }

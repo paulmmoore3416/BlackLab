@@ -130,7 +130,7 @@ object DocImporter {
         return Imported(title, html)
     }
 
-    private fun stripRtf(rtf: String): String =
+    fun stripRtf(rtf: String): String =
         rtf.replace(Regex("\\\\par[d]?"), "\n").replace(Regex("\\{\\\\\\*[^}]*\\}"), "").replace(Regex("\\\\[a-z]+-?\\d* ?"), "")
             .replace("{", "").replace("}", "").trim()
 }
@@ -247,7 +247,7 @@ object DocxReader {
             val content = StringBuilder()
             for (c in r.children()) {
                 when (c.tagName()) {
-                    "w:t" -> content.append(ContentStore.escape(c.text()))
+                    "w:t" -> content.append(ContentStore.escape(c.wholeText()))
                     "w:tab" -> content.append("&emsp;")
                     "w:br" -> if (c.attr("w:type") == "page") content.append("</p><div class=\"page-break\"></div><p>") else content.append("<br>")
                     "w:drawing", "w:pict" -> {

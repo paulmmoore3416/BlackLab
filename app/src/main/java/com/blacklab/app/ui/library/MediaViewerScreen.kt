@@ -102,7 +102,8 @@ fun MediaViewerScreen(relPath: String) {
             Row(Modifier.align(Alignment.BottomCenter).fillMaxWidth().background(Color.Black.copy(alpha = 0.45f)).navigationBarsPadding().padding(8.dp),
                 horizontalArrangement = androidx.compose.foundation.layout.Arrangement.SpaceEvenly) {
                 ViewerAction(Icons.Default.Share, "Share") { Files.share(ctx, listOf(current)) }
-                if (current.isImage()) ViewerAction(Icons.Default.Edit, "Edit") { shell.go("imgedit?path=" + android.net.Uri.encode(app.storage.relative(current)) + "&tab=draw") }
+                if (current.isImage()) ViewerAction(Icons.Default.Edit, "Edit") { shell.go("imgedit?path=" + android.net.Uri.encode(app.storage.relative(current)) + "&tab=crop") }
+                if (current.isVideo()) ViewerAction(Icons.Default.VideoSettings, "Edit") { shell.go("videoedit?path=" + android.net.Uri.encode(app.storage.relative(current))) }
                 if (current.isImage()) ViewerAction(Icons.Default.TextSnippet, "Text") {
                     app.io { val t = Ocr.recognize(ctx, current); withContext(Dispatchers.Main) { ocrText = t } }
                 }
@@ -209,5 +210,6 @@ private fun VideoPage(f: File, active: Boolean) {
     val player = remember(f) { ExoPlayer.Builder(ctx).build().apply { setMediaItem(MediaItem.fromUri(android.net.Uri.fromFile(f))); prepare() } }
     DisposableEffect(f) { onDispose { player.release() } }
     if (!active) player.pause()
-    AndroidView({ PlayerView(it).apply { this.player = player; useController = true } }, Modifier.fillMaxSize())
+    // keep the seek bar clear of the viewer's bottom action row
+    AndroidView({ PlayerView(it).apply { this.player = player; useController = true } }, Modifier.fillMaxSize().navigationBarsPadding().padding(bottom = 76.dp))
 }

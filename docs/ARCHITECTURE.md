@@ -72,3 +72,27 @@ Instead of scheduling one alarm per reminder, `ReminderScheduler` keeps **one ex
 - **USB / Wi-Fi:** `link/LinkServer.kt` is a small HTTP/1.1 JSON API on port 8765, bound to localhost (reached over USB with `adb forward`) and optionally to Wi-Fi. Every call except `/api/ping` needs the 8-character pairing code; repeated bad codes lock the client out. `LinkHub.rev` increases on every change so the desktop long-polls `/api/changes`.
 - **Anywhere:** `link/CloudSync.kt` writes `blacklab-sync.json` (snapshot, schema, results) to the hidden Drive `appDataFolder` and reads `blacklab-inbox.json` (settings changes and commands queued by the web UI). Each side writes only its own file, so they never race.
 - **Desktop:** `desktop/web` is a static single-page app (GitHub Pages and local). `desktop/companion/blacklab_desktop.py` (standard library only) serves it on 127.0.0.1:8770, keeps `adb forward` up while the phone is plugged in, and runs the desktop assistant: rules first, then a local Ollama model with tool calling.
+
+## Files, viewers & editors
+`files/FileKinds` maps every file to a kind and an in-app route (`media?` for photos/videos, `player?`
+for audio, `view?` for everything else). `ui/viewer/FileViewerScreen` dispatches to the PDF viewer,
+text/code editor, spreadsheet editor, document reader (Word/RTF/ODT/PowerPoint/EPUB → sanitized HTML in
+a WebView with JavaScript, file and network access off), ZIP browser, calendar or hex view. Files that
+other apps hand to BlackLab are copied to the external cache (`storage.openedDir`); saving them writes
+into BlackLab › Imports, never back to the temporary copy.
+
+PDFs render with the platform `PdfRenderer` (thread-safe wrapper + LRU bitmap cache) and are edited with
+PdfBox-Android: annotations are drawn in "displayed page" space through a matrix that honours `/Rotate`.
+Every tool writes to a temp file first and the user picks "save as copy" or "replace original";
+replacement is atomic. The spreadsheet engine keeps raw cell text (formulas start with `=`), evaluates
+with a small recursive-descent parser with cycle detection, and writes minimal OOXML with cached values.
+
+## Music, audio & video editing
+`media/PlaybackService` is a Media3 `MediaSessionService` (notification, lock screen, Bluetooth, audio
+focus, becoming-noisy) with equalizer/bass/virtualizer/loudness effects bound to the player's audio
+session. Screens talk to it through a `MediaController`. The audio editor decodes to interleaved 16-bit
+PCM in memory (long files fall back to mono), applies immutable edits for cheap undo, previews through
+`AudioTrack`, and re-encodes with the recorder's AAC/WAV sinks; tempo/pitch use Media3's Sonic processor.
+The video editor builds a Media3 `Composition` (clipped media items, image items, a looping music
+sequence) with one effect chain shared by the live ExoPlayer preview and the Transformer export; if a
+device can't keep HDR with effects it retries with HDR→SDR tone-mapping.
