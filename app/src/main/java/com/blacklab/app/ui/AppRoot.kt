@@ -133,6 +133,7 @@ private val bottomDests = listOf(
 
 private val drawerDests = listOf(
     Dest("home", "Home", Icons.Default.Dashboard),
+    Dest("assistant", "Assistant", Icons.Default.AutoAwesome),
     Dest("camera", "Camera", Icons.Default.PhotoCamera),
     Dest("recorder", "Recorder", Icons.Default.Mic),
     Dest("dictation", "Dictation", Icons.Default.RecordVoiceOver),
@@ -377,6 +378,10 @@ private fun NavGraph(nav: androidx.navigation.NavHostController) {
             ReviewScreen(it.arguments?.getLong("id") ?: 0)
         }
         composable("settings") { SettingsScreen() }
+        composable("assistant?listen={listen}", arguments = listOf(navArgument("listen") { type = NavType.BoolType; defaultValue = false })) {
+            com.blacklab.app.ui.assistant.AssistantScreen(it.arguments?.getBoolean("listen") ?: false)
+        }
+        composable("assistant/settings") { com.blacklab.app.ui.assistant.AssistantSettingsScreen() }
     }
 }
 

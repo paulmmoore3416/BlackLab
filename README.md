@@ -7,13 +7,13 @@
 **A private, all-in-one personal & professional workspace for Android.**
 Pro camera & photo editor · dictation · audio recorder · Word-class documents · journal · to-do · calendar · education & certification tracking — in one app, with every file saved to a real folder on your phone.
 
-[![Version](https://img.shields.io/badge/version-3.1.0-2BD9A8)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-4.0.0-2BD9A8)](CHANGELOG.md)
 [![Android](https://img.shields.io/badge/Android-15%2B-3DDC84?logo=android&logoColor=white)](#requirements)
 [![Kotlin](https://img.shields.io/badge/Kotlin-2.1-7F52FF?logo=kotlin&logoColor=white)](https://kotlinlang.org)
 [![Jetpack Compose](https://img.shields.io/badge/Jetpack%20Compose-Material%203-4285F4?logo=jetpackcompose&logoColor=white)](https://developer.android.com/compose)
 [![Android CI](https://github.com/paulmmoore3416/BlackLab/actions/workflows/android.yml/badge.svg)](https://github.com/paulmmoore3416/BlackLab/actions/workflows/android.yml)
 
-[Download APK](releases/BlackLab-v3.1.0.apk) · [Features](#features) · [Install](#install) · [Build from source](#build-from-source) · [Architecture](docs/ARCHITECTURE.md)
+[Download APK](releases/BlackLab-v4.0.0.apk) · [Features](#features) · [Install](#install) · [Build from source](#build-from-source) · [Architecture](docs/ARCHITECTURE.md)
 
 </div>
 
@@ -38,6 +38,20 @@ BlackLab is designed for people who run complex operations by day and keep learn
 Optimized for the **Google Pixel 10 Pro XL** and newer (Android 15+).
 
 ## Features
+
+### 🤖 Assistant
+- Talk or type from the Home ask bar, a launcher shortcut, the Quick Settings tile, or hold power (set BlackLab as the digital assistant)
+- **Works offline**: an on-device command router runs tasks, calendar, briefings, notes, templates, journal, recorder, dictation, camera, scanners, focus timer, CEUs and every setting; **Gemini Nano** (on-device) handles free-form phrasing and questions
+- **Ask my files** — cited answers from your own documents, journal and transcripts, searched on the phone
+- **Meeting → Actions** — minutes, decisions and To-Do tasks from your latest dictation or recording
+- **Snap-to-Work-Order** — photograph an equipment nameplate and get a filled-in work order
+- Online extras: Gmail, Google Drive, Google Keep, Google developer docs; ElevenLabs voice with an offline fallback
+- Keys are encrypted with a hardware-backed Keystore key and never backed up or synced
+
+### 🖥️ BlackLab Desktop
+- Dashboard, assistant and **detailed settings for every section**, synced live with the phone over USB or Wi-Fi, or through your Google Drive's hidden app folder
+- Run it locally (`desktop/install.sh`) or open **https://paulmmoore3416.github.io/BlackLab/** and sign in with Google
+- Local companion with an offline desktop assistant (Ollama) for desktop tasks
 
 ### 📷 Camera
 - **Geotagged photos** — GPS plus street address, compass heading, altitude and author/copyright written to EXIF; optional burned-in info stamp
@@ -131,13 +145,13 @@ Internal storage/BlackLab/
 
 ## Install
 
-1. Download **[`BlackLab-v3.1.0.apk`](releases/BlackLab-v3.1.0.apk)** (also attached to the [v3.1.0 release](https://github.com/paulmmoore3416/BlackLab/releases/tag/v3.1.0)).
-   Verify it with the published SHA-256: [`BlackLab-v3.1.0.apk.sha256`](releases/BlackLab-v3.1.0.apk.sha256).
+1. Download **[`BlackLab-v4.0.0.apk`](releases/BlackLab-v4.0.0.apk)** (also attached to the [v4.0.0 release](https://github.com/paulmmoore3416/BlackLab/releases/tag/v4.0.0)).
+   Verify it with the published SHA-256: [`BlackLab-v4.0.0.apk.sha256`](releases/BlackLab-v4.0.0.apk.sha256).
 2. On the phone, allow your browser/Files app to **install unknown apps** when prompted.
 3. Open BlackLab and follow onboarding: name & title, account names, then grant
    **All-files access** (creates the BlackLab folder), **camera & microphone**, **notifications** and optionally **calendars**.
 
-Or with USB debugging: `adb install releases/BlackLab-v3.1.0.apk`
+Or with USB debugging: `adb install releases/BlackLab-v4.0.0.apk`
 
 ### Requirements
 - Android **15+** (API 35); targets Android 16 (API 36). Tested on an Android 16 emulator; installed and launched on a Pixel 10 Pro XL running Android 17
@@ -188,19 +202,24 @@ See **[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)** for the design.
 
 ```
 app/src/main/java/com/blacklab/app/
-├── core/        Profiles, settings, storage, time & recurrence, backups
+├── assistant/   Assistant router, Gemini Nano, voice, Google APIs, local index, keys
+├── core/        Profiles, settings + settings schema, storage, time & recurrence, backups
 ├── data/        Room entities/DAOs, calendar logic, task ops, grades, SRS
+├── link/        Desktop link server, data snapshot, Google Drive cloud sync
 ├── docs/        HTML ⇄ blocks model, DOCX writer/reader, PDF writer, Markdown
 ├── recorder/    Audio engine, encoders, transcription, foreground service
 ├── reminders/   Alarm scheduler, receivers, notifications
 ├── study/       Pomodoro timer
 └── ui/          Compose screens (home, camera, recorder, library, documents,
-                 editor, journal, tasks, schedule, education, settings, onboarding)
+                 editor, journal, tasks, schedule, education, settings, onboarding, assistant)
+desktop/
+├── web/         BlackLab Desktop UI (also published to GitHub Pages)
+└── companion/   Local companion: serves the UI, USB link, offline desktop assistant
 ```
 
 ## Privacy & security
 
-BlackLab has no backend and collects no analytics of its own — documents, recordings, photos and your database stay on the device.
+BlackLab has no backend and collects no analytics of its own — documents, recordings, photos and your database stay on the device. The assistant only reaches Google or ElevenLabs when you use an online feature (and never in offline-only mode). Desktop cloud sync uses the hidden app-data folder in your own Google Drive. API keys are stored encrypted on the phone and in `~/.config/blacklab-desktop/secrets.json` (mode 600) on the computer — never in this repository.
 
 **Disclosure:** the document scanner, QR/barcode scanner and OCR run on-device through Google Play services (ML Kit). Those Google libraries add the `INTERNET` / `ACCESS_NETWORK_STATE` permissions and, per Google’s ML Kit terms, may send anonymous usage and performance metrics to Google. They do not upload your images or text.
 

@@ -1,0 +1,11 @@
+{
+  "name": "BlackLab Desktop",
+  "short_name": "BlackLab",
+  "description": "Assistant, dashboard and every setting for the BlackLab app, synced with your phone.",
+  "start_url": "./#/dashboard",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#0B0F0E",
+  "theme_color": "#0B0F0E",
+  "icons": [{ "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }]
+}

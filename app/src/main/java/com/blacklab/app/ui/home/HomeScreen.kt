@@ -75,6 +75,7 @@ import com.blacklab.app.ui.theme.Mint
 import com.blacklab.app.ui.theme.Violet
 import com.google.mlkit.vision.barcode.common.Barcode
 import java.time.LocalDate
+import kotlinx.coroutines.launch
 
 private data class QuickAction(val label: String, val icon: ImageVector, val color: Color, val more: List<com.blacklab.app.ui.components.SheetAction> = emptyList(), val onClick: () -> Unit)
 
@@ -166,6 +167,29 @@ fun HomeScreen() {
                 style = MaterialTheme.typography.headlineMedium, modifier = Modifier.padding(top = 4.dp))
             Text(Time.longDate(today) + (s.jobTitle.takeIf { it.isNotBlank() && profile.name == "PROFESSIONAL" }?.let { " · $it" } ?: ""),
                 style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        item {
+            // Ask bar: tap to type, mic to talk, sparkle for a spoken briefing
+            Surface(
+                onClick = { shell.go("assistant") },
+                shape = RoundedCornerShape(28.dp),
+                color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                modifier = Modifier.fillMaxWidth().padding(top = 14.dp),
+            ) {
+                Row(Modifier.padding(start = 18.dp, end = 6.dp, top = 6.dp, bottom = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Default.AutoAwesome, null, tint = MaterialTheme.colorScheme.primary)
+                    Text("Ask ${s.asstName}…", Modifier.weight(1f).padding(start = 12.dp), color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    IconButton(onClick = {
+                        app.appScope.launch {
+                            val text = com.blacklab.app.assistant.Briefing.build(app, s.asstPersona)
+                            app.assistant.post(text, source = "Daily briefing · on-device")
+                            app.speaker.speak(text)
+                        }
+                        shell.go("assistant")
+                    }) { Icon(Icons.Default.WbSunny, "Brief me", tint = Amber) }
+                    androidx.compose.material3.FilledIconButton(onClick = { shell.go("assistant?listen=true") }) { Icon(Icons.Default.Mic, "Talk") }
+                }
+            }
         }
         if (dict.active) item {
             Surface(onClick = { shell.go("dictation") }, shape = RoundedCornerShape(18.dp), color = Color(0xFF8B6CFF).copy(alpha = 0.18f), modifier = Modifier.fillMaxWidth().padding(top = 12.dp)) {

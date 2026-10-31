@@ -21,8 +21,8 @@ android {
         applicationId = "com.blacklab.app"
         minSdk = 35
         targetSdk = 36
-        versionCode = 4
-        versionName = "3.1.0"
+        versionCode = 5
+        versionName = "4.0.0"
         vectorDrawables { useSupportLibrary = true }
     }
 
@@ -61,6 +61,8 @@ android {
         compose = true
         buildConfig = true
     }
+
+    testOptions { unitTests.isReturnDefaultValues = true }
 
     packaging {
         resources { excludes += "/META-INF/{AL2.0,LGPL2.1}" }
@@ -110,7 +112,8 @@ dependencies {
     implementation("androidx.room:room-ktx:$room")
     ksp("androidx.room:room-compiler:$room")
 
-    val camerax = "1.4.2"
+    // 1.6+: Extensions (Night/Portrait/HDR) keep working after CameraX ≤1.5 support ends on 2026-11-01
+    val camerax = "1.6.2"
     implementation("androidx.camera:camera-core:$camerax")
     implementation("androidx.camera:camera-camera2:$camerax")
     implementation("androidx.camera:camera-lifecycle:$camerax")
@@ -130,4 +133,12 @@ dependencies {
     implementation("com.google.android.gms:play-services-code-scanner:16.1.0")
     implementation("com.google.android.gms:play-services-mlkit-text-recognition:19.0.1")
     implementation("com.google.android.gms:play-services-mlkit-subject-segmentation:16.0.0-beta1")
+
+    // Assistant: on-device Gemini Nano (AICore), Google sign-in for Gmail/Drive, background sync
+    implementation("com.google.mlkit:genai-prompt:1.0.0-beta2")
+    implementation("com.google.android.gms:play-services-auth:21.5.1")
+    implementation("androidx.work:work-runtime-ktx:2.10.5")
+
+    testImplementation("junit:junit:4.13.2")
+    testImplementation("org.json:json:20240303")
 }

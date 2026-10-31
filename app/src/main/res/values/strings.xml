@@ -1,3 +1,8 @@
 <resources>
     <string name="app_name">BlackLab</string>
+    <string name="sc_assistant">Ask BlackLab</string>
+    <string name="sc_assistant_long">Talk to your assistant</string>
+    <string name="sc_task">New task</string>
+    <string name="sc_dictate">Dictate</string>
+    <string name="sc_brief">Brief me</string>
 </resources>

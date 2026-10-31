@@ -29,6 +29,13 @@ class BackupManager(private val context: Context, private val app: AppContainer)
                 prefs.inputStream().use { it.copyTo(zip) }
                 zip.closeEntry()
             }
+            // Assistant conversation (API keys live in a separate encrypted store and are never backed up)
+            val history = File(context.filesDir, "assistant/history.json")
+            if (history.exists()) {
+                zip.putNextEntry(ZipEntry("assistant/history.json"))
+                history.inputStream().use { it.copyTo(zip) }
+                zip.closeEntry()
+            }
         }
         app.settings.update { putLong(Keys.LAST_BACKUP_DAY, Time.today().toEpochDay()) }
         // keep the 14 most recent
@@ -64,9 +71,10 @@ class BackupManager(private val context: Context, private val app: AppContainer)
                 val target = when {
                     e.name.startsWith("db/") -> File(dbDir, name).also { restoredDb = true }
                     e.name.startsWith("prefs/") -> File(prefsDir, name)
+                    e.name == "assistant/history.json" -> File(context.filesDir, e.name).also { it.parentFile?.mkdirs() }
                     else -> null
                 }
-                if (target != null && name.startsWith("blacklab")) {
+                if (target != null && (name.startsWith("blacklab") || name == "history.json")) {
                     if (e.name.startsWith("db/") && name == BlackLabDatabase.NAME) {
                         File(dbDir, "$name-wal").delete(); File(dbDir, "$name-shm").delete()
                     }

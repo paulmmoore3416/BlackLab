@@ -60,3 +60,15 @@ Instead of scheduling one alarm per reminder, `ReminderScheduler` keeps **one ex
 - `Grades.neededOnRemaining` — percentage required on ungraded weight to reach the course target
 - `Grades.gpa` — credit-weighted quality points on a 4.0 scale (pass/fail excluded)
 - `Srs.review` — SM-2 spaced repetition with Again/Hard/Good/Easy grading
+
+## Assistant
+`assistant/Assistant.kt` routes every request through an ordered set of regex intents that call the same repositories the screens use (`TaskOps`, DAOs, `ContentStore`, services), so the assistant never has a separate copy of app state. Unmatched input goes to Gemini Nano (`Nano.kt`, ML Kit Prompt API over AICore) with a short command catalogue; Nano either returns `COMMAND: …`, which is routed again with Nano disabled to prevent loops, or `ANSWER: …`. Replies carry optional navigation routes, intents and UI actions (scanners, nameplate camera, Google sign-in) that the phone screen performs. Actions that send email, or change settings from the desktop, wait for a spoken or typed confirmation.
+
+`LocalIndex` is an in-memory BM25 index over documents, journal, transcripts, tasks, events and courses, rebuilt lazily when data changes. `MeetingActions` and `Nameplate` reuse it and ML Kit OCR. `Secrets` stores API keys as AES-GCM blobs under an Android Keystore key; keys can be provisioned once by pushing `BlackLab/.provision/keys.json`, which is deleted after import.
+
+## Desktop link & sync
+`core/SettingsSchema.kt` describes every setting (type, label, help, range, options). The phone's settings search, the assistant's "set X to Y" and every BlackLab Desktop settings page are generated from it, and desktop writes go back through `SettingsSchema.apply`, which validates them.
+
+- **USB / Wi-Fi:** `link/LinkServer.kt` is a small HTTP/1.1 JSON API on port 8765, bound to localhost (reached over USB with `adb forward`) and optionally to Wi-Fi. Every call except `/api/ping` needs the 8-character pairing code; repeated bad codes lock the client out. `LinkHub.rev` increases on every change so the desktop long-polls `/api/changes`.
+- **Anywhere:** `link/CloudSync.kt` writes `blacklab-sync.json` (snapshot, schema, results) to the hidden Drive `appDataFolder` and reads `blacklab-inbox.json` (settings changes and commands queued by the web UI). Each side writes only its own file, so they never race.
+- **Desktop:** `desktop/web` is a static single-page app (GitHub Pages and local). `desktop/companion/blacklab_desktop.py` (standard library only) serves it on 127.0.0.1:8770, keeps `adb forward` up while the phone is plugged in, and runs the desktop assistant: rules first, then a local Ollama model with tool calling.

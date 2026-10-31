@@ -15,6 +15,7 @@ object Notifications {
     const val CH_AGENDA = "agenda"
     const val CH_RECORDING = "recording"
     const val CH_STUDY = "study"
+    const val CH_LINK = "link"
 
     fun createChannels(context: Context) {
         val nm = context.getSystemService(NotificationManager::class.java)
@@ -30,6 +31,9 @@ object Notifications {
                 NotificationChannel(CH_RECORDING, "Recording", NotificationManager.IMPORTANCE_LOW).apply {
                     description = "Shown while BlackLab is recording audio"
                     setShowBadge(false)
+                },
+                NotificationChannel(CH_LINK, "Desktop link & sync", NotificationManager.IMPORTANCE_MIN).apply {
+                    description = "Shown while BlackLab Desktop can connect"
                 },
                 NotificationChannel(CH_STUDY, "Study timer", NotificationManager.IMPORTANCE_HIGH).apply {
                     description = "Focus session and break alerts"

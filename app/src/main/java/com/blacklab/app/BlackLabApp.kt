@@ -26,6 +26,13 @@ class BlackLabApp : Application() {
         container.storage.ensureStructure()
         container.requestReminderSync()
         container.appScope.launch { container.backups.autoBackupIfDue() }
+        container.appScope.launch {
+            val imported = container.secrets.importProvisioning(container.storage.root)
+            if (imported > 0) android.util.Log.i("BlackLab", "Imported $imported provisioned key(s)")
+            com.blacklab.app.assistant.Nano.refresh()
+        }
+        container.link.watch()
+        com.blacklab.app.link.CloudSync.schedule(this)
     }
 }
 
@@ -36,6 +43,10 @@ class AppContainer(val context: Context) {
     val db: BlackLabDatabase = BlackLabDatabase.build(context)
     val content = ContentStore(storage)
     val backups = com.blacklab.app.core.BackupManager(context, this)
+    val secrets = com.blacklab.app.assistant.Secrets(context)
+    val assistant by lazy { com.blacklab.app.assistant.Assistant(this) }
+    val speaker by lazy { com.blacklab.app.assistant.Speaker(context, this) }
+    val link = com.blacklab.app.link.LinkHub(this)
 
     private var syncJob: Job? = null
 

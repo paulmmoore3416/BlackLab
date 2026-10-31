@@ -294,7 +294,7 @@ class CameraEngine(private val context: Context) {
         }
         if (aeAwbLocked) b.setCaptureRequestOption(CaptureRequest.CONTROL_AWB_LOCK, true)
         else if (m.awbMode != CaptureRequest.CONTROL_AWB_MODE_AUTO) b.setCaptureRequestOption(CaptureRequest.CONTROL_AWB_MODE, m.awbMode)
-        runCatching { Camera2CameraControl.from(cam.cameraControl).captureRequestOptions = b.build() }
+        runCatching { Camera2CameraControl.from(cam.cameraControl).setCaptureRequestOptions(b.build()) }
     }
 
     fun setManual(p: ManualParams) { manual = p; pushRequestOptions() }

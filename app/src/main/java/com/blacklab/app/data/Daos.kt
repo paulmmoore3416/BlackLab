@@ -35,6 +35,9 @@ interface JournalDao {
     @Query("SELECT * FROM journal WHERE id = :id")
     suspend fun get(id: Long): JournalEntity?
 
+    @Query("SELECT * FROM journal WHERE profile = :profile ORDER BY entryDay DESC")
+    suspend fun allFor(profile: String): List<JournalEntity>
+
     @Query("SELECT COUNT(*) FROM journal WHERE profile = :profile AND entryDay = :day")
     suspend fun countOn(profile: String, day: Long): Int
 
@@ -79,6 +82,9 @@ interface TaskDao {
     // lists
     @Query("SELECT * FROM task_lists WHERE profile = :profile ORDER BY sortOrder, name")
     fun observeLists(profile: String): Flow<List<TaskListEntity>>
+
+    @Query("SELECT * FROM task_lists WHERE profile = :profile ORDER BY sortOrder, name")
+    suspend fun lists(profile: String): List<TaskListEntity>
 
     @Insert suspend fun insertList(e: TaskListEntity): Long
     @Update suspend fun updateList(e: TaskListEntity)
@@ -139,6 +145,8 @@ interface EducationDao {
     // terms
     @Query("SELECT * FROM terms WHERE profile = :profile ORDER BY startDay DESC")
     fun observeTerms(profile: String): Flow<List<TermEntity>>
+    @Query("SELECT * FROM terms")
+    suspend fun allTerms(): List<TermEntity>
     @Insert suspend fun insertTerm(e: TermEntity): Long
     @Update suspend fun updateTerm(e: TermEntity)
     @Delete suspend fun deleteTerm(e: TermEntity)
@@ -229,6 +237,9 @@ interface EducationDao {
 interface RecordingDao {
     @Query("SELECT * FROM recordings WHERE profile = :profile ORDER BY createdAt DESC")
     fun observe(profile: String): Flow<List<RecordingEntity>>
+
+    @Query("SELECT * FROM recordings WHERE profile = :profile ORDER BY createdAt DESC")
+    suspend fun allFor(profile: String): List<RecordingEntity>
 
     @Query("SELECT * FROM recordings WHERE filePath = :path LIMIT 1")
     suspend fun byPath(path: String): RecordingEntity?

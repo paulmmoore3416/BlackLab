@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+    <shortcut android:shortcutId="assistant" android:enabled="true" android:icon="@drawable/ic_sc_assistant"
+        android:shortcutShortLabel="@string/sc_assistant" android:shortcutLongLabel="@string/sc_assistant_long">
+        <intent android:action="com.blacklab.app.ASSIST" android:targetPackage="com.blacklab.app" android:targetClass="com.blacklab.app.MainActivity" />
+    </shortcut>
+    <shortcut android:shortcutId="task" android:enabled="true" android:icon="@drawable/ic_sc_task"
+        android:shortcutShortLabel="@string/sc_task" android:shortcutLongLabel="@string/sc_task">
+        <intent android:action="android.intent.action.VIEW" android:targetPackage="com.blacklab.app" android:targetClass="com.blacklab.app.MainActivity">
+            <extra android:name="route" android:value="task/0" />
+        </intent>
+    </shortcut>
+    <shortcut android:shortcutId="dictate" android:enabled="true" android:icon="@drawable/ic_sc_dictate"
+        android:shortcutShortLabel="@string/sc_dictate" android:shortcutLongLabel="@string/sc_dictate">
+        <intent android:action="android.intent.action.VIEW" android:targetPackage="com.blacklab.app" android:targetClass="com.blacklab.app.MainActivity">
+            <extra android:name="route" android:value="dictation" />
+        </intent>
+    </shortcut>
+    <shortcut android:shortcutId="brief" android:enabled="true" android:icon="@drawable/ic_sc_brief"
+        android:shortcutShortLabel="@string/sc_brief" android:shortcutLongLabel="@string/sc_brief">
+        <intent android:action="android.intent.action.VIEW" android:targetPackage="com.blacklab.app" android:targetClass="com.blacklab.app.MainActivity">
+            <extra android:name="route" android:value="assistant" />
+            <extra android:name="ask" android:value="brief me" />
+        </intent>
+    </shortcut>
+</shortcuts>

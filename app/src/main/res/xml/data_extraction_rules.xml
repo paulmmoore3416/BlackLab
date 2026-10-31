@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- API keys are encrypted with a device-bound keystore key, so they are useless on another
+     device and are never included in cloud backups or device-to-device transfers. -->
+<data-extraction-rules>
+    <cloud-backup>
+        <exclude domain="sharedpref" path="blacklab_secrets.xml" />
+    </cloud-backup>
+    <device-transfer>
+        <exclude domain="sharedpref" path="blacklab_secrets.xml" />
+    </device-transfer>
+</data-extraction-rules>

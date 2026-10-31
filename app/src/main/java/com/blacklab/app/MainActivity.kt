@@ -22,6 +22,7 @@ import androidx.lifecycle.ProcessLifecycleOwner
 import com.blacklab.app.ui.AppRoot
 import com.blacklab.app.ui.theme.BlackLabTheme
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.launch
 
 class MainActivity : FragmentActivity() {
 
@@ -31,6 +32,8 @@ class MainActivity : FragmentActivity() {
         val pendingRoute = MutableStateFlow<String?>(null)
         /** Files or text shared into BlackLab from other apps. */
         val pendingShare = MutableStateFlow<SharePayload?>(null)
+        /** Text a shortcut asked the assistant to run once its screen is open. */
+        val pendingAsk = MutableStateFlow<String?>(null)
         val locked = MutableStateFlow(false)
         private var backgroundedAt = 0L
     }
@@ -72,6 +75,15 @@ class MainActivity : FragmentActivity() {
         }
     }
 
+    override fun onResume() {
+        super.onResume()
+        val app = app
+        com.blacklab.app.link.LinkService.sync(this)
+        if (app.settings.current.cloudSync && System.currentTimeMillis() - com.blacklab.app.link.CloudSync.lastSync.value > 120_000) {
+            app.appScope.launch { com.blacklab.app.link.CloudSync.sync(app) }
+        }
+    }
+
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         handleIntent(intent)
@@ -80,7 +92,9 @@ class MainActivity : FragmentActivity() {
     private fun handleIntent(intent: Intent?) {
         intent ?: return
         intent.getStringExtra(EXTRA_ROUTE)?.let { pendingRoute.value = it }
+        intent.getStringExtra("ask")?.let { pendingAsk.value = it }
         when (intent.action) {
+            Intent.ACTION_ASSIST, Intent.ACTION_VOICE_COMMAND, "com.blacklab.app.ASSIST" -> pendingRoute.value = "assistant?listen=true"
             Intent.ACTION_SEND -> {
                 @Suppress("DEPRECATION")
                 val uri = intent.getParcelableExtra<Uri>(Intent.EXTRA_STREAM)

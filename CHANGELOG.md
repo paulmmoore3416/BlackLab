@@ -2,6 +2,28 @@
 
 All notable changes to BlackLab are documented here. The project follows [Semantic Versioning](https://semver.org/).
 
+## [4.0.0] — 2026-10-31
+
+### Added
+- **Personal assistant** — talk or type from the Home ask bar, the drawer, a launcher shortcut, the Quick Settings tile, or by setting BlackLab as the phone's digital assistant (hold power). A deterministic, fully offline command router acts on all of BlackLab: tasks and reminders, calendar events (with conflict warnings), agenda, daily briefing, notes, document templates, journal, recorder and dictation control, camera and scanners, focus timer, CEU logging, GPA, account switching and every setting by name. Phrasing the router doesn't recognize is rewritten into a command, or answered, by **Gemini Nano on-device** (AICore). Personas: laid-back, professional or concise. Spoken replies use **ElevenLabs** (laid-back male voice, monthly character budget, cached phrases) when online, and the on-device Android voice offline.
+- **Three offline features**
+  - **Ask my files** — on-device BM25 search over documents, journal, recording and dictation transcripts, tasks, events and courses; Gemini Nano writes a cited answer from the top passages.
+  - **Meeting → Actions** — turns the latest dictation/recording transcript into minutes (summary, decisions, action items) and creates a To-Do task for each action item.
+  - **Snap-to-Work-Order** — photograph an equipment nameplate; ML Kit OCR pulls manufacturer, model, serial, electrical and refrigerant specs into a pre-filled work order document and task.
+- **Google services** (online, optional) — Gmail (check unread with a Nano summary, search, draft, send with confirmation), Google Drive (search, upload backups/photos/scans/recordings), Google Keep (via the Keep app; Keep's API is Workspace-only), and Google developer docs search (Developer Knowledge API). Gmail and Drive use Google sign-in (OAuth); API keys are stored encrypted with a hardware-backed Keystore key and are never backed up, exported or sent to the desktop.
+- **BlackLab Desktop** — a desktop control center (`desktop/`) with dashboard, assistant chat, a command palette (Ctrl+K) and detailed settings pages for every section, all generated from the app's settings schema. It syncs live with the phone over USB (`adb forward`, automatic) or Wi-Fi with a pairing code, and through a hidden app-data folder in your Google Drive when away. A local companion service adds an offline desktop assistant (Ollama with tool calling) for desktop tasks: system status, disk usage, finding/opening files, launching apps, notes, and pulling phone files to the computer.
+- **GitHub Pages** — the Desktop UI is published at https://paulmmoore3416.github.io/BlackLab/ with a **Sign in with Google** button for cloud sync from any browser; it also installs as an offline-capable web app.
+
+### Improved
+1. **Search all settings** from the top of the Settings screen.
+2. **Launcher shortcuts** — Ask BlackLab, New task, Dictate, Brief me.
+3. **Quick Settings tile** — “Ask BlackLab” from the notification shade.
+4. **Default digital assistant** — BlackLab can be chosen for the assist gesture / power-button hold.
+5. **Home ask bar** with one-tap spoken daily briefing.
+6. **CameraX 1.6** — Night, Portrait and HDR extensions keep working after CameraX ≤1.5 extension support ends on 2026-11-01.
+7. **Safer backups** — Android backup and device-transfer rules exclude the encrypted key store; BlackLab backups now include the assistant conversation.
+8. **Unit tests** for the assistant's parsing logic.
+
 ## [3.1.0] — 2026-10-28
 
 ### Added

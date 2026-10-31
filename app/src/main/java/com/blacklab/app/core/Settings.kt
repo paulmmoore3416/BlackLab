@@ -93,6 +93,41 @@ data class Settings(
     // storage
     val autoBackup: Boolean = true,
     val lastBackupDay: Long = 0,
+    // assistant
+    val asstName: String = "BlackLab",
+    val asstPersona: String = "LAIDBACK", // LAIDBACK, PROFESSIONAL, CONCISE
+    val asstSpeak: Boolean = true,
+    val asstVoiceEngine: String = "AUTO", // AUTO, ELEVENLABS, DEVICE
+    val asstElevenVoice: String = "CwhRBWXzGAHq8TQ4Fs17",
+    val asstElevenModel: String = "eleven_flash_v2_5",
+    val asstElevenStability: Int = 40,
+    val asstElevenSimilarity: Int = 75,
+    val asstElevenStyle: Int = 35,
+    val asstElevenBudget: Int = 9000,
+    val asstSpeechRate: Int = 100,
+    val asstPitch: Int = 88,
+    val asstAutoListen: Boolean = false,
+    val asstConfirm: Boolean = true,
+    val asstUseNano: Boolean = true,
+    val asstNanoTemp: Int = 30,
+    val asstNanoTokens: Int = 320,
+    val asstOfflineOnly: Boolean = false,
+    val asstIndexDocs: Boolean = true,
+    val asstIndexJournal: Boolean = true,
+    val asstIndexTranscripts: Boolean = true,
+    val asstIndexTasks: Boolean = true,
+    val asstHistory: Int = 200,
+    val asstGmailMax: Int = 8,
+    val asstDriveFolder: String = "BlackLab",
+    val asstWorkOrderList: String = "Work Orders",
+    val asstBriefOnOpen: Boolean = false,
+    // desktop link & cloud sync
+    val linkEnabled: Boolean = false,
+    val linkLan: Boolean = false,
+    val linkPort: Int = 8765,
+    val cloudSync: Boolean = false,
+    val cloudSyncMinutes: Int = 15,
+    val googleAccount: String = "",
 )
 
 object Keys {
@@ -171,6 +206,39 @@ object Keys {
     const val PAGE_SIZE = "page_size"
     const val AUTO_BACKUP = "auto_backup"
     const val LAST_BACKUP_DAY = "last_backup_day"
+    const val ASST_NAME = "asst_name"
+    const val ASST_PERSONA = "asst_persona"
+    const val ASST_SPEAK = "asst_speak"
+    const val ASST_VOICE_ENGINE = "asst_voice_engine"
+    const val ASST_ELEVEN_VOICE = "asst_eleven_voice"
+    const val ASST_ELEVEN_MODEL = "asst_eleven_model"
+    const val ASST_ELEVEN_STABILITY = "asst_eleven_stability"
+    const val ASST_ELEVEN_SIMILARITY = "asst_eleven_similarity"
+    const val ASST_ELEVEN_STYLE = "asst_eleven_style"
+    const val ASST_ELEVEN_BUDGET = "asst_eleven_budget"
+    const val ASST_RATE = "asst_rate"
+    const val ASST_PITCH = "asst_pitch"
+    const val ASST_AUTO_LISTEN = "asst_auto_listen"
+    const val ASST_CONFIRM = "asst_confirm"
+    const val ASST_USE_NANO = "asst_use_nano"
+    const val ASST_NANO_TEMP = "asst_nano_temp"
+    const val ASST_NANO_TOKENS = "asst_nano_tokens"
+    const val ASST_OFFLINE_ONLY = "asst_offline_only"
+    const val ASST_INDEX_DOCS = "asst_index_docs"
+    const val ASST_INDEX_JOURNAL = "asst_index_journal"
+    const val ASST_INDEX_TRANSCRIPTS = "asst_index_transcripts"
+    const val ASST_INDEX_TASKS = "asst_index_tasks"
+    const val ASST_HISTORY = "asst_history"
+    const val ASST_GMAIL_MAX = "asst_gmail_max"
+    const val ASST_DRIVE_FOLDER = "asst_drive_folder"
+    const val ASST_WO_LIST = "asst_wo_list"
+    const val ASST_BRIEF_ON_OPEN = "asst_brief_on_open"
+    const val LINK_ENABLED = "link_enabled"
+    const val LINK_LAN = "link_lan"
+    const val LINK_PORT = "link_port"
+    const val CLOUD_SYNC = "cloud_sync"
+    const val CLOUD_SYNC_MIN = "cloud_sync_min"
+    const val GOOGLE_ACCOUNT = "google_account"
 }
 
 class SettingsRepository(context: Context) {
@@ -269,6 +337,39 @@ class SettingsRepository(context: Context) {
             defaultPageSize = getString(Keys.PAGE_SIZE, d.defaultPageSize) ?: d.defaultPageSize,
             autoBackup = getBoolean(Keys.AUTO_BACKUP, d.autoBackup),
             lastBackupDay = getLong(Keys.LAST_BACKUP_DAY, d.lastBackupDay),
+            asstName = getString(Keys.ASST_NAME, d.asstName)?.ifBlank { null } ?: d.asstName,
+            asstPersona = getString(Keys.ASST_PERSONA, d.asstPersona) ?: d.asstPersona,
+            asstSpeak = getBoolean(Keys.ASST_SPEAK, d.asstSpeak),
+            asstVoiceEngine = getString(Keys.ASST_VOICE_ENGINE, d.asstVoiceEngine) ?: d.asstVoiceEngine,
+            asstElevenVoice = getString(Keys.ASST_ELEVEN_VOICE, d.asstElevenVoice)?.ifBlank { null } ?: d.asstElevenVoice,
+            asstElevenModel = getString(Keys.ASST_ELEVEN_MODEL, d.asstElevenModel) ?: d.asstElevenModel,
+            asstElevenStability = getInt(Keys.ASST_ELEVEN_STABILITY, d.asstElevenStability),
+            asstElevenSimilarity = getInt(Keys.ASST_ELEVEN_SIMILARITY, d.asstElevenSimilarity),
+            asstElevenStyle = getInt(Keys.ASST_ELEVEN_STYLE, d.asstElevenStyle),
+            asstElevenBudget = getInt(Keys.ASST_ELEVEN_BUDGET, d.asstElevenBudget),
+            asstSpeechRate = getInt(Keys.ASST_RATE, d.asstSpeechRate),
+            asstPitch = getInt(Keys.ASST_PITCH, d.asstPitch),
+            asstAutoListen = getBoolean(Keys.ASST_AUTO_LISTEN, d.asstAutoListen),
+            asstConfirm = getBoolean(Keys.ASST_CONFIRM, d.asstConfirm),
+            asstUseNano = getBoolean(Keys.ASST_USE_NANO, d.asstUseNano),
+            asstNanoTemp = getInt(Keys.ASST_NANO_TEMP, d.asstNanoTemp),
+            asstNanoTokens = getInt(Keys.ASST_NANO_TOKENS, d.asstNanoTokens),
+            asstOfflineOnly = getBoolean(Keys.ASST_OFFLINE_ONLY, d.asstOfflineOnly),
+            asstIndexDocs = getBoolean(Keys.ASST_INDEX_DOCS, d.asstIndexDocs),
+            asstIndexJournal = getBoolean(Keys.ASST_INDEX_JOURNAL, d.asstIndexJournal),
+            asstIndexTranscripts = getBoolean(Keys.ASST_INDEX_TRANSCRIPTS, d.asstIndexTranscripts),
+            asstIndexTasks = getBoolean(Keys.ASST_INDEX_TASKS, d.asstIndexTasks),
+            asstHistory = getInt(Keys.ASST_HISTORY, d.asstHistory),
+            asstGmailMax = getInt(Keys.ASST_GMAIL_MAX, d.asstGmailMax),
+            asstDriveFolder = getString(Keys.ASST_DRIVE_FOLDER, d.asstDriveFolder) ?: d.asstDriveFolder,
+            asstWorkOrderList = getString(Keys.ASST_WO_LIST, d.asstWorkOrderList) ?: d.asstWorkOrderList,
+            asstBriefOnOpen = getBoolean(Keys.ASST_BRIEF_ON_OPEN, d.asstBriefOnOpen),
+            linkEnabled = getBoolean(Keys.LINK_ENABLED, d.linkEnabled),
+            linkLan = getBoolean(Keys.LINK_LAN, d.linkLan),
+            linkPort = getInt(Keys.LINK_PORT, d.linkPort),
+            cloudSync = getBoolean(Keys.CLOUD_SYNC, d.cloudSync),
+            cloudSyncMinutes = getInt(Keys.CLOUD_SYNC_MIN, d.cloudSyncMinutes),
+            googleAccount = getString(Keys.GOOGLE_ACCOUNT, d.googleAccount) ?: "",
         )
     }
 }

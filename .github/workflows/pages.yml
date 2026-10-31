@@ -1,0 +1,35 @@
+name: BlackLab Desktop (GitHub Pages)
+
+# Publishes desktop/web — the BlackLab Desktop UI — to https://paulmmoore3416.github.io/BlackLab/
+# It is static HTML/JS with no secrets: the Google OAuth client ID is public by design, and API
+# keys live only on the phone (encrypted) and in ~/.config/blacklab-desktop on the computer.
+
+on:
+  push:
+    branches: [ main ]
+    paths: [ 'desktop/web/**', '.github/workflows/pages.yml' ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: desktop/web
+      - id: deployment
+        uses: actions/deploy-pages@v4

@@ -81,6 +81,7 @@ fun SettingsScreen() {
     var allFiles by remember { mutableStateOf(app.storage.hasAllFilesAccess) }
     var notifOk by remember { mutableStateOf(NotificationManagerCompat.from(ctx).areNotificationsEnabled()) }
     var restoreList by remember { mutableStateOf(false) }
+    var query by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf("") }
     var restoreTarget by remember { mutableStateOf<Any?>(null) }
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) {
         allFiles = app.storage.hasAllFilesAccess
@@ -93,6 +94,37 @@ fun SettingsScreen() {
 
     Scaffold(topBar = { BlTopBar("Settings", onBack = { shell.back() }) }) { pad ->
         LazyColumn(Modifier.padding(pad).fillMaxSize().padding(horizontal = 16.dp)) {
+            item {
+                androidx.compose.material3.OutlinedTextField(
+                    query, { query = it }, singleLine = true, placeholder = { Text("Search all settings") },
+                    leadingIcon = { androidx.compose.material3.Icon(Icons.Default.Search, null) },
+                    trailingIcon = { if (query.isNotEmpty()) androidx.compose.material3.IconButton(onClick = { query = "" }) { androidx.compose.material3.Icon(Icons.Default.Close, "Clear") } },
+                    shape = androidx.compose.foundation.shape.RoundedCornerShape(28.dp), modifier = Modifier.fillMaxWidth().padding(top = 4.dp, bottom = 4.dp),
+                )
+            }
+            if (query.isNotBlank()) {
+                val matches = com.blacklab.app.core.SettingsSchema.sections.flatMap { sec -> sec.items.filter { matchesQuery(it, sec, query) }.map { sec to it } }
+                if (matches.isEmpty()) item { Text("No settings match “$query”.", color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(16.dp)) }
+                matches.groupBy { it.first }.forEach { (sec, list) ->
+                    item(key = "h-" + sec.id) { SectionHeader(sec.title) }
+                    list.forEach { (_, def) -> item(key = def.key) { SchemaItem(def) } }
+                }
+                return@LazyColumn
+            }
+            item {
+                BlCard(Modifier.fillMaxWidth().padding(top = 8.dp), onClick = { shell.go("assistant/settings") }) {
+                    Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                        androidx.compose.material3.Icon(Icons.Default.AutoAwesome, null, tint = MaterialTheme.colorScheme.primary)
+                        Spacer(Modifier.padding(start = 12.dp))
+                        Column(Modifier.weight(1f)) {
+                            Text("Assistant, voice & desktop", style = MaterialTheme.typography.titleSmall)
+                            Text("${s.asstName} · Google account, API keys, Gemini Nano, BlackLab Desktop link & cloud sync",
+                                style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                        androidx.compose.material3.Icon(Icons.Default.ChevronRight, null)
+                    }
+                }
+            }
             item { SectionHeader("You") }
             item { SettingRow("Name", s.userName.ifBlank { "Not set" }, Icons.Default.Badge) { edit = Triple(Keys.USER_NAME, "Your name", s.userName) } }
             item { SettingRow("Job title", s.jobTitle.ifBlank { "Not set" }, Icons.Default.Work) { edit = Triple(Keys.JOB_TITLE, "Job title", s.jobTitle) } }
