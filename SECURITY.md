@@ -16,11 +16,27 @@ No signing keys, keystore passwords, API keys or tokens are committed. The follo
 | `local.properties` | Machine-specific SDK path |
 | `.env*`, `google-services.json` | Environment secrets / service config |
 
+`scripts/secret-scan.sh` enforces this. It runs in CI on every push and pull request and fails the build if any of the paths above, or a credential-shaped string (Google/GitHub/ElevenLabs/Anthropic/OpenAI/AWS/Slack keys, private keys, plain-text signing passwords), is tracked.
+
 Release builds read the signing configuration from `keystore/keystore.properties` at build time and fall back to the debug key when it is absent.
 
 ## API keys
 
 Assistant API keys (ElevenLabs, Google) are never compiled into the app or committed here. On the phone they are encrypted with a hardware-backed Android Keystore key, excluded from Android backups and device transfers, and the desktop link reports only whether a key is set. On the computer they live in `~/.config/blacklab-desktop/secrets.json` (mode 600). The desktop link requires a pairing code and the companion listens on 127.0.0.1 only.
+
+## Updates
+
+In-app updates come only from this repository's GitHub Releases, over HTTPS, from GitHub's own hosts. Before an APK is installed it must:
+
+1. match the SHA-256 published next to it in the release;
+2. be signed with the same certificate as the installed app;
+3. be the same package with a higher version code.
+
+Replacing both the APK and its checksum still fails check 2 without the release key, and Android re-checks the signature before replacing the app.
+
+## Problem reports
+
+Crash, ANR and native-crash reports are written to app-private storage, excluded from backups, and leave the phone only when you share them.
 
 ## Reporting a vulnerability
 Please open a private [security advisory](https://github.com/paulmmoore3416/BlackLab/security/advisories/new) rather than a public issue. Include steps to reproduce, the affected version and the device/Android version.

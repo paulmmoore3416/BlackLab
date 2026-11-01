@@ -21,9 +21,10 @@ android {
         applicationId = "com.blacklab.app"
         minSdk = 35
         targetSdk = 36
-        versionCode = 7
-        versionName = "4.2.0"
+        versionCode = 8
+        versionName = "4.3.0"
         vectorDrawables { useSupportLibrary = true }
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
     signingConfigs {
@@ -63,6 +64,9 @@ android {
     }
 
     testOptions { unitTests.isReturnDefaultValues = true }
+
+    // Room schema JSONs feed the migration tests on a device
+    sourceSets { getByName("androidTest").assets.srcDir("$projectDir/schemas") }
 
     packaging {
         resources { excludes += "/META-INF/{AL2.0,LGPL2.1}" }
@@ -131,6 +135,9 @@ dependencies {
     // PDF editing: merge, split, rotate, reorder, text extraction, stamping, forms, passwords
     implementation("com.tom-roush:pdfbox-android:2.0.27.0")
 
+    // Home-screen widgets (Today, Checklist, Quick capture)
+    implementation("androidx.glance:glance-appwidget:1.1.1")
+
     // QR codes for Brainstorm Live Share links
     implementation("com.google.zxing:core:3.5.3")
 
@@ -151,4 +158,10 @@ dependencies {
 
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.json:json:20240303")
+
+    // On-device tests (run on the emulator locally and in CI)
+    androidTestImplementation("androidx.test.ext:junit:1.2.1")
+    androidTestImplementation("androidx.test:runner:1.6.2")
+    androidTestImplementation("androidx.test:rules:1.6.1")
+    androidTestImplementation("androidx.room:room-testing:$room")
 }

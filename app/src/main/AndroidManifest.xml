@@ -30,6 +30,8 @@
     <uses-permission android:name="android.permission.READ_MEDIA_AUDIO" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <!-- In-app updates from GitHub Releases (Android asks you once; every APK is checksum- and signature-verified first) -->
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
 
     <queries>
         <intent>
@@ -130,6 +132,61 @@
                 <data android:mimeType="application/x-subrip" />
             </intent-filter>
         </activity>
+
+        <!-- Write-only quick capture opened by the widgets; never shows existing content -->
+        <activity
+            android:name=".capture.QuickCaptureActivity"
+            android:exported="false"
+            android:excludeFromRecents="true"
+            android:taskAffinity="com.blacklab.app.capture"
+            android:noHistory="false"
+            android:windowSoftInputMode="adjustResize|stateVisible"
+            android:theme="@style/Theme.BlackLab.Capture" />
+
+        <activity
+            android:name=".widgets.ChecklistConfigActivity"
+            android:exported="true"
+            android:excludeFromRecents="true"
+            android:taskAffinity="com.blacklab.app.widgetconfig"
+            android:theme="@style/Theme.BlackLab">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_CONFIGURE" />
+            </intent-filter>
+        </activity>
+
+        <receiver
+            android:name=".widgets.TodayWidgetReceiver"
+            android:exported="true"
+            android:label="@string/widget_today_label">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_today" />
+        </receiver>
+
+        <receiver
+            android:name=".widgets.ChecklistWidgetReceiver"
+            android:exported="true"
+            android:label="@string/widget_checklist_label">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_checklist" />
+        </receiver>
+
+        <receiver
+            android:name=".widgets.CaptureWidgetReceiver"
+            android:exported="true"
+            android:label="@string/widget_capture_label">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_capture" />
+        </receiver>
+
+        <receiver
+            android:name=".update.UpdateReceiver"
+            android:exported="false" />
 
         <service
             android:name=".media.PlaybackService"

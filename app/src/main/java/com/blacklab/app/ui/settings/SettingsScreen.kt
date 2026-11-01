@@ -32,6 +32,7 @@ import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -165,6 +166,31 @@ fun SettingsScreen() {
             }
             item { LabeledSwitchRow("Lock ${s.professionalName} account", "Require unlock when switching to it", s.lockProfessional, icon = Icons.Default.Lock) { v -> app.settings.update { putBoolean(Keys.LOCK_PROFESSIONAL, v) } } }
 
+            item { SectionHeader("Home-screen widgets") }
+            item {
+                val awm = remember { android.appwidget.AppWidgetManager.getInstance(ctx) }
+                BlCard(Modifier.fillMaxWidth()) {
+                    Text("Today, Checklist and Quick capture", style = MaterialTheme.typography.titleSmall)
+                    Text("Long-press your home screen › Widgets › BlackLab, or add one here. Quick capture saves new notes and tasks without unlocking BlackLab; it never shows existing content.",
+                        style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    if (awm.isRequestPinAppWidgetSupported) androidx.compose.foundation.layout.FlowRow(Modifier.padding(top = 6.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        listOf(
+                            "Today" to com.blacklab.app.widgets.TodayWidgetReceiver::class.java,
+                            "Checklist" to com.blacklab.app.widgets.ChecklistWidgetReceiver::class.java,
+                            "Quick capture" to com.blacklab.app.widgets.CaptureWidgetReceiver::class.java,
+                        ).forEach { (label, cls) ->
+                            androidx.compose.material3.AssistChip(onClick = { awm.requestPinAppWidget(android.content.ComponentName(ctx, cls), null, null) },
+                                label = { Text("Add $label") }, leadingIcon = { androidx.compose.material3.Icon(Icons.Default.Widgets, null, Modifier.padding(0.dp)) })
+                        }
+                    }
+                }
+            }
+            item {
+                LabeledSwitchRow("Hide details in widgets", "Show counts only (e.g. “3 tasks to do”). Widgets on the lock screen always hide details.", s.widgetPrivacy == "COUNTS", icon = Icons.Default.VisibilityOff) { v ->
+                    app.settings.update { putString(Keys.WIDGET_PRIVACY, if (v) "COUNTS" else "SHOW") }
+                }
+            }
+
             item { SectionHeader("Storage & backup") }
             item {
                 BlCard(Modifier.fillMaxWidth(), accent = if (allFiles) null else LocalBlColors.current.warning) {
@@ -231,6 +257,18 @@ fun SettingsScreen() {
             item { DropdownField("Default page size", PageSetup.sizes, s.defaultPageSize, { v -> app.settings.update { putString(Keys.PAGE_SIZE, v) } }, Modifier.padding(8.dp)) }
 
             item { SectionHeader("About") }
+            item {
+                val upd by com.blacklab.app.update.Updater.state.collectAsState()
+                SettingRow("App updates", when (val u = upd) {
+                    is com.blacklab.app.update.Updater.State.Available -> "Version ${u.release.version} is available"
+                    is com.blacklab.app.update.Updater.State.Verified -> "Version ${u.release.version} is ready to install"
+                    else -> if (s.updateAuto) "Checking weekly · GitHub Releases" else "Check GitHub Releases for a new version"
+                }, Icons.Default.SystemUpdate) { shell.go("updates") }
+            }
+            item {
+                val unseen by com.blacklab.app.core.CrashLog.unseen.collectAsState()
+                SettingRow("Problem reports", if (unseen > 0) "$unseen new · kept only on this phone" else "Crash and freeze reports, kept only on this phone", Icons.Default.BugReport) { shell.go("diagnostics") }
+            }
             item {
                 BlCard(Modifier.fillMaxWidth().padding(bottom = 32.dp)) {
                     Text("BlackLab ${BuildConfig.VERSION_NAME} (build ${BuildConfig.VERSION_CODE})", style = MaterialTheme.typography.titleSmall)

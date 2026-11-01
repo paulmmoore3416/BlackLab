@@ -106,3 +106,33 @@ device can't keep HDR with effects it retries with HDR→SDR tone-mapping.
 - **Notes** are Room rows (`notes`, `note_labels`) with checklist items and attachments as JSON. Time reminders join the single-alarm `ReminderScheduler` (repeats advance after firing). Place reminders use platform proximity alerts, re-registered at boot and on change.
 - **Live Share.** `LinkServer` routes `/s/<token>` before the pairing check to `LiveShare.serve`. Tokens are 128-bit, scoped to one page or note, expiring and revocable; responses are same-origin with a strict CSP; guest posts are length-limited and rate-limited (20/min per link). Guests get a static, sanitized render (`PageHtml.static`) polled every 4 s, and can comment or (notes) tick/add items; the open note editor adopts changes that differ from what it last wrote.
 - **Exports.** `PageHtml.linear` flows boxes top-to-bottom (tags become symbols, ink becomes one PNG) into the existing DOCX/PDF/Markdown exporters; `PageHtml.static` keeps the exact layout for HTML export and printing. `.blnotebook` is a zip with `manifest.json` and the page folders (locked sections stay encrypted).
+
+## Widgets & quick capture
+
+- **Glance widgets.** `TodayWidget`, `ChecklistWidget` and `CaptureWidget` (package `widgets/`) render with Jetpack Glance. Each loads a plain model (`Widgets.today`, `Widgets.checklist`) before composing and re-loads it whenever `Widgets.version` changes, so a running session and a cold start show the same data.
+- **Freshness.** `Widgets.watch` puts a Room `InvalidationTracker` observer on `tasks`, `notes`, `events`, `courses`, `class_meetings` and `assignments`, and watches the active account and privacy setting. Changes trigger a debounced `updateAll`. The Today widget also refreshes every 30 minutes (day roll-over) and after boot or clock changes.
+- **Tick boxes** are `ActionCallback`s that write through the same `TaskOps` / `NoteOps` used by the screens (recurrence, reminders, place alerts). Checklist ticks carry the item text as well as its index.
+- **Privacy.** `widgetPrivacy = COUNTS` renders counts only. A widget whose host category is `keyguard` always does. The Checklist configuration activity checks that the widget id belongs to BlackLab and asks for the app lock before listing notes.
+- **Quick capture** (`capture/QuickCaptureActivity`) is a separate translucent, non-exported task that only inserts. It saves new notes, checklists, voice notes (reusing the Brainstorm recorder sheet), photo notes (OCR runs after the sheet closes) and tasks, or appends items to the pinned checklist. Because it never reads existing content, it skips the app lock.
+
+## Updates
+
+- `update/Updater` asks `api.github.com/repos/<owner>/BlackLab/releases/latest` and picks the `BlackLab-vX.Y.Z.apk` and `.apk.sha256` assets. Every URL, including redirect targets, must be HTTPS on `github.com`, `api.github.com` or `*.githubusercontent.com`.
+- The APK is hashed while it downloads. `verify` then requires the SHA-256 to match the published checksum, the archive's signer set to contain the installed app's signer (`PackageManager` signing info, rotation-aware), the same package name and a higher `longVersionCode`.
+- Install re-verifies the file, then streams it into a `PackageInstaller` session (`USER_ACTION_NOT_REQUIRED` where Android allows it). `UpdateReceiver` launches the system confirmation when needed, or posts a notification if BlackLab is in the background.
+- The weekly check is a unique periodic `WorkManager` job, scheduled only when the setting is on and the build isn't debug.
+
+## Problem reports
+
+- `core/CrashLog` wraps the default uncaught-exception handler (the previous handler still runs) and writes one text report per crash into `filesDir/crashes`, keeping the newest 30. Reports contain the type, time, version, device, thread and stack trace.
+- On start it imports `ApplicationExitInfo` records newer than the last import: ANR (with the thread dump), native crash, excessive resource use and start-up failure. The first run only sets the baseline.
+- Unseen and announced timestamps drive the Settings badge and a one-time "a report was saved" snackbar. Sharing goes through `FileProvider`.
+
+## Testing & CI
+
+- JVM tests (`app/src/test`) cover pure logic. On-device tests (`app/src/androidTest`) run against the debug build's real container and clean up after themselves.
+- `MigrationTest` uses `MigrationTestHelper` with the exported schemas (added to the androidTest assets) to validate the 1 → 2 upgrade exactly.
+- `.github/workflows/android.yml`:
+  1. `secrets` runs `scripts/secret-scan.sh`, which checks for tracked keystores, property files and credential-shaped strings.
+  2. `build` runs unit tests and the debug and release builds.
+  3. `device-tests` runs `connectedDebugAndroidTest` on an API 35 emulator with KVM.

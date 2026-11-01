@@ -7,13 +7,13 @@
 **A private, all-in-one personal & professional workspace for Android.**
 Pro camera & photo editor · dictation · audio recorder · Word-class documents · journal · to-do · calendar · education & certification tracking — in one app, with every file saved to a real folder on your phone.
 
-[![Version](https://img.shields.io/badge/version-4.0.0-2BD9A8)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-4.3.0-2BD9A8)](CHANGELOG.md)
 [![Android](https://img.shields.io/badge/Android-15%2B-3DDC84?logo=android&logoColor=white)](#requirements)
 [![Kotlin](https://img.shields.io/badge/Kotlin-2.1-7F52FF?logo=kotlin&logoColor=white)](https://kotlinlang.org)
 [![Jetpack Compose](https://img.shields.io/badge/Jetpack%20Compose-Material%203-4285F4?logo=jetpackcompose&logoColor=white)](https://developer.android.com/compose)
 [![Android CI](https://github.com/paulmmoore3416/BlackLab/actions/workflows/android.yml/badge.svg)](https://github.com/paulmmoore3416/BlackLab/actions/workflows/android.yml)
 
-[Download APK](releases/BlackLab-v4.0.0.apk) · [Features](#features) · [Install](#install) · [Build from source](#build-from-source) · [Architecture](docs/ARCHITECTURE.md)
+[Download APK](releases/BlackLab-v4.3.0.apk) · [Features](#features) · [Install](#install) · [Build from source](#build-from-source) · [Architecture](docs/ARCHITECTURE.md)
 
 </div>
 
@@ -87,6 +87,12 @@ Optimized for the **Google Pixel 10 Pro XL** and newer (Android 15+).
 - **Share & collaborate**: export to PDF/Word/Markdown/web page or print, **.blnotebook** packages, and **Live Share** a page or note to anyone on your Wi-Fi (view/comment/edit, expiring links, QR code) with comment threads
 - **Smart tools** on-device: summarize, action items → tasks, idea generation and mind maps
 
+### 🏠 Home-screen widgets
+- **Today** — the rest of today's schedule plus tasks due, overdue and in My Day, with tick-off boxes (finished tasks stay listed, struck through, so a mis-tap can be undone)
+- **Checklist** — pin any Brainstorm checklist or note; tick items and add new ones from the home screen
+- **Quick capture** — one tap to a new note, checklist, voice note (recorded and transcribed), photo note (text in the photo becomes searchable) or task. Capture is write-only, so it works without unlocking BlackLab and never shows existing content
+- Privacy: “Hide details in widgets” shows counts only; widgets placed on a lock screen always hide details; choosing a note for a widget asks for the app lock
+
 ### 🎵 Music, audio & video
 - **Music player** — songs, albums, artists, playlists; background playback with lock-screen controls, queue, speed/pitch, A–B repeat, sleep timer, equalizer
 - **Audio editor** — waveform cut/copy/paste, trim, fades, gain, normalize, reverse, echo, noise gate, filters, tempo & pitch, mix in other files; M4A or WAV
@@ -147,6 +153,8 @@ Rich-text entries saved as dated files, mood tracking, tags & location, favorite
 - Personal / Professional accounts with separate data and folders; default account at launch
 - Optional **biometric / device-credential lock** for the app and/or the Professional account
 - Daily automatic **backups** of the database & settings to `BlackLab/Backups` (14 kept) with one-tap restore
+- **Safe in-app updates** from GitHub Releases: an update installs only if its SHA-256 matches the published checksum **and** it is signed with the same key as the installed app (optional weekly check, off by default)
+- **Problem reports** kept only on the phone: crashes, freezes (ANRs) and native crashes, with share/copy/delete
 - BlackLab has no backend, no account and no analytics of its own; your content never leaves the device unless you share or export it
 
 ## Storage layout
@@ -170,13 +178,15 @@ Internal storage/BlackLab/
 
 ## Install
 
-1. Download **[`BlackLab-v4.2.0.apk`](releases/BlackLab-v4.2.0.apk)** (also attached to the [v4.2.0 release](https://github.com/paulmmoore3416/BlackLab/releases/tag/v4.2.0)).
-   Verify it with the published SHA-256: [`BlackLab-v4.2.0.apk.sha256`](releases/BlackLab-v4.2.0.apk.sha256).
+1. Download **[`BlackLab-v4.3.0.apk`](releases/BlackLab-v4.3.0.apk)** (also attached to the [v4.3.0 release](https://github.com/paulmmoore3416/BlackLab/releases/tag/v4.3.0)).
+   Verify it with the published SHA-256: [`BlackLab-v4.3.0.apk.sha256`](releases/BlackLab-v4.3.0.apk.sha256).
 2. On the phone, allow your browser/Files app to **install unknown apps** when prompted.
 3. Open BlackLab and follow onboarding: name & title, account names, then grant
    **All-files access** (creates the BlackLab folder), **camera & microphone**, **notifications** and optionally **calendars**.
 
-Or with USB debugging: `adb install releases/BlackLab-v4.2.0.apk`
+Or with USB debugging: `adb install releases/BlackLab-v4.3.0.apk`
+
+From 4.3.0 on, BlackLab can update itself: **Settings › App updates › Check now**. Android asks once for permission to install updates.
 
 ### Requirements
 - Android **15+** (API 35); targets Android 16 (API 36). Tested on an Android 16 emulator; installed and launched on a Pixel 10 Pro XL running Android 17
@@ -207,6 +217,20 @@ keyPassword=…
 
 > APKs signed with different keys can’t update each other. Keep your keystore safe and backed up.
 
+### Tests
+
+```bash
+./gradlew :app:testDebugUnitTest            # JVM unit tests
+./gradlew :app:connectedDebugAndroidTest    # on-device tests (emulator or phone)
+scripts/secret-scan.sh                      # fails if a key, token or keystore is tracked
+```
+
+CI runs the secret scan, unit tests, both builds and the on-device tests on an Android 15 emulator for every push and pull request. The on-device tests cover the database upgrade, pictures on pages and every export format, notebook import, voice recording, location reminders, the widgets, update verification and the crash log.
+
+### Publishing a release
+
+Attach `BlackLab-vX.Y.Z.apk` and `BlackLab-vX.Y.Z.apk.sha256` (the output of `sha256sum`) to a GitHub Release tagged `vX.Y.Z`. The in-app updater looks for exactly those two names and refuses releases without the checksum.
+
 ## Tech stack
 
 | Area | Technology |
@@ -222,6 +246,9 @@ keyPassword=…
 | Reminders | Exact alarms (single self-rescheduling alarm), notifications with actions |
 | Security | AndroidX Biometric; AES-256-GCM + PBKDF2 for locked notebook sections |
 | Notebooks | WebView canvas engine (text boxes, SVG ink, lasso), ZXing QR codes, local Live Share server |
+| Widgets | Jetpack Glance 1.1 (app widgets) |
+| Updates | GitHub Releases API, SHA-256 + signing-certificate verification, `PackageInstaller` sessions |
+| Testing | JUnit, AndroidX Test, Room `MigrationTestHelper`, GitHub Actions with an emulator |
 
 See **[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)** for the design.
 
@@ -230,8 +257,9 @@ See **[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)** for the design.
 ```
 app/src/main/java/com/blacklab/app/
 ├── brainstorm/  Notebook pages, section encryption, templates, notes, place reminders, Live Share
+├── capture/     Write-only quick capture opened by the widgets
 ├── assistant/   Assistant router, Gemini Nano, voice, Google APIs, local index, keys
-├── core/        Profiles, settings + settings schema, storage, time & recurrence, backups
+├── core/        Profiles, settings + settings schema, storage, time & recurrence, backups, crash log
 ├── data/        Room entities/DAOs, calendar logic, task ops, grades, SRS
 ├── link/        Desktop link server, data snapshot, Google Drive cloud sync
 ├── docs/        HTML ⇄ blocks model, DOCX writer/reader, PDF writer, Markdown
@@ -240,6 +268,8 @@ app/src/main/java/com/blacklab/app/
 ├── recorder/    Audio engine, encoders, transcription, foreground service
 ├── reminders/   Alarm scheduler, receivers, notifications
 ├── study/       Pomodoro timer
+├── update/      In-app updates: GitHub check, download, verification, installer
+├── widgets/     Today, Checklist and Quick capture home-screen widgets
 └── ui/          Compose screens (home, camera, recorder, library, documents,
                  editor, journal, tasks, schedule, education, settings, onboarding, assistant,
                  brainstorm)
@@ -253,6 +283,8 @@ desktop/
 BlackLab has no backend and collects no analytics of its own — documents, recordings, photos and your database stay on the device. The assistant only reaches Google or ElevenLabs when you use an online feature (and never in offline-only mode). Desktop cloud sync uses the hidden app-data folder in your own Google Drive. API keys are stored encrypted on the phone and in `~/.config/blacklab-desktop/secrets.json` (mode 600) on the computer — never in this repository.
 
 **Disclosure:** the document scanner, QR/barcode scanner and OCR run on-device through Google Play services (ML Kit). Those Google libraries add the `INTERNET` / `ACCESS_NETWORK_STATE` permissions and, per Google’s ML Kit terms, may send anonymous usage and performance metrics to Google. They do not upload your images or text.
+
+**Updates & problem reports:** the update check is a single anonymous request to GitHub's public API, made only when you tap *Check now* or turn on the weekly check. Problem reports stay in the app's private storage (not in backups) until you share them.
 
 Signing keys, passwords and machine-specific files are excluded from this repository by `.gitignore`. See [SECURITY.md](SECURITY.md).
 

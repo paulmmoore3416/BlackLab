@@ -5,4 +5,10 @@
     <string name="sc_task">New task</string>
     <string name="sc_dictate">Dictate</string>
     <string name="sc_brief">Brief me</string>
+    <string name="widget_today_label">BlackLab · Today</string>
+    <string name="widget_today_desc">The rest of today\'s schedule and the tasks due, with tick-off boxes</string>
+    <string name="widget_checklist_label">BlackLab · Checklist</string>
+    <string name="widget_checklist_desc">Pin a Brainstorm checklist or note and tick items from the home screen</string>
+    <string name="widget_capture_label">BlackLab · Quick capture</string>
+    <string name="widget_capture_desc">One tap to a new note, checklist, voice note, photo note or task</string>
 </resources>

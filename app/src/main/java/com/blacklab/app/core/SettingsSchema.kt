@@ -74,6 +74,8 @@ object SettingsSchema {
             bool(Keys.APP_LOCK, "Lock BlackLab", "Require fingerprint, face or screen lock to open the app.", d.appLock),
             bool(Keys.LOCK_PROFESSIONAL, "Lock Professional account", "Require unlock when switching to the Professional account.", d.lockProfessional),
             intChoice(Keys.LOCK_TIMEOUT, "Lock after leaving", "Grace period before the app locks again.", d.lockTimeoutSec, 0 to "Immediately", 30 to "30 seconds", 60 to "1 minute", 300 to "5 minutes", 900 to "15 minutes"),
+            choice(Keys.WIDGET_PRIVACY, "Widget details", "What home-screen widgets show. Widgets on the lock screen always hide details.", d.widgetPrivacy,
+                "SHOW" to "Show titles and items", "COUNTS" to "Counts only"),
         )),
         Section("assistant", "Assistant", "assistant", "Your personal assistant: personality, brain and behavior.", listOf(
             text(Keys.ASST_NAME, "Assistant name", "What the assistant calls itself.", d.asstName),
@@ -209,6 +211,9 @@ object SettingsSchema {
         )),
         Section("storage", "Storage & backup", "storage", "Backups of the database and settings.", listOf(
             bool(Keys.AUTO_BACKUP, "Automatic daily backup", "Keeps the 14 most recent in BlackLab/Backups.", d.autoBackup),
+        )),
+        Section("updates", "App updates", "sync", "New versions from BlackLab's GitHub Releases, checked against the published checksum and your signing key.", listOf(
+            bool(Keys.UPDATE_AUTO, "Check for updates weekly", "Asks GitHub once a week whether a newer release exists and notifies you. Nothing downloads without your OK.", d.updateAuto),
         )),
     )
 

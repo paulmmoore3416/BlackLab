@@ -2,6 +2,27 @@
 
 All notable changes to BlackLab are documented here. The project follows [Semantic Versioning](https://semver.org/).
 
+## [4.3.0] — 2026-11-01
+
+### Added
+- **Home-screen widgets** (Glance):
+  - **Today** — the rest of today's events, classes, deadlines and note reminders, plus tasks that are due, overdue or in My Day. Tick tasks off from the widget; repeating tasks roll forward as in the app, and tasks finished today stay listed (struck through) so a mis-tap can be undone. **+** adds a task.
+  - **Checklist** — pin a Brainstorm checklist or note. Tick items (matched by text, so a list edited in the app since the widget drew is never ticked in the wrong place) and add items with **+**. Reconfigurable.
+  - **Quick capture** — “Take a note…” plus checklist, voice note (recorded and transcribed), photo note (text in the photo is recognized after saving) and task buttons; adapts to its size. Capture is **write-only**: it works without unlocking BlackLab and never lists existing content. Choose Personal or Professional per capture.
+  - Settings › Home-screen widgets adds any widget in one tap. **Hide details in widgets** shows counts only; widgets placed on a lock screen always hide details; picking a note for a widget asks for the app lock when it's on.
+- **Safe in-app updates** (Settings › App updates) from GitHub Releases. An update is offered for install only after three checks pass: its **SHA-256 matches the checksum published with the release**, it is **signed with the same certificate as the installed app**, and it is the same package with a higher build number. It is re-hashed right before the install, downloads are accepted only over HTTPS from GitHub's hosts, and Android verifies the signature again. Optional weekly check (off by default) with a notification; skip a version; nothing downloads without your OK.
+- **Problem reports** (Settings › Problem reports) — crashes are recorded as they happen, and freezes (ANRs), native crashes and start-up failures that Android reports are picked up on the next launch. Reports stay in the app's private storage (newest 30, not in backups) and leave the phone only if you share them. After a crash, BlackLab mentions the saved report once.
+- **Automated checks on every push**: a secret scan (`scripts/secret-scan.sh`) for keys, tokens, keystores and signing passwords; unit tests; debug and release builds; and **on-device tests on an Android 15 emulator** for the database upgrade from 4.1, pictures on pages and every export format, notebook export/import, voice recording, location reminders, the widgets, update verification and the crash log.
+
+### Fixed
+- Exporting, printing or Live-Sharing a Brainstorm page that contains a picture failed (the temporary file name for the picture was too short for Android). Found by the new on-device tests.
+
+### Notes
+- New permission: install updates (`REQUEST_INSTALL_PACKAGES`). Android asks you once, the first time you install an update from inside BlackLab.
+- New library: Jetpack Glance 1.1.1 (Apache-2.0).
+- Tests: 32 JVM unit tests (12 new: version comparison, release parsing, checksum parsing, download-host allowlist, crash report format and pruning, Today and checklist selection) and 10 on-device tests.
+- The self-update path was tested end to end on the emulator: a newer build passed all checks, Android showed its update confirmation and the app was replaced in place.
+
 ## [4.2.0] — 2026-10-31
 
 ### Added

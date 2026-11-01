@@ -13,6 +13,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 
 class BlackLabApp : Application() {
@@ -21,6 +23,7 @@ class BlackLabApp : Application() {
 
     override fun onCreate() {
         super.onCreate()
+        com.blacklab.app.core.CrashLog.install(this)
         container = AppContainer(this)
         Notifications.createChannels(this)
         container.storage.ensureStructure()
@@ -37,6 +40,10 @@ class BlackLabApp : Application() {
             runCatching { com.blacklab.app.brainstorm.Brainstorm.purgeOld(container); com.blacklab.app.brainstorm.NoteOps.purgeTrash(container) }
         }
         com.blacklab.app.link.CloudSync.schedule(this)
+        com.blacklab.app.widgets.Widgets.watch(container)
+        container.appScope.launch {
+            container.settings.state.map { it.updateAuto }.distinctUntilChanged().collect { com.blacklab.app.update.Updater.schedule(this@BlackLabApp) }
+        }
     }
 }
 

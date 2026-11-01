@@ -38,6 +38,9 @@ object Notifications {
                 NotificationChannel(CH_STUDY, "Study timer", NotificationManager.IMPORTANCE_HIGH).apply {
                     description = "Focus session and break alerts"
                 },
+                NotificationChannel(com.blacklab.app.update.Updater.CH_UPDATES, "App updates", NotificationManager.IMPORTANCE_DEFAULT).apply {
+                    description = "A new BlackLab version is ready to download"
+                },
             )
         )
     }

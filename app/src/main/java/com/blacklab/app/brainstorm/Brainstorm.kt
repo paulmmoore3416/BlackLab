@@ -196,7 +196,7 @@ object Brainstorm {
     fun mime(name: String) = Files.mime(File(name))
 
     fun dataUri(bytes: ByteArray, name: String): String {
-        val tmp = File.createTempFile("bs", "." + File(name).extension.ifBlank { "jpg" })
+        val tmp = File.createTempFile("bs_img_", "." + File(name).extension.ifBlank { "jpg" }) // prefix must be ≥ 3 chars
         return try { tmp.writeBytes(bytes); EditorController.imageDataUri(tmp, 1400) ?: "" } finally { tmp.delete() }
     }
 

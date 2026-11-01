@@ -197,6 +197,14 @@ private fun AppShell(activity: MainActivity) {
         }
     }
 
+    // After a crash or freeze, point at the saved report once
+    LaunchedEffect(Unit) {
+        val n = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { com.blacklab.app.core.CrashLog.takeAnnouncement(ctx) }
+        if (n > 0) shell.toast(if (n == 1) "BlackLab stopped unexpectedly last time. A report was saved on this phone." else "$n problem reports were saved on this phone.", "View") {
+            shell.go("diagnostics")
+        }
+    }
+
     androidx.compose.runtime.CompositionLocalProvider(LocalShell provides shell) {
         ModalNavigationDrawer(
             drawerState = drawer,
@@ -410,6 +418,8 @@ private fun NavGraph(nav: androidx.navigation.NavHostController) {
             ReviewScreen(it.arguments?.getLong("id") ?: 0)
         }
         composable("settings") { SettingsScreen() }
+        composable("updates") { com.blacklab.app.ui.settings.UpdatesScreen() }
+        composable("diagnostics") { com.blacklab.app.ui.settings.DiagnosticsScreen() }
         composable("assistant?listen={listen}", arguments = listOf(navArgument("listen") { type = NavType.BoolType; defaultValue = false })) {
             com.blacklab.app.ui.assistant.AssistantScreen(it.arguments?.getBoolean("listen") ?: false)
         }

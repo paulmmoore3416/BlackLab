@@ -128,6 +128,12 @@ data class Settings(
     val cloudSync: Boolean = false,
     val cloudSyncMinutes: Int = 15,
     val googleAccount: String = "",
+    // widgets
+    val widgetPrivacy: String = "SHOW", // SHOW, COUNTS
+    // app updates
+    val updateAuto: Boolean = false,
+    val updateLastCheck: Long = 0,
+    val updateSkip: String = "",
 )
 
 object Keys {
@@ -239,6 +245,10 @@ object Keys {
     const val CLOUD_SYNC = "cloud_sync"
     const val CLOUD_SYNC_MIN = "cloud_sync_min"
     const val GOOGLE_ACCOUNT = "google_account"
+    const val WIDGET_PRIVACY = "widget_privacy"
+    const val UPDATE_AUTO = "update_auto"
+    const val UPDATE_LAST_CHECK = "update_last_check"
+    const val UPDATE_SKIP = "update_skip"
 }
 
 class SettingsRepository(context: Context) {
@@ -370,6 +380,10 @@ class SettingsRepository(context: Context) {
             cloudSync = getBoolean(Keys.CLOUD_SYNC, d.cloudSync),
             cloudSyncMinutes = getInt(Keys.CLOUD_SYNC_MIN, d.cloudSyncMinutes),
             googleAccount = getString(Keys.GOOGLE_ACCOUNT, d.googleAccount) ?: "",
+            widgetPrivacy = getString(Keys.WIDGET_PRIVACY, d.widgetPrivacy) ?: d.widgetPrivacy,
+            updateAuto = getBoolean(Keys.UPDATE_AUTO, d.updateAuto),
+            updateLastCheck = getLong(Keys.UPDATE_LAST_CHECK, d.updateLastCheck),
+            updateSkip = getString(Keys.UPDATE_SKIP, d.updateSkip) ?: "",
         )
     }
 }
