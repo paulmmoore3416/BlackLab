@@ -254,3 +254,108 @@ interface RecordingDao {
     @Update suspend fun update(e: RecordingEntity)
     @Delete suspend fun delete(e: RecordingEntity)
 }
+
+data class NotebookCount(val notebookId: Long, val pages: Int, val sections: Int)
+
+@Dao
+interface BrainstormDao {
+    // notebooks
+    @Query("SELECT * FROM notebooks WHERE profile = :profile ORDER BY sortOrder ASC, createdAt ASC")
+    fun observeNotebooks(profile: String): Flow<List<NotebookEntity>>
+    @Query("SELECT * FROM notebooks WHERE profile = :profile ORDER BY sortOrder ASC, createdAt ASC")
+    suspend fun notebooks(profile: String): List<NotebookEntity>
+    @Query("SELECT * FROM notebooks") suspend fun allNotebooks(): List<NotebookEntity>
+    @Query("SELECT * FROM notebooks WHERE id = :id") suspend fun notebook(id: Long): NotebookEntity?
+    @Query("SELECT * FROM notebooks WHERE id = :id") fun observeNotebook(id: Long): Flow<NotebookEntity?>
+    @Insert suspend fun insertNotebook(e: NotebookEntity): Long
+    @Update suspend fun updateNotebook(e: NotebookEntity)
+    @Delete suspend fun deleteNotebook(e: NotebookEntity)
+    @Query(
+        "SELECT n.id AS notebookId, " +
+            "(SELECT COUNT(*) FROM nb_pages p JOIN nb_sections s ON p.sectionId = s.id WHERE s.notebookId = n.id AND p.deletedAt IS NULL) AS pages, " +
+            "(SELECT COUNT(*) FROM nb_sections s WHERE s.notebookId = n.id) AS sections FROM notebooks n WHERE n.profile = :profile"
+    )
+    fun observeCounts(profile: String): Flow<List<NotebookCount>>
+
+    // sections
+    @Query("SELECT * FROM nb_sections WHERE notebookId = :notebookId ORDER BY sortOrder ASC, id ASC")
+    fun observeSections(notebookId: Long): Flow<List<SectionEntity>>
+    @Query("SELECT * FROM nb_sections WHERE notebookId = :notebookId ORDER BY sortOrder ASC, id ASC")
+    suspend fun sections(notebookId: Long): List<SectionEntity>
+    @Query("SELECT * FROM nb_sections") suspend fun allSections(): List<SectionEntity>
+    @Query("SELECT * FROM nb_sections WHERE id = :id") suspend fun section(id: Long): SectionEntity?
+    @Insert suspend fun insertSection(e: SectionEntity): Long
+    @Update suspend fun updateSection(e: SectionEntity)
+    @Delete suspend fun deleteSection(e: SectionEntity)
+
+    // pages
+    @Query("SELECT * FROM nb_pages WHERE sectionId = :sectionId AND deletedAt IS NULL ORDER BY sortOrder ASC, id ASC")
+    fun observePages(sectionId: Long): Flow<List<PageEntity>>
+    @Query("SELECT * FROM nb_pages WHERE sectionId = :sectionId AND deletedAt IS NULL ORDER BY sortOrder ASC, id ASC")
+    suspend fun pages(sectionId: Long): List<PageEntity>
+    @Query("SELECT * FROM nb_pages WHERE sectionId = :sectionId") suspend fun allPagesIn(sectionId: Long): List<PageEntity>
+    @Query("SELECT * FROM nb_pages") suspend fun allPages(): List<PageEntity>
+    @Query("SELECT * FROM nb_pages WHERE id = :id") suspend fun page(id: Long): PageEntity?
+    @Query("SELECT * FROM nb_pages WHERE id = :id") fun observePage(id: Long): Flow<PageEntity?>
+    @Query("SELECT * FROM nb_pages WHERE profile = :profile AND deletedAt IS NULL ORDER BY updatedAt DESC LIMIT :limit")
+    fun observeRecent(profile: String, limit: Int): Flow<List<PageEntity>>
+    @Query("SELECT * FROM nb_pages WHERE profile = :profile AND deletedAt IS NULL AND (title LIKE :q OR searchText LIKE :q) ORDER BY updatedAt DESC LIMIT 200")
+    suspend fun search(profile: String, q: String): List<PageEntity>
+    @Query("SELECT * FROM nb_pages WHERE profile = :profile AND deletedAt IS NULL AND tagIndex != '' ORDER BY updatedAt DESC")
+    fun observeTagged(profile: String): Flow<List<PageEntity>>
+    @Query("SELECT * FROM nb_pages WHERE profile = :profile AND deletedAt IS NOT NULL ORDER BY deletedAt DESC")
+    fun observeDeleted(profile: String): Flow<List<PageEntity>>
+    @Query("SELECT * FROM nb_pages WHERE deletedAt IS NOT NULL AND deletedAt < :before") suspend fun deletedBefore(before: Long): List<PageEntity>
+    @Query("SELECT * FROM nb_pages WHERE deletedAt IS NULL AND reminderAt IS NOT NULL AND reminderAt > :from AND reminderAt <= :to")
+    suspend fun remindersBetween(from: Long, to: Long): List<PageEntity>
+    @Insert suspend fun insertPage(e: PageEntity): Long
+    @Update suspend fun updatePage(e: PageEntity)
+    @Delete suspend fun deletePage(e: PageEntity)
+
+    // comments
+    @Query("SELECT * FROM bs_comments WHERE pageId = :pageId ORDER BY createdAt ASC") fun observePageComments(pageId: Long): Flow<List<CommentEntity>>
+    @Query("SELECT * FROM bs_comments WHERE noteId = :noteId ORDER BY createdAt ASC") fun observeNoteComments(noteId: Long): Flow<List<CommentEntity>>
+    @Query("SELECT * FROM bs_comments WHERE pageId = :pageId ORDER BY createdAt ASC") suspend fun pageComments(pageId: Long): List<CommentEntity>
+    @Query("SELECT * FROM bs_comments WHERE noteId = :noteId ORDER BY createdAt ASC") suspend fun noteComments(noteId: Long): List<CommentEntity>
+    @Query("SELECT * FROM bs_comments WHERE guest = 1 AND resolved = 0 ORDER BY createdAt DESC") fun observeGuestComments(): Flow<List<CommentEntity>>
+    @Insert suspend fun insertComment(e: CommentEntity): Long
+    @Update suspend fun updateComment(e: CommentEntity)
+    @Delete suspend fun deleteComment(e: CommentEntity)
+    @Query("DELETE FROM bs_comments WHERE pageId = :pageId") suspend fun deletePageComments(pageId: Long)
+    @Query("DELETE FROM bs_comments WHERE noteId = :noteId") suspend fun deleteNoteComments(noteId: Long)
+
+    // live share links
+    @Query("SELECT * FROM bs_shares ORDER BY createdAt DESC") fun observeShares(): Flow<List<ShareLinkEntity>>
+    @Query("SELECT * FROM bs_shares WHERE token = :token") suspend fun share(token: String): ShareLinkEntity?
+    @Query("SELECT * FROM bs_shares WHERE kind = :kind AND refId = :refId AND revoked = 0 ORDER BY createdAt DESC") suspend fun sharesFor(kind: String, refId: Long): List<ShareLinkEntity>
+    @Insert(onConflict = OnConflictStrategy.REPLACE) suspend fun putShare(e: ShareLinkEntity)
+    @Delete suspend fun deleteShare(e: ShareLinkEntity)
+    @Query("DELETE FROM bs_shares WHERE kind = :kind AND refId = :refId") suspend fun deleteSharesFor(kind: String, refId: Long)
+}
+
+@Dao
+interface NoteDao {
+    @Query("SELECT * FROM notes WHERE profile = :profile ORDER BY pinned DESC, sortOrder DESC, updatedAt DESC")
+    fun observe(profile: String): Flow<List<NoteEntity>>
+    @Query("SELECT * FROM notes WHERE profile = :profile") suspend fun allFor(profile: String): List<NoteEntity>
+    @Query("SELECT * FROM notes") suspend fun all(): List<NoteEntity>
+    @Query("SELECT * FROM notes WHERE id = :id") suspend fun get(id: Long): NoteEntity?
+    @Query("SELECT * FROM notes WHERE id = :id") fun observeNote(id: Long): Flow<NoteEntity?>
+    @Query("SELECT * FROM notes WHERE trashedAt IS NULL AND archived = 0 AND reminderAt IS NOT NULL AND reminderAt > :from AND reminderAt <= :to")
+    suspend fun remindersBetween(from: Long, to: Long): List<NoteEntity>
+    @Query("SELECT * FROM notes WHERE trashedAt IS NULL AND archived = 0 AND placeLat IS NOT NULL AND placeLon IS NOT NULL")
+    suspend fun withPlaces(): List<NoteEntity>
+    @Query("SELECT * FROM notes WHERE trashedAt IS NOT NULL AND trashedAt < :before") suspend fun trashedBefore(before: Long): List<NoteEntity>
+    @Query("SELECT MAX(sortOrder) FROM notes WHERE profile = :profile") suspend fun maxOrder(profile: String): Long?
+    @Insert suspend fun insert(e: NoteEntity): Long
+    @Update suspend fun update(e: NoteEntity)
+    @Delete suspend fun delete(e: NoteEntity)
+
+    @Query("SELECT * FROM note_labels WHERE profile = :profile ORDER BY name COLLATE NOCASE")
+    fun observeLabels(profile: String): Flow<List<NoteLabelEntity>>
+    @Query("SELECT * FROM note_labels WHERE profile = :profile ORDER BY name COLLATE NOCASE")
+    suspend fun labels(profile: String): List<NoteLabelEntity>
+    @Insert(onConflict = OnConflictStrategy.IGNORE) suspend fun insertLabel(e: NoteLabelEntity): Long
+    @Update suspend fun updateLabel(e: NoteLabelEntity)
+    @Delete suspend fun deleteLabel(e: NoteLabelEntity)
+}

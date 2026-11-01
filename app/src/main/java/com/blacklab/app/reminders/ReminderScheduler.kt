@@ -20,7 +20,7 @@ object ReminderScheduler {
     private const val KEY_LAST = "last_check"
     private const val HORIZON_DAYS = 35L
 
-    enum class Kind { TASK, EVENT, ASSIGNMENT, CLASS, CERT, AGENDA, JOURNAL }
+    enum class Kind { TASK, EVENT, ASSIGNMENT, CLASS, CERT, AGENDA, JOURNAL, NOTE, PAGE }
 
     data class Due(
         val key: String,
@@ -68,6 +68,7 @@ object ReminderScheduler {
         val to = now + 30_000
         val due = runCatching { collect(app, last, to, buildText = true) }.getOrDefault(emptyList())
         due.sortedBy { it.at }.forEach { Notifications.show(context, it) }
+        runCatching { com.blacklab.app.brainstorm.NoteOps.afterReminders(app, due.filter { it.kind == Kind.NOTE }.map { it.refId }) }
         p.edit().putLong(KEY_LAST, to).apply()
         reschedule(context)
     }
@@ -92,6 +93,16 @@ object ReminderScheduler {
             out += Due("task:${t.id}:${t.reminderAt}", Kind.TASK, t.id, t.reminderAt!!, t.title,
                 listOfNotNull(due, t.notes.takeIf { it.isNotBlank() }?.take(120)).joinToString(" · ").ifBlank { "Task reminder" },
                 "task/${t.id}", label(t.profile))
+        }
+
+        // Brainstorm notes and pages
+        app.db.notes().remindersBetween(from, to).forEach { n ->
+            out += Due("note:${n.id}:${n.reminderAt}", Kind.NOTE, n.id, n.reminderAt!!, n.title.ifBlank { "Note" },
+                com.blacklab.app.brainstorm.NoteOps.summary(n).ifBlank { "Note reminder" }, "note/${n.id}", label(n.profile))
+        }
+        app.db.brainstorm().remindersBetween(from, to).forEach { pg ->
+            out += Due("page:${pg.id}:${pg.reminderAt}", Kind.PAGE, pg.id, pg.reminderAt!!, pg.title.ifBlank { "Notebook page" },
+                pg.preview.ifBlank { "Page reminder" }.take(160), "page/${pg.id}", label(pg.profile))
         }
 
         // Events

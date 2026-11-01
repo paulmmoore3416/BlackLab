@@ -2,6 +2,41 @@
 
 All notable changes to BlackLab are documented here. The project follows [Semantic Versioning](https://semver.org/).
 
+## [4.2.0] — 2026-10-31
+
+### Added
+- **Brainstorm** (drawer › Brainstorm) — one place for notebooks, quick notes and ideas.
+- **Notebooks, OneNote-style** — notebooks › colored section tabs (with section groups) › pages and subpages. Each page is a free-form canvas:
+  - **Type anywhere**: tap empty space to start a text box; drag its bar to move it and its edge to resize. Pinch to zoom; the canvas grows as you write.
+  - **Formatting**: styles, bold/italic/underline/strike, font size and color, highlight, bullets, numbering, checklists, indent, alignment, tables with row/column tools, links and **links to other pages**.
+  - **Tags**: To Do (tickable), Important, Question, Idea, Critical, Remember for later, Definition, Follow up, Discuss, Schedule, Contact, Address, Phone, Website, Password and Book. They collect in a **Tags summary** across all notebooks, where To Dos can be ticked or sent to To-Do as tasks.
+  - **Draw**: pen, highlighter, stroke eraser, line, arrow, rectangle and ellipse, colors and widths, stylus-only mode, and a **lasso** to move, duplicate, recolor or delete ink and objects together.
+  - **Insert**: pictures (the text inside them is recognized on-device and becomes searchable), camera photos, document scans, any file as an attachment, **voice recordings with a live transcript**, dictation, date and time, and lines.
+  - **Quick math**: type `1250*1.08=` then a space and the answer appears.
+  - **Page tools**: templates (lined, grid, dots, to-do, meeting notes, Cornell lecture notes, project overview, mind map, SWOT, pros & cons, daily and weekly planners, retrospective), page color, rule lines and grids, find on page, read aloud, undo/redo, page reminders, and move/copy pages between sections and notebooks.
+  - **Organizing**: recent pages, a recycle bin that keeps deleted pages for 60 days, and search across every page (including text found in pictures and transcripts).
+- **Password-protected sections** — AES-256-GCM with a PBKDF2 key; pages, pictures, recordings and history are encrypted on the phone and left out of search while locked. Unlocked sections lock again after 20 idle minutes or with “Lock all”.
+- **Notes, Keep-style** — a masonry board (or list) with pinned and other notes, plus:
+  - **Content**: checklists whose ticked items collapse below, Enter for a new item, reorder and indent; photos with **“grab image text”**; sketches you can re-edit; voice notes that record and transcribe at the same time.
+  - **Look**: 12 colors and themed backgrounds.
+  - **Organizing**: labels (create, rename, delete, filter), archive, and a trash that empties after 7 days. Long-press to multi-select and pin, color, label, archive, copy or delete.
+  - **Reminders**: by time with repeats, or **by place** (arrive or leave, with a radius).
+  - **Moving**: send a note to a notebook as a page, or share text from any app as a new note.
+
+### Recommendations implemented (sharing, collaboration & smart tools)
+1. **Share anywhere** — export a page to PDF, Word, Markdown, plain text or an exact-layout web page, or print it (with Save as PDF). Send notes as text or pictures. Export a whole notebook as a portable **.blnotebook** package (locked sections stay encrypted inside) and import it on another phone.
+2. **Live Share over Wi-Fi** — create a private link and QR code for one page or note. Anyone on the same network opens it in a browser, with live updates and no account; nothing is uploaded. Choose **view, comment or edit** (guests can tick and add checklist items), an expiry of 1 hour to 1 week, see how often the link was opened, and turn it off at any time. Links are random 128-bit tokens scoped to a single item, served with a strict Content-Security-Policy and rate-limited. The desktop API still needs the pairing code.
+3. **Review & history** — comment threads on pages and notes, from you or Live Share guests, with resolve and reopen and a “new from guests” inbox. Page history keeps a snapshot every 10 minutes (the last 40) with preview and one-tap restore.
+4. **Smart brainstorming & tasks** — on-device Gemini Nano (with offline fallbacks) to **summarize** a page, pull out **action items** and turn them into tasks or To Do tags, **brainstorm ideas**, and build a **mind map** page around any topic (5W1H and SCAMPER prompts when Nano isn't available). Notebook pages and notes are also searchable from the assistant's “Ask my files”.
+
+### Notes
+- Database version 2 (migration adds the notebook, page, note, label, comment and share tables; existing data is untouched).
+- New permission: background location, requested only when you set a place reminder.
+- New library: ZXing core 3.5.3 (Apache-2.0) for QR codes.
+- Pages and notes are stored as files in BlackLab › <profile> › Brainstorm and are covered by the existing backups of that folder.
+- Pages never reach the network: remote images pasted into a page don't load.
+- Unit tests for text and tag extraction, section encryption, templates, ink rendering, HTML sanitizing, note data, the migration and share tokens.
+
 ## [4.1.0] — 2026-10-31
 
 ### Added

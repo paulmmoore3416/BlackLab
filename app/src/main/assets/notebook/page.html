@@ -1,0 +1,928 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<style>
+  :root { --accent: #7c5cff; --paper: #ffffff; --ink: #1b1b1f; --rule: rgba(80,120,200,.22); }
+  html, body { margin: 0; padding: 0; height: 100%; overflow: hidden; background: #202227; -webkit-tap-highlight-color: transparent;
+               font-family: Calibri, 'Segoe UI', Roboto, Arial, sans-serif; }
+  #vp { position: fixed; inset: 0; overflow: auto; overscroll-behavior: contain; }
+  #sizer { position: relative; }
+  #paper { position: absolute; left: 0; top: 0; transform-origin: 0 0; background-color: var(--paper); color: var(--ink); }
+  #paper.dark { --ink: #e8e8ec; }
+  #head { position: absolute; left: 24px; top: 18px; right: 24px; }
+  #title { font-size: 22pt; font-weight: 300; outline: none; min-width: 220px; border-bottom: 1px solid rgba(128,128,128,.45);
+           padding-bottom: 4px; white-space: pre-wrap; word-break: break-word; }
+  #title:empty:before { content: 'Page title'; color: #9aa0a6; }
+  #stamp { font-size: 9pt; color: #8a8f98; margin-top: 4px; }
+  #items { position: absolute; left: 0; top: 0; }
+  .item { position: absolute; box-sizing: border-box; }
+  .box { min-width: 80px; border: 1px solid transparent; border-radius: 4px; }
+  .box.active, .box.selected { border-color: rgba(124,92,255,.55); }
+  .box .grip { position: absolute; left: -1px; right: -1px; top: -14px; height: 13px; border-radius: 4px 4px 0 0; background: rgba(124,92,255,.35);
+               display: none; touch-action: none; }
+  .box .grip:before { content: '⋯'; position: absolute; left: 50%; top: -5px; transform: translateX(-50%); color: #fff; font-size: 14px; }
+  .box.active .grip, .box.selected .grip { display: block; }
+  .rs { position: absolute; right: -9px; top: 50%; width: 16px; height: 34px; margin-top: -17px; display: none; touch-action: none; }
+  .rs:after { content: ''; position: absolute; left: 6px; top: 4px; bottom: 4px; width: 4px; border-radius: 2px; background: rgba(124,92,255,.75); }
+  .box.active .rs, .box.selected .rs, .img.selected .rs { display: block; }
+  .bx { outline: none; padding: 4px 6px; font-size: 11pt; line-height: 1.4; min-height: 1.4em; word-wrap: break-word; overflow-wrap: anywhere; caret-color: var(--accent); }
+  .bx p { margin: 0 0 4px 0; }
+  .bx h1 { font-size: 18pt; margin: 6px 0 4px; color: #2f3ea8; font-weight: 600; }
+  .bx h2 { font-size: 14.5pt; margin: 6px 0 4px; color: #3b4fc4; }
+  .bx h3 { font-size: 12.5pt; margin: 4px 0 2px; color: #4a5ad0; }
+  #paper.dark .bx h1, #paper.dark .bx h2, #paper.dark .bx h3 { color: #a9b4ff; }
+  .bx blockquote { border-left: 3px solid var(--accent); margin: 4px 0; padding: 2px 10px; color: #555; }
+  .bx pre { background: rgba(127,127,127,.12); padding: 6px 8px; border-radius: 4px; font-family: 'Courier New', monospace; font-size: 9.5pt; white-space: pre-wrap; }
+  .bx code { background: rgba(127,127,127,.15); padding: 0 3px; border-radius: 3px; font-family: 'Courier New', monospace; }
+  .bx table { border-collapse: collapse; margin: 4px 0; min-width: 60%; }
+  .bx td, .bx th { border: 1px solid #9aa0a6; padding: 4px 6px; vertical-align: top; min-width: 40px; }
+  .bx th { background: rgba(124,92,255,.12); }
+  .bx ul, .bx ol { padding-left: 24px; margin: 2px 0 4px; }
+  .bx a { color: #0563c1; }
+  #paper.dark .bx a { color: #8ab4ff; }
+  .bx ul.checklist { list-style: none; padding-left: 4px; }
+  .bx ul.checklist li { position: relative; padding-left: 26px; margin: 2px 0; }
+  .bx ul.checklist li::before { content: ''; position: absolute; left: 0; top: 2px; width: 16px; height: 16px; border: 2px solid #6b7078; border-radius: 4px; box-sizing: border-box; }
+  .bx ul.checklist li.checked::before { background: var(--accent); border-color: var(--accent); }
+  .bx ul.checklist li.checked::after { content: ''; position: absolute; left: 5px; top: 4px; width: 5px; height: 9px; border: solid #fff; border-width: 0 2px 2px 0; transform: rotate(45deg); }
+  .bx ul.checklist li.checked { color: #80868b; text-decoration: line-through; }
+  /* OneNote-style paragraph tags */
+  .bx [data-tag] { position: relative; padding-left: 26px; }
+  .bx [data-tag]::before { position: absolute; left: 2px; top: 0; width: 20px; text-align: center; font-size: 13px; }
+  .bx [data-tag="todo"]::before { content: ''; top: 3px; left: 2px; width: 15px; height: 15px; border: 2px solid #4a6ee0; border-radius: 3px; box-sizing: border-box; }
+  .bx [data-tag="todo"][data-done="1"]::before { content: '✓'; color: #fff; background: #4a6ee0; font-size: 11px; line-height: 11px; font-weight: bold; }
+  .bx [data-tag="important"]::before { content: '★'; color: #f2b400; font-size: 15px; }
+  .bx [data-tag="question"]::before { content: '?'; color: #fff; background: #8e44ad; border-radius: 50%; width: 16px; height: 16px; line-height: 16px; top: 2px; font-weight: bold; font-size: 12px; }
+  .bx [data-tag="idea"]::before { content: '💡'; }
+  .bx [data-tag="critical"]::before { content: '!'; color: #fff; background: #d93025; border-radius: 3px; width: 16px; height: 16px; line-height: 16px; top: 2px; font-weight: bold; font-size: 12px; }
+  .bx [data-tag="remember"] { background: linear-gradient(transparent 15%, rgba(255,235,59,.55) 15%); }
+  .bx [data-tag="remember"]::before { content: '📌'; }
+  .bx [data-tag="definition"] { background: linear-gradient(transparent 15%, rgba(102,187,106,.35) 15%); }
+  .bx [data-tag="definition"]::before { content: '📗'; }
+  .bx [data-tag="contact"]::before { content: '👤'; }
+  .bx [data-tag="address"]::before { content: '🏠'; }
+  .bx [data-tag="phone"]::before { content: '📞'; }
+  .bx [data-tag="website"]::before { content: '🌐'; }
+  .bx [data-tag="password"]::before { content: '🔑'; }
+  .bx [data-tag="discuss"]::before { content: '💬'; }
+  .bx [data-tag="follow"]::before { content: '🚩'; }
+  .bx [data-tag="book"]::before { content: '📖'; }
+  .bx [data-tag="schedule"]::before { content: '📅'; }
+  .img img { width: 100%; height: 100%; display: block; border-radius: 2px; pointer-events: none; user-select: none; }
+  .img.selected, .att.selected { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .img .rs { right: -10px; top: auto; bottom: -10px; width: 22px; height: 22px; margin: 0; }
+  .img .rs:after { left: 3px; top: 3px; right: 3px; bottom: 3px; width: auto; border-radius: 50%; background: var(--accent); border: 2px solid #fff; }
+  .att { display: flex; flex-direction: column; background: rgba(124,92,255,.08); border: 1px solid rgba(124,92,255,.35); border-radius: 10px; padding: 8px 10px; min-width: 180px; color: var(--ink); }
+  .att .row { display: flex; align-items: center; gap: 8px; }
+  .att .ic { width: 34px; height: 34px; border-radius: 8px; background: var(--accent); color: #fff; display: flex; align-items: center; justify-content: center; font-size: 16px; flex: none; }
+  .att .nm { font-size: 10.5pt; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 220px; }
+  .att .sz { font-size: 8.5pt; color: #8a8f98; }
+  .att .tr { font-size: 9.5pt; color: #555; margin-top: 6px; max-height: 120px; overflow: auto; white-space: pre-wrap; }
+  #paper.dark .att .tr { color: #bbb; }
+  #ink { position: absolute; left: 0; top: 0; overflow: visible; pointer-events: none; }
+  #ink path.hl { mix-blend-mode: multiply; }
+  #paper.dark #ink path.hl { mix-blend-mode: screen; }
+  #draw { position: absolute; left: 0; top: 0; display: none; touch-action: none; }
+  body.drawing #draw { display: block; }
+  body.drawing .bx { pointer-events: none; }
+  #lasso { fill: rgba(124,92,255,.08); stroke: var(--accent); stroke-width: 1.5; stroke-dasharray: 5 4; }
+  #selbox { position: absolute; border: 1.5px dashed var(--accent); background: rgba(124,92,255,.06); display: none; touch-action: none; z-index: 50; }
+  body.ro .grip, body.ro .rs { display: none !important; }
+  ::highlight(bl-find) { background-color: #fff176; color: #000; }
+  ::highlight(bl-current) { background-color: #ff9800; color: #000; }
+</style>
+</head>
+<body>
+<div id="vp"><div id="sizer"><div id="paper">
+  <div id="head"><div id="title" contenteditable="plaintext-only" spellcheck="true"></div><div id="stamp"></div></div>
+  <svg id="ink" xmlns="http://www.w3.org/2000/svg"></svg>
+  <div id="items"></div>
+  <svg id="draw" xmlns="http://www.w3.org/2000/svg"></svg>
+  <div id="selbox"></div>
+</div></div></div>
+<script>
+(function () {
+  'use strict';
+  const A = window.Android || { getInitial: () => '', assetBase: () => '', onReady() {}, onSave() {}, onTitle() {}, onState() {}, onItem() {}, onOpenLink() {}, onFind() {}, onPasteImage() {}, onChange() {} };
+  const vp = document.getElementById('vp'), sizer = document.getElementById('sizer'), paper = document.getElementById('paper');
+  const itemsEl = document.getElementById('items'), inkEl = document.getElementById('ink'), drawEl = document.getElementById('draw');
+  const titleEl = document.getElementById('title'), stampEl = document.getElementById('stamp'), selbox = document.getElementById('selbox');
+  const NS = 'http://www.w3.org/2000/svg';
+  const RULES = {
+    none: '', narrow: 'lines:22', college: 'lines:28', wide: 'lines:36',
+    smallgrid: 'grid:16', grid: 'grid:24', largegrid: 'grid:40', dots: 'dots:22'
+  };
+
+  let model = null;            // { v, title, created, bg:{color, rule, dark}, items:[], ink:[] }
+  let zoom = 1, mode = 'type', readOnly = false;
+  let tool = { kind: 'pen', color: '#1b1b1f', width: 2.5 };
+  let activeBox = null, selectedItem = null, savedRange = null;
+  let undoStack = [], redoStack = [], lastSnap = '';
+  let saveTimer = null, snapTimer = null, stateTimer = null;
+  let selection = null;        // { strokes:Set, items:Set, rect }
+  let findRanges = [], findIndex = -1;
+  let assetBase = '';
+
+  const uid = () => Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4);
+  const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+  const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+  // ------------------------------------------------------------------ load & render
+  function load(json) {
+    let m = null;
+    try { m = json ? JSON.parse(json) : null; } catch (e) { m = null; }
+    if (!m || typeof m !== 'object') m = {};
+    m.v = 1; m.items = Array.isArray(m.items) ? m.items : []; m.ink = Array.isArray(m.ink) ? m.ink : [];
+    m.bg = m.bg || { color: '#ffffff', rule: 'none', dark: false };
+    if (!m.created) m.created = Date.now();
+    model = m;
+    renderAll();
+  }
+
+  function renderAll() {
+    itemsEl.innerHTML = ''; inkEl.innerHTML = '';
+    activeBox = null; selectedItem = null; clearSelection();
+    titleEl.textContent = model.title || '';
+    const d = new Date(model.created);
+    stampEl.textContent = d.toLocaleDateString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }) + '   ' + d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
+    model.items.forEach(it => itemsEl.appendChild(build(it)));
+    model.ink.forEach(s => inkEl.appendChild(strokeEl(s)));
+    applyBg();
+    applyReadOnly();
+    layout();
+  }
+
+  function applyBg() {
+    const bg = model.bg || {};
+    paper.style.setProperty('--paper', bg.color || '#ffffff');
+    paper.classList.toggle('dark', !!bg.dark);
+    const spec = RULES[bg.rule || 'none'] || '';
+    const rc = bg.dark ? 'rgba(160,180,255,.18)' : 'rgba(80,120,200,.22)';
+    let img = '', size = '';
+    if (spec.startsWith('lines:')) { const n = +spec.split(':')[1]; img = `linear-gradient(to bottom, transparent ${n - 1}px, ${rc} ${n - 1}px)`; size = `100% ${n}px`; }
+    else if (spec.startsWith('grid:')) { const n = +spec.split(':')[1]; img = `linear-gradient(to bottom, transparent ${n - 1}px, ${rc} ${n - 1}px), linear-gradient(to right, transparent ${n - 1}px, ${rc} ${n - 1}px)`; size = `${n}px ${n}px`; }
+    else if (spec.startsWith('dots:')) { const n = +spec.split(':')[1]; img = `radial-gradient(circle, ${rc.replace('.22', '.6').replace('.18', '.5')} 1.2px, transparent 1.6px)`; size = `${n}px ${n}px`; }
+    paper.style.backgroundImage = img; paper.style.backgroundSize = size;
+  }
+
+  function build(it) {
+    const el = document.createElement('div');
+    el.className = 'item'; el._item = it; el.dataset.id = it.id || (it.id = uid());
+    place(el, it);
+    if (it.t === 'text') {
+      el.classList.add('box');
+      const grip = document.createElement('div'); grip.className = 'grip';
+      const bx = document.createElement('div'); bx.className = 'bx'; bx.contentEditable = readOnly ? 'false' : 'true'; bx.spellcheck = true;
+      bx.innerHTML = it.html || '<p><br></p>';
+      const rs = document.createElement('div'); rs.className = 'rs';
+      el.append(grip, bx, rs);
+      dragHandle(grip, el, 'move'); dragHandle(rs, el, 'width');
+    } else if (it.t === 'image') {
+      el.classList.add('img');
+      const img = document.createElement('img'); img.src = src(it.src); img.alt = it.alt || ''; img.draggable = false;
+      const rs = document.createElement('div'); rs.className = 'rs';
+      el.append(img, rs);
+      dragHandle(el, el, 'move', true); dragHandle(rs, el, 'scale');
+    } else {
+      el.classList.add('att');
+      const icon = it.t === 'audio' ? '🎙' : ({ pdf: '📕', doc: '📘', docx: '📘', xls: '📗', xlsx: '📗', csv: '📗', ppt: '📙', pptx: '📙', zip: '🗜', mp4: '🎬', mp3: '🎵', m4a: '🎵' }[(it.name || '').split('.').pop().toLowerCase()] || '📄');
+      const sub = it.t === 'audio' ? ('Recording' + (it.dur ? ' · ' + fmtDur(it.dur) : '')) : (it.size ? fmtSize(it.size) : 'File');
+      el.innerHTML = `<div class="row"><div class="ic">${icon}</div><div><div class="nm">${esc(it.name || 'Attachment')}</div><div class="sz">${esc(sub)}</div></div></div>` +
+        (it.transcript ? `<div class="tr">${esc(it.transcript)}</div>` : '');
+      dragHandle(el, el, 'move', true);
+    }
+    return el;
+  }
+
+  function place(el, it) {
+    el.style.left = (it.x || 0) + 'px'; el.style.top = (it.y || 0) + 'px';
+    if (it.w) el.style.width = it.w + 'px';
+    if (it.t === 'image' && it.h) el.style.height = it.h + 'px';
+    if (it.z) el.style.zIndex = it.z;
+  }
+
+  function src(s) { return s && s.startsWith('asset:') ? assetBase + encodeURIComponent(s.slice(6)) : (s || ''); }
+  function fmtDur(ms) { const s = Math.round(ms / 1000); return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); }
+  function fmtSize(b) { return b < 1024 ? b + ' B' : b < 1048576 ? Math.round(b / 1024) + ' KB' : (b / 1048576).toFixed(1) + ' MB'; }
+
+  // ------------------------------------------------------------------ ink
+  function pathD(s) {
+    const p = s.pts;
+    if (s.shape) {
+      const [x1, y1, x2, y2] = p;
+      if (s.shape === 'line') return `M${x1} ${y1}L${x2} ${y2}`;
+      if (s.shape === 'arrow') {
+        const a = Math.atan2(y2 - y1, x2 - x1), L = Math.max(10, s.w * 4);
+        return `M${x1} ${y1}L${x2} ${y2}M${x2 - L * Math.cos(a - 0.45)} ${y2 - L * Math.sin(a - 0.45)}L${x2} ${y2}L${x2 - L * Math.cos(a + 0.45)} ${y2 - L * Math.sin(a + 0.45)}`;
+      }
+      if (s.shape === 'rect') return `M${x1} ${y1}H${x2}V${y2}H${x1}Z`;
+      if (s.shape === 'ellipse') {
+        const cx = (x1 + x2) / 2, cy = (y1 + y2) / 2, rx = Math.abs(x2 - x1) / 2 || 0.5, ry = Math.abs(y2 - y1) / 2 || 0.5;
+        return `M${cx - rx} ${cy}A${rx} ${ry} 0 1 0 ${cx + rx} ${cy}A${rx} ${ry} 0 1 0 ${cx - rx} ${cy}Z`;
+      }
+    }
+    if (p.length < 6) return p.length >= 3 ? `M${p[0]} ${p[1]}l0.01 0` : '';
+    let d = `M${p[0]} ${p[1]}`;
+    for (let i = 3; i < p.length - 3; i += 3) {
+      const mx = (p[i] + p[i + 3]) / 2, my = (p[i + 1] + p[i + 4]) / 2;
+      d += `Q${p[i].toFixed(1)} ${p[i + 1].toFixed(1)} ${mx.toFixed(1)} ${my.toFixed(1)}`;
+    }
+    d += `L${p[p.length - 3]} ${p[p.length - 2]}`;
+    return d;
+  }
+
+  function strokeEl(s) {
+    const el = document.createElementNS(NS, 'path');
+    el.setAttribute('d', pathD(s));
+    el.setAttribute('fill', 'none');
+    el.setAttribute('stroke', s.c || '#000');
+    let w = s.w || 2;
+    if (!s.shape && !s.hl && s.pts.length >= 3) {
+      let sum = 0, n = 0; for (let i = 2; i < s.pts.length; i += 3) { sum += s.pts[i]; n++; }
+      const avg = n ? sum / n : 0.5; w = w * clamp(avg * 2, 0.6, 1.6);
+    }
+    el.setAttribute('stroke-width', w);
+    el.setAttribute('stroke-linecap', s.hl ? 'butt' : 'round');
+    el.setAttribute('stroke-linejoin', 'round');
+    if (s.hl) { el.setAttribute('stroke-opacity', '0.38'); el.classList.add('hl'); }
+    el._stroke = s;
+    return el;
+  }
+
+  function strokeBounds(s) {
+    let x1 = Infinity, y1 = Infinity, x2 = -Infinity, y2 = -Infinity;
+    for (let i = 0; i < s.pts.length; i += s.shape ? 2 : 3) { x1 = Math.min(x1, s.pts[i]); y1 = Math.min(y1, s.pts[i + 1]); x2 = Math.max(x2, s.pts[i]); y2 = Math.max(y2, s.pts[i + 1]); }
+    const pad = (s.w || 2) * 2;
+    return { x1: x1 - pad, y1: y1 - pad, x2: x2 + pad, y2: y2 + pad };
+  }
+
+  function strokePoints(s) {
+    if (!s.shape) { const out = []; for (let i = 0; i < s.pts.length; i += 3) out.push([s.pts[i], s.pts[i + 1]]); return out; }
+    const [x1, y1, x2, y2] = s.pts, out = [];
+    for (let t = 0; t <= 1.0001; t += 0.1) { out.push([x1 + (x2 - x1) * t, y1]); out.push([x1 + (x2 - x1) * t, y2]); out.push([x1, y1 + (y2 - y1) * t]); out.push([x2, y1 + (y2 - y1) * t]); }
+    if (s.shape === 'line' || s.shape === 'arrow') { out.length = 0; for (let t = 0; t <= 1.0001; t += 0.05) out.push([x1 + (x2 - x1) * t, y1 + (y2 - y1) * t]); }
+    return out;
+  }
+
+  function nearStroke(s, x, y, r) {
+    const b = strokeBounds(s);
+    if (x < b.x1 - r || x > b.x2 + r || y < b.y1 - r || y > b.y2 + r) return false;
+    const pts = strokePoints(s);
+    for (let i = 0; i < pts.length; i++) {
+      const a = pts[i], c = pts[i + 1] || a;
+      if (segDist(x, y, a[0], a[1], c[0], c[1]) <= r + (s.w || 2) / 2) return true;
+    }
+    return false;
+  }
+
+  function segDist(px, py, x1, y1, x2, y2) {
+    const dx = x2 - x1, dy = y2 - y1, l = dx * dx + dy * dy;
+    let t = l ? ((px - x1) * dx + (py - y1) * dy) / l : 0; t = clamp(t, 0, 1);
+    return Math.hypot(px - (x1 + t * dx), py - (y1 + t * dy));
+  }
+
+  // ------------------------------------------------------------------ layout & zoom
+  function contentExtent() {
+    let w = 0, h = 0;
+    itemsEl.querySelectorAll('.item').forEach(el => { w = Math.max(w, el.offsetLeft + el.offsetWidth); h = Math.max(h, el.offsetTop + el.offsetHeight); });
+    model.ink.forEach(s => { const b = strokeBounds(s); w = Math.max(w, b.x2); h = Math.max(h, b.y2); });
+    return { w, h };
+  }
+
+  function layout() {
+    const ext = contentExtent();
+    const W = Math.max(vp.clientWidth / zoom, ext.w + 160), H = Math.max(vp.clientHeight / zoom, ext.h + 480);
+    paper.style.width = W + 'px'; paper.style.height = H + 'px';
+    paper.style.transform = `scale(${zoom})`;
+    sizer.style.width = (W * zoom) + 'px'; sizer.style.height = (H * zoom) + 'px';
+    [inkEl, drawEl].forEach(s => { s.setAttribute('width', W); s.setAttribute('height', H); s.style.width = W + 'px'; s.style.height = H + 'px'; });
+  }
+
+  function setZoom(z, cx, cy) {
+    z = clamp(z, 0.3, 3);
+    if (cx === undefined) { cx = vp.clientWidth / 2; cy = vp.clientHeight / 2; }
+    const wx = (vp.scrollLeft + cx) / zoom, wy = (vp.scrollTop + cy) / zoom;
+    zoom = z; layout();
+    vp.scrollLeft = wx * zoom - cx; vp.scrollTop = wy * zoom - cy;
+    reportState();
+  }
+
+  function toPage(e) {
+    const r = paper.getBoundingClientRect();
+    return { x: (e.clientX - r.left) / zoom, y: (e.clientY - r.top) / zoom };
+  }
+
+  // two-finger pinch + pan (both modes)
+  let pinch = null;
+  vp.addEventListener('touchstart', e => {
+    if (e.touches.length === 2) {
+      const [a, b] = e.touches;
+      pinch = { d: Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY), z: zoom, mx: (a.clientX + b.clientX) / 2, my: (a.clientY + b.clientY) / 2 };
+      cancelStroke();
+    }
+  }, { passive: true });
+  vp.addEventListener('touchmove', e => {
+    if (pinch && e.touches.length === 2) {
+      e.preventDefault();
+      const [a, b] = e.touches;
+      const d = Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY);
+      const mx = (a.clientX + b.clientX) / 2, my = (a.clientY + b.clientY) / 2;
+      const r = vp.getBoundingClientRect();
+      vp.scrollLeft -= mx - pinch.mx; vp.scrollTop -= my - pinch.my;
+      pinch.mx = mx; pinch.my = my;
+      setZoom(pinch.z * d / pinch.d, mx - r.left, my - r.top);
+    }
+  }, { passive: false });
+  vp.addEventListener('touchend', e => { if (e.touches.length < 2) pinch = null; }, { passive: true });
+  window.addEventListener('resize', () => layout());
+
+  // ------------------------------------------------------------------ dragging items
+  function dragHandle(handle, el, kind, tapSelects) {
+    handle.addEventListener('pointerdown', e => {
+      if (readOnly || mode !== 'type' || pinch) return;
+      if (e.button !== undefined && e.button > 0) return;
+      e.stopPropagation();
+      const it = el._item, start = toPage(e), x0 = it.x, y0 = it.y, w0 = el.offsetWidth, h0 = el.offsetHeight;
+      let moved = false;
+      if (tapSelects) select(el);
+      handle.setPointerCapture(e.pointerId);
+      const move = ev => {
+        if (pinch) return;
+        const p = toPage(ev), dx = p.x - start.x, dy = p.y - start.y;
+        if (!moved && Math.hypot(dx, dy) < 4) return;
+        moved = true; ev.preventDefault();
+        if (kind === 'move') { it.x = Math.max(0, Math.round(x0 + dx)); it.y = Math.max(0, Math.round(y0 + dy)); }
+        else if (kind === 'width') { it.w = Math.max(80, Math.round(w0 + dx)); }
+        else if (kind === 'scale') { const r = h0 / w0; it.w = Math.max(40, Math.round(w0 + dx)); it.h = Math.round(it.w * r); }
+        place(el, it);
+      };
+      const up = () => {
+        handle.removeEventListener('pointermove', move); handle.removeEventListener('pointerup', up); handle.removeEventListener('pointercancel', up);
+        if (moved) { layout(); changed(true); }
+      };
+      handle.addEventListener('pointermove', move); handle.addEventListener('pointerup', up); handle.addEventListener('pointercancel', up);
+    });
+    if (tapSelects) handle.addEventListener('dblclick', () => { if (el._item.t !== 'image') A.onItem('open', el._item.id); });
+  }
+
+  function select(el) {
+    if (selectedItem && selectedItem !== el) selectedItem.classList.remove('selected');
+    selectedItem = el; if (el) el.classList.add('selected');
+    if (el) { blurBox(); A.onItem('select', el._item.id); }
+    reportState();
+  }
+
+  function deselect() { if (selectedItem) { selectedItem.classList.remove('selected'); selectedItem = null; reportState(); } }
+
+  // ------------------------------------------------------------------ text boxes
+  function boxOf(node) { while (node && node !== document.body) { if (node.classList && node.classList.contains('box')) return node; node = node.parentNode; } return null; }
+
+  function addText(x, y, html, focus) {
+    const w = Math.max(160, Math.min(vp.clientWidth / zoom - x - 16, 640));
+    const it = { id: uid(), t: 'text', x: Math.round(x), y: Math.round(y), w: Math.round(w), html: html || '<p><br></p>' };
+    model.items.push(it);
+    const el = build(it); itemsEl.appendChild(el);
+    layout();
+    if (focus !== false) { const bx = el.querySelector('.bx'); bx.focus(); caretEnd(bx); }
+    changed(true);
+    return el;
+  }
+
+  function caretEnd(node) {
+    const r = document.createRange(); r.selectNodeContents(node); r.collapse(false);
+    const s = getSelection(); s.removeAllRanges(); s.addRange(r); savedRange = r.cloneRange();
+  }
+
+  function isEmptyBox(el) {
+    const bx = el.querySelector('.bx');
+    return bx && bx.innerText.trim() === '' && !bx.querySelector('img,table,hr,li,[data-tag]');
+  }
+
+  function blurBox() {
+    if (activeBox) {
+      const el = activeBox; activeBox = null; el.classList.remove('active');
+      if (isEmptyBox(el) && model.items.filter(i => i.t === 'text').length > 1) removeItemEl(el);
+      if (document.activeElement && document.activeElement.classList.contains('bx')) document.activeElement.blur();
+    }
+  }
+
+  function removeItemEl(el) {
+    model.items = model.items.filter(i => i !== el._item);
+    if (selectedItem === el) selectedItem = null;
+    if (activeBox === el) activeBox = null;
+    el.remove(); layout(); changed(true);
+  }
+
+  document.addEventListener('focusin', e => {
+    const b = boxOf(e.target);
+    if (b) { if (activeBox && activeBox !== b) activeBox.classList.remove('active'); activeBox = b; b.classList.add('active'); deselect(); }
+    reportState();
+  });
+  document.addEventListener('focusout', e => {
+    setTimeout(() => {
+      const ae = document.activeElement;
+      if (activeBox && !(ae && activeBox.contains(ae))) {
+        const el = activeBox; el.classList.remove('active'); activeBox = null;
+        if (isEmptyBox(el) && model.items.filter(i => i.t === 'text').length > 1) removeItemEl(el);
+      }
+      reportState();
+    }, 60);
+  });
+
+  // tap on empty paper → new text box (OneNote style)
+  let tapStart = null;
+  paper.addEventListener('pointerdown', e => {
+    if (mode !== 'type' || readOnly) return;
+    tapStart = (e.target === paper || e.target === itemsEl || e.target === inkEl || e.target.id === 'head' || e.target === stampEl) ? { x: e.clientX, y: e.clientY, t: Date.now() } : null;
+  });
+  // "click" (not pointerup): it fires after the compatibility mousedown, so the new box keeps focus
+  paper.addEventListener('click', e => {
+    if (!tapStart || pinch) { tapStart = null; return; }
+    const moved = Math.hypot(e.clientX - tapStart.x, e.clientY - tapStart.y) > 8 || Date.now() - tapStart.t > 600;
+    tapStart = null;
+    if (moved) return;
+    if (selection) { clearSelection(); return; }
+    if (selectedItem) { deselect(); return; }
+    if (activeBox || (document.activeElement && document.activeElement === titleEl)) { blurBox(); titleEl.blur(); return; }
+    const p = toPage(e);
+    if (p.y < 70) { titleEl.focus(); return; }
+    addText(p.x, p.y - 10);
+  });
+
+  function saveSel() {
+    const s = getSelection();
+    if (s.rangeCount && boxOf(s.anchorNode)) savedRange = s.getRangeAt(0).cloneRange();
+  }
+  function restoreSel() {
+    if (!savedRange) return false;
+    const b = boxOf(savedRange.startContainer);
+    if (!b || !b.isConnected) return false;
+    const bx = b.querySelector('.bx');
+    if (document.activeElement !== bx) bx.focus({ preventScroll: true });
+    const s = getSelection(); s.removeAllRanges(); s.addRange(savedRange);
+    return true;
+  }
+  function anchorEl() {
+    const s = getSelection();
+    let n = s.rangeCount ? s.anchorNode : (savedRange ? savedRange.startContainer : null);
+    if (!n) return null; if (n.nodeType === 3) n = n.parentNode;
+    return boxOf(n) ? n : null;
+  }
+  function closest(tags) {
+    let n = anchorEl();
+    while (n && !(n.classList && n.classList.contains('bx'))) { if (tags.indexOf(n.nodeName) >= 0) return n; n = n.parentNode; }
+    return null;
+  }
+  function blockEl() { return closest(['P', 'DIV', 'H1', 'H2', 'H3', 'H4', 'LI', 'BLOCKQUOTE', 'PRE', 'TD', 'TH']); }
+  function currentBx() { const n = anchorEl(); const b = n && boxOf(n); return b ? b.querySelector('.bx') : null; }
+  function selectedBlocks() {
+    const bx = currentBx(); if (!bx) return [];
+    const s = getSelection();
+    if (s.rangeCount) {
+      const r = s.getRangeAt(0);
+      const hit = Array.from(bx.querySelectorAll('p,div,h1,h2,h3,h4,li,blockquote,pre')).filter(b => r.intersectsNode(b) && !b.querySelector('p,div,h1,h2,h3,h4,li,blockquote,pre'));
+      if (hit.length) return hit;
+    }
+    let b = blockEl();
+    if (!b) { // bare text directly in the box: wrap it in a paragraph so it can carry a tag
+      document.execCommand('formatBlock', false, 'p'); b = blockEl();
+    }
+    return b ? [b] : [];
+  }
+
+  // ------------------------------------------------------------------ change tracking, undo, save
+  function serialize() {
+    itemsEl.querySelectorAll('.box').forEach(el => { el._item.html = el.querySelector('.bx').innerHTML; });
+    model.title = titleEl.textContent.trim();
+    return JSON.stringify(model);
+  }
+
+  function changed(structural) {
+    if (readOnly) return;
+    A.onChange();
+    clearTimeout(saveTimer); saveTimer = setTimeout(save, 700);
+    clearTimeout(snapTimer);
+    if (structural) snapshot(); else snapTimer = setTimeout(snapshot, 600);
+  }
+
+  function snapshot() {
+    const s = serialize();
+    if (s === lastSnap) return;
+    if (lastSnap) { undoStack.push(lastSnap); if (undoStack.length > 80) undoStack.shift(); }
+    redoStack = []; lastSnap = s; reportState();
+  }
+
+  function save() { clearTimeout(saveTimer); if (!readOnly) A.onSave(serialize()); }
+
+  function restore(s) {
+    const z = zoom, sl = vp.scrollLeft, st = vp.scrollTop;
+    load(s); lastSnap = s; zoom = z; layout(); vp.scrollLeft = sl; vp.scrollTop = st;
+    A.onTitle(model.title || ''); save(); reportState();
+  }
+
+  function reportState() {
+    clearTimeout(stateTimer);
+    stateTimer = setTimeout(() => {
+      const q = c => { try { return document.queryCommandState(c); } catch (e) { return false; } };
+      const inBox = !!activeBox;
+      const b = inBox ? blockEl() : null, a = inBox ? closest(['A']) : null, ul = inBox ? closest(['UL']) : null;
+      const st = {
+        focus: inBox ? 'text' : selectedItem ? selectedItem._item.t : (document.activeElement === titleEl ? 'title' : 'none'),
+        item: selectedItem ? selectedItem._item.id : '',
+        bold: inBox && q('bold'), italic: inBox && q('italic'), underline: inBox && q('underline'), strike: inBox && q('strikeThrough'),
+        ul: inBox && q('insertUnorderedList') && !(ul && ul.classList.contains('checklist')), ol: inBox && q('insertOrderedList'),
+        check: !!(ul && ul.classList.contains('checklist')), table: inBox && !!closest(['TD', 'TH']),
+        block: b ? b.nodeName : 'P', tag: b ? (b.getAttribute('data-tag') || '') : '', link: a ? a.getAttribute('href') : '',
+        align: b ? (getComputedStyle(b).textAlign || 'left').replace('start', 'left').replace('end', 'right') : 'left',
+        sel: selection ? selection.strokes.size + selection.items.size : 0,
+        undo: undoStack.length > 0, redo: redoStack.length > 0, zoom: Math.round(zoom * 100), mode: mode
+      };
+      A.onState(JSON.stringify(st));
+    }, 40);
+  }
+
+  // ------------------------------------------------------------------ quick math ("12*7=" + space)
+  function calc(expr) {
+    const s = expr.replace(/\s+/g, '').replace(/×/g, '*').replace(/÷/g, '/').toLowerCase();
+    if (!/[\d)]/.test(s) || !/[-+*/^%(]|sqrt|sin|cos|tan|log|ln|abs/.test(s.replace(/^-/, ''))) return null;
+    let i = 0;
+    const peek = () => s[i];
+    function num() {
+      if (peek() === '(') { i++; const v = add(); if (peek() !== ')') throw 0; i++; return v; }
+      const fn = /^(sqrt|sin|cos|tan|log|ln|abs)/.exec(s.slice(i));
+      if (fn) { i += fn[1].length; const v = num(); return { sqrt: Math.sqrt, sin: x => Math.sin(x * Math.PI / 180), cos: x => Math.cos(x * Math.PI / 180), tan: x => Math.tan(x * Math.PI / 180), log: Math.log10, ln: Math.log, abs: Math.abs }[fn[1]](v); }
+      if (s.slice(i, i + 2) === 'pi') { i += 2; return Math.PI; }
+      const m = /^\d*\.?\d+(e[-+]?\d+)?/.exec(s.slice(i)); if (!m) throw 0; i += m[0].length;
+      let v = parseFloat(m[0]); if (peek() === '%') { i++; v /= 100; } return v;
+    }
+    function unary() { if (peek() === '-') { i++; return -unary(); } if (peek() === '+') { i++; return unary(); } return num(); }
+    function pow() { const b = unary(); if (peek() === '^') { i++; return Math.pow(b, pow()); } return b; }
+    function mul() { let v = pow(); while (peek() === '*' || peek() === '/') { const o = s[i++]; const r = pow(); v = o === '*' ? v * r : v / r; } return v; }
+    function add() { let v = mul(); while (peek() === '+' || peek() === '-') { const o = s[i++]; const r = mul(); v = o === '+' ? v + r : v - r; } return v; }
+    try { const v = add(); if (i !== s.length || !isFinite(v)) return null; return Math.round(v * 1e10) / 1e10; } catch (e) { return null; }
+  }
+
+  function tryMath(e) {
+    if (e.inputType !== 'insertText' || e.data !== ' ') return;
+    const s = getSelection(); if (!s.rangeCount) return;
+    const node = s.anchorNode; if (!node || node.nodeType !== 3) return;
+    const before = node.nodeValue.slice(0, s.anchorOffset);
+    const m = /([0-9a-z.+\-*/^%()×÷\s]*[0-9)])\s*=\s$/i.exec(before);
+    if (!m) return;
+    const v = calc(m[1]); if (v === null) return;
+    document.execCommand('insertText', false, String(v) + ' ');
+  }
+
+  // ------------------------------------------------------------------ events inside boxes
+  document.addEventListener('selectionchange', () => { saveSel(); reportState(); });
+  itemsEl.addEventListener('input', e => { tryMath(e); changed(false); reportState(); });
+  titleEl.addEventListener('input', () => { A.onTitle(titleEl.textContent.trim()); changed(false); });
+  titleEl.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); titleEl.blur(); } });
+  itemsEl.addEventListener('click', e => {
+    const t = e.target;
+    if (t.nodeName === 'LI' && t.parentNode.classList.contains('checklist')) {
+      const r = t.getBoundingClientRect();
+      if (e.clientX - r.left < 26 * zoom) { t.classList.toggle('checked'); e.preventDefault(); changed(true); }
+    }
+    const tagged = t.closest && t.closest('[data-tag="todo"]');
+    if (tagged) {
+      const r = tagged.getBoundingClientRect();
+      if (e.clientX - r.left < 24 * zoom) { tagged.setAttribute('data-done', tagged.getAttribute('data-done') === '1' ? '0' : '1'); e.preventDefault(); changed(true); }
+    }
+    if (readOnly && t.closest && t.closest('a')) { e.preventDefault(); A.onOpenLink(t.closest('a').getAttribute('href') || ''); }
+    reportState();
+  });
+  itemsEl.addEventListener('paste', e => {
+    const items = (e.clipboardData && e.clipboardData.items) || [];
+    for (const it of items) {
+      if (it.type && it.type.indexOf('image') === 0) {
+        const f = it.getAsFile(), rd = new FileReader();
+        rd.onload = () => A.onPasteImage(rd.result); rd.readAsDataURL(f); e.preventDefault(); return;
+      }
+    }
+  });
+
+  // ------------------------------------------------------------------ drawing
+  let stroke = null, strokePath = null, lassoPts = null, lassoEl = null, shapeStart = null, pointers = 0, strokeStartT = 0;
+
+  drawEl.addEventListener('pointerdown', e => {
+    if (readOnly || mode !== 'draw') return;
+    pointers++;
+    if (pointers > 1 || pinch) { cancelStroke(); return; }
+    if (tool.penOnly && e.pointerType === 'touch') return;
+    drawEl.setPointerCapture(e.pointerId);
+    const p = toPage(e), pr = e.pressure || 0.5;
+    strokeStartT = Date.now();
+    if (tool.kind === 'eraser') { eraseAt(p); return; }
+    if (tool.kind === 'lasso') {
+      if (selection && inRect(p, selection.rect)) { startSelDrag(e, p); return; }
+      clearSelection();
+      lassoPts = [p.x, p.y]; lassoEl = document.createElementNS(NS, 'polygon'); lassoEl.id = 'lasso'; drawEl.appendChild(lassoEl); return;
+    }
+    if (['line', 'arrow', 'rect', 'ellipse'].indexOf(tool.kind) >= 0) {
+      shapeStart = p;
+      stroke = { id: uid(), c: tool.color, w: tool.width, shape: tool.kind, pts: [p.x, p.y, p.x, p.y] };
+    } else {
+      stroke = { id: uid(), c: tool.color, w: tool.kind === 'highlighter' ? Math.max(10, tool.width * 4) : tool.width, hl: tool.kind === 'highlighter', pts: [round1(p.x), round1(p.y), round2(pr)] };
+    }
+    strokePath = strokeEl(stroke); drawEl.appendChild(strokePath);
+  });
+
+  drawEl.addEventListener('pointermove', e => {
+    if (mode !== 'draw' || pinch) return;
+    const evs = e.getCoalescedEvents ? e.getCoalescedEvents() : [e];
+    if (tool.kind === 'eraser' && e.buttons) { evs.forEach(ev => eraseAt(toPage(ev))); return; }
+    if (selDrag) { moveSelDrag(e); return; }
+    if (lassoPts) { const p = toPage(e); lassoPts.push(p.x, p.y); lassoEl.setAttribute('points', lassoPts.join(' ')); return; }
+    if (!stroke) return;
+    if (stroke.shape) {
+      const p = toPage(e); let x2 = p.x, y2 = p.y;
+      if (stroke.shape === 'rect' || stroke.shape === 'ellipse') { /* free aspect */ }
+      stroke.pts = [shapeStart.x, shapeStart.y, round1(x2), round1(y2)];
+    } else {
+      evs.forEach(ev => { const p = toPage(ev); const n = stroke.pts.length; if (Math.hypot(p.x - stroke.pts[n - 3], p.y - stroke.pts[n - 2]) > 0.8 / zoom) stroke.pts.push(round1(p.x), round1(p.y), round2(ev.pressure || 0.5)); });
+    }
+    strokePath.setAttribute('d', pathD(stroke));
+  });
+
+  const endPointer = e => {
+    pointers = Math.max(0, pointers - 1);
+    if (mode !== 'draw') return;
+    if (selDrag) { endSelDrag(); return; }
+    if (lassoPts) { finishLasso(); return; }
+    if (tool.kind === 'eraser') { if (erasedAny) { erasedAny = false; layout(); changed(true); } return; }
+    if (!stroke) return;
+    const s = stroke; stroke = null;
+    if (strokePath) { strokePath.remove(); strokePath = null; }
+    if (s.shape && Math.hypot(s.pts[2] - s.pts[0], s.pts[3] - s.pts[1]) < 3) return;
+    model.ink.push(s); inkEl.appendChild(strokeEl(s));
+    layout(); changed(true);
+  };
+  drawEl.addEventListener('pointerup', endPointer);
+  drawEl.addEventListener('pointercancel', e => { pointers = Math.max(0, pointers - 1); cancelStroke(); });
+
+  function cancelStroke() {
+    if (strokePath) strokePath.remove();
+    stroke = null; strokePath = null;
+    if (lassoEl) lassoEl.remove(); lassoEl = null; lassoPts = null;
+  }
+  const round1 = v => Math.round(v * 10) / 10, round2 = v => Math.round(v * 100) / 100;
+
+  let erasedAny = false;
+  function eraseAt(p) {
+    const r = Math.max(6, tool.width * 2) / Math.max(zoom, 0.5);
+    const keep = [];
+    let hit = false;
+    model.ink.forEach(s => { if (nearStroke(s, p.x, p.y, r)) hit = true; else keep.push(s); });
+    if (hit) {
+      model.ink = keep; erasedAny = true;
+      Array.from(inkEl.children).forEach(el => { if (keep.indexOf(el._stroke) < 0) el.remove(); });
+    }
+  }
+
+  // ------------------------------------------------------------------ lasso selection
+  function pointInPoly(x, y, poly) {
+    let inside = false;
+    for (let i = 0, j = poly.length - 2; i < poly.length; j = i, i += 2) {
+      const xi = poly[i], yi = poly[i + 1], xj = poly[j], yj = poly[j + 1];
+      if (((yi > y) !== (yj > y)) && (x < (xj - xi) * (y - yi) / (yj - yi) + xi)) inside = !inside;
+    }
+    return inside;
+  }
+
+  function finishLasso() {
+    const poly = lassoPts; cancelStroke();
+    if (poly.length < 8) return;
+    const strokes = new Set(), items = new Set();
+    model.ink.forEach(s => { const pts = strokePoints(s); const n = pts.filter(q => pointInPoly(q[0], q[1], poly)).length; if (n >= pts.length * 0.6) strokes.add(s); });
+    itemsEl.querySelectorAll('.item').forEach(el => { const cx = el.offsetLeft + el.offsetWidth / 2, cy = el.offsetTop + el.offsetHeight / 2; if (pointInPoly(cx, cy, poly)) items.add(el); });
+    if (!strokes.size && !items.size) return;
+    selection = { strokes, items, rect: null };
+    showSelection();
+  }
+
+  function showSelection() {
+    if (!selection) { selbox.style.display = 'none'; reportState(); return; }
+    let x1 = Infinity, y1 = Infinity, x2 = -Infinity, y2 = -Infinity;
+    selection.strokes.forEach(s => { const b = strokeBounds(s); x1 = Math.min(x1, b.x1); y1 = Math.min(y1, b.y1); x2 = Math.max(x2, b.x2); y2 = Math.max(y2, b.y2); });
+    selection.items.forEach(el => { x1 = Math.min(x1, el.offsetLeft); y1 = Math.min(y1, el.offsetTop); x2 = Math.max(x2, el.offsetLeft + el.offsetWidth); y2 = Math.max(y2, el.offsetTop + el.offsetHeight); });
+    selection.rect = { x: x1 - 6, y: y1 - 6, w: x2 - x1 + 12, h: y2 - y1 + 12 };
+    Object.assign(selbox.style, { display: 'block', left: selection.rect.x + 'px', top: selection.rect.y + 'px', width: selection.rect.w + 'px', height: selection.rect.h + 'px' });
+    reportState();
+  }
+
+  function clearSelection() { selection = null; selbox.style.display = 'none'; reportState(); }
+  function inRect(p, r) { return r && p.x >= r.x && p.x <= r.x + r.w && p.y >= r.y && p.y <= r.y + r.h; }
+
+  let selDrag = null;
+  function startSelDrag(e, p) { selDrag = { last: p }; }
+  function moveSelDrag(e) {
+    const p = toPage(e), dx = p.x - selDrag.last.x, dy = p.y - selDrag.last.y; selDrag.last = p;
+    selection.strokes.forEach(s => { for (let i = 0; i < s.pts.length; i += s.shape ? 2 : 3) { s.pts[i] = round1(s.pts[i] + dx); s.pts[i + 1] = round1(s.pts[i + 1] + dy); } });
+    Array.from(inkEl.children).forEach(el => { if (selection.strokes.has(el._stroke)) el.setAttribute('d', pathD(el._stroke)); });
+    selection.items.forEach(el => { const it = el._item; it.x = Math.max(0, Math.round(it.x + dx)); it.y = Math.max(0, Math.round(it.y + dy)); place(el, it); });
+    showSelection();
+  }
+  function endSelDrag() { selDrag = null; layout(); changed(true); }
+  selbox.addEventListener('pointerdown', e => {
+    if (readOnly) return;
+    e.stopPropagation(); selbox.setPointerCapture(e.pointerId);
+    selDrag = { last: toPage(e) };
+    const mv = ev => moveSelDrag(ev);
+    const up = () => { selbox.removeEventListener('pointermove', mv); selbox.removeEventListener('pointerup', up); endSelDrag(); };
+    selbox.addEventListener('pointermove', mv); selbox.addEventListener('pointerup', up);
+  });
+
+  // ------------------------------------------------------------------ read-only
+  function applyReadOnly() {
+    document.body.classList.toggle('ro', readOnly);
+    titleEl.contentEditable = readOnly ? 'false' : 'plaintext-only';
+    itemsEl.querySelectorAll('.bx').forEach(b => b.contentEditable = readOnly ? 'false' : 'true');
+  }
+
+  // ------------------------------------------------------------------ public API
+  function fmt(fn) { return function () { if (!restoreSel()) return; fn.apply(null, arguments); saveSel(); changed(false); reportState(); }; }
+
+  window.bl = {
+    getJson: () => serialize(),
+    flush: () => { save(); return 'ok'; },
+    setReadOnly: ro => { readOnly = !!ro; if (readOnly) setMode('type'); applyReadOnly(); },
+    load: json => { load(json); lastSnap = serialize(); undoStack = []; redoStack = []; reportState(); },
+    exec: fmt((cmd, val) => document.execCommand(cmd, false, val === undefined ? null : val)),
+    block: fmt(tag => document.execCommand('formatBlock', false, tag.toLowerCase())),
+    fontSize: fmt(pt => {
+      document.execCommand('styleWithCSS', false, false); document.execCommand('fontSize', false, '7'); document.execCommand('styleWithCSS', false, true);
+      document.querySelectorAll('.bx font[size="7"]').forEach(f => { const sp = document.createElement('span'); sp.style.fontSize = pt + 'pt'; while (f.firstChild) sp.appendChild(f.firstChild); f.parentNode.replaceChild(sp, f); sp.querySelectorAll('[style*="font-size"]').forEach(n => n.style.fontSize = ''); });
+      document.querySelectorAll('.bx span[style*="xxx-large"]').forEach(n => n.style.fontSize = pt + 'pt');
+    }),
+    color: fmt(c => { document.execCommand('styleWithCSS', false, true); document.execCommand('foreColor', false, c || '#1b1b1f'); }),
+    highlight: fmt(c => { document.execCommand('styleWithCSS', false, true); document.execCommand('hiliteColor', false, c || 'transparent'); }),
+    checklist: fmt(() => {
+      const ul = closest(['UL']);
+      if (ul && ul.classList.contains('checklist')) document.execCommand('insertUnorderedList');
+      else { if (!ul) document.execCommand('insertUnorderedList'); const l = closest(['UL']); if (l) l.classList.add('checklist'); }
+    }),
+    indent: fmt(dir => {
+      if (closest(['LI'])) document.execCommand(dir > 0 ? 'indent' : 'outdent');
+      else selectedBlocks().forEach(b => { const cur = parseInt(b.style.marginLeft || '0', 10) || 0; const n = Math.max(0, cur + dir * 32); b.style.marginLeft = n ? n + 'px' : ''; });
+    }),
+    tag: fmt(name => {
+      const blocks = selectedBlocks();
+      const all = blocks.length && blocks.every(b => b.getAttribute('data-tag') === name);
+      blocks.forEach(b => { if (all || !name) { b.removeAttribute('data-tag'); b.removeAttribute('data-done'); } else { b.setAttribute('data-tag', name); if (name === 'todo') b.setAttribute('data-done', '0'); else b.removeAttribute('data-done'); } });
+    }),
+    insertHtml: html => { if (!restoreSel()) { addText(24, nextY(), html); return; } document.execCommand('insertHTML', false, html); saveSel(); changed(true); },
+    insertText: text => { if (!restoreSel()) { addText(24, nextY(), '<p>' + esc(text) + '</p>'); return; } document.execCommand('insertText', false, text); saveSel(); changed(false); },
+    table: (rows, cols, header) => {
+      let h = '<table><tbody>';
+      for (let r = 0; r < rows; r++) { h += '<tr>'; for (let c = 0; c < cols; c++) h += (header && r === 0) ? '<th><br></th>' : '<td><br></td>'; h += '</tr>'; }
+      h += '</tbody></table><p><br></p>';
+      window.bl.insertHtml(h);
+    },
+    tableOp: fmt(op => {
+      const cell = closest(['TD', 'TH']); if (!cell) return;
+      const row = cell.parentNode, table = row.closest('table'), idx = Array.prototype.indexOf.call(row.children, cell);
+      if (op === 'rowBelow' || op === 'rowAbove') { const nr = document.createElement('tr'); for (let i = 0; i < row.children.length; i++) { const td = document.createElement('td'); td.innerHTML = '<br>'; nr.appendChild(td); } row.parentNode.insertBefore(nr, op === 'rowBelow' ? row.nextSibling : row); }
+      else if (op === 'colRight' || op === 'colLeft') table.querySelectorAll('tr').forEach(tr => { const ref = tr.children[idx]; const td = document.createElement(ref && ref.nodeName === 'TH' ? 'th' : 'td'); td.innerHTML = '<br>'; tr.insertBefore(td, op === 'colRight' ? (ref ? ref.nextSibling : null) : (ref || null)); });
+      else if (op === 'delRow') { if (table.querySelectorAll('tr').length <= 1) table.remove(); else row.remove(); }
+      else if (op === 'delCol') { table.querySelectorAll('tr').forEach(tr => { if (tr.children[idx]) tr.children[idx].remove(); }); if (!table.querySelector('td,th')) table.remove(); }
+      else if (op === 'delTable') table.remove();
+    }),
+    link: (url, text) => {
+      if (!restoreSel()) { addText(24, nextY(), `<p><a href="${esc(url)}">${esc(text || url)}</a></p>`); return; }
+      const s = getSelection(), ex = closest(['A']);
+      if (ex) { ex.setAttribute('href', url); if (text) ex.textContent = text; }
+      else if (s.rangeCount && !s.isCollapsed) document.execCommand('createLink', false, url);
+      else document.execCommand('insertHTML', false, `<a href="${esc(url)}">${esc(text || url)}</a>&nbsp;`);
+      saveSel(); changed(true);
+    },
+    unlink: fmt(() => { const a = closest(['A']); if (a) { const r = document.createRange(); r.selectNodeContents(a); const s = getSelection(); s.removeAllRanges(); s.addRange(r); } document.execCommand('unlink'); }),
+    addText: () => { setMode('type'); const y = nextY(); addText(24, y); vp.scrollTop = Math.max(0, y * zoom - 120); },
+    addImage: (srcRef, w, h, ocr) => {
+      const maxW = Math.min(vp.clientWidth / zoom - 48, 520), sc = w > maxW ? maxW / w : 1;
+      const y = nextY();
+      const it = { id: uid(), t: 'image', x: 24, y: y, w: Math.round(w * sc), h: Math.round(h * sc), src: srcRef, ocr: ocr || '' };
+      model.items.push(it); const el = build(it); itemsEl.appendChild(el); layout(); select(el);
+      vp.scrollTop = Math.max(0, y * zoom - 120); changed(true); return it.id;
+    },
+    addFile: json => {
+      const f = JSON.parse(json); const y = nextY();
+      const it = Object.assign({ id: uid(), x: 24, y: y }, f);
+      model.items.push(it); const el = build(it); itemsEl.appendChild(el); layout(); select(el);
+      vp.scrollTop = Math.max(0, y * zoom - 120); changed(true); return it.id;
+    },
+    updateItem: (id, json) => {
+      const it = model.items.find(i => i.id === id); if (!it) return;
+      Object.assign(it, JSON.parse(json));
+      const el = itemsEl.querySelector(`[data-id="${id}"]`); if (el) { const n = build(it); el.replaceWith(n); if (selectedItem === el) select(n); }
+      changed(true);
+    },
+    item: id => JSON.stringify(model.items.find(i => i.id === id) || null),
+    removeSelected: () => {
+      if (selection) { window.bl.deleteSelection(); return; }
+      if (selectedItem) { removeItemEl(selectedItem); return; }
+      const el = activeBox || (savedRange && boxOf(savedRange.startContainer));
+      if (el && el.isConnected) { activeBox = null; savedRange = null; removeItemEl(el); if (document.activeElement) document.activeElement.blur(); }
+    },
+    toFront: () => {
+      const el = selectedItem || activeBox || (savedRange && boxOf(savedRange.startContainer)); if (!el) return;
+      const z = Math.max(1, ...model.items.map(i => i.z || 1)) + 1; el._item.z = z; el.style.zIndex = z; changed(true);
+    },
+    deleteSelection: () => {
+      if (!selection) return;
+      model.ink = model.ink.filter(s => !selection.strokes.has(s));
+      Array.from(inkEl.children).forEach(el => { if (selection.strokes.has(el._stroke)) el.remove(); });
+      selection.items.forEach(el => { model.items = model.items.filter(i => i !== el._item); el.remove(); });
+      clearSelection(); layout(); changed(true);
+    },
+    duplicateSelection: () => {
+      if (!selection) return;
+      const ns = new Set(), ni = new Set();
+      selection.strokes.forEach(s => { const c = JSON.parse(JSON.stringify(s)); c.id = uid(); for (let i = 0; i < c.pts.length; i += c.shape ? 2 : 3) { c.pts[i] += 24; c.pts[i + 1] += 24; } model.ink.push(c); inkEl.appendChild(strokeEl(c)); ns.add(c); });
+      selection.items.forEach(el => { const c = JSON.parse(JSON.stringify(serializeItem(el))); c.id = uid(); c.x += 24; c.y += 24; model.items.push(c); const n = build(c); itemsEl.appendChild(n); ni.add(n); });
+      selection = { strokes: ns, items: ni, rect: null }; showSelection(); layout(); changed(true);
+    },
+    recolorSelection: c => {
+      if (!selection) return;
+      selection.strokes.forEach(s => s.c = c);
+      Array.from(inkEl.children).forEach(el => { if (selection.strokes.has(el._stroke)) el.setAttribute('stroke', c); });
+      changed(true);
+    },
+    setMode: m => setMode(m),
+    setTool: json => { tool = Object.assign(tool, JSON.parse(json)); if (tool.kind !== 'lasso') clearSelection(); setMode('draw'); },
+    undo: () => { snapshot(); if (!undoStack.length) return; redoStack.push(lastSnap); restore(undoStack.pop()); },
+    redo: () => { if (!redoStack.length) return; undoStack.push(lastSnap); restore(redoStack.pop()); },
+    setBg: json => { model.bg = Object.assign(model.bg || {}, JSON.parse(json)); applyBg(); changed(true); },
+    getBg: () => JSON.stringify(model.bg || {}),
+    setZoom: z => setZoom(z),
+    zoomBy: f => setZoom(zoom * f),
+    fitWidth: () => { const ext = contentExtent(); setZoom(clamp(vp.clientWidth / Math.max(ext.w + 24, 200), 0.3, 1.5)); vp.scrollLeft = 0; },
+    plainText: () => {
+      const parts = [titleEl.textContent];
+      model.items.slice().sort((a, b) => (a.y - b.y) || (a.x - b.x)).forEach(it => {
+        if (it.t === 'text') { const el = itemsEl.querySelector(`[data-id="${it.id}"] .bx`); if (el) parts.push(el.innerText); }
+        else if (it.t === 'audio' && it.transcript) parts.push(it.transcript);
+      });
+      return parts.join('\n\n');
+    },
+    selectedText: () => String(getSelection() || ''),
+    insertDate: text => window.bl.insertText(text),
+    scrollToTop: () => { vp.scrollTop = 0; vp.scrollLeft = 0; },
+    find: (term, matchCase) => {
+      findRanges = []; findIndex = -1;
+      if (CSS.highlights) { CSS.highlights.delete('bl-find'); CSS.highlights.delete('bl-current'); }
+      if (!term) { A.onFind(0, -1); return; }
+      const needle = matchCase ? term : term.toLowerCase();
+      [titleEl, ...itemsEl.querySelectorAll('.bx, .att .tr')].forEach(root => {
+        const w = document.createTreeWalker(root, NodeFilter.SHOW_TEXT); let n;
+        while ((n = w.nextNode())) {
+          const hay = matchCase ? n.nodeValue : n.nodeValue.toLowerCase(); let i = hay.indexOf(needle);
+          while (i >= 0) { const r = document.createRange(); r.setStart(n, i); r.setEnd(n, i + term.length); findRanges.push(r); i = hay.indexOf(needle, i + term.length); }
+        }
+      });
+      if (CSS.highlights && findRanges.length) CSS.highlights.set('bl-find', new Highlight(...findRanges));
+      if (findRanges.length) window.bl.findStep(1); else A.onFind(0, -1);
+    },
+    findStep: dir => {
+      if (!findRanges.length) return;
+      findIndex = (findIndex + dir + findRanges.length) % findRanges.length;
+      const r = findRanges[findIndex];
+      if (CSS.highlights) CSS.highlights.set('bl-current', new Highlight(r));
+      const rect = r.getBoundingClientRect();
+      vp.scrollBy({ top: rect.top - vp.clientHeight / 3, left: rect.left < 0 || rect.right > vp.clientWidth ? rect.left - 40 : 0, behavior: 'smooth' });
+      A.onFind(findRanges.length, findIndex);
+    },
+    clearFind: () => window.bl.find('', false),
+    blur: () => { blurBox(); deselect(); clearSelection(); titleEl.blur(); }
+  };
+
+  function serializeItem(el) { if (el._item.t === 'text') el._item.html = el.querySelector('.bx').innerHTML; return el._item; }
+
+  function nextY() {
+    let y = 90;
+    itemsEl.querySelectorAll('.item').forEach(el => { y = Math.max(y, el.offsetTop + el.offsetHeight + 16); });
+    return Math.round(y);
+  }
+
+  function setMode(m) {
+    mode = m === 'draw' && !readOnly ? 'draw' : 'type';
+    document.body.classList.toggle('drawing', mode === 'draw');
+    if (mode === 'draw') { blurBox(); deselect(); } else { clearSelection(); cancelStroke(); }
+    reportState();
+  }
+
+  function init() {
+    assetBase = A.assetBase() || '';
+    load(A.getInitial());
+    lastSnap = serialize();
+    A.onTitle(model.title || '');
+    A.onReady();
+    reportState();
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init); else init();
+})();
+</script>
+</body>
+</html>

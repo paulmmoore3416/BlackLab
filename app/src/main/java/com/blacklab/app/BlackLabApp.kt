@@ -32,6 +32,10 @@ class BlackLabApp : Application() {
             com.blacklab.app.assistant.Nano.refresh()
         }
         container.link.watch()
+        container.appScope.launch {
+            runCatching { com.blacklab.app.brainstorm.PlaceReminders.sync(this@BlackLabApp) }
+            runCatching { com.blacklab.app.brainstorm.Brainstorm.purgeOld(container); com.blacklab.app.brainstorm.NoteOps.purgeTrash(container) }
+        }
         com.blacklab.app.link.CloudSync.schedule(this)
     }
 }

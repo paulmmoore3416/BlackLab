@@ -16,8 +16,10 @@ import com.blacklab.app.core.Profile
         AssignmentEntity::class, CertificationEntity::class, CeuEntryEntity::class, StudySessionEntity::class,
         DeckEntity::class, FlashcardEntity::class,
         RecordingEntity::class,
+        NotebookEntity::class, SectionEntity::class, PageEntity::class,
+        NoteEntity::class, NoteLabelEntity::class, CommentEntity::class, ShareLinkEntity::class,
     ],
-    version = 1,
+    version = 2,
     exportSchema = true,
 )
 abstract class BlackLabDatabase : RoomDatabase() {
@@ -27,6 +29,8 @@ abstract class BlackLabDatabase : RoomDatabase() {
     abstract fun events(): EventDao
     abstract fun education(): EducationDao
     abstract fun recordings(): RecordingDao
+    abstract fun brainstorm(): BrainstormDao
+    abstract fun notes(): NoteDao
 
     companion object {
         const val NAME = "blacklab.db"
@@ -34,6 +38,7 @@ abstract class BlackLabDatabase : RoomDatabase() {
         fun build(context: Context): BlackLabDatabase =
             Room.databaseBuilder(context, BlackLabDatabase::class.java, NAME)
                 .addCallback(Seed)
+                .addMigrations(Migrations.M1_2)
                 .build()
     }
 

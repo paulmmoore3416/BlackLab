@@ -78,6 +78,15 @@ Optimized for the **Google Pixel 10 Pro XL** and newer (Android 15+).
 - **ZIP** — browse, open entries, extract; compress files to ZIP
 - BlackLab is an **“Open with”** choice for documents, media and archives from any app
 
+### 💡 Brainstorm — notebooks, notes & ideas
+- **Notebooks**: colored sections (and section groups) with pages and subpages. Every page is a **free-form canvas**: tap anywhere to type, move and resize text boxes, pinch to zoom
+- **Ink**: pen, highlighter, shapes, eraser and **lasso** (move, duplicate, recolor). **Tags** like To Do, Important, Question and Idea gather in a cross-notebook **Tags summary**
+- **Insert** pictures (their text becomes searchable), scans, files, **voice recordings with live transcripts**, tables and links to other pages; **quick math** (`12*7=` + space)
+- **Templates**: meeting notes, Cornell lecture notes, project overview, **mind map**, SWOT, pros & cons, planners. Also page history, a recycle bin and **password-protected (encrypted) sections**
+- **Notes**: a color-coded board with pins, labels, archive and trash; checklists, sketches, photos with “grab image text”, voice notes; **reminders by time or by place**
+- **Share & collaborate**: export to PDF/Word/Markdown/web page or print, **.blnotebook** packages, and **Live Share** a page or note to anyone on your Wi-Fi (view/comment/edit, expiring links, QR code) with comment threads
+- **Smart tools** on-device: summarize, action items → tasks, idea generation and mind maps
+
 ### 🎵 Music, audio & video
 - **Music player** — songs, albums, artists, playlists; background playback with lock-screen controls, queue, speed/pitch, A–B repeat, sleep timer, equalizer
 - **Audio editor** — waveform cut/copy/paste, trim, fades, gain, normalize, reverse, echo, noise gate, filters, tempo & pitch, mix in other files; M4A or WAV
@@ -152,6 +161,7 @@ Internal storage/BlackLab/
 │   ├── Scans/         Document scans (PDF + page images)
 │   ├── Documents/     Documents as .html (open in any browser or Word)
 │   ├── Journal/       Entries by year/month
+│   ├── Brainstorm/    Notebook pages (canvas JSON + pictures, recordings, history) and note attachments
 │   ├── Education/     Certificates, syllabi
 │   ├── Exports/       DOCX / PDF / MD / TXT / ICS exports
 │   └── Imports/       Files shared or imported into BlackLab
@@ -160,13 +170,13 @@ Internal storage/BlackLab/
 
 ## Install
 
-1. Download **[`BlackLab-v4.1.0.apk`](releases/BlackLab-v4.1.0.apk)** (also attached to the [v4.1.0 release](https://github.com/paulmmoore3416/BlackLab/releases/tag/v4.1.0)).
-   Verify it with the published SHA-256: [`BlackLab-v4.1.0.apk.sha256`](releases/BlackLab-v4.1.0.apk.sha256).
+1. Download **[`BlackLab-v4.2.0.apk`](releases/BlackLab-v4.2.0.apk)** (also attached to the [v4.2.0 release](https://github.com/paulmmoore3416/BlackLab/releases/tag/v4.2.0)).
+   Verify it with the published SHA-256: [`BlackLab-v4.2.0.apk.sha256`](releases/BlackLab-v4.2.0.apk.sha256).
 2. On the phone, allow your browser/Files app to **install unknown apps** when prompted.
 3. Open BlackLab and follow onboarding: name & title, account names, then grant
    **All-files access** (creates the BlackLab folder), **camera & microphone**, **notifications** and optionally **calendars**.
 
-Or with USB debugging: `adb install releases/BlackLab-v4.1.0.apk`
+Or with USB debugging: `adb install releases/BlackLab-v4.2.0.apk`
 
 ### Requirements
 - Android **15+** (API 35); targets Android 16 (API 36). Tested on an Android 16 emulator; installed and launched on a Pixel 10 Pro XL running Android 17
@@ -210,7 +220,8 @@ keyPassword=…
 | Documents | WebView `contenteditable` editor, jsoup, custom OOXML (DOCX) writer/reader, native `PdfDocument` renderer |
 | On-device ML | ML Kit document scanner, code scanner, text recognition (Play services) |
 | Reminders | Exact alarms (single self-rescheduling alarm), notifications with actions |
-| Security | AndroidX Biometric |
+| Security | AndroidX Biometric; AES-256-GCM + PBKDF2 for locked notebook sections |
+| Notebooks | WebView canvas engine (text boxes, SVG ink, lasso), ZXing QR codes, local Live Share server |
 
 See **[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)** for the design.
 
@@ -218,6 +229,7 @@ See **[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)** for the design.
 
 ```
 app/src/main/java/com/blacklab/app/
+├── brainstorm/  Notebook pages, section encryption, templates, notes, place reminders, Live Share
 ├── assistant/   Assistant router, Gemini Nano, voice, Google APIs, local index, keys
 ├── core/        Profiles, settings + settings schema, storage, time & recurrence, backups
 ├── data/        Room entities/DAOs, calendar logic, task ops, grades, SRS
@@ -229,7 +241,8 @@ app/src/main/java/com/blacklab/app/
 ├── reminders/   Alarm scheduler, receivers, notifications
 ├── study/       Pomodoro timer
 └── ui/          Compose screens (home, camera, recorder, library, documents,
-                 editor, journal, tasks, schedule, education, settings, onboarding, assistant)
+                 editor, journal, tasks, schedule, education, settings, onboarding, assistant,
+                 brainstorm)
 desktop/
 ├── web/         BlackLab Desktop UI (also published to GitHub Pages)
 └── companion/   Local companion: serves the UI, USB link, offline desktop assistant

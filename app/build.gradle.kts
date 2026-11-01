@@ -21,8 +21,8 @@ android {
         applicationId = "com.blacklab.app"
         minSdk = 35
         targetSdk = 36
-        versionCode = 6
-        versionName = "4.1.0"
+        versionCode = 7
+        versionName = "4.2.0"
         vectorDrawables { useSupportLibrary = true }
     }
 
@@ -130,6 +130,9 @@ dependencies {
     implementation("androidx.media3:media3-effect:$media3")
     // PDF editing: merge, split, rotate, reorder, text extraction, stamping, forms, passwords
     implementation("com.tom-roush:pdfbox-android:2.0.27.0")
+
+    // QR codes for Brainstorm Live Share links
+    implementation("com.google.zxing:core:3.5.3")
 
     implementation("io.coil-kt:coil-compose:2.7.0")
     implementation("io.coil-kt:coil-video:2.7.0")

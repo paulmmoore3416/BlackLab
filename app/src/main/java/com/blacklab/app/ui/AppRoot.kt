@@ -140,6 +140,7 @@ private val drawerDests = listOf(
     Dest("dictation", "Dictation", Icons.Default.RecordVoiceOver),
     Dest("library", "Library & Files", Icons.Default.Folder),
     Dest("create", "Create & Edit", Icons.Default.AddCircle),
+    Dest("brainstorm", "Brainstorm", Icons.Default.Lightbulb),
     Dest("documents", "Documents", Icons.Default.Description),
     Dest("journal", "Journal", Icons.AutoMirrored.Filled.MenuBook),
     Dest("tasks", "To-Do", Icons.Default.TaskAlt),
@@ -333,6 +334,18 @@ private fun NavGraph(nav: androidx.navigation.NavHostController) {
         composable("nowplaying") { com.blacklab.app.ui.music.NowPlayingScreen() }
         composable("music") { com.blacklab.app.ui.music.MusicScreen() }
         composable("create") { com.blacklab.app.ui.create.CreateScreen() }
+        composable("brainstorm?tab={tab}", arguments = listOf(navArgument("tab") { defaultValue = "" })) {
+            com.blacklab.app.ui.brainstorm.BrainstormScreen(it.arguments?.getString("tab") ?: "")
+        }
+        composable("notebook/{id}?section={section}", arguments = listOf(navArgument("id") { type = NavType.LongType }, navArgument("section") { type = NavType.LongType; defaultValue = 0L })) {
+            com.blacklab.app.ui.brainstorm.NotebookScreen(it.arguments?.getLong("id") ?: 0, it.arguments?.getLong("section") ?: 0)
+        }
+        composable("page/{id}", arguments = listOf(navArgument("id") { type = NavType.LongType })) {
+            com.blacklab.app.ui.brainstorm.PageEditorScreen(it.arguments?.getLong("id") ?: 0)
+        }
+        composable("note/{id}?kind={kind}", arguments = listOf(navArgument("id") { type = NavType.LongType }, navArgument("kind") { defaultValue = "" })) {
+            com.blacklab.app.ui.brainstorm.NoteEditorScreen(it.arguments?.getLong("id") ?: 0, it.arguments?.getString("kind") ?: "")
+        }
         composable("audioedit?path={path}", arguments = listOf(navArgument("path") { defaultValue = "" })) {
             com.blacklab.app.ui.audioedit.AudioEditorScreen(Uri.decode(it.arguments?.getString("path") ?: ""))
         }
@@ -450,6 +463,12 @@ private fun ShareIntake() {
                         }
                         shell.toast("Task created"); dismiss()
                     }, modifier = Modifier.fillMaxWidth()) { Text("Create task") }
+                    Button(onClick = {
+                        app.io {
+                            com.blacklab.app.brainstorm.NoteOps.save(app, com.blacklab.app.data.NoteEntity(profile = profile.name, title = (p.subject ?: "").take(120), body = p.text))
+                        }
+                        shell.toast("Saved to Brainstorm notes", "Open") { shell.go("brainstorm?tab=notes") }; dismiss()
+                    }, modifier = Modifier.fillMaxWidth()) { Text("Save as note") }
                     Button(onClick = {
                         val html = ContentStore.textToHtml(p.text)
                         app.io {

@@ -86,14 +86,14 @@ val EditorFonts = listOf(
 )
 private val FontSizes = listOf(8f, 9f, 10f, 10.5f, 11f, 12f, 14f, 16f, 18f, 20f, 24f, 28f, 32f, 36f, 48f, 60f, 72f)
 private val Styles = listOf("P" to "Normal", "TITLE" to "Title", "H1" to "Heading 1", "H2" to "Heading 2", "H3" to "Heading 3", "H4" to "Heading 4", "BLOCKQUOTE" to "Quote", "PRE" to "Code")
-private val WordColors = listOf(
+internal val WordColors = listOf(
     "#000000", "#434343", "#666666", "#999999", "#B7B7B7", "#FFFFFF",
     "#C00000", "#FF0000", "#FFC000", "#FFFF00", "#92D050", "#00B050",
     "#00B0F0", "#0070C0", "#002060", "#7030A0", "#1F3864", "#2F5496",
     "#C55A11", "#BF8F00", "#538135", "#2E75B6", "#7F6000", "#833C0B",
 )
-private val Highlights = listOf("#FFFF00", "#00FF00", "#00FFFF", "#FF00FF", "#FFC000", "#FF9999", "#B4C7E7", "#C5E0B4", "#D9D9D9")
-private val Symbols = listOf("©", "®", "™", "§", "¶", "†", "•", "°", "±", "×", "÷", "≈", "≠", "≤", "≥", "∞", "√", "µ", "Ω", "π", "∑", "€", "£", "¥", "¢", "←", "→", "↑", "↓", "↔", "✓", "✗", "★", "☆", "♥", "☐", "☑", "½", "¼", "¾", "…", "—", "–", "“", "”", "‘", "’")
+internal val Highlights = listOf("#FFFF00", "#00FF00", "#00FFFF", "#FF00FF", "#FFC000", "#FF9999", "#B4C7E7", "#C5E0B4", "#D9D9D9")
+internal val Symbols = listOf("©", "®", "™", "§", "¶", "†", "•", "°", "±", "×", "÷", "≈", "≠", "≤", "≥", "∞", "√", "µ", "Ω", "π", "∑", "€", "£", "¥", "¢", "←", "→", "↑", "↓", "↔", "✓", "✗", "★", "☆", "♥", "☐", "☑", "½", "¼", "¾", "…", "—", "–", "“", "”", "‘", "’")
 
 @Composable
 fun EditorRibbon(
@@ -341,7 +341,7 @@ private fun StatLine(label: String, value: String) {
 }
 
 @Composable
-private fun RB(icon: ImageVector, desc: String, active: Boolean = false, onClick: () -> Unit) {
+internal fun RB(icon: ImageVector, desc: String, active: Boolean = false, onClick: () -> Unit) {
     Box(
         Modifier.padding(horizontal = 1.dp).size(40.dp).clip(RoundedCornerShape(10.dp))
             .background(if (active) MaterialTheme.colorScheme.primary.copy(alpha = 0.22f) else Color.Transparent)
@@ -351,7 +351,7 @@ private fun RB(icon: ImageVector, desc: String, active: Boolean = false, onClick
 }
 
 @Composable
-private fun RL(icon: ImageVector, label: String, onClick: () -> Unit) {
+internal fun RL(icon: ImageVector, label: String, onClick: () -> Unit) {
     Column(
         Modifier.padding(horizontal = 2.dp).clip(RoundedCornerShape(10.dp)).clickable(onClick = onClick).padding(horizontal = 8.dp, vertical = 4.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -362,12 +362,12 @@ private fun RL(icon: ImageVector, label: String, onClick: () -> Unit) {
 }
 
 @Composable
-private fun Sep() {
+internal fun Sep() {
     Box(Modifier.padding(horizontal = 4.dp).width(1.dp).height(26.dp).background(MaterialTheme.colorScheme.outlineVariant))
 }
 
 @Composable
-private fun MenuChip(label: String, minWidth: Int, items: @Composable (close: () -> Unit) -> Unit) {
+internal fun MenuChip(label: String, minWidth: Int, items: @Composable (close: () -> Unit) -> Unit) {
     var open by remember { mutableStateOf(false) }
     Box(Modifier.padding(horizontal = 2.dp)) {
         Row(
@@ -383,7 +383,7 @@ private fun MenuChip(label: String, minWidth: Int, items: @Composable (close: ()
 }
 
 @Composable
-private fun ColorDialog(title: String, colors: List<String>, auto: String, onDismiss: () -> Unit, onPick: (String?) -> Unit) {
+internal fun ColorDialog(title: String, colors: List<String>, auto: String, onDismiss: () -> Unit, onPick: (String?) -> Unit) {
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(title) },
@@ -405,7 +405,7 @@ private fun ColorDialog(title: String, colors: List<String>, auto: String, onDis
 }
 
 @Composable
-private fun TableDialog(onDismiss: () -> Unit, onInsert: (Int, Int, Boolean) -> Unit) {
+internal fun TableDialog(onDismiss: () -> Unit, onInsert: (Int, Int, Boolean) -> Unit) {
     var rows by remember { mutableIntStateOf(3) }
     var cols by remember { mutableIntStateOf(3) }
     var header by remember { mutableStateOf(true) }
@@ -447,7 +447,7 @@ fun Stepper(label: String, value: Int, range: IntRange, onChange: (Int) -> Unit)
 }
 
 @Composable
-private fun LinkDialog(existing: String, onDismiss: () -> Unit, onSave: (String, String) -> Unit) {
+internal fun LinkDialog(existing: String, onDismiss: () -> Unit, onSave: (String, String) -> Unit) {
     var url by remember { mutableStateOf(existing) }
     var text by remember { mutableStateOf("") }
     AlertDialog(

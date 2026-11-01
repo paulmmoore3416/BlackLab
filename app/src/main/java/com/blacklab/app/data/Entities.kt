@@ -306,3 +306,133 @@ data class RecordingEntity(
     val format: String = "",
     val createdAt: Long = System.currentTimeMillis(),
 )
+
+// ---------------------------------------------------------------- Brainstorm: notebooks (OneNote-style)
+
+@Entity(tableName = "notebooks", indices = [Index("profile")])
+data class NotebookEntity(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val profile: String,
+    val name: String,
+    val color: Int,
+    val emoji: String = "",
+    val sortOrder: Int = 0,
+    val createdAt: Long = System.currentTimeMillis(),
+    val updatedAt: Long = System.currentTimeMillis(),
+)
+
+@Entity(
+    tableName = "nb_sections",
+    indices = [Index("notebookId")],
+    foreignKeys = [ForeignKey(entity = NotebookEntity::class, parentColumns = ["id"], childColumns = ["notebookId"], onDelete = ForeignKey.CASCADE)],
+)
+data class SectionEntity(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val notebookId: Long,
+    val name: String,
+    val color: Int,
+    /** Section group this section belongs to ("" = top level). */
+    val groupName: String = "",
+    val sortOrder: Int = 0,
+    /** Password-protected: page files of this section are AES-GCM encrypted with a key derived from the password. */
+    val locked: Boolean = false,
+    val lockSalt: String = "",
+    /** A known value encrypted with the section key, used to check the password. */
+    val lockCheck: String = "",
+    val lockHint: String = "",
+    val createdAt: Long = System.currentTimeMillis(),
+)
+
+@Entity(tableName = "nb_pages", indices = [Index("sectionId"), Index("profile")])
+data class PageEntity(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val profile: String,
+    val sectionId: Long,
+    val title: String = "",
+    /** 0 = page, 1 = subpage, 2 = sub-subpage. */
+    val level: Int = 0,
+    val sortOrder: Int = 0,
+    val preview: String = "",
+    /** Plain text of the page (text boxes, transcripts, text found in pictures) for search. Empty for locked sections. */
+    val searchText: String = "",
+    /** One "tag|done|text" line per tagged paragraph. Empty for locked sections. */
+    val tagIndex: String = "",
+    val wordCount: Int = 0,
+    val pinned: Boolean = false,
+    val reminderAt: Long? = null,
+    val deletedAt: Long? = null,
+    val createdAt: Long = System.currentTimeMillis(),
+    val updatedAt: Long = System.currentTimeMillis(),
+)
+
+// ---------------------------------------------------------------- Brainstorm: notes (Keep-style)
+
+@Entity(tableName = "notes", indices = [Index("profile")])
+data class NoteEntity(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val profile: String,
+    val title: String = "",
+    val body: String = "",
+    val checklist: Boolean = false,
+    /** JSON array of {t: text, d: done, i: indent}. */
+    val items: String = "[]",
+    /** Index into NoteColors (0 = default). */
+    val color: Int = 0,
+    /** Background pattern name ("" = none). */
+    val bg: String = "",
+    val pinned: Boolean = false,
+    val archived: Boolean = false,
+    val trashedAt: Long? = null,
+    /** Labels as ",a,b," so LIKE '%,a,%' matches whole labels. */
+    val labels: String = "",
+    val reminderAt: Long? = null,
+    val repeatRule: String? = null,
+    val placeName: String = "",
+    val placeLat: Double? = null,
+    val placeLon: Double? = null,
+    val placeRadius: Int = 150,
+    val placeOnLeave: Boolean = false,
+    /** JSON array of {k: image|audio|drawing, p: path, tr: transcript, ocr: text, d: durationMs}. */
+    val attachments: String = "[]",
+    val sortOrder: Long = 0,
+    val createdAt: Long = System.currentTimeMillis(),
+    val updatedAt: Long = System.currentTimeMillis(),
+)
+
+@Entity(tableName = "note_labels", indices = [Index(value = ["profile", "name"], unique = true)])
+data class NoteLabelEntity(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val profile: String,
+    val name: String,
+)
+
+// ---------------------------------------------------------------- Brainstorm: collaboration
+
+/** Comment threads on pages and notes, from you or from Live Share guests. */
+@Entity(tableName = "bs_comments", indices = [Index("pageId"), Index("noteId")])
+data class CommentEntity(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val pageId: Long? = null,
+    val noteId: Long? = null,
+    val parentId: Long? = null,
+    val author: String,
+    val text: String,
+    val guest: Boolean = false,
+    val resolved: Boolean = false,
+    val createdAt: Long = System.currentTimeMillis(),
+)
+
+/** A Live Share link: lets people on the same Wi-Fi open one page or note in a browser. */
+@Entity(tableName = "bs_shares")
+data class ShareLinkEntity(
+    @PrimaryKey val token: String,
+    val kind: String, // PAGE or NOTE
+    val refId: Long,
+    val title: String,
+    /** VIEW, COMMENT or EDIT (edit = guests can tick checklist items and add lines). */
+    val permission: String = "VIEW",
+    val createdAt: Long = System.currentTimeMillis(),
+    val expiresAt: Long,
+    val revoked: Boolean = false,
+    val opens: Int = 0,
+)

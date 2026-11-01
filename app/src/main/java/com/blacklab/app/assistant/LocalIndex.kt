@@ -46,6 +46,16 @@ class LocalIndex(private val app: AppContainer) {
                 chunk(text).forEach { out += Passage("Document", d.title, it, "doc/${d.id}", d.profile, d.updatedAt) }
                 if (text.isBlank()) out += Passage("Document", d.title, d.preview, "doc/${d.id}", d.profile, d.updatedAt)
             }
+            if (s.asstIndexDocs) {
+                // Brainstorm notebook pages (locked sections have no search text) and Keep-style notes
+                app.db.brainstorm().allPages().filter { it.deletedAt == null && it.searchText.isNotBlank() }.forEach { pg ->
+                    chunk(pg.searchText).forEach { out += Passage("Notebook", pg.title.ifBlank { "Untitled page" }, it, "page/${pg.id}", pg.profile, pg.updatedAt) }
+                }
+                app.db.notes().all().filter { it.trashedAt == null }.forEach { n ->
+                    val text = com.blacklab.app.brainstorm.NoteOps.plainText(n)
+                    if (text.isNotBlank()) chunk(text).forEach { out += Passage("Note", n.title.ifBlank { text.take(40) }, it, "note/${n.id}", n.profile, n.updatedAt) }
+                }
+            }
             if (s.asstIndexJournal) Profile.entries.forEach { p ->
                 app.db.journal().allFor(p.name).forEach { j ->
                     val text = ContentStore.plainText(app.content.readBody(j.filePath))

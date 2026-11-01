@@ -63,7 +63,7 @@ class LinkHub(private val app: AppContainer) {
 
     fun watch() {
         app.db.invalidationTracker.addObserver(object : InvalidationTracker.Observer(
-            arrayOf("documents", "journal", "tasks", "task_lists", "subtasks", "events", "event_calendars", "courses", "assignments", "certifications", "ceu_entries", "recordings"),
+            arrayOf("documents", "journal", "tasks", "task_lists", "subtasks", "events", "event_calendars", "courses", "assignments", "certifications", "ceu_entries", "recordings", "notes", "nb_pages", "notebooks"),
         ) {
             override fun onInvalidated(tables: Set<String>) = bump()
         })
@@ -204,6 +204,13 @@ class LinkServer(private val app: AppContainer, private val port: Int, private v
         val origin = headers["origin"]
 
         if (req.method == "OPTIONS") { respond(out, 204, "", origin); return }
+        if (path.startsWith("/s/")) {
+            // Live Share guest links carry their own scoped token instead of the pairing code
+            val r = runCatching { runBlocking { com.blacklab.app.brainstorm.LiveShare.serve(app, req.method, path, body) } }
+                .getOrElse { com.blacklab.app.brainstorm.LiveShare.Response(500, "application/json", err("error").toByteArray()) }
+            respondRaw(out, r.code, r.type, r.body)
+            return
+        }
         if (path == "/api/ping") {
             respond(out, 200, JSONObject().put("app", "BlackLab").put("version", com.blacklab.app.BuildConfig.VERSION_NAME).put("pairing", true).toString(), origin); return
         }
@@ -310,6 +317,17 @@ class LinkServer(private val app: AppContainer, private val port: Int, private v
     private fun cors(origin: String?) = "Access-Control-Allow-Origin: ${origin ?: "*"}\r\nVary: Origin\r\n" +
         "Access-Control-Allow-Methods: GET, POST, PUT, OPTIONS\r\nAccess-Control-Allow-Headers: Authorization, Content-Type\r\n" +
         "Access-Control-Allow-Private-Network: true\r\nAccess-Control-Max-Age: 600\r\n"
+
+    /** Same-origin response for Live Share pages (no CORS; strict CSP; never cached). */
+    private fun respondRaw(out: OutputStream, code: Int, type: String, bytes: ByteArray) {
+        val status = when (code) { 200 -> "OK"; 400 -> "Bad Request"; 403 -> "Forbidden"; 404 -> "Not Found"; 410 -> "Gone"; 429 -> "Too Many Requests"; else -> "Error" }
+        val head = "HTTP/1.1 $code $status\r\nContent-Type: $type\r\nContent-Length: ${bytes.size}\r\nCache-Control: no-store\r\n" +
+            "Content-Security-Policy: default-src 'none'; img-src 'self' data:; style-src 'unsafe-inline'; script-src 'unsafe-inline'; connect-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'\r\n" +
+            "X-Content-Type-Options: nosniff\r\nReferrer-Policy: no-referrer\r\nConnection: close\r\n\r\n"
+        out.write(head.toByteArray())
+        out.write(bytes)
+        out.flush()
+    }
 
     private fun respond(out: OutputStream, code: Int, json: String, origin: String?) {
         val bytes = json.toByteArray(Charsets.UTF_8)

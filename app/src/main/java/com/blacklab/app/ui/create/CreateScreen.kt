@@ -127,6 +127,9 @@ fun CreateScreen() {
     }
 
     val create = listOf(
+        CreateItem("Notebook page", "Free-form canvas: type anywhere, ink, tags, pictures", Icons.Default.MenuBook, Violet) { shell.go("brainstorm?tab=notebooks") },
+        CreateItem("Quick note", "Keep-style note, list, sketch or voice memo", Icons.Default.StickyNote2, Amber) { shell.go("note/0?kind=") },
+        CreateItem("Mind map", "Brainstorm a topic around a central idea", Icons.Default.Hub, Mint) { shell.go("brainstorm?tab=mindmap") },
         CreateItem("Document", "Rich text, tables, pictures — exports to Word & PDF", Icons.Default.Description, Cobalt) { shell.go("doc/0") },
         CreateItem("Spreadsheet", "Excel-compatible .xlsx with formulas", Icons.Default.TableChart, Mint) {
             make(Folder.DOCUMENTS, "Spreadsheet ${stamp()}", "xlsx") { Sheets.writeXlsx(listOf(Sheet("Sheet1", mutableListOf(mutableListOf("Item", "Qty", "Cost", "Total"), mutableListOf("", "", "", "=B2*C2")))), it) }

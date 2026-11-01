@@ -25,6 +25,7 @@ enum class Folder(val dirName: String) {
     SCANS("Scans"),
     DOCUMENTS("Documents"),
     JOURNAL("Journal"),
+    BRAINSTORM("Brainstorm"),
     EDUCATION("Education"),
     EXPORTS("Exports"),
     IMPORTS("Imports"),
@@ -78,6 +79,7 @@ class BlackLabStorage(private val context: Context) {
                       Scans/        Document scans (PDF)
                       Documents/    Documents (.html, open in any browser or Word)
                       Journal/      Journal entries by year/month
+                      Brainstorm/   Notebook pages, notes and their pictures, recordings & files
                       Education/    Syllabi, certificates and course files
                       Exports/      PDF / DOCX / TXT / MD exports
                       Imports/      Files imported into BlackLab
