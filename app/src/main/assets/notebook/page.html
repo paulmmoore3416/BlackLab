@@ -158,6 +158,7 @@
     const bg = model.bg || {};
     paper.style.setProperty('--paper', bg.color || '#ffffff');
     paper.classList.toggle('dark', !!bg.dark);
+    Array.from(inkEl.children).forEach(el => { if (el._stroke) el.setAttribute('stroke', inkFor(el._stroke.c)); });
     const spec = RULES[bg.rule || 'none'] || '';
     const rc = bg.dark ? 'rgba(160,180,255,.18)' : 'rgba(80,120,200,.22)';
     let img = '', size = '';
@@ -233,11 +234,18 @@
     return d;
   }
 
+  // Dark ink on dark paper would vanish: show near-black ink light while the paper is dark (stored color unchanged)
+  function inkFor(c) {
+    if (!(model && model.bg && model.bg.dark) || !c || c[0] !== '#' || c.length < 7) return c || '#000';
+    const r = parseInt(c.substr(1, 2), 16), g = parseInt(c.substr(3, 2), 16), b = parseInt(c.substr(5, 2), 16);
+    return (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255 < 0.25 ? '#e8e8ec' : c;
+  }
+
   function strokeEl(s) {
     const el = document.createElementNS(NS, 'path');
     el.setAttribute('d', pathD(s));
     el.setAttribute('fill', 'none');
-    el.setAttribute('stroke', s.c || '#000');
+    el.setAttribute('stroke', inkFor(s.c || '#000'));
     let w = s.w || 2;
     if (!s.shape && !s.hl && s.pts.length >= 3) {
       let sum = 0, n = 0; for (let i = 2; i < s.pts.length; i += 3) { sum += s.pts[i]; n++; }

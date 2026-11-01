@@ -474,7 +474,7 @@ fun PdfViewerScreen(original: File, startSign: Boolean = false) {
                 dismissButton = { TextButton(onClick = { dialog = null }) { Text("Cancel") } },
             )
         }
-        "form" -> PdfFormDialog(viewFile, onDismiss = { dialog = null }) { values, flatten -> dialog = null; runTool("Filling form", "_filled") { s, o -> PdfTools.fillForm(s, o, values, flatten) } }
+        "form" -> PdfFormDialog(viewFile, onDismiss = { dialog = null }) { values, flatten, images -> dialog = null; runTool("Filling form", "_filled") { s, o -> PdfTools.fillForm(s, o, values, flatten, images) } }
         "props" -> {
             val info by produceState<Map<String, String>?>(null, viewFile) { value = withContext(Dispatchers.IO) { viewFile?.let { PdfTools.init(ctx); PdfTools.info(it) } } }
             var title by remember(info) { mutableStateOf(info?.get("Title").orEmpty()) }
@@ -572,11 +572,21 @@ private fun PdfSearchDialog(texts: List<String>?, onDismiss: () -> Unit, onGo: (
 }
 
 @Composable
-private fun PdfFormDialog(file: File?, onDismiss: () -> Unit, onFill: (Map<String, String>, Boolean) -> Unit) {
+private fun PdfFormDialog(file: File?, onDismiss: () -> Unit, onFill: (Map<String, String>, Boolean, Map<String, android.graphics.Bitmap>) -> Unit) {
     val ctx = LocalContext.current
+    val settings = com.blacklab.app.ui.components.settingsState()
     val fields by produceState<List<FormField>?>(null, file) { value = withContext(Dispatchers.IO) { file?.let { runCatching { PdfTools.init(ctx); PdfTools.formFields(it) }.getOrDefault(emptyList()) } } }
     val values = remember(fields) { androidx.compose.runtime.mutableStateMapOf<String, String>().apply { fields?.forEach { put(it.name, it.value) } } }
+    val images = remember(fields) { androidx.compose.runtime.mutableStateMapOf<String, android.graphics.Bitmap>() }
+    val slots = remember(fields) { fields.orEmpty().associate { it.name to com.blacklab.app.core.FormAutofill.classify(it.name, it.alt) } }
     var flatten by remember { mutableStateOf(false) }
+    var profile by remember(settings) { mutableStateOf(com.blacklab.app.core.FormAutofill.profile(ctx, settings)) }
+    var signFor by remember { mutableStateOf<String?>(null) }
+    var editDetails by remember { mutableStateOf(false) }
+    var filledNote by remember { mutableStateOf<String?>(null) }
+    fun isSignature(f: FormField) = f.type == "signature" || (f.type == "text" && slots[f.name].let { it == com.blacklab.app.core.FormAutofill.Slot.SIGNATURE || it == com.blacklab.app.core.FormAutofill.Slot.INITIALS })
+    fun label(f: FormField) = f.alt.ifBlank { f.name }
+
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text("Fill in form") },
@@ -586,19 +596,78 @@ private fun PdfFormDialog(file: File?, onDismiss: () -> Unit, onFill: (Map<Strin
                     fields == null -> CircularProgressIndicator()
                     fields!!.isEmpty() -> Text("This PDF has no fillable fields. Use Mark up & sign to type text anywhere on a page.")
                     else -> {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            androidx.compose.material3.FilledTonalButton(onClick = {
+                                var n = 0
+                                fields!!.filter { it.type == "text" && !isSignature(it) && values[it.name].isNullOrBlank() }.forEach { f ->
+                                    val v = slots[f.name]?.let { com.blacklab.app.core.FormAutofill.valueFor(it, profile) }.orEmpty()
+                                    if (v.isNotBlank()) { values[f.name] = v; n++ }
+                                }
+                                filledNote = if (n > 0) "Filled $n field(s) from your details. Check them before saving." else "Nothing to fill: add your details, or the field names weren't recognized."
+                            }) { Icon(Icons.Default.AutoAwesome, null, Modifier.size(18.dp)); Spacer(Modifier.width(6.dp)); Text("Auto-fill my details") }
+                            TextButton(onClick = { editDetails = true }) { Text("My details") }
+                        }
+                        filledNote?.let { Text(it, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(bottom = 6.dp)) }
                         fields!!.forEach { f ->
-                            when (f.type) {
-                                "check" -> Row(verticalAlignment = Alignment.CenterVertically) { Checkbox(values[f.name] == "Yes", { values[f.name] = if (it) "Yes" else "Off" }); Text(f.name) }
-                                "radio", "choice" -> ChoiceField(f.name, f.options, values[f.name].orEmpty()) { values[f.name] = it }
-                                else -> OutlinedTextField(values[f.name].orEmpty(), { values[f.name] = it }, Modifier.fillMaxWidth().padding(vertical = 2.dp), label = { Text(f.name) })
+                            val slot = slots[f.name]
+                            when {
+                                isSignature(f) -> Row(Modifier.fillMaxWidth().padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                                    Column(Modifier.weight(1f)) {
+                                        Text(label(f), style = MaterialTheme.typography.bodyMedium)
+                                        Text(if (slot == com.blacklab.app.core.FormAutofill.Slot.INITIALS) "Initials" else "Signature", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    }
+                                    val img = images[f.name]
+                                    if (img != null) androidx.compose.foundation.Image(img.asImageBitmap(), "Signature", Modifier.size(width = 110.dp, height = 40.dp).background(Color.White, RoundedCornerShape(8.dp)).clickable { signFor = f.name }.padding(4.dp))
+                                    else androidx.compose.material3.OutlinedButton(onClick = { signFor = f.name }) { Icon(Icons.Default.Draw, null, Modifier.size(18.dp)); Spacer(Modifier.width(6.dp)); Text("Sign here") }
+                                }
+                                f.type == "check" -> Row(verticalAlignment = Alignment.CenterVertically) { Checkbox(values[f.name] == "Yes", { values[f.name] = if (it) "Yes" else "Off" }); Text(label(f)) }
+                                f.type == "radio" || f.type == "choice" -> ChoiceField(label(f), f.options, values[f.name].orEmpty()) { values[f.name] = it }
+                                else -> OutlinedTextField(values[f.name].orEmpty(), { values[f.name] = it }, Modifier.fillMaxWidth().padding(vertical = 2.dp), label = { Text(label(f)) },
+                                    supportingText = slot?.let { sl -> { Text(sl.label, style = MaterialTheme.typography.labelSmall) } },
+                                    trailingIcon = slot?.takeIf { values[f.name].isNullOrBlank() }?.let { sl -> {
+                                        val v = com.blacklab.app.core.FormAutofill.valueFor(sl, profile)
+                                        if (v.isNotBlank()) IconButton(onClick = { values[f.name] = v }) { Icon(Icons.Default.AutoAwesome, "Fill with ${sl.label.lowercase()}") }
+                                    } })
                             }
                         }
-                        Row(verticalAlignment = Alignment.CenterVertically) { Checkbox(flatten, { flatten = it }); Text("Flatten (lock answers into the page)") }
+                        Row(verticalAlignment = Alignment.CenterVertically) { Checkbox(flatten, { flatten = it }); Text("Lock as finished copy (answers can't be changed)") }
                     }
                 }
             }
         },
-        confirmButton = { TextButton(enabled = !fields.isNullOrEmpty(), onClick = { onFill(values.toMap(), flatten) }) { Text("Save") } },
+        confirmButton = { TextButton(enabled = !fields.isNullOrEmpty(), onClick = { onFill(values.toMap(), flatten, images.toMap()) }) { Text("Save") } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
+    )
+    signFor?.let { name ->
+        com.blacklab.app.ui.signature.SignatureChooserDialog(onDismiss = { signFor = null }) { _, bmp -> images[name] = bmp; signFor = null; flatten = true }
+    }
+    if (editDetails) FormDetailsDialog(profile, onDismiss = { editDetails = false }) { p -> com.blacklab.app.core.FormAutofill.saveContact(ctx, p); profile = com.blacklab.app.core.FormAutofill.profile(ctx, settings); editDetails = false }
+}
+
+/** Contact details used to fill forms (name, title and organization come from Settings › You). */
+@Composable
+fun FormDetailsDialog(p: com.blacklab.app.core.FormAutofill.Profile, onDismiss: () -> Unit, onSave: (com.blacklab.app.core.FormAutofill.Profile) -> Unit) {
+    var email by remember { mutableStateOf(p.email) }
+    var phone by remember { mutableStateOf(p.phone) }
+    var address by remember { mutableStateOf(p.address) }
+    var city by remember { mutableStateOf(p.city) }
+    var state by remember { mutableStateOf(p.state) }
+    var zip by remember { mutableStateOf(p.zip) }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("My details for forms") },
+        text = {
+            Column(Modifier.verticalScroll(rememberScrollState())) {
+                Text("Name: ${p.fullName.ifBlank { "—" }} · Title: ${p.title.ifBlank { "—" }} · Organization: ${p.organization.ifBlank { "—" }} (change these in Settings › You).",
+                    style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                listOf<Triple<String, String, (String) -> Unit>>(
+                    Triple("Email", email) { email = it }, Triple("Phone", phone) { phone = it }, Triple("Street address", address) { address = it },
+                    Triple("City", city) { city = it }, Triple("State", state) { state = it }, Triple("ZIP / postal code", zip) { zip = it },
+                ).forEach { (l, v, set) -> OutlinedTextField(v, set, Modifier.fillMaxWidth().padding(vertical = 2.dp), label = { Text(l) }, singleLine = true) }
+                Text("Kept only on this phone; not synced to BlackLab Desktop.", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 6.dp))
+            }
+        },
+        confirmButton = { TextButton(onClick = { onSave(p.copy(email = email, phone = phone, address = address, city = city, state = state, zip = zip)) }) { Text("Save") } },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
     )
 }

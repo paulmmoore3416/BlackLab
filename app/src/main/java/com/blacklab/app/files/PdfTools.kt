@@ -43,7 +43,7 @@ sealed class Stamp(open val page: Int) {
     data class Box(override val page: Int, val rect: RectF, val color: Int, val filled: Boolean, val alpha: Float) : Stamp(page)
 }
 
-data class FormField(val name: String, val type: String, val value: String, val options: List<String> = emptyList())
+data class FormField(val name: String, val type: String, val value: String, val options: List<String> = emptyList(), val alt: String = "")
 
 object PdfTools {
     @Volatile private var ready = false
@@ -277,28 +277,52 @@ object PdfTools {
         val form = doc.documentCatalog.acroForm ?: return emptyList()
         form.fieldTree.filterIsInstance<PDTerminalField>().map { fld ->
             when (fld) {
-                is PDCheckBox -> FormField(fld.fullyQualifiedName, "check", if (fld.isChecked) "Yes" else "Off")
-                is PDRadioButton -> FormField(fld.fullyQualifiedName, "radio", fld.value.orEmpty(), fld.exportValues.orEmpty().toList())
-                is PDChoice -> FormField(fld.fullyQualifiedName, "choice", fld.value.firstOrNull().orEmpty(), fld.options.orEmpty().toList())
-                is PDTextField -> FormField(fld.fullyQualifiedName, "text", fld.value.orEmpty())
+                is PDCheckBox -> FormField(fld.fullyQualifiedName, "check", if (fld.isChecked) "Yes" else "Off", alt = fld.alternateFieldName.orEmpty())
+                is PDRadioButton -> FormField(fld.fullyQualifiedName, "radio", fld.value.orEmpty(), fld.exportValues.orEmpty().toList(), fld.alternateFieldName.orEmpty())
+                is PDChoice -> FormField(fld.fullyQualifiedName, "choice", fld.value.firstOrNull().orEmpty(), fld.options.orEmpty().toList(), fld.alternateFieldName.orEmpty())
+                is PDTextField -> FormField(fld.fullyQualifiedName, "text", fld.value.orEmpty(), alt = fld.alternateFieldName.orEmpty())
+                is com.tom_roush.pdfbox.pdmodel.interactive.form.PDSignatureField -> FormField(fld.fullyQualifiedName, "signature", "", alt = fld.alternateFieldName.orEmpty())
                 else -> FormField(fld.fullyQualifiedName, "other", fld.valueAsString.orEmpty())
             }
         }.filter { it.type != "other" }
     }
 
-    fun fillForm(f: File, out: File, values: Map<String, String>, flatten: Boolean) = load(f).use { doc ->
+    /**
+     * Fills [values] into the form. [images] puts a picture (your signature or initials) inside the
+     * box of each named field, scaled to fit and keeping its shape; [flatten] locks the result.
+     */
+    fun fillForm(f: File, out: File, values: Map<String, String>, flatten: Boolean, images: Map<String, Bitmap> = emptyMap()) = load(f).use { doc ->
         val form = doc.documentCatalog.acroForm ?: error("This PDF has no form")
-        form.needAppearances = true
+        // Draw each value into the field (appearance stream) as it's set. With NeedAppearances on,
+        // PdfBox skips that and leaves drawing to the viewer, and flattening would then drop the answers.
+        form.needAppearances = false
+        var viewerMustDraw = false
         values.forEach { (name, v) ->
             when (val fld = form.getField(name)) {
                 is PDCheckBox -> if (v == "Yes" || v == "true") fld.check() else fld.unCheck()
                 is PDRadioButton -> if (v.isNotBlank()) runCatching { fld.value = v }
                 is PDChoice -> if (v.isNotBlank()) runCatching { fld.setValue(v) }
-                is PDTextField -> runCatching { fld.value = v }.onFailure { form.needAppearances = true }
+                is PDTextField -> runCatching { fld.value = v }.onFailure { runCatching { fld.cosObject.setString(com.tom_roush.pdfbox.cos.COSName.V, v) }; viewerMustDraw = true }
                 else -> {}
             }
         }
-        if (flatten) runCatching { form.flatten() }
+        images.forEach { (name, bmp) ->
+            val fld = form.getField(name) as? PDTerminalField ?: return@forEach
+            val img = LosslessFactory.createFromImage(doc, bmp)
+            fld.widgets.forEach { w ->
+                val r = w.rectangle ?: return@forEach
+                val page = w.page ?: doc.pages.firstOrNull { p -> p.annotations.any { it.cosObject == w.cosObject } } ?: return@forEach
+                val pad = minOf(r.width, r.height) * 0.08f
+                val s = minOf((r.width - 2 * pad) / bmp.width, (r.height - 2 * pad) / bmp.height)
+                val iw = bmp.width * s; val ih = bmp.height * s
+                PDPageContentStream(doc, page, PDPageContentStream.AppendMode.APPEND, true, true).use { cs ->
+                    cs.drawImage(img, r.lowerLeftX + pad, r.lowerLeftY + pad, iw, ih) // left-aligned, sitting on the line
+                }
+            }
+            if (fld is PDTextField) runCatching { fld.value = "" }
+        }
+        if (flatten) runCatching { form.refreshAppearances(); form.flatten() }
+        else if (viewerMustDraw) form.needAppearances = true // a field's font couldn't be used here; let the viewer draw it
         save(doc, out)
     }
 

@@ -87,6 +87,23 @@ data class ThemeChoice(
 
 val LocalThemeChoice = staticCompositionLocalOf { ThemeChoice() }
 
+/**
+ * The theme mode to draw with right now: "Sunset to sunrise" and "Custom hours" resolve to DARK or
+ * LIGHT and re-check every minute, so the app switches over while you're using it.
+ */
+@Composable
+fun rememberThemeMode(s: com.blacklab.app.core.Settings): String {
+    if (s.themeMode != com.blacklab.app.core.AutoTheme.AUTO && s.themeMode != com.blacklab.app.core.AutoTheme.SCHEDULE) return s.themeMode
+    val ctx = LocalContext.current
+    val now = com.blacklab.app.ui.components.rememberNow()
+    val sun = androidx.compose.runtime.produceState<com.blacklab.app.core.AutoTheme.SunTimes?>(null, now.toLocalDate(), s.themeMode) {
+        value = if (s.themeMode != com.blacklab.app.core.AutoTheme.AUTO) null else kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            com.blacklab.app.core.AutoTheme.location(ctx)?.let { (lat, lon) -> com.blacklab.app.core.AutoTheme.sunTimes(now.toLocalDate(), lat, lon, java.time.ZoneId.systemDefault()) }
+        }
+    }.value
+    return com.blacklab.app.core.AutoTheme.resolve(s.themeMode, now, sun, s.themeDarkFrom, s.themeDarkTo)
+}
+
 /** The accent of an account (used for its badge and switcher), in the current light/dark shade. */
 @Composable
 fun profileAccent(p: Profile): Color = LocalThemeChoice.current.palette(p).accent(LocalBlColors.current.isDark)

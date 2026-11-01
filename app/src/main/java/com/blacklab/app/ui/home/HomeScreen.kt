@@ -94,6 +94,20 @@ fun HomeScreen() {
     val ctx = androidx.compose.ui.platform.LocalContext.current
     val tasks by remember(profile) { app.db.tasks().observe(profile.name) }.collectAsState(emptyList())
     val docs by remember(profile) { app.db.documents().observe(profile.name) }.collectAsState(emptyList())
+    // "Since you last looked": the window starts at your previous visit to Home and stays put while you're here
+    val feedPrefs = remember { ctx.getSharedPreferences("blacklab_home", 0) }
+    var feedSince by remember(profile) { mutableStateOf(com.blacklab.app.core.ActivityFeed.since(feedPrefs.getLong("seen_" + profile.name, 0), System.currentTimeMillis())) }
+    val feedEvents by remember(profile) { app.db.events().observe(listOf(profile.name)) }.collectAsState(emptyList())
+    val feedRecordings by remember(profile) { app.db.recordings().observe(profile.name) }.collectAsState(emptyList())
+    val feedNotes by remember(profile) { app.db.notes().observe(profile.name) }.collectAsState(emptyList())
+    val feedComments by remember { app.db.brainstorm().observeGuestComments() }.collectAsState(emptyList())
+    val homeLifecycle = androidx.lifecycle.compose.LocalLifecycleOwner.current.lifecycle
+    androidx.compose.runtime.DisposableEffect(homeLifecycle, profile) {
+        fun markSeen() = feedPrefs.edit().putLong("seen_" + profile.name, System.currentTimeMillis()).apply()
+        val obs = androidx.lifecycle.LifecycleEventObserver { _, e -> if (e == androidx.lifecycle.Lifecycle.Event.ON_STOP) markSeen() }
+        homeLifecycle.addObserver(obs)
+        onDispose { homeLifecycle.removeObserver(obs); markSeen() }
+    }
     val agenda = rememberCalendarItems(today, today)
     val edu = rememberEduData()
     var scan by remember { mutableStateOf<ScanResult?>(null) }
@@ -108,6 +122,8 @@ fun HomeScreen() {
     val overdue = open.count { it.dueDay != null && it.dueDay < todayEpoch }
     val startOfToday = Time.millis(today, 0)
     val doneToday = tasks.count { it.completed && (it.completedAt ?: 0) >= startOfToday }
+    val feed = com.blacklab.app.core.ActivityFeed.build(feedSince, System.currentTimeMillis() + 1, tasks, feedEvents, docs, feedRecordings, feedNotes, feedComments,
+        timeLabel = { t -> Time.relativeDay(Time.toDate(t)) + " " + Time.time(Time.toLdt(t)) })
     val dayItems = agenda.filter { it.kind != CalKind.TASK }
     val upcoming = dayItems.filter { it.allDay || it.end > now }
     val finishedToday = dayItems.size - upcoming.size
@@ -230,6 +246,34 @@ fun HomeScreen() {
                                 Icon(a.icon, a.label, tint = a.color)
                             }
                             Text(a.label, style = MaterialTheme.typography.labelSmall, modifier = Modifier.padding(top = 4.dp), maxLines = 1)
+                        }
+                    }
+                }
+            }
+        }
+        if (feed.isNotEmpty()) {
+            item { SectionHeader("Since you last looked", action = "Got it") { feedSince = System.currentTimeMillis(); feedPrefs.edit().putLong("seen_" + profile.name, feedSince).apply() } }
+            item {
+                BlCard(Modifier.fillMaxWidth(), contentPadding = PaddingValues(vertical = 6.dp, horizontal = 6.dp)) {
+                    feed.forEach { f ->
+                        Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).clickable { shell.go(f.route) }.padding(horizontal = 8.dp, vertical = 7.dp), verticalAlignment = Alignment.CenterVertically) {
+                            val (icon, tint) = when (f.kind) {
+                                com.blacklab.app.core.ActivityFeed.Kind.TASK_DONE -> Icons.Default.TaskAlt to LocalBlColors.current.success
+                                com.blacklab.app.core.ActivityFeed.Kind.TASK_NEW -> Icons.Default.AddTask to MaterialTheme.colorScheme.primary
+                                com.blacklab.app.core.ActivityFeed.Kind.EVENT_NEW -> Icons.Default.EventAvailable to MaterialTheme.colorScheme.tertiary
+                                com.blacklab.app.core.ActivityFeed.Kind.REMINDER -> Icons.Default.NotificationsActive to LocalBlColors.current.warning
+                                com.blacklab.app.core.ActivityFeed.Kind.RECORDING -> Icons.Default.Mic to MaterialTheme.colorScheme.secondary
+                                com.blacklab.app.core.ActivityFeed.Kind.DOCUMENT -> Icons.Default.Description to MaterialTheme.colorScheme.primary
+                                com.blacklab.app.core.ActivityFeed.Kind.NOTE -> Icons.Default.Lightbulb to MaterialTheme.colorScheme.tertiary
+                                com.blacklab.app.core.ActivityFeed.Kind.COMMENT -> Icons.Default.Forum to MaterialTheme.colorScheme.secondary
+                            }
+                            Icon(icon, null, tint = tint, modifier = Modifier.size(20.dp))
+                            Spacer(Modifier.width(12.dp))
+                            Column(Modifier.weight(1f)) {
+                                Text(f.title, maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.bodyMedium)
+                                Text(f.detail, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            }
+                            Text(Time.ago(f.time), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                     }
                 }

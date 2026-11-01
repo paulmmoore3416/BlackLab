@@ -174,3 +174,41 @@ private fun Preview(choice: ThemeChoice, p: Profile, currentDark: Boolean) {
     if (!currentDark) Text("Tip: the light theme also tints its backgrounds very slightly with your main color.",
         style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 6.dp))
 }
+
+/** Under Appearance › Auto: sunset-to-sunrise (with the sun times for today) or custom hours. */
+@Composable
+fun AutoThemeOptions(s: com.blacklab.app.core.Settings) {
+    val app = rememberApp()
+    val ctx = androidx.compose.ui.platform.LocalContext.current
+    var pick by remember { mutableStateOf<String?>(null) }
+    val sun = androidx.compose.runtime.produceState<com.blacklab.app.core.AutoTheme.SunTimes?>(null, s.themeMode) {
+        value = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            com.blacklab.app.core.AutoTheme.location(ctx)?.let { (lat, lon) -> com.blacklab.app.core.AutoTheme.sunTimes(java.time.LocalDate.now(), lat, lon, java.time.ZoneId.systemDefault()) }
+        }
+    }.value
+    fun hm(m: Int) = com.blacklab.app.core.Time.time(m)
+    Column(Modifier.fillMaxWidth().padding(top = 8.dp)) {
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            androidx.compose.material3.FilterChip(s.themeMode == com.blacklab.app.core.AutoTheme.AUTO, { app.settings.update { putString(Keys.THEME_MODE, com.blacklab.app.core.AutoTheme.AUTO) } }, label = { Text("Sunset to sunrise") })
+            androidx.compose.material3.FilterChip(s.themeMode == com.blacklab.app.core.AutoTheme.SCHEDULE, { app.settings.update { putString(Keys.THEME_MODE, com.blacklab.app.core.AutoTheme.SCHEDULE) } }, label = { Text("Custom hours") })
+        }
+        val custom = s.themeMode == com.blacklab.app.core.AutoTheme.SCHEDULE || sun == null
+        Text(
+            when {
+                !custom -> "Dark from sunset (${com.blacklab.app.core.Time.time(sun!!.sunset.hour * 60 + sun.sunset.minute)}) to sunrise (${com.blacklab.app.core.Time.time(sun.sunrise.hour * 60 + sun.sunrise.minute)}) today, worked out on this phone from your approximate location."
+                s.themeMode == com.blacklab.app.core.AutoTheme.AUTO -> "Your location isn't available (BlackLab only uses the phone's last known position, and only if location access is on), so these hours are used instead:"
+                else -> "Dark between these times:"
+            },
+            style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 4.dp),
+        )
+        if (custom) Row(Modifier.padding(top = 4.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            androidx.compose.material3.OutlinedButton(onClick = { pick = "from" }) { Text("Dark from ${hm(s.themeDarkFrom)}") }
+            androidx.compose.material3.OutlinedButton(onClick = { pick = "to" }) { Text("until ${hm(s.themeDarkTo)}") }
+        }
+    }
+    pick?.let { which ->
+        com.blacklab.app.ui.components.TimePickerDialogBox(if (which == "from") s.themeDarkFrom else s.themeDarkTo, onDismiss = { pick = null }) { m ->
+            app.settings.update { putInt(if (which == "from") Keys.THEME_DARK_FROM else Keys.THEME_DARK_TO, m) }; pick = null
+        }
+    }
+}

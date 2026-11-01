@@ -82,6 +82,7 @@ fun SignaturesScreen() {
     var busy by remember { mutableStateOf<String?>(null) }
     var deleting by remember { mutableStateOf<Signatures.Sig?>(null) }
     var renaming by remember { mutableStateOf<Signatures.Sig?>(null) }
+    var details by remember { mutableStateOf(false) }
 
     fun openToSign(f: File) = shell.go("view?path=${Uri.encode(f.absolutePath)}&sign=true")
     fun prepare(label: String, block: suspend () -> File?) {
@@ -128,7 +129,9 @@ fun SignaturesScreen() {
                         FilledTonalButton(onClick = { pick.launch(SignDocs.MIME) }) { Icon(Icons.Default.Description, null, Modifier.size(18.dp)); Spacer(Modifier.size(6.dp)); Text("Choose a file") }
                         OutlinedButton(onClick = scanner) { Icon(Icons.Default.DocumentScanner, null, Modifier.size(18.dp)); Spacer(Modifier.size(6.dp)); Text("Scan & sign") }
                     }
-                    Text("You can also sign from: a PDF › Mark up & sign · Documents › Insert › Signature · a notebook page › Insert › Signature.",
+                    TextButton(onClick = { details = true }, modifier = Modifier.padding(top = 4.dp)) { Text("My details for forms") }
+                    Text("PDF forms: open the PDF › ⋮ › Fill in form › Auto-fill my details, then Sign here on each signature box. " +
+                        "You can also sign from a PDF › Mark up & sign · Documents › Insert › Signature · a notebook page › Insert › Signature.",
                         style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 10.dp))
                 }
             }
@@ -179,6 +182,9 @@ fun SignaturesScreen() {
             text = { OutlinedTextField(name, { name = it.take(40) }, singleLine = true, label = { Text("Name (e.g. Full signature, Short)") }) },
             confirmButton = { TextButton(enabled = name.isNotBlank(), onClick = { app.io { Signatures.rename(ctx, sig.id, name.trim()) }; renaming = null }) { Text("Save") } },
             dismissButton = { TextButton(onClick = { renaming = null }) { Text("Cancel") } })
+    }
+    if (details) com.blacklab.app.ui.viewer.FormDetailsDialog(com.blacklab.app.core.FormAutofill.profile(ctx, s), onDismiss = { details = false }) { p ->
+        com.blacklab.app.core.FormAutofill.saveContact(ctx, p); details = false; shell.toast("Details saved")
     }
     busy?.let { BusyOverlay(it) }
 }

@@ -62,7 +62,8 @@ class MainActivity : FragmentActivity() {
 
         setContent {
             val settings by app.settings.state.collectAsState()
-            val dark = when (settings.themeMode) { "LIGHT" -> false; "SYSTEM" -> isSystemInDarkTheme(); else -> true }
+            val themeMode = com.blacklab.app.ui.theme.rememberThemeMode(settings)
+            val dark = when (themeMode) { "LIGHT" -> false; "SYSTEM" -> isSystemInDarkTheme(); else -> true }
             LaunchedEffect(dark) {
                 val transparent = android.graphics.Color.TRANSPARENT
                 enableEdgeToEdge(
@@ -70,7 +71,7 @@ class MainActivity : FragmentActivity() {
                     navigationBarStyle = if (dark) SystemBarStyle.dark(transparent) else SystemBarStyle.light(transparent, transparent),
                 )
             }
-            BlackLabTheme(settings.themeMode, settings.dynamicColor, settings.activeProfile, com.blacklab.app.ui.theme.ThemeChoice.from(settings)) {
+            BlackLabTheme(themeMode, settings.dynamicColor, settings.activeProfile, com.blacklab.app.ui.theme.ThemeChoice.from(settings)) {
                 AppRoot(activity = this)
             }
         }

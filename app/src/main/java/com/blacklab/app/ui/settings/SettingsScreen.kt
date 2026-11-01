@@ -145,11 +145,13 @@ fun SettingsScreen() {
 
             item { SectionHeader("Appearance") }
             item {
+                val auto = s.themeMode == com.blacklab.app.core.AutoTheme.AUTO || s.themeMode == com.blacklab.app.core.AutoTheme.SCHEDULE
                 SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
-                    listOf("DARK" to "Dark", "LIGHT" to "Light", "SYSTEM" to "System").forEachIndexed { i, (k, l) ->
-                        SegmentedButton(s.themeMode == k, { app.settings.update { putString(Keys.THEME_MODE, k) } }, SegmentedButtonDefaults.itemShape(i, 3)) { Text(l) }
+                    listOf("DARK" to "Dark", "LIGHT" to "Light", "SYSTEM" to "System", "AUTO" to "Auto").forEachIndexed { i, (k, l) ->
+                        SegmentedButton(if (k == "AUTO") auto else s.themeMode == k, { app.settings.update { putString(Keys.THEME_MODE, k) } }, SegmentedButtonDefaults.itemShape(i, 4)) { Text(l) }
                     }
                 }
+                if (auto) AutoThemeOptions(s)
             }
             item { LabeledSwitchRow("Material You colors", "Use your wallpaper colors instead of account accents", s.dynamicColor, icon = Icons.Default.Palette) { v -> app.settings.update { putBoolean(Keys.DYNAMIC_COLOR, v) } } }
             item { ColorChoices() }

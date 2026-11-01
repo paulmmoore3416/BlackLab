@@ -2,6 +2,29 @@
 
 All notable changes to BlackLab are documented here. The project follows [Semantic Versioning](https://semver.org/).
 
+## [4.5.0] — 2026-11-01
+
+### Added
+- **Fill in PDF forms for you** (PDF › ⋮ › Fill in form):
+  - **Auto-fill my details** recognizes what each field asks for from its name and tooltip (e.g. "Applicant_LastName", "txtEmail", "Date of Signature"). It fills your name, first and last name, job title, organization, email, phone, address, city, state, ZIP and today's date. Each field shows what it was matched to and has a one-tap fill button. Fields such as date of birth are left alone.
+  - Signature fields, and text fields meant for a signature or initials, get **Sign here**: pick a saved signature or initials (confirmed with your fingerprint) and it's drawn inside the box, scaled to fit.
+  - **Lock as finished copy** turns on automatically when you sign.
+  - **My details for forms** (in the form dialog and in Signatures) holds your email, phone and address. They're kept only on the phone and not synced to BlackLab Desktop. Name, title and organization come from Settings › You.
+- **"Since you last looked" on Home**:
+  - **What it lists:** tasks finished or added elsewhere (a widget, the desktop, the assistant), new calendar events, reminders that went off, recordings saved (and whether the transcript is ready), new or edited documents, new notes, and Live Share guest comments.
+  - **How it behaves:** newest first, with a tap to open each item and **Got it** to clear. It covers the time since you last viewed Home, up to 3 days.
+- **Automatic light/dark** (Settings › Appearance › Auto):
+  - **Sunset to sunrise:** times are worked out on the phone from your approximate location (the last known position, rounded to ~10 km; nothing is looked up online).
+  - **Custom hours:** dark from 7 PM to 7 AM by default, adjustable. Also used when no location is available.
+  - **Switching:** happens on time while you're using the app. Also available from BlackLab Desktop.
+
+### Fixed
+- **Flattened forms came out blank.** Filling a form with *Flatten* ticked dropped every answer, because values were never drawn into their fields before flattening. Values are now drawn as they're set, and flattening keeps them. Found by the new form test.
+- **Dark ink on dark notebook paper** was invisible. Near-black ink now shows light while the page is dark, and the stored color is unchanged, so it flips back on white paper.
+
+### Notes
+- Tests: 48 JVM unit tests (new: form-field recognition, sunrise/sunset and dark windows, the activity feed) and 15 on-device tests (new: build a real PDF form, auto-fill it, sign the signature box, flatten, and check the result).
+
 ## [4.4.0] — 2026-11-01
 
 ### Added

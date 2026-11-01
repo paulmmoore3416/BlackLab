@@ -16,7 +16,9 @@ data class Settings(
     val professionalName: String = "Professional",
     val organization: String = "",
     // appearance
-    val themeMode: String = "DARK", // DARK, LIGHT, SYSTEM
+    val themeMode: String = "DARK", // DARK, LIGHT, SYSTEM, AUTO (sunset→sunrise), SCHEDULE
+    val themeDarkFrom: Int = 19 * 60, // minutes after midnight, for SCHEDULE (and AUTO without a location)
+    val themeDarkTo: Int = 7 * 60,
     val dynamicColor: Boolean = false,
     // security
     val appLock: Boolean = false,
@@ -153,6 +155,8 @@ object Keys {
     const val PROFESSIONAL_NAME = "professional_name"
     const val ORGANIZATION = "organization"
     const val THEME_MODE = "theme_mode"
+    const val THEME_DARK_FROM = "theme_dark_from"
+    const val THEME_DARK_TO = "theme_dark_to"
     const val DYNAMIC_COLOR = "dynamic_color"
     const val APP_LOCK = "app_lock"
     const val LOCK_PROFESSIONAL = "lock_professional"
@@ -294,6 +298,8 @@ class SettingsRepository(context: Context) {
             organization = getString(Keys.ORGANIZATION, d.organization) ?: "",
             themeMode = getString(Keys.THEME_MODE, d.themeMode) ?: d.themeMode,
             dynamicColor = getBoolean(Keys.DYNAMIC_COLOR, d.dynamicColor),
+            themeDarkFrom = getInt(Keys.THEME_DARK_FROM, d.themeDarkFrom),
+            themeDarkTo = getInt(Keys.THEME_DARK_TO, d.themeDarkTo),
             appLock = getBoolean(Keys.APP_LOCK, d.appLock),
             lockProfessional = getBoolean(Keys.LOCK_PROFESSIONAL, d.lockProfessional),
             lockTimeoutSec = getInt(Keys.LOCK_TIMEOUT, d.lockTimeoutSec),

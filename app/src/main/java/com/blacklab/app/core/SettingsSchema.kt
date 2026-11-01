@@ -71,7 +71,10 @@ object SettingsSchema {
             choice(Keys.ACTIVE_PROFILE, "Active account", "Switches the account currently shown on the phone.", d.activeProfile.name, "PERSONAL" to "Personal", "PROFESSIONAL" to "Professional"),
         )),
         Section("appearance", "Appearance", "palette", "Theme and colors.", listOf(
-            choice(Keys.THEME_MODE, "Theme", "Dark, light or follow the system.", d.themeMode, "DARK" to "Dark", "LIGHT" to "Light", "SYSTEM" to "System"),
+            choice(Keys.THEME_MODE, "Theme", "Dark, light, follow the system, switch at sunset and sunrise, or on your own hours.", d.themeMode,
+                "DARK" to "Dark", "LIGHT" to "Light", "SYSTEM" to "System", "AUTO" to "Sunset to sunrise", "SCHEDULE" to "Custom hours"),
+            time(Keys.THEME_DARK_FROM, "Dark from", "Custom hours: when the dark theme starts.", d.themeDarkFrom),
+            time(Keys.THEME_DARK_TO, "Dark until", "Custom hours: when the light theme comes back.", d.themeDarkTo),
             bool(Keys.DYNAMIC_COLOR, "Material You colors", "Use wallpaper colors instead of the account accents.", d.dynamicColor),
             choice(Keys.ACCENT_PERSONAL, "Personal color", "Main color of the Personal account. Each comes with a complementary secondary color.", d.accentPersonal, *PALETTES),
             choice(Keys.SECONDARY_PERSONAL, "Personal secondary color", "Used for selections, highlights and the navigation bar. Auto picks the complement.", d.secondaryPersonal, "AUTO" to "Auto (complementary)", *PALETTES),
