@@ -110,7 +110,7 @@ fun TextEditorScreen(file: File) {
     LaunchedEffect(file) {
         val raw = withContext(Dispatchers.IO) { runCatching { file.readBytes() }.getOrDefault(ByteArray(0)) }
         bom = raw.size >= 3 && raw[0] == 0xEF.toByte() && raw[1] == 0xBB.toByte() && raw[2] == 0xBF.toByte()
-        var text = String(raw, Charsets.UTF_8).removePrefix("﻿")
+        var text = String(raw, Charsets.UTF_8).removePrefix("\uFEFF")
         crlf = text.contains("\r\n")
         text = text.replace("\r\n", "\n")
         state.setTextAndPlaceCursorAtEnd(text)

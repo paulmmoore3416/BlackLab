@@ -1,3 +1,6 @@
+// Manual exposure, focus and white balance go through Camera2 interop, which CameraX marks experimental.
+@file:androidx.annotation.OptIn(markerClass = [androidx.camera.camera2.interop.ExperimentalCamera2Interop::class])
+
 package com.blacklab.app.ui.camera
 
 import android.annotation.SuppressLint

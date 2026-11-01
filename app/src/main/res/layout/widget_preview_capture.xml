@@ -1,10 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android" android:layout_width="match_parent" android:layout_height="match_parent"
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android" xmlns:tools="http://schemas.android.com/tools" android:layout_width="match_parent" android:layout_height="match_parent"
     android:orientation="horizontal" android:gravity="center_vertical" android:padding="8dp" android:background="@drawable/widget_preview_bg">
     <TextView android:layout_width="0dp" android:layout_weight="1" android:layout_height="42dp" android:gravity="center_vertical" android:paddingStart="16dp"
         android:background="@drawable/widget_preview_pill" android:text="Take a note…" android:textColor="@android:color/system_neutral1_50" android:textSize="14sp" />
-    <ImageView android:layout_width="40dp" android:layout_height="40dp" android:padding="9dp" android:layout_marginStart="6dp" android:src="@drawable/ic_w_checklist" android:tint="@android:color/system_accent1_200" />
-    <ImageView android:layout_width="40dp" android:layout_height="40dp" android:padding="9dp" android:src="@drawable/ic_w_mic" android:tint="@android:color/system_accent1_200" />
-    <ImageView android:layout_width="40dp" android:layout_height="40dp" android:padding="9dp" android:src="@drawable/ic_w_camera" android:tint="@android:color/system_accent1_200" />
-    <ImageView android:layout_width="40dp" android:layout_height="40dp" android:padding="9dp" android:src="@drawable/ic_w_task" android:tint="@android:color/system_accent1_200" />
+    <ImageView android:layout_width="40dp" android:layout_height="40dp" android:padding="9dp" android:layout_marginStart="6dp" android:src="@drawable/ic_w_checklist" tools:ignore="UseAppTint" android:tint="@android:color/system_accent1_200" />
+    <ImageView android:layout_width="40dp" android:layout_height="40dp" android:padding="9dp" android:src="@drawable/ic_w_mic" tools:ignore="UseAppTint" android:tint="@android:color/system_accent1_200" />
+    <ImageView android:layout_width="40dp" android:layout_height="40dp" android:padding="9dp" android:src="@drawable/ic_w_camera" tools:ignore="UseAppTint" android:tint="@android:color/system_accent1_200" />
+    <ImageView android:layout_width="40dp" android:layout_height="40dp" android:padding="9dp" android:src="@drawable/ic_w_task" tools:ignore="UseAppTint" android:tint="@android:color/system_accent1_200" />
 </LinearLayout>

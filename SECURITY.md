@@ -38,5 +38,15 @@ Replacing both the APK and its checksum still fails check 2 without the release 
 
 Crash, ANR and native-crash reports are written to app-private storage, excluded from backups, and leave the phone only when you share them.
 
+## Entry points other apps can reach
+
+BlackLab accepts files from "Open with" and the share sheet, and deep links from its shortcuts. Links that point into BlackLab's own private folders, or at its own file provider, are refused. Deep links cannot carry file paths. The only assistant request an outside intent can start is the **Brief me** shortcut, so other apps can't send email or change settings through BlackLab.
+
+## BlackLab Desktop
+
+- **Companion:** listens on 127.0.0.1 only. It accepts browser requests only from its own origin and the GitHub Pages origin, requires an `X-BlackLab` header, and checks the Host header to stop DNS rebinding.
+- **Web page:** has a Content-Security-Policy that allows only its own scripts and Google's sign-in library to run.
+- **Google OAuth web client ID:** public by design. It works only from the JavaScript origins you authorize in Google Cloud.
+
 ## Reporting a vulnerability
 Please open a private [security advisory](https://github.com/paulmmoore3416/BlackLab/security/advisories/new) rather than a public issue. Include steps to reproduce, the affected version and the device/Android version.

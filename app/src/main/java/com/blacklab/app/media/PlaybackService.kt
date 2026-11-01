@@ -1,3 +1,6 @@
+// Media3 transformer, effect and session APIs used here are marked unstable; the version is pinned in build.gradle.kts.
+@file:androidx.annotation.OptIn(markerClass = [androidx.media3.common.util.UnstableApi::class])
+
 package com.blacklab.app.media
 
 import android.app.PendingIntent

@@ -17,10 +17,22 @@ All notable changes to BlackLab are documented here. The project follows [Semant
 ### Fixed
 - Exporting, printing or Live-Sharing a Brainstorm page that contains a picture failed (the temporary file name for the picture was too short for Android). Found by the new on-device tests.
 
+### Security
+- **Other apps can no longer drive BlackLab through its "open with", share and shortcut entry points.** Before, an installed app could:
+  - make BlackLab copy its own private files (database, settings) by sending a `file://` link to them or a link into BlackLab's own file provider;
+  - open a private file in the viewer or editor through a deep link;
+  - run any assistant command (for example, change a setting or send an email) through the shortcut's `ask` extra.
+
+  Incoming links to BlackLab's private folders are now refused, deep links can't carry file paths, and the only request an outside intent can make of the assistant is the **Brief me** shortcut.
+- **Desktop companion**: requests must name `127.0.0.1` or `localhost` in their Host header. This blocks DNS-rebinding pages that point their own domain at your computer.
+- **BlackLab Desktop (web)**: a Content-Security-Policy now allows only the page's own scripts and Google's sign-in library to run, which protects the Drive token held while you're signed in.
+- Bouncy Castle (pulled in by the PDF tools) raised from 1.72 to 1.80 for CVE-2024-29857, CVE-2024-30171, CVE-2024-30172 and CVE-2024-34447.
+- Opening two different files with the same name from other apps no longer overwrites the first.
+
 ### Notes
 - New permission: install updates (`REQUEST_INSTALL_PACKAGES`). Android asks you once, the first time you install an update from inside BlackLab.
-- New library: Jetpack Glance 1.1.1 (Apache-2.0).
-- Tests: 32 JVM unit tests (12 new: version comparison, release parsing, checksum parsing, download-host allowlist, crash report format and pruning, Today and checklist selection) and 10 on-device tests.
+- New library: Jetpack Glance 1.1.1 (Apache-2.0). Android lint now passes with no errors (Media3 and CameraX experimental APIs are explicitly opted in).
+- Tests: 36 JVM unit tests (16 new: incoming-intent guard, version comparison, release parsing, checksum parsing, download-host allowlist, crash report format and pruning, Today and checklist selection) and 11 on-device tests (new: the PDF tools — create, page numbers, merge, split, password protect and unlock).
 - The self-update path was tested end to end on the emulator: a newer build passed all checks, Android showed its update confirmation and the app was replaced in place.
 
 ## [4.2.0] — 2026-10-31

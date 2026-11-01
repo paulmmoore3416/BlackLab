@@ -91,7 +91,7 @@ jobs:
           sudo udevadm trigger --name-match=kvm
 
       # Migration 1→2, photo insert, every export format, notebook import, voice recording,
-      # location reminders, widgets, update verification and the crash log
+      # location reminders, widgets, update verification, the crash log and the PDF tools
       - name: Run on-device tests
         uses: reactivecircus/android-emulator-runner@v2
         with:

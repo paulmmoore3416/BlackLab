@@ -42,6 +42,9 @@ if not OLLAMA.startswith("http"):  # Ollama's own convention allows "host:port"
 ALLOWED_ORIGINS = {
     f"http://{HOST}:{PORT}", f"http://localhost:{PORT}", "https://paulmmoore3416.github.io",
 }
+# A web page can point its own domain name at 127.0.0.1 ("DNS rebinding") and then talk to this
+# port as if it were same-origin. Browsers always send the name they used in Host, so only accept ours.
+ALLOWED_HOSTS = {f"{HOST}:{PORT}", f"localhost:{PORT}"}
 PREFERRED_MODELS = ["qwen3:8b", "granite4:tiny-h", "paul-assistant:latest", "qwen2.5:14b"]
 
 
@@ -520,9 +523,12 @@ class Handler(SimpleHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(data)
 
+    def host_ok(self) -> bool:
+        return (self.headers.get("Host") or "").lower() in ALLOWED_HOSTS
+
     def guard(self) -> bool:
         origin = self.headers.get("Origin")
-        if self.headers.get("X-BlackLab") != "1" or (origin and origin not in ALLOWED_ORIGINS):
+        if not self.host_ok() or self.headers.get("X-BlackLab") != "1" or (origin and origin not in ALLOWED_ORIGINS):
             self.reply(403, {"error": "forbidden"})
             return False
         return True
@@ -533,6 +539,8 @@ class Handler(SimpleHTTPRequestHandler):
         self.end_headers()
 
     def do_GET(self):
+        if not self.host_ok():
+            return self.reply(403, {"error": "forbidden"})
         if self.path.startswith("/local/"):
             if not self.guard():
                 return

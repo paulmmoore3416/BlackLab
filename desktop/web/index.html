@@ -7,6 +7,10 @@
   <meta name="description" content="Control center for the BlackLab app: assistant, dashboard and every setting, synced with your phone.">
   <meta name="theme-color" content="#0B0F0E">
   <meta name="referrer" content="no-referrer">
+  <!-- This page holds a Google Drive token while you're signed in: only its own scripts and Google's
+       sign-in library may run, so injected text can never execute. connect-src allows the phone
+       link (USB 127.0.0.1, or Wi-Fi when opened from the companion) and Google's APIs. -->
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://accounts.google.com/gsi/client; style-src 'self' 'unsafe-inline' https://accounts.google.com/gsi/style; frame-src https://accounts.google.com/gsi/; connect-src 'self' https://accounts.google.com/gsi/ https://www.googleapis.com https://openidconnect.googleapis.com http://127.0.0.1:* http://localhost:* http:; img-src 'self' data: blob: https://*.googleusercontent.com; media-src 'self' blob:; object-src 'none'; base-uri 'none'; form-action 'none'">
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" href="icon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="app.css">

@@ -19,6 +19,7 @@ import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.ProcessLifecycleOwner
+import com.blacklab.app.core.IncomingGuard
 import com.blacklab.app.ui.AppRoot
 import com.blacklab.app.ui.theme.BlackLabTheme
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -91,20 +92,24 @@ class MainActivity : FragmentActivity() {
 
     private fun handleIntent(intent: Intent?) {
         intent ?: return
-        intent.getStringExtra(EXTRA_ROUTE)?.let { pendingRoute.value = it }
-        intent.getStringExtra("ask")?.let { pendingAsk.value = it }
+        // This activity is exported, so any app can send these extras. Routes may not carry file
+        // paths (that would open BlackLab's private files in the viewer/editor), and only the
+        // home-screen shortcut's own request runs in the assistant: arbitrary text could otherwise
+        // send email or change settings on another app's behalf.
+        intent.getStringExtra(EXTRA_ROUTE)?.takeIf { IncomingGuard.routeAllowed(it) }?.let { pendingRoute.value = it }
+        intent.getStringExtra("ask")?.takeIf { IncomingGuard.askAllowed(it) }?.let { pendingAsk.value = it }
         when (intent.action) {
             Intent.ACTION_ASSIST, Intent.ACTION_VOICE_COMMAND, "com.blacklab.app.ASSIST" -> pendingRoute.value = "assistant?listen=true"
             Intent.ACTION_SEND -> {
                 @Suppress("DEPRECATION")
-                val uri = intent.getParcelableExtra<Uri>(Intent.EXTRA_STREAM)
+                val uri = intent.getParcelableExtra<Uri>(Intent.EXTRA_STREAM)?.takeIf { IncomingGuard.uriAllowed(this, it) }
                 pendingShare.value = SharePayload(listOfNotNull(uri), intent.getStringExtra(Intent.EXTRA_TEXT), intent.getStringExtra(Intent.EXTRA_SUBJECT))
             }
-            Intent.ACTION_VIEW, Intent.ACTION_EDIT -> intent.data?.takeIf { it.scheme == "content" || it.scheme == "file" }?.let { uri -> openExternal(uri, intent.type) }
+            Intent.ACTION_VIEW, Intent.ACTION_EDIT -> intent.data?.takeIf { IncomingGuard.uriAllowed(this, it) }?.let { uri -> openExternal(uri, intent.type) }
             Intent.ACTION_SEND_MULTIPLE -> {
                 @Suppress("DEPRECATION")
-                val uris = intent.getParcelableArrayListExtra<Uri>(Intent.EXTRA_STREAM) ?: arrayListOf()
-                pendingShare.value = SharePayload(uris, null, null)
+                val uris = (intent.getParcelableArrayListExtra<Uri>(Intent.EXTRA_STREAM) ?: arrayListOf()).filter { IncomingGuard.uriAllowed(this, it) }
+                if (uris.isNotEmpty()) pendingShare.value = SharePayload(uris, null, null)
             }
         }
     }
@@ -116,7 +121,9 @@ class MainActivity : FragmentActivity() {
             val mime = type ?: runCatching { contentResolver.getType(uri) }.getOrNull()
             var name = com.blacklab.app.core.Files.displayName(this@MainActivity, uri)
             if (!name.contains('.')) name += "." + com.blacklab.app.files.FileKinds.extFor(mime)
-            val dest = java.io.File(app.storage.openedDir, com.blacklab.app.core.Files.sanitize(name))
+            val ext = name.substringAfterLast('.', "bin")
+            // A new name per file, so opening two different "report.pdf"s doesn't overwrite the one on screen
+            val dest = com.blacklab.app.core.Files.unique(app.storage.openedDir, name.substringBeforeLast('.'), ext)
             if (com.blacklab.app.core.Files.copyFromUri(this@MainActivity, uri, dest)) {
                 pendingRoute.value = com.blacklab.app.files.FileKinds.route(dest, dest.absolutePath)
             }

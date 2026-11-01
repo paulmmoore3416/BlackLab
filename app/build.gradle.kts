@@ -134,6 +134,14 @@ dependencies {
     implementation("androidx.media3:media3-effect:$media3")
     // PDF editing: merge, split, rotate, reorder, text extraction, stamping, forms, passwords
     implementation("com.tom-roush:pdfbox-android:2.0.27.0")
+    constraints {
+        // pdfbox-android pulls Bouncy Castle 1.72, which has published CVEs (CVE-2024-29857,
+        // CVE-2024-30171, CVE-2024-30172, CVE-2024-34447) reachable through crafted PDFs/certificates
+        val bc = "1.80"
+        listOf("bcprov", "bcpkix", "bcutil").forEach { m ->
+            implementation("org.bouncycastle:$m-jdk15to18:$bc") { because("security fixes over 1.72") }
+        }
+    }
 
     // Home-screen widgets (Today, Checklist, Quick capture)
     implementation("androidx.glance:glance-appwidget:1.1.1")
