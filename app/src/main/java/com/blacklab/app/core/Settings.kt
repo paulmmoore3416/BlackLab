@@ -134,6 +134,13 @@ data class Settings(
     val updateAuto: Boolean = false,
     val updateLastCheck: Long = 0,
     val updateSkip: String = "",
+    // colors (ui/theme/Theme.kt AccentPalette names; secondary "AUTO" = the palette's complement)
+    val accentPersonal: String = "MINT",
+    val accentProfessional: String = "COBALT",
+    val secondaryPersonal: String = "AUTO",
+    val secondaryProfessional: String = "AUTO",
+    // signatures
+    val sigConfirm: Boolean = true,
 )
 
 object Keys {
@@ -249,6 +256,11 @@ object Keys {
     const val UPDATE_AUTO = "update_auto"
     const val UPDATE_LAST_CHECK = "update_last_check"
     const val UPDATE_SKIP = "update_skip"
+    const val ACCENT_PERSONAL = "accent_personal"
+    const val ACCENT_PROFESSIONAL = "accent_professional"
+    const val SECONDARY_PERSONAL = "secondary_personal"
+    const val SECONDARY_PROFESSIONAL = "secondary_professional"
+    const val SIG_CONFIRM = "sig_confirm"
 }
 
 class SettingsRepository(context: Context) {
@@ -384,6 +396,11 @@ class SettingsRepository(context: Context) {
             updateAuto = getBoolean(Keys.UPDATE_AUTO, d.updateAuto),
             updateLastCheck = getLong(Keys.UPDATE_LAST_CHECK, d.updateLastCheck),
             updateSkip = getString(Keys.UPDATE_SKIP, d.updateSkip) ?: "",
+            accentPersonal = getString(Keys.ACCENT_PERSONAL, d.accentPersonal) ?: d.accentPersonal,
+            accentProfessional = getString(Keys.ACCENT_PROFESSIONAL, d.accentProfessional) ?: d.accentProfessional,
+            secondaryPersonal = getString(Keys.SECONDARY_PERSONAL, d.secondaryPersonal) ?: d.secondaryPersonal,
+            secondaryProfessional = getString(Keys.SECONDARY_PROFESSIONAL, d.secondaryProfessional) ?: d.secondaryProfessional,
+            sigConfirm = getBoolean(Keys.SIG_CONFIRM, d.sigConfirm),
         )
     }
 }

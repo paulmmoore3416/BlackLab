@@ -85,7 +85,10 @@ fun HomeScreen() {
     val shell = LocalShell.current
     val s = settingsState()
     val profile = s.activeProfile
-    val today = Time.today()
+    // Live: re-filters every minute and on resume, so finished events drop off and overdue flips at midnight
+    val now = com.blacklab.app.ui.components.rememberNow()
+    val today = now.toLocalDate()
+    val greeting = remember(now.hour) { Time.greeting() }
     val rec by RecorderService.state.collectAsState()
     val dict by DictationService.state.collectAsState()
     val ctx = androidx.compose.ui.platform.LocalContext.current
@@ -103,6 +106,11 @@ fun HomeScreen() {
     val focus = open.filter { it.myDayDay == todayEpoch || (it.dueDay != null && it.dueDay <= todayEpoch) }
         .sortedWith(compareBy({ it.dueDay ?: Long.MAX_VALUE }, { -it.priority }))
     val overdue = open.count { it.dueDay != null && it.dueDay < todayEpoch }
+    val startOfToday = Time.millis(today, 0)
+    val doneToday = tasks.count { it.completed && (it.completedAt ?: 0) >= startOfToday }
+    val dayItems = agenda.filter { it.kind != CalKind.TASK }
+    val upcoming = dayItems.filter { it.allDay || it.end > now }
+    val finishedToday = dayItems.size - upcoming.size
 
     val actions = listOf(
         QuickAction("Photo", Icons.Default.PhotoCamera, Mint, more = listOf(
@@ -163,7 +171,7 @@ fun HomeScreen() {
                 ProfileBadge(profile, app.settings.profileName(profile)) { shell.switchProfile(profile.other) }
                 IconButton(onClick = { shell.go("settings") }) { Icon(Icons.Default.Settings, "Settings") }
             }
-            Text("${Time.greeting()}${s.userName.takeIf { it.isNotBlank() }?.let { ", ${it.substringBefore(' ')}" } ?: ""}",
+            Text("$greeting${s.userName.takeIf { it.isNotBlank() }?.let { ", ${it.substringBefore(' ')}" } ?: ""}",
                 style = MaterialTheme.typography.headlineMedium, modifier = Modifier.padding(top = 4.dp))
             Text(Time.longDate(today) + (s.jobTitle.takeIf { it.isNotBlank() && profile.name == "PROFESSIONAL" }?.let { " · $it" } ?: ""),
                 style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -229,11 +237,23 @@ fun HomeScreen() {
         }
         item { SectionHeader("Today", action = "Schedule") { shell.go("schedule") } }
         item {
-            if (agenda.isEmpty()) BlCard(Modifier.fillMaxWidth()) { Text("Nothing on the calendar today.", color = MaterialTheme.colorScheme.onSurfaceVariant) }
-            else Column { agenda.filter { it.kind != CalKind.TASK }.take(6).forEach { ItemRow(it, today) { when (it.kind) { CalKind.EVENT -> shell.go("event/${it.refId}"); CalKind.CLASS, CalKind.ASSIGNMENT, CalKind.EXAM -> shell.go("course/${it.refId}"); else -> shell.go("schedule") } } } }
+            if (dayItems.isEmpty()) BlCard(Modifier.fillMaxWidth()) { Text("Nothing on the calendar today.", color = MaterialTheme.colorScheme.onSurfaceVariant) }
+            else Column {
+                if (upcoming.isEmpty()) BlCard(Modifier.fillMaxWidth()) { Text("All done for today. ✓", color = MaterialTheme.colorScheme.onSurfaceVariant) }
+                upcoming.take(6).forEach { item ->
+                    val live = !item.allDay && item.start <= now && item.end > now
+                    Box {
+                        ItemRow(item, today) { when (item.kind) { CalKind.EVENT -> shell.go("event/${item.refId}"); CalKind.CLASS, CalKind.ASSIGNMENT, CalKind.EXAM -> shell.go("course/${item.refId}"); else -> shell.go("schedule") } }
+                        if (live) Text("NOW", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onPrimary,
+                            modifier = Modifier.align(Alignment.TopEnd).padding(top = 8.dp, end = 10.dp).clip(RoundedCornerShape(50)).background(MaterialTheme.colorScheme.primary).padding(horizontal = 7.dp, vertical = 1.dp))
+                    }
+                }
+                if (finishedToday > 0) Text("✓ $finishedToday finished earlier today", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(start = 6.dp, top = 4.dp))
+            }
         }
         item {
-            SectionHeader("Focus · ${focus.size} task(s)" + if (overdue > 0) " · $overdue overdue" else "", action = "To-Do") { shell.go("tasks") }
+            SectionHeader("Focus · ${focus.size} task(s)" + (if (overdue > 0) " · $overdue overdue" else "") + (if (doneToday > 0) " · $doneToday done" else ""), action = "To-Do") { shell.go("tasks") }
         }
         item {
             BlCard(Modifier.fillMaxWidth(), contentPadding = PaddingValues(vertical = 4.dp, horizontal = 4.dp)) {
@@ -254,7 +274,7 @@ fun HomeScreen() {
             }
         }
         // Education snapshot
-        val classes = CalendarLogic.classOccurrences(edu.courses, edu.meetings, edu.terms.associateBy { it.id }, today, today.plusDays(6)).filter { it.end > java.time.LocalDateTime.now() }
+        val classes = CalendarLogic.classOccurrences(edu.courses, edu.meetings, edu.terms.associateBy { it.id }, today, today.plusDays(6)).filter { it.end > now }
         val dueSoon = edu.assignments.filter { it.status != "SUBMITTED" && it.status != "GRADED" && it.dueAt != null && Time.toDate(it.dueAt) <= today.plusDays(5) }.sortedBy { it.dueAt }
         val certAlerts = edu.certs.filter { c -> (c.expiresDay != null && c.expiresDay - todayEpoch in 0..90) || (c.examAt != null && Time.toDate(c.examAt) >= today && Time.toDate(c.examAt) <= today.plusDays(30)) }
         if (classes.isNotEmpty() || dueSoon.isNotEmpty() || certAlerts.isNotEmpty()) {

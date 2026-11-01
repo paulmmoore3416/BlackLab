@@ -32,25 +32,90 @@ val Palette: List<Int> = listOf(
     0xFF81C784, 0xFFF06292, 0xFF9575CD, 0xFF4DB6AC, 0xFFA1887F, 0xFF90A4AE, 0xFF7986CB, 0xFFE57373,
 ).map { it.toInt() }
 
-fun profileAccent(p: Profile): Color = if (p == Profile.PERSONAL) Mint else Cobalt
+/**
+ * Accent palettes. Each pairs a main color with a complementary secondary and a third (tertiary)
+ * color, in a light-mode and a dark-mode shade. Every light shade has at least 4.5:1 contrast on
+ * white and every dark shade on the dark background (WCAG AA), so text and icons stay readable.
+ */
+enum class AccentPalette(
+    val label: String,
+    val darkAccent: Long, val lightAccent: Long,
+    val darkSecondary: Long, val lightSecondary: Long,
+    val darkTertiary: Long, val lightTertiary: Long,
+) {
+    MINT("Mint", 0xFF2BD9A8, 0xFF00785A, 0xFFFF8A70, 0xFFC2410C, 0xFF8C9EFF, 0xFF4F46E5),
+    COBALT("Cobalt", 0xFF4F8CFF, 0xFF1D5FD6, 0xFFFFB74D, 0xFFA3500B, 0xFF4DD0C4, 0xFF0F766E),
+    VIOLET("Violet", 0xFFAB7CFF, 0xFF6D3FD4, 0xFFE6C84A, 0xFF806200, 0xFF4DD0E1, 0xFF0E7490),
+    CORAL("Coral", 0xFFFF7A59, 0xFFC2410C, 0xFF2BCFC1, 0xFF0F766E, 0xFF8C9EFF, 0xFF4338CA),
+    ROSE("Rose", 0xFFF472B6, 0xFFBE185D, 0xFF6EE7A0, 0xFF15803D, 0xFFFBBF24, 0xFF975A00),
+    FOREST("Forest", 0xFF66BB6A, 0xFF2E7D32, 0xFFE07ACB, 0xFF9D2C8A, 0xFFF2C14E, 0xFF836000),
+    AMBER("Amber", 0xFFFFB74D, 0xFF9A5200, 0xFF7AA7FF, 0xFF2457C5, 0xFF4DD0C4, 0xFF0F766E),
+    OCEAN("Ocean", 0xFF26C6DA, 0xFF00707F, 0xFFFF8A65, 0xFFC2410C, 0xFFB39DFF, 0xFF6D3FD4),
+    GRAPHITE("Graphite", 0xFFB0BEC5, 0xFF37474F, 0xFF4DD0E1, 0xFF00707F, 0xFFFFB74D, 0xFF9A5200);
+
+    fun accent(dark: Boolean) = Color(if (dark) darkAccent else lightAccent)
+    fun secondary(dark: Boolean) = Color(if (dark) darkSecondary else lightSecondary)
+    fun tertiary(dark: Boolean) = Color(if (dark) darkTertiary else lightTertiary)
+
+    companion object {
+        fun of(name: String?, fallback: AccentPalette) = entries.firstOrNull { it.name == name } ?: fallback
+    }
+}
+
+/** The user's color choices: a palette per account, and an optional secondary override ("AUTO" = the palette's complement). */
+data class ThemeChoice(
+    val personal: AccentPalette = AccentPalette.MINT,
+    val professional: AccentPalette = AccentPalette.COBALT,
+    val personalSecondary: String = "AUTO",
+    val professionalSecondary: String = "AUTO",
+) {
+    fun palette(p: Profile) = if (p == Profile.PERSONAL) personal else professional
+    fun secondaryChosen(p: Profile) = (if (p == Profile.PERSONAL) personalSecondary else professionalSecondary) != "AUTO"
+    fun secondary(p: Profile, dark: Boolean): Color {
+        val pick = if (p == Profile.PERSONAL) personalSecondary else professionalSecondary
+        val over = AccentPalette.entries.firstOrNull { it.name == pick }
+        return over?.accent(dark) ?: palette(p).secondary(dark)
+    }
+
+    companion object {
+        fun from(s: com.blacklab.app.core.Settings) = ThemeChoice(
+            AccentPalette.of(s.accentPersonal, AccentPalette.MINT), AccentPalette.of(s.accentProfessional, AccentPalette.COBALT),
+            s.secondaryPersonal, s.secondaryProfessional,
+        )
+    }
+}
+
+val LocalThemeChoice = staticCompositionLocalOf { ThemeChoice() }
+
+/** The accent of an account (used for its badge and switcher), in the current light/dark shade. */
+@Composable
+fun profileAccent(p: Profile): Color = LocalThemeChoice.current.palette(p).accent(LocalBlColors.current.isDark)
 
 data class BlColors(val accent: Color, val accentSoft: Color, val warning: Color, val danger: Color, val success: Color, val isDark: Boolean)
 
 val LocalBlColors = staticCompositionLocalOf { BlColors(Mint, Mint.copy(alpha = 0.15f), Amber, Danger, Success, true) }
 
-private fun dark(accent: Color): ColorScheme = darkColorScheme(
+private fun mix(c: Color, other: Color, t: Float) = Color(
+    c.red * (1 - t) + other.red * t, c.green * (1 - t) + other.green * t, c.blue * (1 - t) + other.blue * t, 1f,
+)
+
+/**
+ * Dark mode: selections (secondary containers) use a deep tint of the main color, because warm
+ * complements turn muddy over near-black. A secondary color you pick yourself is used as chosen.
+ */
+private fun dark(accent: Color, secondary: Color, tertiary: Color, secondaryChosen: Boolean): ColorScheme = darkColorScheme(
     primary = accent,
-    onPrimary = Color(0xFF00140E),
+    onPrimary = mix(accent, Color.Black, 0.85f),
     primaryContainer = accent.copy(alpha = 0.22f).compositeOver(Color(0xFF0E1014)),
-    onPrimaryContainer = Color(0xFFE6FFF6),
-    secondary = Violet,
-    onSecondary = Color(0xFF14002E),
-    secondaryContainer = Color(0xFF2A2140),
-    onSecondaryContainer = Color(0xFFEDE3FF),
-    tertiary = Amber,
-    onTertiary = Color(0xFF2A1700),
-    tertiaryContainer = Color(0xFF3A2A12),
-    onTertiaryContainer = Color(0xFFFFE6C4),
+    onPrimaryContainer = mix(accent, Color.White, 0.82f),
+    secondary = secondary,
+    onSecondary = mix(secondary, Color.Black, 0.85f),
+    secondaryContainer = (if (secondaryChosen) secondary.copy(alpha = 0.24f) else accent.copy(alpha = 0.26f)).compositeOver(Color(0xFF0E1014)),
+    onSecondaryContainer = mix(if (secondaryChosen) secondary else accent, Color.White, 0.82f),
+    tertiary = tertiary,
+    onTertiary = mix(tertiary, Color.Black, 0.85f),
+    tertiaryContainer = tertiary.copy(alpha = 0.20f).compositeOver(Color(0xFF0E1014)),
+    onTertiaryContainer = mix(tertiary, Color.White, 0.82f),
     background = Color(0xFF0E1014),
     onBackground = Color(0xFFE9EBEF),
     surface = Color(0xFF0E1014),
@@ -68,30 +133,51 @@ private fun dark(accent: Color): ColorScheme = darkColorScheme(
     onError = Color.White,
     inverseSurface = Color(0xFFE8EAED),
     inverseOnSurface = Color(0xFF121418),
+    inversePrimary = accent,
+    surfaceTint = accent,
 )
 
-private fun light(accent: Color): ColorScheme = lightColorScheme(
-    primary = if (accent == Mint) Color(0xFF008F6B) else Color(0xFF2563EB),
-    onPrimary = Color.White,
-    primaryContainer = accent.copy(alpha = 0.18f).compositeOver(Color.White),
-    onPrimaryContainer = Color(0xFF00201A),
-    secondary = Color(0xFF6D4AD1),
-    tertiary = Color(0xFFB26A00),
-    background = Color(0xFFF6F7F9),
-    onBackground = Color(0xFF15171B),
-    surface = Color(0xFFF6F7F9),
-    onSurface = Color(0xFF15171B),
-    surfaceVariant = Color(0xFFE6E8EC),
-    onSurfaceVariant = Color(0xFF545A63),
-    surfaceContainerLowest = Color.White,
-    surfaceContainerLow = Color(0xFFFBFBFC),
-    surfaceContainer = Color(0xFFF0F2F5),
-    surfaceContainerHigh = Color(0xFFEAECF0),
-    surfaceContainerHighest = Color(0xFFE3E6EA),
-    outline = Color(0xFFC8CDD5),
-    outlineVariant = Color(0xFFE3E6EB),
-    error = Color(0xFFD32F2F),
-)
+/**
+ * Light mode: the accent, its complementary secondary and the tertiary each get a soft container
+ * (selected chips, the navigation highlight, badges) and a deep "on" color, and the neutral
+ * surfaces carry a faint tint of the accent so the whole screen feels of a piece.
+ */
+private fun light(accent: Color, secondary: Color, tertiary: Color): ColorScheme {
+    val base = Color(0xFFF7F8FA)
+    fun tint(t: Float, over: Color = base) = accent.copy(alpha = t).compositeOver(over)
+    return lightColorScheme(
+        primary = accent,
+        onPrimary = Color.White,
+        primaryContainer = accent.copy(alpha = 0.16f).compositeOver(Color.White),
+        onPrimaryContainer = mix(accent, Color.Black, 0.55f),
+        secondary = secondary,
+        onSecondary = Color.White,
+        secondaryContainer = secondary.copy(alpha = 0.16f).compositeOver(Color.White),
+        onSecondaryContainer = mix(secondary, Color.Black, 0.55f),
+        tertiary = tertiary,
+        onTertiary = Color.White,
+        tertiaryContainer = tertiary.copy(alpha = 0.16f).compositeOver(Color.White),
+        onTertiaryContainer = mix(tertiary, Color.Black, 0.55f),
+        background = tint(0.03f),
+        onBackground = Color(0xFF15171B),
+        surface = tint(0.03f),
+        onSurface = Color(0xFF15171B),
+        surfaceVariant = tint(0.06f, Color(0xFFE6E8EC)),
+        onSurfaceVariant = Color(0xFF4F5560),
+        surfaceContainerLowest = Color.White,
+        surfaceContainerLow = tint(0.025f, Color(0xFFFBFBFC)),
+        surfaceContainer = tint(0.04f, Color(0xFFF0F2F5)),
+        surfaceContainerHigh = tint(0.05f, Color(0xFFEAECF0)),
+        surfaceContainerHighest = tint(0.06f, Color(0xFFE3E6EA)),
+        outline = Color(0xFFC3C8D0),
+        outlineVariant = Color(0xFFE1E4E9),
+        error = Color(0xFFD32F2F),
+        inverseSurface = Color(0xFF2A2D33),
+        inverseOnSurface = Color(0xFFF1F2F4),
+        inversePrimary = mix(accent, Color.White, 0.35f),
+        surfaceTint = accent,
+    )
+}
 
 private fun Color.compositeOver(bg: Color): Color {
     val a = alpha
@@ -132,29 +218,32 @@ object Motion {
 }
 
 @Composable
-fun BlackLabTheme(themeMode: String, dynamic: Boolean, profile: Profile, content: @Composable () -> Unit) {
+fun BlackLabTheme(themeMode: String, dynamic: Boolean, profile: Profile, choice: ThemeChoice = ThemeChoice(), content: @Composable () -> Unit) {
     val dark = when (themeMode) {
         "LIGHT" -> false
         "SYSTEM" -> isSystemInDarkTheme()
         else -> true
     }
-    val accent = profileAccent(profile)
+    val palette = choice.palette(profile)
+    val accent = palette.accent(dark)
+    val secondary = choice.secondary(profile, dark)
+    val tertiary = palette.tertiary(dark)
     val ctx = LocalContext.current
     val scheme = when {
         dynamic && dark -> dynamicDarkColorScheme(ctx)
         dynamic -> dynamicLightColorScheme(ctx)
-        dark -> dark(accent)
-        else -> light(accent)
+        dark -> dark(accent, secondary, tertiary, choice.secondaryChosen(profile))
+        else -> light(accent, secondary, tertiary)
     }
     val bl = BlColors(
         accent = scheme.primary,
         accentSoft = scheme.primary.copy(alpha = 0.14f),
-        warning = Amber,
+        warning = if (dark) Amber else Color(0xFFB45309),
         danger = if (dark) Danger else Color(0xFFD32F2F),
         success = if (dark) Success else Color(0xFF2E7D32),
         isDark = dark,
     )
-    androidx.compose.runtime.CompositionLocalProvider(LocalBlColors provides bl) {
+    androidx.compose.runtime.CompositionLocalProvider(LocalBlColors provides bl, LocalThemeChoice provides choice) {
         MaterialTheme(colorScheme = scheme, typography = BlTypography, shapes = BlShapes) {
             // Root surface so every screen inherits the correct background and on-background text color
             androidx.compose.material3.Surface(

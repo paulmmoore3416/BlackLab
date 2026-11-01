@@ -142,6 +142,7 @@ private val drawerDests = listOf(
     Dest("create", "Create & Edit", Icons.Default.AddCircle),
     Dest("brainstorm", "Brainstorm", Icons.Default.Lightbulb),
     Dest("documents", "Documents", Icons.Default.Description),
+    Dest("signatures", "Signatures", Icons.Default.Draw),
     Dest("journal", "Journal", Icons.AutoMirrored.Filled.MenuBook),
     Dest("tasks", "To-Do", Icons.Default.TaskAlt),
     Dest("schedule", "Schedule", Icons.Default.CalendarMonth),
@@ -333,9 +334,11 @@ private fun NavGraph(nav: androidx.navigation.NavHostController) {
         composable("media?path={path}", arguments = listOf(navArgument("path") { defaultValue = "" })) {
             MediaViewerScreen(Uri.decode(it.arguments?.getString("path") ?: ""))
         }
-        composable("view?path={path}&text={text}", arguments = listOf(navArgument("path") { defaultValue = "" }, navArgument("text") { type = NavType.BoolType; defaultValue = false })) {
-            com.blacklab.app.ui.viewer.FileViewerScreen(Uri.decode(it.arguments?.getString("path") ?: ""), it.arguments?.getBoolean("text") ?: false)
+        composable("view?path={path}&text={text}&sign={sign}", arguments = listOf(navArgument("path") { defaultValue = "" }, navArgument("text") { type = NavType.BoolType; defaultValue = false },
+            navArgument("sign") { type = NavType.BoolType; defaultValue = false })) {
+            com.blacklab.app.ui.viewer.FileViewerScreen(Uri.decode(it.arguments?.getString("path") ?: ""), it.arguments?.getBoolean("text") ?: false, it.arguments?.getBoolean("sign") ?: false)
         }
+        composable("signatures") { com.blacklab.app.ui.signature.SignaturesScreen() }
         composable("player?path={path}", arguments = listOf(navArgument("path") { defaultValue = "" })) {
             com.blacklab.app.ui.music.PlayFileScreen(Uri.decode(it.arguments?.getString("path") ?: ""))
         }

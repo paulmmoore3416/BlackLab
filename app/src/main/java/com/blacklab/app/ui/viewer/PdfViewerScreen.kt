@@ -151,7 +151,7 @@ private val NightFilter = ColorFilter.colorMatrix(ColorMatrix(floatArrayOf(
 )))
 
 @Composable
-fun PdfViewerScreen(original: File) {
+fun PdfViewerScreen(original: File, startSign: Boolean = false) {
     val app = rememberApp()
     val shell = LocalShell.current
     val ctx = LocalContext.current
@@ -186,6 +186,9 @@ fun PdfViewerScreen(original: File) {
     var busy by remember { mutableStateOf<String?>(null) }
     var pending by remember { mutableStateOf<Pair<File, String>?>(null) } // tool output awaiting "replace / copy"
     var annotatePage by remember { mutableIntStateOf(0) }
+    // Opened from Signatures › Sign a document: go straight to the sign tool on page 1
+    var signStarted by rememberSaveable { mutableStateOf(false) }
+    LaunchedEffect(doc, startSign) { if (startSign && !signStarted && doc != null) { signStarted = true; annotatePage = 0; mode = "annotate" } }
     val list = rememberLazyListState()
     val currentPage by remember { derivedStateOf { list.firstVisibleItemIndex } }
     val texts by produceState<List<String>?>(null, viewFile, version) { val f = viewFile ?: return@produceState; value = withContext(Dispatchers.IO) { runCatching { PdfTools.init(ctx); PdfTools.pageTexts(f) }.getOrNull() } }
@@ -236,7 +239,7 @@ fun PdfViewerScreen(original: File) {
             if (extractOnly) runTool("Extracting pages", "_pages") { src, out -> PdfTools.organize(src, out, refs) }
             else runTool("Saving pages", "_organized") { src, out -> PdfTools.organize(src, out, refs) }
         }; pending?.let { SaveChoiceDialog(original, onCancel = { pending = null }, onChoice = ::finish) }; busy?.let { BusyOverlay(it) }; return }
-        mode == "annotate" && d != null -> { PdfAnnotator(d, annotatePage, onCancel = { mode = "read" }) { stamps -> runTool("Saving markup", "_marked") { src, out -> PdfTools.applyStamps(src, out, stamps) } }
+        mode == "annotate" && d != null -> { PdfAnnotator(d, annotatePage, startSign = startSign && signStarted, onCancel = { mode = "read" }) { stamps -> runTool("Saving markup", "_marked") { src, out -> PdfTools.applyStamps(src, out, stamps) } }
             pending?.let { SaveChoiceDialog(original, onCancel = { pending = null }, onChoice = ::finish) }; busy?.let { BusyOverlay(it) }; return }
     }
 

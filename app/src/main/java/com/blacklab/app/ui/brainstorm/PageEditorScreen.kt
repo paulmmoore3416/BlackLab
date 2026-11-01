@@ -467,6 +467,7 @@ fun PageEditorScreen(pageId: Long) {
                                 RL(Icons.Default.Image, "Pictures") { pickImages.launch(androidx.activity.result.PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) }
                                 RL(Icons.Default.PhotoCamera, "Camera") { takePhoto.launch(camUri) }
                                 RL(Icons.Default.DocumentScanner, "Scan") { scan() }
+                                RL(Icons.Default.Draw, "Signature") { dialog = "signature" }
                                 RL(Icons.Default.AttachFile, "File") { pickFile.launch(arrayOf("*/*")) }
                                 RL(Icons.Default.Mic, "Recording") { dialog = "voice" }
                                 RL(Icons.Default.RecordVoiceOver, "Dictate") {
@@ -597,6 +598,20 @@ fun PageEditorScreen(pageId: Long) {
     // ---------------- dialogs
     val p = page
     when (dialog) {
+        "signature" -> com.blacklab.app.ui.signature.SignatureChooserDialog(onDismiss = { dialog = null }) { sig, bmp ->
+            dialog = null
+            scope.launch {
+                // Scale to a natural size on the page (initials smaller) before inserting as a picture
+                val f = withContext(Dispatchers.IO) {
+                    val targetW = if (sig.kind == com.blacklab.app.core.Signatures.INITIALS) 120 else 300
+                    val sc = targetW.toFloat() / bmp.width
+                    val small = if (sc < 1f) Bitmap.createScaledBitmap(bmp, targetW, (bmp.height * sc).toInt().coerceAtLeast(1), true) else bmp
+                    File(ctx.cacheDir, "sig_insert_${System.currentTimeMillis()}.png").also { out -> out.outputStream().use { small.compress(Bitmap.CompressFormat.PNG, 100, it) } }
+                }
+                insertImage(Uri.fromFile(f))
+                f.delete()
+            }
+        }
         "color" -> ColorDialog("Font color", WordColors, "Automatic", { dialog = null }) { controller.call("color", it ?: "#1b1b1f") }
         "highlight" -> ColorDialog("Highlight", Highlights, "No highlight", { dialog = null }) { controller.call("highlight", it ?: "transparent") }
         "table" -> TableDialog({ dialog = null }) { r, c, h -> controller.call("table", r, c, h) }

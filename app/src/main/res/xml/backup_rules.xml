@@ -3,4 +3,6 @@
     <exclude domain="sharedpref" path="blacklab_secrets.xml" />
     <!-- Problem reports stay on this phone -->
     <exclude domain="file" path="crashes/" />
+    <!-- Signatures: encrypted with a device-bound key and never meant to leave the phone -->
+    <exclude domain="file" path="signatures/" />
 </full-backup-content>

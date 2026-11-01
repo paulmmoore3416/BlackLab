@@ -76,7 +76,7 @@ import java.io.File
 
 /** Route "view?path=…": opens any file with the right BlackLab viewer/editor. */
 @Composable
-fun FileViewerScreen(path: String, forceText: Boolean = false) {
+fun FileViewerScreen(path: String, forceText: Boolean = false, sign: Boolean = false) {
     val app = rememberApp()
     val shell = LocalShell.current
     val file = remember(path) { app.storage.resolve(path) }
@@ -86,15 +86,15 @@ fun FileViewerScreen(path: String, forceText: Boolean = false) {
         }
         return
     }
-    androidx.compose.runtime.key(path, forceText) { ViewerFor(file, path, forceText) }
+    androidx.compose.runtime.key(path, forceText) { ViewerFor(file, path, forceText, sign) }
 }
 
 @Composable
-private fun ViewerFor(file: File, path: String, forceText: Boolean) {
+private fun ViewerFor(file: File, path: String, forceText: Boolean, sign: Boolean = false) {
     val shell = LocalShell.current
     if (forceText) { TextEditorScreen(file); return }
     when (FileKinds.of(file)) {
-        FileKind.PDF -> PdfViewerScreen(file)
+        FileKind.PDF -> PdfViewerScreen(file, startSign = sign)
         FileKind.TEXT, FileKind.CODE, FileKind.MARKDOWN, FileKind.HTML -> TextEditorScreen(file)
         FileKind.CALENDAR -> CalendarFileScreen(file)
         FileKind.SHEET -> SheetScreen(file)

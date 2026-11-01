@@ -81,19 +81,26 @@ private val Inks = listOf(0xFF111111, 0xFF1E4FD8, 0xFFD32F2F, 0xFF2E7D32, 0xFFF9
 
 /** Draw, type, sign, highlight, white-out and tick boxes on PDF pages; saved as real PDF content. */
 @Composable
-fun PdfAnnotator(d: PdfDoc, startPage: Int, onCancel: () -> Unit, onSave: (List<Stamp>) -> Unit) {
+fun PdfAnnotator(d: PdfDoc, startPage: Int, startSign: Boolean = false, onCancel: () -> Unit, onSave: (List<Stamp>) -> Unit) {
     val ctx = LocalContext.current
     val density = LocalDensity.current
     var page by remember { mutableIntStateOf(startPage.coerceIn(0, d.pageCount - 1)) }
     val stamps = remember { mutableStateListOf<Stamp>() }
-    var tool by remember { mutableStateOf(PdfTool.PEN) }
+    var tool by remember { mutableStateOf(if (startSign) PdfTool.SIGN else PdfTool.PEN) }
     var ink by remember { mutableIntStateOf(Inks[1]) }
     var width by remember { mutableFloatStateOf(0.004f) }
     var live by remember { mutableStateOf<Stamp?>(null) }
     var textAt by remember { mutableStateOf<PointF?>(null) }
     var signAt by remember { mutableStateOf<PointF?>(null) }
-    var signature by remember { mutableStateOf(loadSignature(ctx.filesDir)) }
+    // Saved signatures and initials (encrypted store); the picked one, else your default signature
+    val sigs = com.blacklab.app.ui.signature.rememberSignatures()
+    var sigId by remember { mutableStateOf<String?>(null) }
+    val activeSig = sigs.firstOrNull { it.id == sigId } ?: sigs.firstOrNull { it.kind == com.blacklab.app.core.Signatures.SIGNATURE && it.isDefault } ?: sigs.firstOrNull()
+    val signature = com.blacklab.app.ui.signature.rememberSignatureBitmap(activeSig?.id)
+    val initials = activeSig?.kind == com.blacklab.app.core.Signatures.INITIALS
     var signPad by remember { mutableStateOf(false) }
+    var newKind by remember { mutableStateOf(com.blacklab.app.core.Signatures.SIGNATURE) }
+    var dateNext by remember { mutableStateOf(false) }
     var dragging by remember { mutableIntStateOf(-1) }
 
     Scaffold(topBar = {
@@ -125,7 +132,15 @@ fun PdfAnnotator(d: PdfDoc, startPage: Int, onCancel: () -> Unit, onSave: (List<
                             detectTapGestures { o ->
                                 when (tool) {
                                     PdfTool.TEXT -> { val i = hit(o); if (i < 0 || stamps[i] !is Stamp.Text) textAt = norm(o) }
-                                    PdfTool.SIGN -> if (signature == null) { signAt = norm(o); signPad = true } else placeSignature(stamps, page, signature!!, norm(o), dw / dh)
+                                    PdfTool.SIGN -> {
+                                        val at = norm(o)
+                                        val sig = signature
+                                        when {
+                                            dateNext -> { stamps += Stamp.Text(page, at.x, at.y - 0.008f, today(), 0.016f, Inks[0]); dateNext = false }
+                                            sig == null -> { signAt = at; newKind = com.blacklab.app.core.Signatures.SIGNATURE; signPad = true }
+                                            else -> com.blacklab.app.ui.signature.SignatureGate.require(ctx) { placeSignature(stamps, page, sig, at, dw / dh, if (initials) 0.11f else 0.32f) }
+                                        }
+                                    }
                                     PdfTool.CHECK -> stamps += Stamp.Text(page, norm(o).x - 0.012f, norm(o).y - 0.018f, "X", 0.028f, ink, bold = true)
                                     PdfTool.ERASE -> hit(o).takeIf { it >= 0 }?.let { stamps.removeAt(it) }
                                     PdfTool.PEN -> stamps += Stamp.Ink(page, listOf(norm(o)), ink, width)
@@ -182,19 +197,25 @@ fun PdfAnnotator(d: PdfDoc, startPage: Int, onCancel: () -> Unit, onSave: (List<
             Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 8.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 PdfTool.entries.forEach { t -> FilterChip(t == tool, { tool = t }, label = { Text(t.label) }, leadingIcon = { Icon(t.icon, null, Modifier.size(18.dp)) }) }
             }
-            Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+            if (tool == PdfTool.SIGN) com.blacklab.app.ui.signature.SignaturePickerRow(activeSig?.id, onSelect = { sigId = it.id; dateNext = false },
+                onNew = { k -> newKind = k; signAt = null; signPad = true }, onDate = { dateNext = true })
+            else Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
                 Inks.forEach { c ->
                     Box(Modifier.padding(end = 8.dp).size(28.dp).clip(CircleShape).background(Color(c))
                         .border(if (c == ink) 3.dp else 1.dp, if (c == ink) MaterialTheme.colorScheme.primary else Color.Gray, CircleShape).clickable { ink = c })
                 }
                 if (tool == PdfTool.PEN) Slider(width, { width = it }, valueRange = 0.0015f..0.012f, modifier = Modifier.weight(1f))
-                if (tool == PdfTool.SIGN) TextButton(onClick = { signPad = true; signAt = null }) { Text(if (signature == null) "Create signature" else "New signature") }
             }
             Text(when (tool) {
                 PdfTool.PEN -> "Draw with your finger."
                 PdfTool.HIGHLIGHT -> "Drag across text to highlight it."
                 PdfTool.TEXT -> "Tap where the text should start. Drag existing text to move it."
-                PdfTool.SIGN -> if (signature == null) "Tap where you want to sign." else "Tap to place your signature; drag it to adjust."
+                PdfTool.SIGN -> when {
+                    dateNext -> "Tap where today's date should go."
+                    signature == null -> "Tap where you want to sign. You'll draw your signature once; it's saved encrypted for next time."
+                    initials -> "Tap each place to initial; drag to adjust."
+                    else -> "Tap to place your signature; drag it to adjust. Date adds today's date."
+                }
                 PdfTool.WHITEOUT -> "Drag a box to cover (white-out) content."
                 PdfTool.BOX -> "Drag to draw a rectangle."
                 PdfTool.CHECK -> "Tap a box on a form to mark it."
@@ -224,16 +245,19 @@ fun PdfAnnotator(d: PdfDoc, startPage: Int, onCancel: () -> Unit, onSave: (List<
             dismissButton = { TextButton(onClick = { textAt = null }) { Text("Cancel") } },
         )
     }
-    if (signPad) SignaturePad(onDismiss = { signPad = false }) { bmp ->
-        signature = bmp; saveSignature(ctx.filesDir, bmp); signPad = false
-        val (pw, ph) = d.sizes[page]
-        placeSignature(stamps, page, bmp, signAt ?: PointF(0.6f, 0.82f), pw.toFloat() / ph)
+    if (signPad) com.blacklab.app.ui.signature.SignatureCaptureDialog(newKind, onDismiss = { signPad = false; signAt = null }) { sig, bmp ->
+        signPad = false; sigId = sig.id
+        signAt?.let { at ->
+            val (pw, ph) = d.sizes[page]
+            placeSignature(stamps, page, bmp, at, pw.toFloat() / ph, if (sig.kind == com.blacklab.app.core.Signatures.INITIALS) 0.11f else 0.32f)
+        }
         signAt = null
     }
 }
 
-private fun placeSignature(stamps: MutableList<Stamp>, page: Int, sig: Bitmap, at: PointF, pageAspect: Float) {
-    val w = 0.32f
+private fun today() = java.time.LocalDate.now().format(java.time.format.DateTimeFormatter.ofPattern("MM/dd/yyyy"))
+
+private fun placeSignature(stamps: MutableList<Stamp>, page: Int, sig: Bitmap, at: PointF, pageAspect: Float, w: Float = 0.32f) {
     val h = w * pageAspect * sig.height / sig.width
     stamps += Stamp.Image(page, RectF(at.x - w / 2, at.y - h / 2, at.x + w / 2, at.y + h / 2), sig)
 }
@@ -260,62 +284,4 @@ private fun drawStamps(c: android.graphics.Canvas, list: List<Stamp>, dw: Float,
             })
         }
     }
-}
-
-private fun signatureFile(dir: File) = File(dir, "signature.png")
-private fun loadSignature(dir: File): Bitmap? = signatureFile(dir).takeIf { it.exists() }?.let { android.graphics.BitmapFactory.decodeFile(it.path) }
-private fun saveSignature(dir: File, b: Bitmap) = runCatching { signatureFile(dir).outputStream().use { b.compress(Bitmap.CompressFormat.PNG, 100, it) } }
-
-/** Finger signature → transparent PNG trimmed to the ink. */
-@Composable
-fun SignaturePad(onDismiss: () -> Unit, onDone: (Bitmap) -> Unit) {
-    val strokes = remember { mutableStateListOf<List<Offset>>() }
-    var current by remember { mutableStateOf<List<Offset>>(emptyList()) }
-    var size by remember { mutableStateOf(androidx.compose.ui.geometry.Size.Zero) }
-    var color by remember { mutableIntStateOf(0xFF111111.toInt()) }
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("Sign here") },
-        text = {
-            Column {
-                Box(Modifier.fillMaxWidth().height(200.dp).clip(RoundedCornerShape(12.dp)).background(Color.White).border(1.dp, Color.Gray, RoundedCornerShape(12.dp))) {
-                    Canvas(Modifier.fillMaxSize().pointerInput(Unit) {
-                        detectDragGestures(onDragStart = { current = listOf(it) }, onDrag = { ch, _ -> current = current + ch.position },
-                            onDragEnd = { strokes += current; current = emptyList() })
-                    }) {
-                        size = this.size
-                        (strokes + listOf(current)).forEach { s ->
-                            for (i in 1 until s.size) drawLine(Color(color), s[i - 1], s[i], strokeWidth = 5f, cap = androidx.compose.ui.graphics.StrokeCap.Round)
-                        }
-                        drawLine(Color.LightGray, Offset(20f, this.size.height * 0.78f), Offset(this.size.width - 20f, this.size.height * 0.78f), strokeWidth = 2f)
-                    }
-                }
-                Row(Modifier.padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                    listOf(0xFF111111, 0xFF1E4FD8).map { it.toInt() }.forEach { c ->
-                        Box(Modifier.padding(end = 8.dp).size(26.dp).clip(CircleShape).background(Color(c)).border(if (c == color) 3.dp else 0.dp, MaterialTheme.colorScheme.primary, CircleShape).clickable { color = c })
-                    }
-                    Spacer(Modifier.weight(1f))
-                    TextButton(onClick = { strokes.clear() }) { Text("Clear") }
-                }
-            }
-        },
-        confirmButton = {
-            TextButton(enabled = strokes.isNotEmpty(), onClick = {
-                val all = strokes.flatten()
-                val minX = all.minOf { it.x } - 8; val minY = all.minOf { it.y } - 8
-                val maxX = all.maxOf { it.x } + 8; val maxY = all.maxOf { it.y } + 8
-                val scale = 2f
-                val bmp = Bitmap.createBitmap(((maxX - minX) * scale).toInt().coerceAtLeast(1), ((maxY - minY) * scale).toInt().coerceAtLeast(1), Bitmap.Config.ARGB_8888)
-                val c = android.graphics.Canvas(bmp)
-                val p = Paint(Paint.ANTI_ALIAS_FLAG).apply { this.color = color; style = Paint.Style.STROKE; strokeWidth = 5f * scale; strokeCap = Paint.Cap.ROUND; strokeJoin = Paint.Join.ROUND }
-                strokes.forEach { s ->
-                    val path = android.graphics.Path()
-                    s.forEachIndexed { i, o -> val x = (o.x - minX) * scale; val y = (o.y - minY) * scale; if (i == 0) path.moveTo(x, y) else path.lineTo(x, y) }
-                    c.drawPath(path, p)
-                }
-                onDone(bmp)
-            }) { Text("Use signature") }
-        },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
-    )
 }

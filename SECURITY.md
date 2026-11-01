@@ -38,6 +38,10 @@ Replacing both the APK and its checksum still fails check 2 without the release 
 
 Crash, ANR and native-crash reports are written to app-private storage, excluded from backups, and leave the phone only when you share them.
 
+## Signatures
+
+Saved signatures and initials are PNGs encrypted with AES-256-GCM. The key is created in the Android Keystore and never leaves the phone. They live in app-private storage (`files/signatures/`), are excluded from cloud backup and device transfer, and are never included in cloud sync or the desktop link. With **Confirm before signing** on (the default), a saved signature is placed only after fingerprint, face or screen-lock confirmation. Deleting one overwrites the file before removing it.
+
 ## Entry points other apps can reach
 
 BlackLab accepts files from "Open with" and the share sheet, and deep links from its shortcuts. Links that point into BlackLab's own private folders, or at its own file provider, are refused. Deep links cannot carry file paths. The only assistant request an outside intent can start is the **Brief me** shortcut, so other apps can't send email or change settings through BlackLab.

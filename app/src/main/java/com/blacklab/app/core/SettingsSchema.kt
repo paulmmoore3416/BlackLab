@@ -47,6 +47,10 @@ object SettingsSchema {
     private fun text(key: String, label: String, help: String, default: String, advanced: Boolean = false) =
         Def(key, Store.STRING, label, help, "text", default = default, advanced = advanced)
 
+    /** Mirrors ui/theme AccentPalette (kept here so settings don't depend on the UI layer). */
+    private val PALETTES = arrayOf("MINT" to "Mint", "COBALT" to "Cobalt", "VIOLET" to "Violet", "CORAL" to "Coral", "ROSE" to "Rose",
+        "FOREST" to "Forest", "AMBER" to "Amber", "OCEAN" to "Ocean", "GRAPHITE" to "Graphite")
+
     private fun choice(key: String, label: String, help: String, default: String, vararg options: Pair<String, String>, advanced: Boolean = false) =
         Def(key, Store.STRING, label, help, "choice", options.toList(), default = default, advanced = advanced)
 
@@ -69,6 +73,10 @@ object SettingsSchema {
         Section("appearance", "Appearance", "palette", "Theme and colors.", listOf(
             choice(Keys.THEME_MODE, "Theme", "Dark, light or follow the system.", d.themeMode, "DARK" to "Dark", "LIGHT" to "Light", "SYSTEM" to "System"),
             bool(Keys.DYNAMIC_COLOR, "Material You colors", "Use wallpaper colors instead of the account accents.", d.dynamicColor),
+            choice(Keys.ACCENT_PERSONAL, "Personal color", "Main color of the Personal account. Each comes with a complementary secondary color.", d.accentPersonal, *PALETTES),
+            choice(Keys.SECONDARY_PERSONAL, "Personal secondary color", "Used for selections, highlights and the navigation bar. Auto picks the complement.", d.secondaryPersonal, "AUTO" to "Auto (complementary)", *PALETTES),
+            choice(Keys.ACCENT_PROFESSIONAL, "Professional color", "Main color of the Professional account.", d.accentProfessional, *PALETTES),
+            choice(Keys.SECONDARY_PROFESSIONAL, "Professional secondary color", "Auto picks the complement of the Professional color.", d.secondaryProfessional, "AUTO" to "Auto (complementary)", *PALETTES),
         )),
         Section("security", "Security & privacy", "lock", "App lock and account protection.", listOf(
             bool(Keys.APP_LOCK, "Lock BlackLab", "Require fingerprint, face or screen lock to open the app.", d.appLock),
@@ -76,6 +84,7 @@ object SettingsSchema {
             intChoice(Keys.LOCK_TIMEOUT, "Lock after leaving", "Grace period before the app locks again.", d.lockTimeoutSec, 0 to "Immediately", 30 to "30 seconds", 60 to "1 minute", 300 to "5 minutes", 900 to "15 minutes"),
             choice(Keys.WIDGET_PRIVACY, "Widget details", "What home-screen widgets show. Widgets on the lock screen always hide details.", d.widgetPrivacy,
                 "SHOW" to "Show titles and items", "COUNTS" to "Counts only"),
+            bool(Keys.SIG_CONFIRM, "Confirm before signing", "Ask for your fingerprint or screen lock before your saved signature is placed on a document.", d.sigConfirm),
         )),
         Section("assistant", "Assistant", "assistant", "Your personal assistant: personality, brain and behavior.", listOf(
             text(Keys.ASST_NAME, "Assistant name", "What the assistant calls itself.", d.asstName),

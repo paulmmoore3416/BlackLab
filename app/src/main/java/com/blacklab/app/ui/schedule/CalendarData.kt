@@ -65,7 +65,9 @@ fun rememberCalendarItems(from: LocalDate, to: LocalDate): List<CalItem> {
     val courses by remember(profiles) { app.db.education().observeCourses(profiles) }.collectAsState(emptyList())
     val meetings by remember(profiles) { app.db.education().observeMeetings(profiles) }.collectAsState(emptyList())
     val assignments by remember(profiles) { app.db.education().observeAssignments(profiles) }.collectAsState(emptyList())
-    val device by produceState(emptyList<CalItem>(), from, to, s.showDeviceCalendars, s.hiddenDeviceCalendars) {
+    // Re-read the phone's calendars when they change (new event in Google Calendar, a sync) or the screen resumes
+    val deviceVersion = com.blacklab.app.ui.components.rememberDeviceCalendarVersion(s.showDeviceCalendars)
+    val device by produceState(emptyList<CalItem>(), from, to, s.showDeviceCalendars, s.hiddenDeviceCalendars, deviceVersion) {
         value = if (s.showDeviceCalendars) withContext(Dispatchers.IO) { DeviceCalendar.items(ctx, from, to, s.hiddenDeviceCalendars) } else emptyList()
     }
     return remember(events, calendars, tasks, courses, meetings, assignments, device, from, to, s.showTasksInCalendar, s.showClassesInCalendar) {

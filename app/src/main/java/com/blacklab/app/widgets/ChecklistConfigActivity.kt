@@ -76,7 +76,7 @@ class ChecklistConfigActivity : FragmentActivity() {
 
         setContent {
             val s by app.settings.state.collectAsState()
-            BlackLabTheme(s.themeMode, s.dynamicColor, s.activeProfile) {
+            BlackLabTheme(s.themeMode, s.dynamicColor, s.activeProfile, com.blacklab.app.ui.theme.ThemeChoice.from(s)) {
                 val ok by unlocked
                 var notes by remember { mutableStateOf<List<NoteEntity>?>(null) }
                 LaunchedEffect(ok) { if (ok) notes = Widgets.pinnableNotes(this@ChecklistConfigActivity) }

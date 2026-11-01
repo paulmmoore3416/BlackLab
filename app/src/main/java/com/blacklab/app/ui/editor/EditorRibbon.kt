@@ -1,5 +1,7 @@
 package com.blacklab.app.ui.editor
 
+import com.blacklab.app.ui.signature.toPngDataUri
+
 import android.app.Activity
 import android.content.Intent
 import android.speech.RecognizerIntent
@@ -199,6 +201,7 @@ fun EditorRibbon(
                     }
                     RibbonTab.INSERT -> {
                         RL(Icons.Default.Image, "Picture") { pickImage.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) }
+                        RL(Icons.Default.Draw, "Signature") { dialog = "signature" }
                         RL(Icons.Default.TableChart, "Table") { dialog = "table" }
                         RL(Icons.Default.Link, "Link") { dialog = "link" }
                         RL(Icons.Default.HorizontalRule, "Line") { controller.exec("insertHorizontalRule") }
@@ -282,6 +285,13 @@ fun EditorRibbon(
         "color" -> ColorDialog("Font color", WordColors, auto = "Automatic", onDismiss = { dialog = null }) { c -> controller.exec("foreColor", c ?: "#1b1b1f") }
         "highlight" -> ColorDialog("Highlight", Highlights, auto = "No color", onDismiss = { dialog = null }) { c -> controller.exec("hiliteColor", c ?: "transparent") }
         "table" -> TableDialog(onDismiss = { dialog = null }) { r, c, h -> controller.table(r, c, h) }
+        "signature" -> com.blacklab.app.ui.signature.SignatureChooserDialog(onDismiss = { dialog = null }) { sig, bmp ->
+            dialog = null
+            // Sized like ink on a signature line (initials smaller); exported to PDF/Word with the document
+            val h = if (sig.kind == com.blacklab.app.core.Signatures.INITIALS) 30 else 56
+            val w = (h * bmp.width.toFloat() / bmp.height.coerceAtLeast(1)).toInt().coerceIn(20, 360)
+            controller.insertHtml("<img src=\"${bmp.toPngDataUri()}\" alt=\"${sig.label}\" width=\"$w\" style=\"width:${w}px;height:auto;vertical-align:bottom\">&nbsp;")
+        }
         "link" -> LinkDialog(st.link, onDismiss = { dialog = null }) { url, text -> controller.link(url, text) }
         "symbol" -> AlertDialog(
             onDismissRequest = { dialog = null },

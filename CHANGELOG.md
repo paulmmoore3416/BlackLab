@@ -2,6 +2,31 @@
 
 All notable changes to BlackLab are documented here. The project follows [Semantic Versioning](https://semver.org/).
 
+## [4.4.0] — 2026-11-01
+
+### Added
+- **Signatures** (drawer › Signatures, or Settings):
+  - Draw your signature and initials with a finger or stylus (smooth ink that starts the moment you touch; black, blue or navy; fine, medium or bold), or type your name in a script, classic, casual or clean font. Keep several, set a default, rename or delete.
+  - **Sign a document**: choose a PDF, Word (.docx), picture, RTF, Markdown, HTML or text file, or scan a paper document. BlackLab converts it to a PDF, opens it with the Sign tool ready, and you tap to place your signature, initials and today's date, then save it to *Documents › Signed*.
+  - **PDF › Mark up & sign** now lists your saved signatures and initials and adds a **Date** stamp. Initials are placed at initial size.
+  - **Documents › Insert › Signature** and **notebook pages › Insert › Signature** put a saved signature into the document or page. It comes along when you export to PDF or Word.
+  - **Confirm before signing** (on by default): fingerprint, face or screen lock before a saved signature is placed, then not again for 3 minutes.
+- **Colors** (Settings › Appearance › Colors): choose a palette for each account from Mint, Cobalt, Violet, Coral, Rose, Forest, Amber, Ocean and Graphite. Each palette has a main color, a **complementary secondary** and a third (tertiary) color. Optionally pick a different secondary, and see a live light-and-dark preview. Every color meets WCAG AA contrast (4.5:1). Also changeable from BlackLab Desktop.
+
+### Changed
+- **Light mode** has matching color sets: the secondary and tertiary colors now have soft containers (selected chips, the navigation highlight, badges) with deep text colors, instead of Material's default purple. Backgrounds carry a faint tint of your main color. In dark mode, selections use a deep tint of your main color, unless you pick a secondary.
+- **Home dashboard updates live**:
+  - **Time:** it re-checks every minute and whenever you return to it, so events that ended drop off ("✓ 2 finished earlier today"), the one happening now is marked **NOW**, overdue tasks flip at midnight and the greeting follows the time of day.
+  - **Phone calendar:** new events in your phone's calendar (e.g. Google Calendar) appear as soon as they sync.
+  - **Tasks:** the Focus header counts tasks finished today.
+
+### Security
+- The single signature that PDF markup saved in 4.1–4.3 was an unencrypted image. It is moved into the encrypted store on first use, and the old file is overwritten and deleted.
+- Signatures are excluded from cloud backup and device transfer.
+
+### Notes
+- Tests: 39 JVM unit tests (new: the signature index and its one-default-per-kind rule) and 14 on-device tests. New on-device tests check that signatures are encrypted at rest and reload, that the old signature migrates, and that text and pictures become signable PDFs.
+
 ## [4.3.0] — 2026-11-01
 
 ### Added

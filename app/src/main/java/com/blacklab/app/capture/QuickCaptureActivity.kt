@@ -103,7 +103,7 @@ class QuickCaptureActivity : ComponentActivity() {
         setContent {
             val s by app.settings.state.collectAsState()
             var profile by remember { mutableStateOf(s.activeProfile) }
-            BlackLabTheme(s.themeMode, s.dynamicColor, profile) {
+            BlackLabTheme(s.themeMode, s.dynamicColor, profile, com.blacklab.app.ui.theme.ThemeChoice.from(s)) {
                 when (mode) {
                     "voice" -> VoiceRecorderSheet(onDismiss = { finish() }) { f, transcript, ms -> saveVoice(profile, f, transcript, ms) }
                     "photo" -> PhotoCapture(profile, onProfile = { profile = it })

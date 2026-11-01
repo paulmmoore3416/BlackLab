@@ -152,6 +152,7 @@ fun SettingsScreen() {
                 }
             }
             item { LabeledSwitchRow("Material You colors", "Use your wallpaper colors instead of account accents", s.dynamicColor, icon = Icons.Default.Palette) { v -> app.settings.update { putBoolean(Keys.DYNAMIC_COLOR, v) } } }
+            item { ColorChoices() }
 
             item { SectionHeader("Security") }
             item {
@@ -166,6 +167,11 @@ fun SettingsScreen() {
             }
             item { LabeledSwitchRow("Lock ${s.professionalName} account", "Require unlock when switching to it", s.lockProfessional, icon = Icons.Default.Lock) { v -> app.settings.update { putBoolean(Keys.LOCK_PROFESSIONAL, v) } } }
 
+            item {
+                BlCard(Modifier.fillMaxWidth().padding(top = 8.dp)) {
+                    SettingRow("Signatures", "Your signature and initials, encrypted on this phone. Sign any document.", Icons.Default.Draw) { shell.go("signatures") }
+                }
+            }
             item { SectionHeader("Home-screen widgets") }
             item {
                 val awm = remember { android.appwidget.AppWidgetManager.getInstance(ctx) }

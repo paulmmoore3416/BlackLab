@@ -70,7 +70,7 @@ class MainActivity : FragmentActivity() {
                     navigationBarStyle = if (dark) SystemBarStyle.dark(transparent) else SystemBarStyle.light(transparent, transparent),
                 )
             }
-            BlackLabTheme(settings.themeMode, settings.dynamicColor, settings.activeProfile) {
+            BlackLabTheme(settings.themeMode, settings.dynamicColor, settings.activeProfile, com.blacklab.app.ui.theme.ThemeChoice.from(settings)) {
                 AppRoot(activity = this)
             }
         }
