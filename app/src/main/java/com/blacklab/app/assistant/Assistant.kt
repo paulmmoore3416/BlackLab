@@ -15,6 +15,7 @@ import com.blacklab.app.data.Grades
 import com.blacklab.app.data.JournalEntity
 import com.blacklab.app.data.TaskEntity
 import com.blacklab.app.data.TaskOps
+import com.blacklab.app.summarize.Summarizer
 import com.blacklab.app.dictation.DictationService
 import com.blacklab.app.recorder.RecState
 import com.blacklab.app.recorder.RecorderService
@@ -47,13 +48,17 @@ data class Reply(
     val ui: UiAction? = null,
     val intent: Intent? = null,
     val speak: Boolean = true,
+    /** Address or place to drive to (phone: Google Maps; Android Auto: the car's navigation app). */
+    val nav: String? = null,
+    /** Phone number to dial. */
+    val dial: String? = null,
 )
 
 class Confirm(val prompt: String, val run: suspend () -> Reply)
 
 data class Msg(val id: Long, val user: Boolean, val text: String, val time: Long, val links: List<Link> = emptyList(), val source: String = "")
 
-enum class Origin { PHONE, DESKTOP, CLOUD }
+enum class Origin { PHONE, DESKTOP, CLOUD, CAR }
 
 /**
  * The BlackLab personal assistant. Every request first goes through a deterministic, offline
@@ -196,6 +201,9 @@ class Assistant(private val app: AppContainer) {
             return Reply("Marked.")
         }
 
+        // ---- Garage: the Santa Fe (fuel, service, odometer, what's due) — before tasks so "what's due on the car" lands here
+        garage(t, l)?.let { return it }
+
         // ---- tasks
         m("^(?:remind me(?: to)?|don't let me forget(?: to)?)\\s+(.+)$")?.let { return addTask(it.groupValues[1], remind = true) }
         m("^(?:add|create|new|make)(?: a| an)?(?: new)? (?:task|to-?do|todo|reminder)(?: to| for| called| named)?[:\\s]+(.+)$")?.let { return addTask(it.groupValues[1], remind = false) }
@@ -207,6 +215,11 @@ class Assistant(private val app: AppContainer) {
             Regex("^(what|what's|whats|show|read|list|do i have|any|how many|tell|my|tasks)").containsMatchIn(l))
             return listTasks(l)
 
+        // ---- Summaries of your own stuff, in the style you ask for ("summarize this week as action items")
+        m("^(?:summari[sz]e|sum up|recap|give me (?:a |the )?(?:summary|recap|rundown) of|what's the rundown on)\\b\\s*(?:my |the |all |of )*(.*)$")?.let { r ->
+            summarize(r.groupValues[1], origin)?.let { return it }
+        }
+
         // ---- feature: Meeting → Actions
         if (Regex("(action items?|actions|minutes|summar(y|ize|ise)|follow[- ]?ups?)").containsMatchIn(l) && Regex("(meeting|dictation|recording|call|transcript)").containsMatchIn(l))
             return meetingActions()
@@ -215,6 +228,17 @@ class Assistant(private val app: AppContainer) {
         if (Regex("(name ?plate|data ?plate|equipment (label|tag)|work order from|snap .*work order|scan (the |this |an? )?(equipment|unit|motor|boiler|chiller|rtu|pump))").containsMatchIn(l))
             return if (origin == Origin.PHONE) Reply("Point the camera at the nameplate — I'll read it and write up the work order.", ui = UiAction.NAMEPLATE)
             else Reply("That one needs the phone camera. Open BlackLab on your phone and say “nameplate”.")
+
+        // ---- Drive somewhere / call (Android Auto hands these to the car's navigation & dialer)
+        m("^(?:navigate|directions|take me|drive|get me) to (?:my )?next (?:meeting|event|appointment|class)$")?.let { return navigateNext() }
+        m("^(?:find|navigate to|take me to|where'?s|directions to)(?: me)? (?:a |the |an )?(?:nearest |closest |nearby )?(gas station|gas|fuel|hyundai (?:dealer(?:ship)?|service(?: center)?)|car wash|coffee|ev charger|charging station|tire shop|auto parts|hardware store|home depot|lowe'?s|pharmacy|urgent care|parking)$")
+            ?.let { r -> val q = r.groupValues[1].let { if (it == "gas" || it == "fuel") "gas station" else it }; return Reply("Finding the nearest $q.", nav = q) }
+        m("^(?:navigate|directions|drive|get me) to (.+)$")?.let { r -> return Reply("Heading to ${r.groupValues[1]}.", nav = r.groupValues[1]) }
+        m("^(?:call|dial) (?:the )?(?:number )?([+\\d][\\d\\s().-]{6,})$")?.let { r -> return Reply("Calling ${r.groupValues[1].trim()}.", dial = r.groupValues[1].filter { it.isDigit() || it == '+' }) }
+
+        // ---- Knowledge: start a conversation ("let's talk about RAG", "talk to me about retirement")
+        m("^(?:let'?s talk(?: about)?|talk to me about|can we talk about|i want to talk about|let'?s chat about|let'?s discuss|start (?:a |an |the )?(.+?) (?:conversation|chat|talk))\\s*(.*)$")
+            ?.let { r -> return startConversation(r.groupValues.drop(1).filter { it.isNotBlank() }.joinToString(" "), origin) }
 
         // ---- Google Keep (via the Keep app)
         m("^(?:save|add|put|make|create|take)?\\s*(?:a )?(?:note )?(?:to|in|on) (?:google )?keep[:\\s]*(.*)$|^keep note[:\\s]+(.+)$|^(?:note|remember) (.+?) (?:in|to|on) (?:google )?keep$")
@@ -286,6 +310,9 @@ class Assistant(private val app: AppContainer) {
         if (Regex("^(what|when|where|who|which|did|how)\\b.*\\b(i|my|we|our)\\b.*\\b(write|wrote|say|said|note|noted|record|recorded|mention|mentioned|decide|decided|discuss|discussed|journal|meeting)").containsMatchIn(l))
             return askFiles(t)
 
+        // ---- Expert knowledge bases (software, AI, GitHub, everyday topics) — offline, grounded
+        knowledgeAnswer(t)?.let { return it }
+
         // ---- fall through to Gemini Nano
         if (allowNano && s.asstUseNano) nano(t, origin)?.let { return it }
         val hits = run { index.ensure(); index.search(t, 3, profile.name) }
@@ -321,7 +348,10 @@ You live inside the BlackLab app on the user's phone and can run these commands:
 add task <text with date/time> | remind me to <text> | schedule <event> <day> at <time> | what's on my calendar <today/tomorrow/this week> | what tasks are due |
 complete <task> | brief me | note <text> | journal <text> | start dictation | start recording | stop recording | take a photo | scan document |
 nameplate | start focus | search my files for <words> | action items from my last meeting | check email | search drive for <words> |
-android docs <question> | switch to personal/professional | open <screen> | log <n> CEUs for <certification>.
+android docs <question> | switch to personal/professional | open <screen> | log <n> CEUs for <certification> |
+summarize <today/tomorrow/this week/my recent notes/my open tasks/my journal> as <kind of summary> | let's talk about <topic> |
+log fuel <gallons> gallons <dollars> dollars at <miles> miles | log <service> at <miles> miles | what's due on the car |
+navigate to my next meeting | find a gas station | navigate to <place>.
 
 If the user's message is a request one of these commands can do, reply with exactly one line: COMMAND: <the command>
 Otherwise answer the user directly in 1-4 sentences, starting with: ANSWER:
@@ -353,6 +383,10 @@ User: $text"""
 • Camera & scans — “take a photo”, “scan a document”, “scan a QR code”
 • Learning — “start focus”, “log 2 CEUs for CFM”, “what's my GPA”
 • Settings — “dark mode”, “switch to professional”, “set focus length to 45”
+• Summaries — “summarize this week as action items”, “recap my recent notes for my boss”, or pick items in Summarize
+• Knowledge — “what is retrieval-augmented generation?”, “explain GitHub Actions caching”, “let's talk about system design”
+• Garage — “log fuel 13.2 gallons $48 at 31,250 miles”, “I got an oil change at 31,000”, “what's due on the car?”
+• Driving — “navigate to my next meeting”, “find a gas station”, “call 555-0100”
 • 🌐 Gmail — “check email”, “search email for invoice”, “draft email to x@y.com about … saying …”
 • 🌐 Drive — “search drive for budget”, “back up to drive”
 • 🌐 Google Keep — “save to keep: …” · 🌐 Android docs — “android docs camera extensions”""",
@@ -663,6 +697,131 @@ User: $text"""
             "settings" -> "settings"; "camera" -> "camera?mode=photo"; else -> "assistant"
         }
         return Reply("Opening ${target.replaceFirstChar { it.uppercase() }}.", route = route, speak = false)
+    }
+
+    // ------------------------------------------------------------------ summaries
+
+    private suspend fun summarize(rest: String, origin: Origin): Reply? {
+        val l = rest.lowercase(Locale.US)
+        val target = l.substringBefore(" as ").substringBefore(" for my ").substringBefore(" in ")
+        val preset = when {
+            Regex("\\b(today|my day|the day)\\b").containsMatchIn(target) -> com.blacklab.app.summarize.SummarySources.Preset.TODAY
+            Regex("\\btomorrow\\b").containsMatchIn(target) -> com.blacklab.app.summarize.SummarySources.Preset.TOMORROW
+            Regex("\\bweek\\b").containsMatchIn(target) && !target.contains("journal") -> com.blacklab.app.summarize.SummarySources.Preset.WEEK
+            Regex("journal").containsMatchIn(target) -> com.blacklab.app.summarize.SummarySources.Preset.JOURNAL_WEEK
+            Regex("(meeting|recording|dictation|call|transcript)").containsMatchIn(target) -> {
+                // Plain "summarize my last meeting" keeps the full Meeting → Actions flow (minutes + tasks)
+                if (Summarizer.styleFrom(rest) == null) return null
+                com.blacklab.app.summarize.SummarySources.Preset.LAST_MEETING
+            }
+            Regex("(notes?|pages?|documents?|docs|wrote|writing)").containsMatchIn(target) -> com.blacklab.app.summarize.SummarySources.Preset.RECENT_NOTES
+            Regex("(tasks?|to-?dos?|list)").containsMatchIn(target) -> com.blacklab.app.summarize.SummarySources.Preset.OPEN_TASKS
+            else -> null
+        }
+        if (preset == null) {
+            if (Regex("(e-?mails?|inbox)").containsMatchIn(l)) return null
+            return if (origin == Origin.PHONE) Reply("Pick what to summarize — files, documents, notes, events, tasks, anything — then choose the kind of summary.", route = "summarize", speak = false)
+            else Reply("Tell me what to summarize: today, tomorrow, this week, my recent notes, my open tasks, my journal, or my latest meeting.")
+        }
+        val sources = com.blacklab.app.summarize.SummarySources.preset(app, preset)
+        if (sources.isEmpty()) return Reply("Nothing to summarize for ${preset.label.lowercase()}. " + casual("Quiet one.", "Clean slate.", ""), listOf(Link("Summarize", "summarize")))
+        val style = Summarizer.styleFrom(rest) ?: if (origin == Origin.CAR) Summarizer.Style.SPOKEN else Summarizer.Style.KEY_POINTS
+        val length = Summarizer.lengthFrom(rest) ?: Summarizer.Length.MEDIUM
+        val custom = if (Summarizer.styleFrom(rest) == null && rest.contains(" as ")) rest.substringAfter(" as ") else ""
+        val r = Summarizer.run(Summarizer.Request(sources, if (custom.isNotBlank()) Summarizer.Style.CUSTOM else style, length, custom), s.asstUseNano)
+        return Reply("${preset.label} — ${r.style.label.lowercase()} (${r.sourceCount} item${if (r.sourceCount == 1) "" else "s"}):\n\n${r.text}",
+            listOf(Link("Summarize more", "summarize")), source = "Summaries · ${r.engine}")
+    }
+
+    // ------------------------------------------------------------------ knowledge
+
+    private suspend fun knowledgeAnswer(question: String): Reply? {
+        val l = question.lowercase(Locale.US)
+        val asking = Regex("^(what|what's|whats|how|why|when should|should i|explain|define|describe|tell me about|teach me|give me|compare|difference|best practices?|is it|are there|which|can you explain|walk me through)\\b").containsMatchIn(l) || l.endsWith("?")
+        if (!asking) return null
+        val hits = com.blacklab.app.knowledge.Knowledge.search(app.context, question, 3)
+        val top = hits.firstOrNull() ?: return null
+        val q = LocalIndex.tokens(question).toSet()
+        val titleOverlap = (LocalIndex.tokens(top.entry.title) + LocalIndex.tokens(top.entry.tags.joinToString(" "))).count { it in q }
+        if (top.score < 7.0 || titleOverlap == 0) return null
+        val base = com.blacklab.app.knowledge.Knowledge.base(app.context, top.entry.kbId)
+        val links = hits.take(3).map { Link(it.entry.title.take(28), "kbentry?id=" + android.net.Uri.encode(it.entry.id)) }
+        if (s.asstUseNano && Nano.ready) {
+            val notes = hits.mapIndexed { i, h -> "[${i + 1}] ${h.entry.title}: ${com.blacklab.app.knowledge.Text.bestSentences(h.entry.body, question, 6).joinToString(" ").take(800)}" }.joinToString("\n")
+            val out = Nano.generate("Answer the question in 2-5 plain sentences using these expert notes (cite [n] when used). If they don't cover it, say what you know and that it's general knowledge.\n\n$notes\n\nQuestion: $question", 0.25f, s.asstNanoTokens)
+            if (!out.isNullOrBlank()) return Reply(out, links, source = "Knowledge · ${base?.title ?: ""} · Gemini Nano")
+        }
+        val text = com.blacklab.app.knowledge.Text.bestSentences(top.entry.body, question, 4).joinToString(" ")
+        return Reply(text + "\n\n— ${base?.title ?: "Knowledge"} › ${top.entry.title}", links, source = "Knowledge · offline")
+    }
+
+    private suspend fun startConversation(topic: String, origin: Origin): Reply {
+        val ctx = app.context
+        val convs = com.blacklab.app.knowledge.Knowledge.conversations(ctx)
+        if (convs.isEmpty()) return Reply("The conversation library isn't available.")
+        val t = topic.trim().removePrefix("about ").trim()
+        // Name match first ("start the health conversation"), then whichever conversation draws on the best-matching notes
+        val byName = convs.firstOrNull { c -> t.isNotBlank() && LocalIndex.tokens(c.title).any { it in LocalIndex.tokens(t).toSet() } }
+        val chosen = byName ?: run {
+            val hit = com.blacklab.app.knowledge.Knowledge.search(ctx, t, 1).firstOrNull()?.entry?.kbId
+            convs.firstOrNull { it.id == hit } ?: convs.firstOrNull { hit != null && hit in it.draws } ?: convs.first()
+        }
+        val q = if (byName != null) "" else t
+        val route = "talk/${chosen.id}" + if (q.isNotBlank()) "?q=" + android.net.Uri.encode(q) else ""
+        if (origin == Origin.DESKTOP || origin == Origin.CLOUD) {
+            if (q.isBlank()) return Reply(chosen.opener)
+            val a = app.conversations.ask(chosen.id, q)
+            return Reply(a.text, source = a.engine)
+        }
+        return Reply(if (q.isBlank()) chosen.opener else "Let's get into it — ${chosen.title}.", route = route, source = chosen.title, speak = origin == Origin.CAR || q.isBlank())
+    }
+
+    // ------------------------------------------------------------------ garage & driving
+
+    private fun garage(t: String, l: String): Reply? {
+        val ctx = app.context
+        val g = com.blacklab.app.vehicle.Garage
+        val st = g.load(ctx)
+        if (Regex("^(log|add|record)?\\s*(fuel|gas|fill[- ]?up)|^(i )?(just )?(filled up|got gas|fueled up|put in)").containsMatchIn(l) && Regex("gal").containsMatchIn(l)) {
+            val f = g.parseFuel(t) ?: return Reply("How many gallons? Say something like “log fuel 13 gallons for 48 dollars at 31,250 miles”.")
+            g.addFuel(ctx, f)
+            val stats = g.fuelStats(g.state.value.fuel)
+            return Reply(done("logged ${f.gallons} gal" + (f.cost?.let { " for $${"%.2f".format(it)}" } ?: "") + (f.miles?.let { " at ${g.fmtMiles(it)} mi" } ?: "") + ".") +
+                (stats.lastMpg?.let { " That tank: ${"%.1f".format(it)} mpg." } ?: ""), listOf(Link("Garage", "garage")), source = "Garage")
+        }
+        if (Regex("^(log|record|mark)\\b|^(i )?(just )?(got|had|did)\\b|^(the )?(car|santa fe) (got|had)\\b").containsMatchIn(l) &&
+            Regex("oil|rotat|filter|brake|wiper|battery|coolant|spark|plugs|transmission|differential|transfer case|belt|service").containsMatchIn(l)) {
+            val ids = g.matchItems(t, st.items)
+            if (ids.isEmpty()) return null
+            val miles = Regex("(\\d{1,3}(?:,\\d{3})+|\\d{3,6})\\s*(?:miles|mi\\b|on the clock)|at (\\d{1,3}(?:,\\d{3})+|\\d{3,6})").find(l)?.groupValues?.drop(1)?.firstOrNull { it.isNotBlank() }?.replace(",", "")?.toIntOrNull()
+            val cost = Regex("\\$\\s*(\\d+(?:\\.\\d{1,2})?)|(\\d+(?:\\.\\d{1,2})?) dollars").find(l)?.groupValues?.drop(1)?.firstOrNull { it.isNotBlank() }?.toDoubleOrNull()
+            g.logService(ctx, ids, miles, cost = cost)
+            val names = st.items.filter { it.id in ids }.joinToString(", ") { it.name.lowercase() }
+            val next = g.due(g.state.value).firstOrNull { it.item.id in ids }
+            return Reply(done("logged $names" + (miles?.let { " at ${g.fmtMiles(it)} mi" } ?: "") + ".") + (next?.dueMiles?.let { " Next one around ${g.fmtMiles(it)} mi." } ?: ""),
+                listOf(Link("Garage", "garage")), source = "Garage")
+        }
+        Regex("(?:odometer|mileage|odo)(?: is| reads| at| to| of)? (\\d{1,3}(?:,\\d{3})+|\\d{3,6})").find(l)?.let { r ->
+            val miles = r.groupValues[1].replace(",", "").toInt()
+            g.setOdometer(ctx, miles)
+            return Reply(done("odometer set to ${g.fmtMiles(miles)} mi.") + " " + g.summary(g.state.value).substringAfter(". ", ""), listOf(Link("Garage", "garage")), source = "Garage")
+        }
+        val carTopic = Regex("(oil change|tire rotation|mpg|gas mileage|fuel economy|due on (the|my) (car|santa fe|suv)|car (status|report|health)|how('s| is) (the|my) (car|santa fe))").containsMatchIn(l) ||
+            (Regex("(maintenance|service)").containsMatchIn(l) && Regex("\\b(car|santa fe|vehicle|suv)\\b").containsMatchIn(l))
+        if (carTopic &&
+            Regex("^(when|what|what's|whats|how|is|any|car|santa fe|my car|status|check)").containsMatchIn(l)) {
+            val due = g.due(st).filter { it.status == com.blacklab.app.vehicle.Garage.Status.OVERDUE || it.status == com.blacklab.app.vehicle.Garage.Status.DUE_SOON }.take(3)
+            val extra = if (due.isEmpty()) "" else "\n" + due.joinToString("\n") { "• ${it.item.name} — ${it.describe()}" }
+            return Reply(g.summary(st) + extra, listOf(Link("Garage", "garage")), source = "Garage")
+        }
+        return null
+    }
+
+    private suspend fun navigateNext(): Reply {
+        val now = java.time.LocalDateTime.now()
+        val next = Briefing.agenda(app, Time.today(), Time.today().plusDays(7)).firstOrNull { it.start > now.minusMinutes(15) && it.where.isNotBlank() }
+            ?: return Reply("I don't see an upcoming event with a location this week.", listOf(Link("Schedule", "schedule")))
+        return Reply("Heading to “${next.title}” at ${next.where} — ${Time.relativeDay(next.start.toLocalDate()).lowercase()} at ${Time.time(next.start)}.", nav = next.where)
     }
 
     suspend fun askFiles(question: String): Reply {

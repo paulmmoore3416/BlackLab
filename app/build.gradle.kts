@@ -21,8 +21,8 @@ android {
         applicationId = "com.blacklab.app"
         minSdk = 35
         targetSdk = 36
-        versionCode = 11
-        versionName = "4.6.0"
+        versionCode = 12
+        versionName = "5.0.0"
         vectorDrawables { useSupportLibrary = true }
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -164,6 +164,11 @@ dependencies {
     implementation("com.google.mlkit:genai-prompt:1.0.0-beta2")
     implementation("com.google.android.gms:play-services-auth:21.5.1")
     implementation("androidx.work:work-runtime-ktx:2.10.5")
+    // Android Auto: templated car screens (assistant, agenda, tasks, Santa Fe garage, knowledge talk) and
+    // car hardware info (model, fuel level, odometer) when the vehicle shares it
+    val carApp = "1.7.0"
+    implementation("androidx.car.app:app:$carApp")
+    implementation("androidx.car.app:app-projected:$carApp")
     // Installs the bundled baseline profile so BlackLab's code is precompiled: faster start, smoother first scrolls
     implementation("androidx.profileinstaller:profileinstaller:1.4.1")
 
@@ -175,4 +180,7 @@ dependencies {
     androidTestImplementation("androidx.test:runner:1.6.2")
     androidTestImplementation("androidx.test:rules:1.6.1")
     androidTestImplementation("androidx.room:room-testing:$room")
+    // TestCarContext for the Android Auto template checks; Robolectric (pulled in transitively) would
+    // replace GrantPermissionRule's on-device permission granter, so it's excluded
+    androidTestImplementation("androidx.car.app:app-testing:$carApp") { exclude(group = "org.robolectric") }
 }

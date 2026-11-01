@@ -65,6 +65,7 @@ class AppContainer(val context: Context) {
     val secrets = com.blacklab.app.assistant.Secrets(context)
     val assistant by lazy { com.blacklab.app.assistant.Assistant(this) }
     val speaker by lazy { com.blacklab.app.assistant.Speaker(context, this) }
+    val conversations by lazy { com.blacklab.app.knowledge.Conversations(this) }
     val link = com.blacklab.app.link.LinkHub(this)
 
     private var syncJob: Job? = null

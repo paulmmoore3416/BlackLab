@@ -226,6 +226,23 @@ fun HomeScreen() {
                 }
             }
         }
+        item {
+            // Smart tools: summarize anything, talk through the knowledge bases, the Santa Fe
+            Row(Modifier.fillMaxWidth().padding(top = 10.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                listOf(
+                    Triple("Summarize", Icons.Rounded.Summarize, "summarize"),
+                    Triple("Talk", Icons.Rounded.Forum, "knowledge"),
+                    Triple("Garage", Icons.Rounded.DirectionsCar, "garage"),
+                ).forEach { (label, icon, route) ->
+                    Surface(onClick = { shell.go(route) }, shape = RoundedCornerShape(16.dp), color = MaterialTheme.colorScheme.surfaceContainer, modifier = Modifier.weight(1f)) {
+                        Row(Modifier.padding(horizontal = 12.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.Center) {
+                            Icon(icon, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
+                            Text(label, Modifier.padding(start = 6.dp), style = MaterialTheme.typography.labelLarge)
+                        }
+                    }
+                }
+            }
+        }
         if (dict.active) item {
             Surface(onClick = { shell.go("dictation") }, shape = RoundedCornerShape(18.dp), color = Color(0xFF8B6CFF).copy(alpha = 0.18f), modifier = Modifier.fillMaxWidth().padding(top = 12.dp)) {
                 Row(Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {

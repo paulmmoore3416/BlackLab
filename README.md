@@ -7,13 +7,13 @@
 **A private, all-in-one personal & professional workspace for Android.**
 Pro camera & photo editor · dictation · audio recorder · Word-class documents · journal · to-do · calendar · education & certification tracking — in one app, with every file saved to a real folder on your phone.
 
-[![Version](https://img.shields.io/badge/version-4.6.0-2BD9A8)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-5.0.0-2BD9A8)](CHANGELOG.md)
 [![Android](https://img.shields.io/badge/Android-15%2B-3DDC84?logo=android&logoColor=white)](#requirements)
 [![Kotlin](https://img.shields.io/badge/Kotlin-2.1-7F52FF?logo=kotlin&logoColor=white)](https://kotlinlang.org)
 [![Jetpack Compose](https://img.shields.io/badge/Jetpack%20Compose-Material%203-4285F4?logo=jetpackcompose&logoColor=white)](https://developer.android.com/compose)
 [![Android CI](https://github.com/paulmmoore3416/BlackLab/actions/workflows/android.yml/badge.svg)](https://github.com/paulmmoore3416/BlackLab/actions/workflows/android.yml)
 
-[Download APK](releases/BlackLab-v4.6.0.apk) · [Features](#features) · [Install](#install) · [Build from source](#build-from-source) · [Architecture](docs/ARCHITECTURE.md)
+[Download APK](releases/BlackLab-v5.0.0.apk) · [Features](#features) · [Install](#install) · [Build from source](#build-from-source) · [Architecture](docs/ARCHITECTURE.md)
 
 </div>
 
@@ -47,6 +47,27 @@ Optimized for the **Google Pixel 10 Pro XL** and newer (Android 15+).
 - **Snap-to-Work-Order** — photograph an equipment nameplate and get a filled-in work order
 - Online extras: Gmail, Google Drive, Google Keep, Google developer docs; ElevenLabs voice with an offline fallback
 - Keys are encrypted with a hardware-backed Keystore key and never backed up or synced
+
+### 🚗 Android Auto — built for the 2023 Hyundai Santa Fe
+- **Ask BlackLab** hands-free through the car's microphone, with spoken replies — tasks, calendar, notes, email, summaries, knowledge questions, “navigate to my next meeting”
+- **Brief me** (daily briefing and spoken summaries), **Agenda** with Navigate and Call, **Tasks** with check-off and voice add, **Voice notes**
+- **Talk** through any conversation knowledge base, hands-free
+- **Santa Fe Garage** on the dash: fuel level, range and odometer when the car shares them, service due, MPG, voice fuel and service logs
+- Reminders pop up on the car display; music and recordings play from Android Auto's media launcher
+- Setup (Unknown sources in Android Auto developer settings) in [docs/ANDROID_AUTO.md](docs/ANDROID_AUTO.md)
+
+### 🧾 Summarize anything
+- Pick any mix of documents, notes, notebook pages, journal entries, events, tasks, recordings, dictations and files
+- Choose the summary: TL;DR, key points, detailed, executive brief, action items, decisions & questions, timeline, compare, study guide, talking points, spoken brief — or say exactly what you want
+- Gemini Nano on-device (long items read in chunks), with an offline extractive engine as the fallback; save as a document or note, make tasks, read aloud
+
+### 🧠 Knowledge & Talk
+- **Five expert knowledge bases**: Software Engineering, Software Development, AI Engineering, AI Development, GitHub & Git
+- **Seven conversations**: Architecture Roundtable, Code Craft & Review, AI Builder's Lab, Ship It: DevOps & GitHub — each drawing on all five bases — plus Health & Performance at 40; Money, Home & Family; Downtime & Interests
+- Ask the assistant (“what is RAG?”) or talk it through by voice; everything is searched on the phone
+
+### 🔧 Garage
+- 2023 Santa Fe profile, editable maintenance schedule (normal or severe service) with what's due next, fuel log with MPG and cost per mile, service history
 
 ### 🖥️ BlackLab Desktop
 - Dashboard, assistant and **detailed settings for every section**, synced live with the phone over USB or Wi-Fi, or through your Google Drive's hidden app folder
@@ -239,7 +260,7 @@ keyPassword=…
 scripts/secret-scan.sh                      # fails if a key, token or keystore is tracked
 ```
 
-CI runs the secret scan, unit tests, both builds and the on-device tests on an Android 15 emulator for every push and pull request. The on-device tests cover the database upgrade, pictures on pages and every export format, notebook import, voice recording, location reminders, the widgets, update verification, the crash log, the PDF tools, encrypted signatures and signing, and filling and signing a real PDF form.
+CI runs the secret scan, unit tests, both builds and the on-device tests on an Android 15 emulator for every push and pull request. The on-device tests cover the database upgrade, pictures on pages and every export format, notebook import, voice recording, location reminders, the widgets, update verification, the crash log, the PDF tools, encrypted signatures and signing, filling and signing a real PDF form, and every Android Auto screen against the Car App Library's template rules. Unit tests cover the knowledge bases (format and retrieval quality), every summary style, and the Garage schedule, MPG and voice parsing.
 
 ### Publishing a release
 

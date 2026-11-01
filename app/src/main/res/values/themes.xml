@@ -19,4 +19,12 @@
         <item name="android:navigationBarColor">@android:color/transparent</item>
         <item name="android:windowAnimationStyle">@android:style/Animation.InputMethod</item>
     </style>
+
+    <!-- Android Auto: BlackLab mint on the car display (Car App Library reads these attributes) -->
+    <style name="Theme.BlackLab.Car" parent="android:Theme.DeviceDefault">
+        <item name="carColorPrimary">@color/bl_accent</item>
+        <item name="carColorPrimaryDark">#FF14A07A</item>
+        <item name="carColorSecondary">#FF7FB2FF</item>
+        <item name="carColorSecondaryDark">#FF3D7BE0</item>
+    </style>
 </resources>

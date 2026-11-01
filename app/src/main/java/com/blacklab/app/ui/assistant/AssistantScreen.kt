@@ -179,6 +179,13 @@ fun AssistantScreen(startListening: Boolean = false) {
         assistant.events.collect { r ->
             if (r.speak && app.settings.current.asstSpeak && r.text.isNotBlank()) app.speaker.speak(r.text)
             r.intent?.let { runCatching { ctx.startActivity(it) }.onFailure { shell.toast("Couldn't open that app") } }
+            r.nav?.let { q ->
+                val u = android.net.Uri.encode(q)
+                runCatching { ctx.startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse("google.navigation:q=$u"))) }
+                    .recoverCatching { ctx.startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse("geo:0,0?q=$u"))) }
+                    .onFailure { shell.toast("No maps app to navigate with") }
+            }
+            r.dial?.let { n -> runCatching { ctx.startActivity(android.content.Intent(android.content.Intent.ACTION_DIAL, android.net.Uri.parse("tel:$n"))) } }
             when (r.ui) {
                 UiAction.SCAN_DOCUMENT -> docScanner()
                 UiAction.SCAN_CODE -> codeScanner()
@@ -257,7 +264,8 @@ fun AssistantScreen(startListening: Boolean = false) {
                     }
                 }
             }
-            val chips = listOf("Brief me", "What's due?", "What's on my calendar this week?", "Action items from my last meeting", "Nameplate → work order",
+            val chips = listOf("Brief me", "What's due?", "What's on my calendar this week?", "Summarize this week as action items", "Action items from my last meeting", "Nameplate → work order",
+                "Let's talk about system design", "What's due on the car?",
                 "Search my files for ", "Check email", "Start dictation", "Start focus", "Help")
             LazyRow(contentPadding = PaddingValues(horizontal = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 items(chips) { c -> SuggestionChip(onClick = { if (c.endsWith(" ")) input = c else if (c.startsWith("Nameplate")) send("nameplate") else send(c) }, label = { Text(c.trim()) }) }

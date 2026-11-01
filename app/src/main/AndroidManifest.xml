@@ -32,6 +32,9 @@
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     <!-- In-app updates from GitHub Releases (Android asks you once; every APK is checksum- and signature-verified first) -->
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
+    <!-- Android Auto: fuel level / range and odometer for the Garage, when the car reports them -->
+    <uses-permission android:name="com.google.android.gms.permission.CAR_FUEL" />
+    <uses-permission android:name="com.google.android.gms.permission.CAR_MILEAGE" />
 
     <queries>
         <intent>
@@ -87,6 +90,11 @@
             </intent-filter>
             <intent-filter>
                 <action android:name="android.intent.action.VOICE_COMMAND" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+            <!-- "Play … on BlackLab" from Google Assistant (phone and Android Auto) -->
+            <intent-filter>
+                <action android:name="android.media.action.MEDIA_PLAY_FROM_SEARCH" />
                 <category android:name="android.intent.category.DEFAULT" />
             </intent-filter>
             <meta-data
@@ -188,12 +196,25 @@
             android:name=".update.UpdateReceiver"
             android:exported="false" />
 
+        <!-- Music + recordings; also browsable from Android Auto's media launcher -->
         <service
             android:name=".media.PlaybackService"
             android:exported="true"
             android:foregroundServiceType="mediaPlayback">
             <intent-filter>
                 <action android:name="androidx.media3.session.MediaSessionService" />
+                <action android:name="androidx.media3.session.MediaLibraryService" />
+                <action android:name="android.media.browse.MediaBrowserService" />
+            </intent-filter>
+        </service>
+
+        <!-- Android Auto templated app (hands-free assistant, agenda, tasks, Garage, knowledge talk) -->
+        <service
+            android:name=".car.BlackLabCarAppService"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="androidx.car.app.CarAppService" />
+                <category android:name="androidx.car.app.category.IOT" />
             </intent-filter>
         </service>
 
@@ -255,6 +276,16 @@
                 android:name="android.support.FILE_PROVIDER_PATHS"
                 android:resource="@xml/file_paths" />
         </provider>
+
+        <meta-data
+            android:name="com.google.android.gms.car.application"
+            android:resource="@xml/automotive_app_desc" />
+        <meta-data
+            android:name="androidx.car.app.minCarApiLevel"
+            android:value="1" />
+        <meta-data
+            android:name="androidx.car.app.theme"
+            android:resource="@style/Theme.BlackLab.Car" />
 
         <meta-data
             android:name="com.google.mlkit.vision.DEPENDENCIES"

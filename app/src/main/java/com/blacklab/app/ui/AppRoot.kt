@@ -137,6 +137,9 @@ private val bottomDests = listOf(
 private val drawerDests = listOf(
     Dest("home", "Home", Icons.Rounded.Dashboard),
     Dest("assistant", "Assistant", Icons.Rounded.AutoAwesome),
+    Dest("knowledge", "Knowledge & Talk", Icons.Rounded.Psychology),
+    Dest("summarize", "Summarize", Icons.Rounded.Summarize),
+    Dest("garage", "Garage · Santa Fe", Icons.Rounded.DirectionsCar),
     Dest("camera", "Camera", Icons.Rounded.PhotoCamera),
     Dest("recorder", "Recorder", Icons.Rounded.Mic),
     Dest("music", "Music", Icons.Rounded.LibraryMusic),
@@ -461,6 +464,18 @@ private fun NavGraph(nav: androidx.navigation.NavHostController) {
             com.blacklab.app.ui.assistant.AssistantScreen(it.arguments?.getBoolean("listen") ?: false)
         }
         screen("assistant/settings") { com.blacklab.app.ui.assistant.AssistantSettingsScreen() }
+        screen("knowledge?tab={tab}", arguments = listOf(navArgument("tab") { defaultValue = "" })) {
+            com.blacklab.app.ui.knowledge.KnowledgeScreen(it.arguments?.getString("tab") ?: "")
+        }
+        screen("kbentry?id={id}", arguments = listOf(navArgument("id") { defaultValue = "" })) {
+            com.blacklab.app.ui.knowledge.KbEntryScreen(Uri.decode(it.arguments?.getString("id") ?: ""))
+        }
+        screen("kb/{id}") { com.blacklab.app.ui.knowledge.KbScreen(it.arguments?.getString("id") ?: "") }
+        screen("talk/{id}?q={q}", arguments = listOf(navArgument("q") { defaultValue = "" })) {
+            com.blacklab.app.ui.knowledge.TalkScreen(it.arguments?.getString("id") ?: "", Uri.decode(it.arguments?.getString("q") ?: ""))
+        }
+        screen("summarize") { com.blacklab.app.ui.summarize.SummarizeScreen() }
+        screen("garage") { com.blacklab.app.ui.vehicle.GarageScreen() }
     }
     }
     }

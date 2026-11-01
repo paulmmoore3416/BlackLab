@@ -2,6 +2,31 @@
 
 All notable changes to BlackLab are documented here. The project follows [Semantic Versioning](https://semver.org/).
 
+## [5.0.0] — 2026-11-01
+
+BlackLab comes to the car, summarizes anything you pick, and gains an expert knowledge library you can talk to.
+
+### Added
+- **Android Auto**, designed around the 2023 Hyundai Santa Fe (8-inch wireless and 10.25-inch USB displays). See [docs/ANDROID_AUTO.md](docs/ANDROID_AUTO.md).
+  - **Ask BlackLab** hands-free through the car's microphone (Car App API 5+, on-device speech recognition), with spoken replies.
+  - **Brief me**: daily briefing and spoken summaries (tomorrow, week ahead, latest meeting, recent notes, open tasks, journal week).
+  - **Agenda** with **Navigate** and **Call**; **Tasks** with check-off toggles and voice add; **Voice note** dictation to Brainstorm.
+  - **Talk**: the conversation knowledge bases by voice, hands-free back-and-forth.
+  - **Santa Fe Garage**: fuel level, range and odometer when the car reports them, service due, MPG, voice fuel and service logging, gas and dealer navigation.
+  - Task and event reminders as heads-up cards on the car display with **Done** / **Snooze**.
+  - Music and recordings in Android Auto's media launcher; "play … on BlackLab" voice search.
+- **Summarize**: pick any mix of documents, notes, notebook pages, journal entries, events, tasks, recordings, dictations and files (PDF, Word, text, slides, e-books, CSV), then choose the summary — TL;DR, key points, detailed, executive brief, action items, decisions & questions, timeline, compare, study guide, talking points, spoken brief — or say exactly what you want. Gemini Nano reads long items in chunks (map-reduce); without it an on-device extractive engine produces every style. Save as a document or note, make tasks, read aloud, share.
+- **Knowledge**: five expert knowledge bases — Software Engineering, Software Development, AI Engineering, AI Development, and GitHub & Git — 153 entries, searchable on the phone.
+- **Talk**: seven conversation knowledge bases with their own persona and notes. Four draw on all five expert bases — Architecture Roundtable, Code Craft & Review, AI Builder's Lab, Ship It: DevOps & GitHub — and three cover everyday life — Health & Performance at 40, Money, Home & Family, Downtime & Interests. Grounded in the notes with Gemini Nano, or answered from them offline; history stays on the phone.
+- **Garage** (phone): vehicle profile (trim, engine, AWD/FWD, VIN, tire pressure, oil spec, dealer), editable maintenance schedule with normal and severe intervals and what's due by miles or months, fuel log with MPG and cost per mile, service history, 2023 Santa Fe facts and Android Auto setup steps.
+- Assistant commands: “summarize this week as action items”, “let's talk about system design”, “what is RAG?”, “log fuel 13 gallons for 48 dollars at 31,250 miles”, “I got an oil change at 31,000”, “what's due on the car?”, “navigate to my next meeting”, “find a gas station”.
+- Home shortcuts for Summarize, Talk and Garage; drawer entries for Knowledge & Talk, Summarize and Garage.
+- Settings › Android Auto: speak replies in the car, hands-free conversations, brief me when I connect.
+
+### Changed
+- The music service is now a browsable media library (Media3 `MediaLibraryService`).
+- Assistant speech is tagged as assistant audio so the car and Bluetooth duck music under it.
+
 ## [4.6.0] — 2026-11-01
 
 A polish release: BlackLab should feel smoother, more consistent and more responsive in the hand.

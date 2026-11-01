@@ -41,6 +41,9 @@ class Speaker(private val context: Context, private val app: AppContainer) {
     /** "ElevenLabs", "On-device" — which engine spoke last. */
     val lastEngine = MutableStateFlow("")
     var onDone: (() -> Unit)? = null
+    /** Extra "finished speaking" listeners (the Android Auto screens use these alongside the phone's [onDone]). */
+    val doneListeners = java.util.concurrent.CopyOnWriteArraySet<() -> Unit>()
+    private fun finished() { onDone?.invoke(); doneListeners.forEach { runCatching { it() } } }
 
     private var tts: TextToSpeech? = null
     private var ttsReady = false
@@ -54,6 +57,8 @@ class Speaker(private val context: Context, private val app: AppContainer) {
             ttsReady = status == TextToSpeech.SUCCESS
             if (ttsReady) {
                 tts?.language = Locale.US
+                // Assistant audio: Android Auto and Bluetooth ducks music under it instead of mixing at full volume
+                tts?.setAudioAttributes(AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_ASSISTANT).setContentType(AudioAttributes.CONTENT_TYPE_SPEECH).build())
                 // Prefer a local (offline) male US voice to suit the laid-back persona.
                 val voices = runCatching { tts?.voices.orEmpty() }.getOrDefault(emptySet())
                 val preferred = listOf("en-us-x-iom-local", "en-us-x-tpd-local", "en-us-x-iol-local")
@@ -61,7 +66,7 @@ class Speaker(private val context: Context, private val app: AppContainer) {
                     ?: voices.firstOrNull { it.locale == Locale.US && !it.isNetworkConnectionRequired })?.let { tts?.voice = it }
                 tts?.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
                     override fun onStart(id: String?) { speaking.value = true }
-                    override fun onDone(id: String?) { speaking.value = false; onDone?.invoke() }
+                    override fun onDone(id: String?) { speaking.value = false; finished() }
                     @Deprecated("Deprecated in Java") override fun onError(id: String?) { speaking.value = false }
                 })
                 then()
@@ -111,7 +116,7 @@ class Speaker(private val context: Context, private val app: AppContainer) {
         player = MediaPlayer().apply {
             setAudioAttributes(AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_ASSISTANT).setContentType(AudioAttributes.CONTENT_TYPE_SPEECH).build())
             setDataSource(file.absolutePath)
-            setOnCompletionListener { speaking.value = false; it.release(); player = null; onDone?.invoke() }
+            setOnCompletionListener { speaking.value = false; it.release(); player = null; finished() }
             setOnErrorListener { mp, _, _ -> speaking.value = false; mp.release(); player = null; true }
             prepare()
             start()

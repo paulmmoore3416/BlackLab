@@ -19,11 +19,14 @@ import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.ProcessLifecycleOwner
+import androidx.lifecycle.lifecycleScope
 import com.blacklab.app.core.IncomingGuard
 import com.blacklab.app.ui.AppRoot
 import com.blacklab.app.ui.theme.BlackLabTheme
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 class MainActivity : FragmentActivity() {
 
@@ -107,6 +110,18 @@ class MainActivity : FragmentActivity() {
         intent.getStringExtra("ask")?.takeIf { IncomingGuard.askAllowed(it) }?.let { pendingAsk.value = it }
         when (intent.action) {
             Intent.ACTION_ASSIST, Intent.ACTION_VOICE_COMMAND, "com.blacklab.app.ASSIST" -> pendingRoute.value = "assistant?listen=true"
+            // "Hey Google, play … on BlackLab": search the phone's music and start playing (shuffle when no query)
+            android.provider.MediaStore.INTENT_ACTION_MEDIA_PLAY_FROM_SEARCH -> {
+                val q = intent.getStringExtra(android.app.SearchManager.QUERY).orEmpty().trim().take(120).lowercase()
+                val ctx = this
+                lifecycleScope.launch(Dispatchers.Main) {
+                    val all = withContext(Dispatchers.IO) { com.blacklab.app.media.Music.songs(ctx) }
+                    val hits = if (q.isBlank()) emptyList() else all.filter { it.title.lowercase().contains(q) || it.artist.lowercase().contains(q) || it.album.lowercase().contains(q) }
+                    val list = hits.ifEmpty { all.shuffled() }.take(100)
+                    if (list.isNotEmpty()) runCatching { com.blacklab.app.media.Music.play(ctx, list, 0) }
+                    pendingRoute.value = "nowplaying"
+                }
+            }
             Intent.ACTION_SEND -> {
                 @Suppress("DEPRECATION")
                 val uri = intent.getParcelableExtra<Uri>(Intent.EXTRA_STREAM)?.takeIf { IncomingGuard.uriAllowed(this, it) }

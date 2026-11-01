@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<automotiveApp>
+    <!-- Car screens built with the Car App Library -->
+    <uses name="template" />
+    <!-- Music and recordings in Android Auto's media launcher -->
+    <uses name="media" />
+</automotiveApp>

@@ -75,6 +75,23 @@ object Notifications {
             b.addAction(0, "Complete", actionIntent(context, ReminderReceiver.ACTION_COMPLETE_TASK, due.refId, id))
             b.addAction(0, "Snooze 10 min", actionIntent(context, ReminderReceiver.ACTION_SNOOZE_TASK, due.refId, id))
         }
+        // Android Auto: show task and event reminders as heads-up cards on the car display
+        if (due.kind != ReminderScheduler.Kind.AGENDA) runCatching {
+            val carRoute = if (due.kind == ReminderScheduler.Kind.TASK) "tasks" else "agenda"
+            val open = androidx.car.app.notification.CarPendingIntent.getCarApp(context, id,
+                Intent().setComponent(android.content.ComponentName(context, com.blacklab.app.car.BlackLabCarAppService::class.java)).putExtra("car_route", carRoute), 0)
+            val car = androidx.car.app.notification.CarAppExtender.Builder()
+                .setContentTitle(due.title)
+                .setContentText(due.text)
+                .setSmallIcon(R.drawable.ic_notification)
+                .setImportance(NotificationManagerCompat.IMPORTANCE_HIGH)
+                .setContentIntent(open)
+            if (due.kind == ReminderScheduler.Kind.TASK) {
+                car.addAction(R.drawable.ic_car_check, "Done", actionIntent(context, ReminderReceiver.ACTION_COMPLETE_TASK, due.refId, id))
+                car.addAction(R.drawable.ic_car_task, "Snooze", actionIntent(context, ReminderReceiver.ACTION_SNOOZE_TASK, due.refId, id))
+            }
+            b.extend(car.build())
+        }
         try {
             nm.notify(id, b.build())
         } catch (_: SecurityException) {

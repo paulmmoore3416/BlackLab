@@ -132,6 +132,11 @@ object SettingsSchema {
             bool(Keys.ASST_INDEX_TRANSCRIPTS, "Recordings & dictation", "Index transcripts.", d.asstIndexTranscripts),
             bool(Keys.ASST_INDEX_TASKS, "Tasks, events & courses", "Index titles and notes.", d.asstIndexTasks),
         )),
+        Section("car", "Android Auto", "car", "BlackLab on your car's display (set up for the 2023 Hyundai Santa Fe).", listOf(
+            bool(Keys.CAR_SPEAK, "Speak replies in the car", "Read answers, summaries and confirmations aloud through the car speakers.", d.carSpeak),
+            bool(Keys.CAR_AUTO_LISTEN, "Hands-free conversations", "In Talk, listen again after each answer so you can keep the conversation going without touching the screen.", d.carAutoListen),
+            bool(Keys.CAR_BRIEF_ON_START, "Brief me when I connect", "Speak the daily briefing the first time BlackLab opens in the car each day.", d.carBriefOnStart),
+        )),
         Section("google", "Google services", "cloud", "Gmail, Drive and Keep through your Google account.", listOf(
             Def(Keys.GOOGLE_ACCOUNT, Store.STRING, "Signed-in account", "Sign in on the phone under Settings › Assistant.", "text", default = "", readOnly = true),
             int(Keys.ASST_GMAIL_MAX, "Emails per summary", "How many messages the assistant reads for an inbox summary.", d.asstGmailMax, 1, 50),

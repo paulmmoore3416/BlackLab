@@ -123,6 +123,10 @@ data class Settings(
     val asstDriveFolder: String = "BlackLab",
     val asstWorkOrderList: String = "Work Orders",
     val asstBriefOnOpen: Boolean = false,
+    // Android Auto
+    val carSpeak: Boolean = true,
+    val carAutoListen: Boolean = true,
+    val carBriefOnStart: Boolean = false,
     // desktop link & cloud sync
     val linkEnabled: Boolean = false,
     val linkLan: Boolean = false,
@@ -253,6 +257,9 @@ object Keys {
     const val ASST_DRIVE_FOLDER = "asst_drive_folder"
     const val ASST_WO_LIST = "asst_wo_list"
     const val ASST_BRIEF_ON_OPEN = "asst_brief_on_open"
+    const val CAR_SPEAK = "car_speak"
+    const val CAR_AUTO_LISTEN = "car_auto_listen"
+    const val CAR_BRIEF_ON_START = "car_brief_on_start"
     const val LINK_ENABLED = "link_enabled"
     const val LINK_LAN = "link_lan"
     const val LINK_PORT = "link_port"
@@ -397,6 +404,9 @@ class SettingsRepository(context: Context) {
             asstDriveFolder = getString(Keys.ASST_DRIVE_FOLDER, d.asstDriveFolder) ?: d.asstDriveFolder,
             asstWorkOrderList = getString(Keys.ASST_WO_LIST, d.asstWorkOrderList) ?: d.asstWorkOrderList,
             asstBriefOnOpen = getBoolean(Keys.ASST_BRIEF_ON_OPEN, d.asstBriefOnOpen),
+            carSpeak = getBoolean(Keys.CAR_SPEAK, d.carSpeak),
+            carAutoListen = getBoolean(Keys.CAR_AUTO_LISTEN, d.carAutoListen),
+            carBriefOnStart = getBoolean(Keys.CAR_BRIEF_ON_START, d.carBriefOnStart),
             linkEnabled = getBoolean(Keys.LINK_ENABLED, d.linkEnabled),
             linkLan = getBoolean(Keys.LINK_LAN, d.linkLan),
             linkPort = getInt(Keys.LINK_PORT, d.linkPort),

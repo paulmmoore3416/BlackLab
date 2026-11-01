@@ -66,6 +66,42 @@ Instead of scheduling one alarm per reminder, `ReminderScheduler` keeps **one ex
 
 `LocalIndex` is an in-memory BM25 index over documents, journal, transcripts, tasks, events and courses, rebuilt lazily when data changes. `MeetingActions` and `Nameplate` reuse it and ML Kit OCR. `Secrets` stores API keys as AES-GCM blobs under an Android Keystore key; keys can be provisioned once by pushing `BlackLab/.provision/keys.json`, which is deleted after import.
 
+## Knowledge & conversations
+`knowledge/Knowledge.kt` loads the Markdown knowledge bases from `assets/knowledge/` (front-matter header,
+then `## entries` with `tags:` and `ask:` lines) and builds one BM25 index over all entries, with title and
+tag terms weighted above body text. `Conversations.kt` runs a conversation: it retrieves from the
+conversation's own base plus the bases it `draws` on (its own notes boosted), then asks Gemini Nano to
+answer in the conversation's persona from those notes and the last few turns; without Nano it answers with
+the sentences of the best note that match the question. Turns are stored per conversation in
+`filesDir/knowledge`. The assistant answers clear knowledge questions directly when the top match scores
+above a calibrated threshold and shares a title or tag term with the question.
+
+## Summaries
+`summarize/SummarySources.kt` lists every summarizable item (documents, notes, notebook pages, journal,
+events, tasks, recordings, dictations, and readable files under the account folder) and reads its text;
+it also builds ready-made selections ("my day", "the week ahead", …) for the assistant and the car.
+`Summarizer.kt` uses Gemini Nano map-reduce — long items are condensed per chunk with the requested style
+in mind, groups are merged until they fit, then the summary is written — and falls back to `Extractive`,
+which scores sentences by TF-IDF centrality and picks them per style, with cue phrases for decisions,
+actions, risks and dates. `Extractive` is plain Kotlin and unit-tested.
+
+## Garage
+`vehicle/Garage.kt` keeps the vehicle profile, maintenance schedule, service records and fuel log in one
+JSON file (`filesDir/garage/garage.json`, written atomically) behind a `StateFlow`. Due items are computed
+by miles or months, whichever comes first (severe intervals when enabled); MPG is measured between full
+fill-ups. Spoken fuel and service logs are parsed by `parseFuel` and `matchItems`.
+
+## Android Auto
+`car/BlackLabCarAppService.kt` is a Car App Library templated app (category IOT; release builds accept only
+Google-signed hosts). Screens in `car/CarScreens.kt` use Grid, List, Pane and Message templates and read
+the car's content limits from `ConstraintManager`. Voice screens keep the same title, row titles and
+actions on every update so the host treats updates as refreshes rather than new steps. `CarVoice` records
+from the car microphone with `CarAudioRecord` (API 5+, phone mic otherwise) and feeds the same on-device
+`LiveTranscriber` the recorder uses; replies are spoken by the shared `Speaker`. `CarData` reads model, fuel
+level/range and odometer through `CarHardwareManager` when the car shares them. Reminder notifications carry
+a `CarAppExtender`. `PlaybackService` is a Media3 `MediaLibraryService` with a browse tree (songs, albums,
+playlists, recordings) and search, which is what Android Auto's media launcher shows.
+
 ## Desktop link & sync
 `core/SettingsSchema.kt` describes every setting (type, label, help, range, options). The phone's settings search, the assistant's "set X to Y" and every BlackLab Desktop settings page are generated from it, and desktop writes go back through `SettingsSchema.apply`, which validates them.
 
