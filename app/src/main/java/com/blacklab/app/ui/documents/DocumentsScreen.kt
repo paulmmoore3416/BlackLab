@@ -23,8 +23,8 @@ import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.Sort
-import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.automirrored.rounded.Sort
+import androidx.compose.material.icons.rounded.*
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -115,7 +115,7 @@ fun ExportSheet(title: String, onDismiss: () -> Unit, onPrint: (() -> Unit)? = n
             ExportFormat.entries.forEach { f ->
                 Row(Modifier.fillMaxWidth().padding(vertical = 2.dp), verticalAlignment = Alignment.CenterVertically) {
                     Icon(
-                        when (f) { ExportFormat.PDF -> Icons.Default.PictureAsPdf; ExportFormat.DOCX -> Icons.Default.Description; ExportFormat.HTML -> Icons.Default.Language; ExportFormat.MD -> Icons.Default.Code; ExportFormat.TXT -> Icons.Default.TextSnippet },
+                        when (f) { ExportFormat.PDF -> Icons.Rounded.PictureAsPdf; ExportFormat.DOCX -> Icons.Rounded.Description; ExportFormat.HTML -> Icons.Rounded.Language; ExportFormat.MD -> Icons.Rounded.Code; ExportFormat.TXT -> Icons.Rounded.TextSnippet },
                         null, tint = MaterialTheme.colorScheme.primary,
                     )
                     Spacer(Modifier.width(14.dp))
@@ -127,7 +127,7 @@ fun ExportSheet(title: String, onDismiss: () -> Unit, onPrint: (() -> Unit)? = n
             if (onPrint != null) {
                 HorizontalDivider(Modifier.padding(vertical = 8.dp))
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Default.Print, null, tint = MaterialTheme.colorScheme.primary)
+                    Icon(Icons.Rounded.Print, null, tint = MaterialTheme.colorScheme.primary)
                     Spacer(Modifier.width(14.dp))
                     Text("Print or Save as PDF (system)", Modifier.weight(1f))
                     TextButton(onClick = { onPrint(); onDismiss() }) { Text("Print") }
@@ -184,37 +184,37 @@ fun DocumentsScreen() {
     Scaffold(
         topBar = {
             BlTopBar("Documents", subtitle = "${docs.size} documents · ${app.settings.profileName(profile)}", actions = {
-                IconButton(onClick = { searching = !searching; if (!searching) query = "" }) { Icon(Icons.Default.Search, "Search") }
-                IconButton(onClick = { grid = !grid }) { Icon(if (grid) Icons.Default.ViewList else Icons.Default.GridView, "Layout") }
+                IconButton(onClick = { searching = !searching; if (!searching) query = "" }) { Icon(Icons.Rounded.Search, "Search") }
+                IconButton(onClick = { grid = !grid }) { Icon(if (grid) Icons.Rounded.ViewList else Icons.Rounded.GridView, "Layout") }
                 var sortMenu by remember { mutableStateOf(false) }
                 Box {
-                    IconButton(onClick = { sortMenu = true }) { Icon(Icons.AutoMirrored.Filled.Sort, "Sort") }
+                    IconButton(onClick = { sortMenu = true }) { Icon(Icons.AutoMirrored.Rounded.Sort, "Sort") }
                     DropdownMenu(sortMenu, { sortMenu = false }) {
                         listOf("UPDATED" to "Last modified", "CREATED" to "Date created", "TITLE" to "Title", "WORDS" to "Length").forEach { (k, l) ->
                             DropdownMenuItem(text = { Text(l) }, onClick = { app.settings.update { putString(Keys.DOC_SORT, k) }; sortMenu = false },
-                                trailingIcon = { if (s.docSort == k) Icon(Icons.Default.Check, null) })
+                                trailingIcon = { if (s.docSort == k) Icon(Icons.Rounded.Check, null) })
                         }
                     }
                 }
             })
         },
         floatingActionButton = {
-            ExtendedFloatingActionButton(onClick = { newSheet = true }, icon = { Icon(Icons.Default.Add, null) }, text = { Text("New") })
+            ExtendedFloatingActionButton(onClick = { newSheet = true }, icon = { Icon(Icons.Rounded.Add, null) }, text = { Text("New") })
         },
     ) { pad ->
         Column(Modifier.padding(pad).fillMaxSize()) {
             if (searching) OutlinedTextField(query, { query = it }, placeholder = { Text("Search titles and text") }, singleLine = true,
-                leadingIcon = { Icon(Icons.Default.Search, null) }, modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp))
+                leadingIcon = { Icon(Icons.Rounded.Search, null) }, modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp))
             Row(Modifier.horizontalScroll(rememberScrollState()).padding(horizontal = 12.dp, vertical = 4.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 FilterChip(folder == "ALL", { folder = "ALL" }, label = { Text("All") })
                 FilterChip(folder == "PINNED", { folder = "PINNED" }, label = { Text("📌 Pinned") })
                 folders.forEach { f -> FilterChip(folder == f, { folder = f }, label = { Text("📁 $f") }) }
                 FilterChip(false, { importer.launch(arrayOf("application/vnd.openxmlformats-officedocument.wordprocessingml.document", "text/*", "text/html", "text/markdown", "application/rtf")) },
-                    label = { Text("Import") }, leadingIcon = { Icon(Icons.Default.Upload, null, Modifier.size(16.dp)) })
-                FilterChip(false, { scanner() }, label = { Text("Scan") }, leadingIcon = { Icon(Icons.Default.DocumentScanner, null, Modifier.size(16.dp)) })
+                    label = { Text("Import") }, leadingIcon = { Icon(Icons.Rounded.Upload, null, Modifier.size(16.dp)) })
+                FilterChip(false, { scanner() }, label = { Text("Scan") }, leadingIcon = { Icon(Icons.Rounded.DocumentScanner, null, Modifier.size(16.dp)) })
             }
             if (shown.isEmpty()) {
-                EmptyState(Icons.Default.Description, if (docs.isEmpty()) "No documents yet" else "No matches",
+                EmptyState(Icons.Rounded.Description, if (docs.isEmpty()) "No documents yet" else "No matches",
                     if (docs.isEmpty()) "Create one from a template — memos, minutes, work orders, SOPs, inspections — or import a Word file." else "Try a different search or folder.",
                     Modifier.padding(top = 40.dp))
             } else {
@@ -252,14 +252,14 @@ private fun DocCard(d: DocumentEntity, grid: Boolean, onClick: () -> Unit, onMen
             Row(verticalAlignment = Alignment.Top) {
                 Column(Modifier.weight(1f)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        if (d.pinned) Icon(Icons.Default.PushPin, null, tint = Amber, modifier = Modifier.size(14.dp).padding(end = 2.dp))
+                        if (d.pinned) Icon(Icons.Rounded.PushPin, null, tint = Amber, modifier = Modifier.size(14.dp).padding(end = 2.dp))
                         Text(d.title, style = MaterialTheme.typography.titleSmall, maxLines = 2, overflow = TextOverflow.Ellipsis, fontWeight = FontWeight.SemiBold)
                     }
                     Text("${Time.ago(d.updatedAt)} · ${d.wordCount} words", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     if (!grid && d.preview.isNotBlank()) Text(d.preview, style = MaterialTheme.typography.bodySmall, maxLines = 2, overflow = TextOverflow.Ellipsis, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     if (d.folder.isNotBlank()) Pill(d.folder, modifier = Modifier.padding(top = 4.dp))
                 }
-                IconButton(onClick = onMenu, modifier = Modifier.size(32.dp)) { Icon(Icons.Default.MoreVert, "More", Modifier.size(18.dp)) }
+                IconButton(onClick = onMenu, modifier = Modifier.size(32.dp)) { Icon(Icons.Rounded.MoreVert, "More", Modifier.size(18.dp)) }
             }
         }
     }
@@ -302,11 +302,11 @@ private fun DocMenu(d: DocumentEntity, folders: List<String>, onDismiss: () -> U
                     @Composable fun item(icon: androidx.compose.ui.graphics.vector.ImageVector, label: String, action: () -> Unit) {
                         DropdownMenuItem(text = { Text(label) }, leadingIcon = { Icon(icon, null) }, onClick = action, modifier = Modifier.padding(horizontal = 8.dp))
                     }
-                    item(Icons.Default.Edit, "Open") { onDismiss(); shell.go("doc/${d.id}") }
-                    item(Icons.Default.DriveFileRenameOutline, "Rename") { step = "rename" }
-                    item(Icons.Default.DriveFileMove, "Move to folder") { step = "move" }
-                    item(Icons.Default.PushPin, if (d.pinned) "Unpin" else "Pin") { app.io { app.db.documents().update(d.copy(pinned = !d.pinned)) }; onDismiss() }
-                    item(Icons.Default.ContentCopy, "Duplicate") {
+                    item(Icons.Rounded.Edit, "Open") { onDismiss(); shell.go("doc/${d.id}") }
+                    item(Icons.Rounded.DriveFileRenameOutline, "Rename") { step = "rename" }
+                    item(Icons.Rounded.DriveFileMove, "Move to folder") { step = "move" }
+                    item(Icons.Rounded.PushPin, if (d.pinned) "Unpin" else "Pin") { app.io { app.db.documents().update(d.copy(pinned = !d.pinned)) }; onDismiss() }
+                    item(Icons.Rounded.ContentCopy, "Duplicate") {
                         app.io {
                             val body = app.content.readBody(d.filePath)
                             val title = d.title + " copy"
@@ -315,10 +315,10 @@ private fun DocMenu(d: DocumentEntity, folders: List<String>, onDismiss: () -> U
                         }
                         onDismiss()
                     }
-                    item(Icons.Default.IosShare, "Export / share") { step = "export" }
-                    item(Icons.Default.Print, "Print") { app.io { val b = app.content.readBody(d.filePath); withContext(Dispatchers.Main) { Printer.print(ctx, d.title, b, DocActions.pageOf(d)) } }; onDismiss() }
-                    item(Icons.Default.Html, "Open .html file") { Files.open(ctx, app.content.file(d.filePath)); onDismiss() }
-                    item(Icons.Default.Delete, "Delete") { step = "delete" }
+                    item(Icons.Rounded.IosShare, "Export / share") { step = "export" }
+                    item(Icons.Rounded.Print, "Print") { app.io { val b = app.content.readBody(d.filePath); withContext(Dispatchers.Main) { Printer.print(ctx, d.title, b, DocActions.pageOf(d)) } }; onDismiss() }
+                    item(Icons.Rounded.Html, "Open .html file") { Files.open(ctx, app.content.file(d.filePath)); onDismiss() }
+                    item(Icons.Rounded.Delete, "Delete") { step = "delete" }
                 }
             }
         }

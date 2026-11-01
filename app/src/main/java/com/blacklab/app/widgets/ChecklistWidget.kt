@@ -67,7 +67,7 @@ class ChecklistWidget : GlanceAppWidget() {
             val noteId = currentState<Preferences>()[NoteKey] ?: 0L
             val v by Widgets.version.collectAsState()
             val model by produceState(initial, noteId, v) { value = Widgets.checklist(context, noteId, onLock) }
-            GlanceTheme { Content(model, appWidgetId) }
+            GlanceTheme(colors = WUi.colors(context)) { Content(model, appWidgetId) }
         }
     }
 

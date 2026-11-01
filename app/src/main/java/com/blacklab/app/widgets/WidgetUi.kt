@@ -1,5 +1,6 @@
 package com.blacklab.app.widgets
 
+import com.blacklab.app.app
 import android.appwidget.AppWidgetManager
 import android.appwidget.AppWidgetProviderInfo
 import android.content.Context
@@ -80,6 +81,29 @@ internal object WUi {
             Spacer(GlanceModifier.size(6.dp))
             lines.forEach { Text(it, style = TextStyle(color = GlanceTheme.colors.onSurface, fontSize = 14.sp)) }
             Text("Details hidden · tap to open BlackLab", style = TextStyle(color = GlanceTheme.colors.onSurfaceVariant, fontSize = 11.sp))
+        }
+    }
+
+    /**
+     * Widget colors: your account palette (or wallpaper colors with Material You), light or dark as
+     * the app is set (Auto and custom hours resolve at render time; System follows the phone).
+     */
+    fun colors(context: android.content.Context): androidx.glance.color.ColorProviders {
+        val s = context.app.settings.current
+        if (s.dynamicColor) return androidx.glance.material3.ColorProviders(
+            androidx.compose.material3.dynamicLightColorScheme(context), androidx.compose.material3.dynamicDarkColorScheme(context))
+        val choice = com.blacklab.app.ui.theme.ThemeChoice.from(s)
+        val light = com.blacklab.app.ui.theme.colorSchemeFor(choice, s.activeProfile, false)
+        val dark = com.blacklab.app.ui.theme.colorSchemeFor(choice, s.activeProfile, true)
+        val mode = if (s.themeMode == com.blacklab.app.core.AutoTheme.AUTO || s.themeMode == com.blacklab.app.core.AutoTheme.SCHEDULE) {
+            val sun = if (s.themeMode == com.blacklab.app.core.AutoTheme.AUTO) com.blacklab.app.core.AutoTheme.location(context)?.let { (la, lo) ->
+                com.blacklab.app.core.AutoTheme.sunTimes(java.time.LocalDate.now(), la, lo, java.time.ZoneId.systemDefault()) } else null
+            com.blacklab.app.core.AutoTheme.resolve(s.themeMode, java.time.LocalDateTime.now(), sun, s.themeDarkFrom, s.themeDarkTo)
+        } else s.themeMode
+        return when (mode) {
+            "LIGHT" -> androidx.glance.material3.ColorProviders(light, light)
+            "SYSTEM" -> androidx.glance.material3.ColorProviders(light, dark)
+            else -> androidx.glance.material3.ColorProviders(dark, dark)
         }
     }
 

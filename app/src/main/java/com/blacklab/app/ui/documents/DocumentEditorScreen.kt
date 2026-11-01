@@ -10,8 +10,8 @@ import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.automirrored.rounded.ArrowBack
+import androidx.compose.material.icons.rounded.*
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
@@ -146,32 +146,32 @@ fun DocumentEditorScreen(id: Long, template: String?, courseId: Long?) {
                         style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             },
-            navigationIcon = { IconButton(onClick = leave) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back") } },
+            navigationIcon = { IconButton(onClick = leave) { Icon(Icons.AutoMirrored.Rounded.ArrowBack, "Back") } },
             actions = {
-                IconButton(onClick = { c?.exec("undo") }) { Icon(Icons.Default.Undo, "Undo") }
-                IconButton(onClick = { scope.launch { save(); dialog = "export" } }) { Icon(Icons.Default.IosShare, "Export") }
+                IconButton(onClick = { c?.exec("undo") }) { Icon(Icons.Rounded.Undo, "Undo") }
+                IconButton(onClick = { scope.launch { save(); dialog = "export" } }) { Icon(Icons.Rounded.IosShare, "Export") }
                 var more by remember { mutableStateOf(false) }
                 Box {
-                    IconButton(onClick = { more = true }) { Icon(Icons.Default.MoreVert, "More") }
+                    IconButton(onClick = { more = true }) { Icon(Icons.Rounded.MoreVert, "More") }
                     DropdownMenu(more, { more = false }) {
-                        DropdownMenuItem(text = { Text("Save now") }, leadingIcon = { Icon(Icons.Default.Save, null) }, onClick = { more = false; scope.launch { save(); shell.toast("Saved to BlackLab") } })
-                        DropdownMenuItem(text = { Text("Rename") }, leadingIcon = { Icon(Icons.Default.DriveFileRenameOutline, null) }, onClick = { more = false; dialog = "rename" })
-                        DropdownMenuItem(text = { Text("Print / Save as PDF") }, leadingIcon = { Icon(Icons.Default.Print, null) }, onClick = {
+                        DropdownMenuItem(text = { Text("Save now") }, leadingIcon = { Icon(Icons.Rounded.Save, null) }, onClick = { more = false; scope.launch { save(); shell.toast("Saved to BlackLab") } })
+                        DropdownMenuItem(text = { Text("Rename") }, leadingIcon = { Icon(Icons.Rounded.DriveFileRenameOutline, null) }, onClick = { more = false; dialog = "rename" })
+                        DropdownMenuItem(text = { Text("Print / Save as PDF") }, leadingIcon = { Icon(Icons.Rounded.Print, null) }, onClick = {
                             more = false
                             scope.launch { val html = c?.html() ?: return@launch; d?.let { Printer.print(ctx, it.title, html, DocActions.pageOf(it)) } }
                         })
-                        DropdownMenuItem(text = { Text(if (d?.pinned == true) "Unpin" else "Pin") }, leadingIcon = { Icon(Icons.Default.PushPin, null) }, onClick = {
+                        DropdownMenuItem(text = { Text(if (d?.pinned == true) "Unpin" else "Pin") }, leadingIcon = { Icon(Icons.Rounded.PushPin, null) }, onClick = {
                             more = false; d?.let { doc = it.copy(pinned = !it.pinned); scope.launch { save() } }
                         })
-                        DropdownMenuItem(text = { Text("Document info") }, leadingIcon = { Icon(Icons.Default.Info, null) }, onClick = { more = false; dialog = "info" })
-                        DropdownMenuItem(text = { Text("Delete") }, leadingIcon = { Icon(Icons.Default.Delete, null) }, onClick = { more = false; dialog = "delete" })
+                        DropdownMenuItem(text = { Text("Document info") }, leadingIcon = { Icon(Icons.Rounded.Info, null) }, onClick = { more = false; dialog = "info" })
+                        DropdownMenuItem(text = { Text("Delete") }, leadingIcon = { Icon(Icons.Rounded.Delete, null) }, onClick = { more = false; dialog = "delete" })
                     }
                 }
             },
             colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
         )
         if (d == null || c == null) {
-            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
+            com.blacklab.app.ui.components.SkeletonPage(Modifier.fillMaxSize())
             return@Column
         }
         RichEditorView(c, lightDesk = !LocalBlColors.current.isDark, modifier = Modifier.weight(1f).fillMaxWidth())

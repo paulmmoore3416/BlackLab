@@ -28,11 +28,11 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.Undo
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.DeleteSweep
-import androidx.compose.material.icons.filled.Event
+import androidx.compose.material.icons.automirrored.rounded.Undo
+import androidx.compose.material.icons.rounded.Add
+import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material.icons.rounded.DeleteSweep
+import androidx.compose.material.icons.rounded.Event
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -134,9 +134,9 @@ fun SignaturePickerRow(selectedId: String?, onSelect: (Signatures.Sig) -> Unit, 
         horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
         sigs.forEach { s -> SignatureThumb(s, selected = s.id == selectedId, height = 44) { onSelect(s) } }
         FilterChip(false, { onNew(Signatures.SIGNATURE) }, label = { Text(if (sigs.none { it.kind == Signatures.SIGNATURE }) "Create signature" else "New signature") },
-            leadingIcon = { Icon(Icons.Default.Add, null, Modifier.size(18.dp)) })
-        if (sigs.none { it.kind == Signatures.INITIALS }) FilterChip(false, { onNew(Signatures.INITIALS) }, label = { Text("Initials") }, leadingIcon = { Icon(Icons.Default.Add, null, Modifier.size(18.dp)) })
-        if (onDate != null) FilterChip(false, onDate, label = { Text("Date") }, leadingIcon = { Icon(Icons.Default.Event, null, Modifier.size(18.dp)) })
+            leadingIcon = { Icon(Icons.Rounded.Add, null, Modifier.size(18.dp)) })
+        if (sigs.none { it.kind == Signatures.INITIALS }) FilterChip(false, { onNew(Signatures.INITIALS) }, label = { Text("Initials") }, leadingIcon = { Icon(Icons.Rounded.Add, null, Modifier.size(18.dp)) })
+        if (onDate != null) FilterChip(false, onDate, label = { Text("Date") }, leadingIcon = { Icon(Icons.Rounded.Event, null, Modifier.size(18.dp)) })
     }
 }
 
@@ -178,11 +178,11 @@ fun SignatureCaptureDialog(kind: String, onDismiss: () -> Unit, onSaved: (Signat
         Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.surface) {
             Column(Modifier.fillMaxSize().systemBarsPadding()) {
                 Row(Modifier.fillMaxWidth().padding(horizontal = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-                    IconButton(onClick = onDismiss) { Icon(Icons.Default.Close, "Cancel") }
+                    IconButton(onClick = onDismiss) { Icon(Icons.Rounded.Close, "Cancel") }
                     Text(title, style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
                     if (mode == "draw") {
-                        IconButton(onClick = { if (strokes.isNotEmpty()) strokes.removeAt(strokes.lastIndex) }, enabled = strokes.isNotEmpty()) { Icon(Icons.AutoMirrored.Filled.Undo, "Undo") }
-                        IconButton(onClick = { strokes.clear() }, enabled = strokes.isNotEmpty()) { Icon(Icons.Default.DeleteSweep, "Clear") }
+                        IconButton(onClick = { if (strokes.isNotEmpty()) strokes.removeAt(strokes.lastIndex) }, enabled = strokes.isNotEmpty()) { Icon(Icons.AutoMirrored.Rounded.Undo, "Undo") }
+                        IconButton(onClick = { strokes.clear() }, enabled = strokes.isNotEmpty()) { Icon(Icons.Rounded.DeleteSweep, "Clear") }
                     }
                     TextButton(onClick = ::save, enabled = if (mode == "draw") strokes.isNotEmpty() else typed.isNotBlank()) { Text("Save") }
                 }

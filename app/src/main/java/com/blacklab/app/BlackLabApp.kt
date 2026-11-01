@@ -42,6 +42,14 @@ class BlackLabApp : Application() {
         com.blacklab.app.link.CloudSync.schedule(this)
         com.blacklab.app.widgets.Widgets.watch(container)
         container.appScope.launch {
+            // Feel: haptics and reduced motion apply app-wide (also honors the system "Remove animations" switch)
+            container.settings.state.map { it.haptics to it.reduceMotion }.distinctUntilChanged().collect { (h, r) ->
+                com.blacklab.app.ui.components.Haptics.enabled = h
+                val systemOff = runCatching { android.provider.Settings.Global.getFloat(contentResolver, android.provider.Settings.Global.ANIMATOR_DURATION_SCALE, 1f) == 0f }.getOrDefault(false)
+                com.blacklab.app.ui.theme.Motion.reduced = r || systemOff
+            }
+        }
+        container.appScope.launch {
             container.settings.state.map { it.updateAuto }.distinctUntilChanged().collect { com.blacklab.app.update.Updater.schedule(this@BlackLabApp) }
         }
     }

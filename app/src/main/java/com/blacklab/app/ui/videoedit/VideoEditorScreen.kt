@@ -29,9 +29,9 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.RotateLeft
-import androidx.compose.material.icons.automirrored.filled.RotateRight
-import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.automirrored.rounded.RotateLeft
+import androidx.compose.material.icons.automirrored.rounded.RotateRight
+import androidx.compose.material.icons.rounded.*
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.FilterChip
@@ -197,7 +197,7 @@ fun VideoEditorScreen(path: String, multi: String = "") {
                     when {
                         clip == null -> Column(horizontalAlignment = Alignment.CenterHorizontally) {
                             Text("Add videos or photos to start", color = Color.White)
-                            FilledTonalButton(onClick = { adder.launch(arrayOf("video/*", "image/*")) }, Modifier.padding(top = 10.dp)) { Icon(Icons.Default.Add, null); Text("Add media") }
+                            FilledTonalButton(onClick = { adder.launch(arrayOf("video/*", "image/*")) }, Modifier.padding(top = 10.dp)) { Icon(Icons.Rounded.Add, null); Text("Add media") }
                         }
                         clip.isImage -> AsyncImage(clip.uri, null, Modifier.fillMaxSize(), contentScale = ContentScale.Fit)
                         player != null -> AndroidView({ PlayerView(it).apply { this.player = player; useController = true; controllerShowTimeoutMs = 2500 } }, Modifier.fillMaxSize(), update = { it.player = player })
@@ -211,12 +211,12 @@ fun VideoEditorScreen(path: String, multi: String = "") {
                             AsyncImage(ImageRequest.Builder(ctx).data(c.uri).size(200).apply { if (!c.isImage) decoderFactory(VideoFrameDecoder.Factory()) }.build(), null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
                             Text(Time.duration(c.lengthMs), color = Color.White, style = MaterialTheme.typography.labelSmall,
                                 modifier = Modifier.align(Alignment.BottomEnd).background(Color.Black.copy(alpha = 0.6f)).padding(horizontal = 4.dp))
-                            if (c.isImage) Icon(Icons.Default.Image, null, tint = Color.White, modifier = Modifier.align(Alignment.TopStart).padding(2.dp).size(14.dp))
+                            if (c.isImage) Icon(Icons.Rounded.Image, null, tint = Color.White, modifier = Modifier.align(Alignment.TopStart).padding(2.dp).size(14.dp))
                         }
                     }
                     item {
                         Box(Modifier.size(56.dp).clip(RoundedCornerShape(8.dp)).background(MaterialTheme.colorScheme.primaryContainer).androidxClickable { adder.launch(arrayOf("video/*", "image/*")) }, contentAlignment = Alignment.Center) {
-                            Icon(Icons.Default.Add, "Add clip", tint = MaterialTheme.colorScheme.onPrimaryContainer)
+                            Icon(Icons.Rounded.Add, "Add clip", tint = MaterialTheme.colorScheme.onPrimaryContainer)
                         }
                     }
                 }
@@ -240,7 +240,7 @@ fun VideoEditorScreen(path: String, multi: String = "") {
                                     FilledTonalButton(onClick = { setClip(clip.copy(endMs = position.coerceIn(clip.startMs + 200, clip.durationMs))) }) { Text("End here") }
                                     FilledTonalButton(enabled = position > clip.startMs + 200 && position < clip.endMs - 200, onClick = {
                                         update { p -> p.copy(clips = p.clips.toMutableList().also { l -> l[sel] = clip.copy(endMs = position); l.add(sel + 1, clip.copy(startMs = position)) }) }
-                                    }) { Icon(Icons.Default.ContentCut, null); Text("Split") }
+                                    }) { Icon(Icons.Rounded.ContentCut, null); Text("Split") }
                                     FilledTonalButton(onClick = {
                                         busy = "Saving frame…"
                                         scope.launch {
@@ -252,14 +252,14 @@ fun VideoEditorScreen(path: String, multi: String = "") {
                                             busy = null
                                             shell.toast(if (f != null) "Saved ${f.name} to Photos" else "Couldn't grab that frame")
                                         }
-                                    }) { Icon(Icons.Default.PhotoCamera, null); Text("Frame → photo") }
+                                    }) { Icon(Icons.Rounded.PhotoCamera, null); Text("Frame → photo") }
                                 }
                             }
                             Row(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.padding(top = 6.dp)) {
-                                IconButton(enabled = sel > 0, onClick = { update { p -> p.copy(clips = p.clips.toMutableList().also { java.util.Collections.swap(it, sel, sel - 1) }) }; sel-- }) { Icon(Icons.Default.ArrowBack, "Move earlier") }
-                                IconButton(enabled = sel < project.clips.lastIndex, onClick = { update { p -> p.copy(clips = p.clips.toMutableList().also { java.util.Collections.swap(it, sel, sel + 1) }) }; sel++ }) { Icon(Icons.Default.ArrowForward, "Move later") }
-                                IconButton(onClick = { update { p -> p.copy(clips = p.clips.toMutableList().also { it.add(sel + 1, clip) }) } }) { Icon(Icons.Default.ContentCopy, "Duplicate") }
-                                IconButton(onClick = { update { p -> p.copy(clips = p.clips.toMutableList().also { it.removeAt(sel) }) }; sel = (sel - 1).coerceAtLeast(0) }) { Icon(Icons.Default.Delete, "Remove clip") }
+                                IconButton(enabled = sel > 0, onClick = { update { p -> p.copy(clips = p.clips.toMutableList().also { java.util.Collections.swap(it, sel, sel - 1) }) }; sel-- }) { Icon(Icons.Rounded.ArrowBack, "Move earlier") }
+                                IconButton(enabled = sel < project.clips.lastIndex, onClick = { update { p -> p.copy(clips = p.clips.toMutableList().also { java.util.Collections.swap(it, sel, sel + 1) }) }; sel++ }) { Icon(Icons.Rounded.ArrowForward, "Move later") }
+                                IconButton(onClick = { update { p -> p.copy(clips = p.clips.toMutableList().also { it.add(sel + 1, clip) }) } }) { Icon(Icons.Rounded.ContentCopy, "Duplicate") }
+                                IconButton(onClick = { update { p -> p.copy(clips = p.clips.toMutableList().also { it.removeAt(sel) }) }; sel = (sel - 1).coerceAtLeast(0) }) { Icon(Icons.Rounded.Delete, "Remove clip") }
                             }
                         } else Text("Add a clip to trim it.")
                         "Look" -> {
@@ -289,8 +289,8 @@ fun VideoEditorScreen(path: String, multi: String = "") {
                         "Frame" -> {
                             Text("Rotate", style = MaterialTheme.typography.labelLarge)
                             Row(verticalAlignment = Alignment.CenterVertically) {
-                                IconButton(onClick = { update { it.copy(rotation = (it.rotation + 270) % 360) } }) { Icon(Icons.AutoMirrored.Filled.RotateLeft, "Rotate left") }
-                                IconButton(onClick = { update { it.copy(rotation = (it.rotation + 90) % 360) } }) { Icon(Icons.AutoMirrored.Filled.RotateRight, "Rotate right") }
+                                IconButton(onClick = { update { it.copy(rotation = (it.rotation + 270) % 360) } }) { Icon(Icons.AutoMirrored.Rounded.RotateLeft, "Rotate left") }
+                                IconButton(onClick = { update { it.copy(rotation = (it.rotation + 90) % 360) } }) { Icon(Icons.AutoMirrored.Rounded.RotateRight, "Rotate right") }
                                 Text("${project.rotation}°")
                             }
                             Text("Crop to aspect ratio", style = MaterialTheme.typography.labelLarge)
@@ -313,9 +313,9 @@ fun VideoEditorScreen(path: String, multi: String = "") {
                             Row(verticalAlignment = Alignment.CenterVertically) { Text("Mute original sound", Modifier.weight(1f)); Switch(project.mute, { v -> update { it.copy(mute = v) } }) }
                             if (!project.mute) Labeled("Original volume", project.volume, 0f..2f) { v -> update { it.copy(volume = v) } }
                             Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 4.dp)) {
-                                Icon(Icons.Default.MusicNote, null)
+                                Icon(Icons.Rounded.MusicNote, null)
                                 Text(project.music?.let { project.musicName } ?: "No background music", Modifier.weight(1f).padding(start = 8.dp), maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                if (project.music != null) IconButton(onClick = { update { it.copy(music = null, musicName = "") } }) { Icon(Icons.Default.Close, "Remove music") }
+                                if (project.music != null) IconButton(onClick = { update { it.copy(music = null, musicName = "") } }) { Icon(Icons.Rounded.Close, "Remove music") }
                                 TextButton(onClick = { musicPicker.launch(arrayOf("audio/*")) }) { Text(if (project.music == null) "Add music" else "Change") }
                             }
                             if (project.music != null) Labeled("Music volume", project.musicVolume, 0f..1.5f) { v -> update { it.copy(musicVolume = v) } }
@@ -325,7 +325,7 @@ fun VideoEditorScreen(path: String, multi: String = "") {
                             Row(verticalAlignment = Alignment.CenterVertically) { Column(Modifier.weight(1f)) { Text("HEVC (H.265)"); Text("About half the size; some older devices can't play it.", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }; Switch(project.hevc, { v -> update { it.copy(hevc = v) } }) }
                             Row(verticalAlignment = Alignment.CenterVertically) { Column(Modifier.weight(1f)) { Text("Convert HDR to SDR"); Text("Best for sharing to apps that show HDR too bright.", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }; Switch(project.toSdr, { v -> update { it.copy(toSdr = v) } }) }
                             Row(verticalAlignment = Alignment.CenterVertically) { Column(Modifier.weight(1f)) { Text("Audio only (.m4a)"); Text("Extract the soundtrack instead of a video.", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }; Switch(project.audioOnly, { v -> update { it.copy(audioOnly = v) } }) }
-                            FilledTonalButton(enabled = project.clips.isNotEmpty(), onClick = { export() }, modifier = Modifier.padding(top = 8.dp)) { Icon(Icons.Default.Movie, null); Spacer(Modifier.width(6.dp)); Text("Export now") }
+                            FilledTonalButton(enabled = project.clips.isNotEmpty(), onClick = { export() }, modifier = Modifier.padding(top = 8.dp)) { Icon(Icons.Rounded.Movie, null); Spacer(Modifier.width(6.dp)); Text("Export now") }
                         }
                     }
                 }

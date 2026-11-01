@@ -26,13 +26,13 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.ArrowDropDown
-import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Person
-import androidx.compose.material.icons.filled.Work
-import androidx.compose.material.icons.filled.Menu
+import androidx.compose.material.icons.automirrored.rounded.ArrowBack
+import androidx.compose.material.icons.rounded.ArrowDropDown
+import androidx.compose.material.icons.rounded.Check
+import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material.icons.rounded.Person
+import androidx.compose.material.icons.rounded.Work
+import androidx.compose.material.icons.rounded.Menu
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -139,9 +139,29 @@ fun BlTopBar(
     onBack: (() -> Unit)? = null,
     showMenu: Boolean = onBack == null,
     scrollBehavior: TopAppBarScrollBehavior? = null,
+    large: Boolean = false,
     actions: @Composable RowScope.() -> Unit = {},
 ) {
     val shell = LocalShell.current
+    if (large && subtitle == null) {
+        // Big title that shrinks into the bar as the list scrolls (pass an exitUntilCollapsed scroll behavior)
+        androidx.compose.material3.LargeTopAppBar(
+            title = { Text(title, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+            navigationIcon = {
+                when {
+                    onBack != null -> IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Rounded.ArrowBack, "Back") }
+                    showMenu -> IconButton(onClick = shell.openDrawer) { Icon(Icons.Rounded.Menu, "Menu") }
+                }
+            },
+            actions = actions,
+            scrollBehavior = scrollBehavior,
+            colors = TopAppBarDefaults.largeTopAppBarColors(
+                containerColor = MaterialTheme.colorScheme.background,
+                scrolledContainerColor = MaterialTheme.colorScheme.surfaceContainer,
+            ),
+        )
+        return
+    }
     TopAppBar(
         title = {
             Column {
@@ -151,8 +171,8 @@ fun BlTopBar(
         },
         navigationIcon = {
             when {
-                onBack != null -> IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back") }
-                showMenu -> IconButton(onClick = shell.openDrawer) { Icon(Icons.Default.Menu, "Menu") }
+                onBack != null -> IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Rounded.ArrowBack, "Back") }
+                showMenu -> IconButton(onClick = shell.openDrawer) { Icon(Icons.Rounded.Menu, "Menu") }
             }
         },
         actions = actions,
@@ -163,6 +183,11 @@ fun BlTopBar(
         ),
     )
 }
+
+/** Scroll behavior for a large title that collapses as you scroll; use with BlTopBar(large = true) and Modifier.nestedScroll. */
+@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
+@Composable
+fun rememberCollapsingTitle(): TopAppBarScrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
 
 @Composable
 fun SectionHeader(text: String, modifier: Modifier = Modifier, action: String? = null, onAction: (() -> Unit)? = null) {
@@ -204,9 +229,22 @@ fun BlCard(
 
 @Composable
 fun EmptyState(icon: ImageVector, title: String, body: String, modifier: Modifier = Modifier, action: (@Composable () -> Unit)? = null) {
-    Column(modifier.fillMaxWidth().padding(32.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-        Box(Modifier.size(72.dp).clip(CircleShape).background(LocalBlColors.current.accentSoft), contentAlignment = Alignment.Center) {
-            Icon(icon, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(34.dp))
+    // A small illustration in the palette's three colors; settles in once (instant with reduced motion)
+    val shown = androidx.compose.runtime.remember { androidx.compose.animation.core.Animatable(if (com.blacklab.app.ui.theme.Motion.reduced) 1f else 0f) }
+    androidx.compose.runtime.LaunchedEffect(Unit) { shown.animateTo(1f, com.blacklab.app.ui.theme.Motion.emphasized(520)) }
+    val primary = MaterialTheme.colorScheme.primary
+    val secondary = MaterialTheme.colorScheme.secondary
+    val tertiary = MaterialTheme.colorScheme.tertiary
+    Column(modifier.fillMaxWidth().padding(32.dp).graphicsLayer { alpha = shown.value; translationY = (1 - shown.value) * 24f }, horizontalAlignment = Alignment.CenterHorizontally) {
+        Box(Modifier.size(120.dp).graphicsLayer { scaleX = 0.9f + 0.1f * shown.value; scaleY = scaleX }, contentAlignment = Alignment.Center) {
+            androidx.compose.foundation.Canvas(Modifier.matchParentSize()) {
+                val r = size.minDimension / 2
+                drawCircle(primary.copy(alpha = 0.10f), r, center)
+                drawCircle(secondary.copy(alpha = 0.18f), r * 0.34f, center + androidx.compose.ui.geometry.Offset(r * 0.62f, -r * 0.48f))
+                drawCircle(tertiary.copy(alpha = 0.20f), r * 0.22f, center + androidx.compose.ui.geometry.Offset(-r * 0.66f, r * 0.52f))
+                drawCircle(primary.copy(alpha = 0.16f), r * 0.62f, center)
+            }
+            Icon(icon, null, tint = primary, modifier = Modifier.size(40.dp))
         }
         Spacer(Modifier.height(14.dp))
         Text(title, style = MaterialTheme.typography.titleMedium)
@@ -299,12 +337,13 @@ fun TimePickerDialogBox(initialMinute: Int, onDismiss: () -> Unit, onPick: (Int)
 
 @Composable
 fun ConfirmDialog(title: String, text: String, confirmLabel: String = "Delete", destructive: Boolean = true, onDismiss: () -> Unit, onConfirm: () -> Unit) {
+    val haptics = rememberHaptics()
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(title) },
         text = { Text(text) },
         confirmButton = {
-            TextButton(onClick = { onConfirm(); onDismiss() }) {
+            TextButton(onClick = { if (destructive) haptics.reject() else haptics.confirm(); onConfirm(); onDismiss() }) {
                 Text(confirmLabel, color = if (destructive) LocalBlColors.current.danger else MaterialTheme.colorScheme.primary)
             }
         },
@@ -347,7 +386,7 @@ fun ColorPickerRow(selected: Int?, onPick: (Int) -> Unit, colors: List<Int> = Pa
                     .border(if (isSel) 3.dp else 0.dp, MaterialTheme.colorScheme.onSurface, CircleShape)
                     .clickable { onPick(c) },
                 contentAlignment = Alignment.Center,
-            ) { if (isSel) Icon(Icons.Default.Check, null, tint = Color.Black.copy(alpha = 0.7f), modifier = Modifier.size(18.dp)) }
+            ) { if (isSel) Icon(Icons.Rounded.Check, null, tint = Color.Black.copy(alpha = 0.7f), modifier = Modifier.size(18.dp)) }
         }
     }
 }
@@ -362,7 +401,7 @@ fun <T> DropdownField(label: String, options: List<Pair<T, String>>, selected: T
             onValueChange = {},
             readOnly = true,
             label = { Text(label) },
-            trailingIcon = { Icon(Icons.Default.ArrowDropDown, null) },
+            trailingIcon = { Icon(Icons.Rounded.ArrowDropDown, null) },
             modifier = Modifier.fillMaxWidth(),
             singleLine = true,
         )
@@ -370,7 +409,7 @@ fun <T> DropdownField(label: String, options: List<Pair<T, String>>, selected: T
         DropdownMenu(open, { open = false }) {
             options.forEach { (v, l) ->
                 DropdownMenuItem(text = { Text(l) }, onClick = { onSelect(v); open = false },
-                    trailingIcon = { if (v == selected) Icon(Icons.Default.Check, null) })
+                    trailingIcon = { if (v == selected) Icon(Icons.Rounded.Check, null) })
             }
         }
     }
@@ -390,7 +429,7 @@ fun PickerRow(icon: ImageVector, label: String, value: String?, modifier: Modifi
             if (value != null) Text(label, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         if (value != null && onClear != null) {
-            IconButton(onClick = onClear) { Icon(Icons.Default.Close, "Clear", modifier = Modifier.size(18.dp)) }
+            IconButton(onClick = onClear) { Icon(Icons.Rounded.Close, "Clear", modifier = Modifier.size(18.dp)) }
         }
     }
 }
@@ -405,7 +444,7 @@ fun ProfileBadge(profile: Profile, name: String, modifier: Modifier = Modifier, 
         border = BorderStroke(1.dp, c.copy(alpha = 0.5f)),
     ) {
         Row(Modifier.padding(horizontal = 10.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-            Icon(if (profile == Profile.PERSONAL) Icons.Default.Person else Icons.Default.Work,
+            Icon(if (profile == Profile.PERSONAL) Icons.Rounded.Person else Icons.Rounded.Work,
                 null, tint = c, modifier = Modifier.size(14.dp))
             Spacer(Modifier.width(6.dp))
             Text(name, color = c, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
@@ -415,8 +454,10 @@ fun ProfileBadge(profile: Profile, name: String, modifier: Modifier = Modifier, 
 
 @Composable
 fun LabeledSwitchRow(title: String, subtitle: String? = null, checked: Boolean, enabled: Boolean = true, icon: ImageVector? = null, onChange: (Boolean) -> Unit) {
+    val haptics = rememberHaptics()
+    val change: (Boolean) -> Unit = { v -> haptics.toggle(v); onChange(v) }
     Row(
-        Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).clickable(enabled = enabled) { onChange(!checked) }.padding(horizontal = 8.dp, vertical = 10.dp),
+        Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).clickable(enabled = enabled) { change(!checked) }.padding(horizontal = 8.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         if (icon != null) { Icon(icon, null, tint = MaterialTheme.colorScheme.onSurfaceVariant); Spacer(Modifier.width(16.dp)) }
@@ -424,7 +465,7 @@ fun LabeledSwitchRow(title: String, subtitle: String? = null, checked: Boolean, 
             Text(title, style = MaterialTheme.typography.bodyLarge)
             if (subtitle != null) Text(subtitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
-        androidx.compose.material3.Switch(checked = checked, onCheckedChange = onChange, enabled = enabled)
+        androidx.compose.material3.Switch(checked = checked, onCheckedChange = change, enabled = enabled)
     }
 }
 

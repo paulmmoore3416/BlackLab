@@ -30,8 +30,8 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.*
-import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.automirrored.rounded.*
+import androidx.compose.material.icons.rounded.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -383,27 +383,27 @@ fun PageEditorScreen(pageId: Long) {
                             color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
                     }
                 },
-                navigationIcon = { IconButton(onClick = { leave() }) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back") } },
+                navigationIcon = { IconButton(onClick = { leave() }) { Icon(Icons.AutoMirrored.Rounded.ArrowBack, "Back") } },
                 actions = {
-                    IconButton(onClick = { controller.call("undo") }, enabled = st.undo) { Icon(Icons.AutoMirrored.Filled.Undo, "Undo") }
-                    IconButton(onClick = { controller.call("redo") }, enabled = st.redo) { Icon(Icons.AutoMirrored.Filled.Redo, "Redo") }
+                    IconButton(onClick = { controller.call("undo") }, enabled = st.undo) { Icon(Icons.AutoMirrored.Rounded.Undo, "Undo") }
+                    IconButton(onClick = { controller.call("redo") }, enabled = st.redo) { Icon(Icons.AutoMirrored.Rounded.Redo, "Redo") }
                     IconButton(onClick = {
                         if (st.mode == "draw") { controller.call("setMode", "type"); if (tab == PTab.DRAW) tab = PTab.HOME }
                         else { tab = PTab.DRAW; controller.call("setTool", toolJson(drawTool, penColor, hlColor, penWidth, penOnly)) }
-                    }) { Icon(if (st.mode == "draw") Icons.Default.Keyboard else Icons.Default.Draw, if (st.mode == "draw") "Type" else "Draw", tint = if (st.mode == "draw") MaterialTheme.colorScheme.primary else LocalContentColor.current) }
+                    }) { Icon(if (st.mode == "draw") Icons.Rounded.Keyboard else Icons.Rounded.Draw, if (st.mode == "draw") "Type" else "Draw", tint = if (st.mode == "draw") MaterialTheme.colorScheme.primary else LocalContentColor.current) }
                     Box {
-                        IconButton(onClick = { menu = true }) { Icon(Icons.Default.MoreVert, "More") }
+                        IconButton(onClick = { menu = true }) { Icon(Icons.Rounded.MoreVert, "More") }
                         DropdownMenu(menu, { menu = false }) {
-                            DropdownMenuItem(text = { Text("Share / export") }, leadingIcon = { Icon(Icons.Default.IosShare, null) }, onClick = { menu = false; dialog = "export" })
-                            DropdownMenuItem(text = { Text("Live Share") }, leadingIcon = { Icon(Icons.Default.Wifi, null) }, onClick = { menu = false; scope.launch { flush() }; dialog = "live" })
-                            DropdownMenuItem(text = { Text("Comments") }, leadingIcon = { Icon(Icons.AutoMirrored.Filled.Comment, null) }, onClick = { menu = false; dialog = "comments" })
-                            DropdownMenuItem(text = { Text("Page history") }, leadingIcon = { Icon(Icons.Default.History, null) }, onClick = { menu = false; scope.launch { flush(); dialog = "history" } })
-                            DropdownMenuItem(text = { Text(if (page?.reminderAt != null) "Reminder · " + Time.dateTime(page!!.reminderAt!!) else "Remind me") }, leadingIcon = { Icon(Icons.Default.NotificationsActive, null) }, onClick = { menu = false; dialog = "reminder" })
-                            DropdownMenuItem(text = { Text("Find on page") }, leadingIcon = { Icon(Icons.Default.Search, null) }, onClick = { menu = false; findOpen = true })
-                            DropdownMenuItem(text = { Text("Move page…") }, leadingIcon = { Icon(Icons.AutoMirrored.Filled.DriveFileMove, null) }, onClick = { menu = false; dialog = "move" })
-                            DropdownMenuItem(text = { Text("Copy page to…") }, leadingIcon = { Icon(Icons.Default.FileCopy, null) }, onClick = { menu = false; dialog = "copy" })
-                            DropdownMenuItem(text = { Text("Page info") }, leadingIcon = { Icon(Icons.Default.Info, null) }, onClick = { menu = false; dialog = "info" })
-                            DropdownMenuItem(text = { Text("Delete page", color = LocalBlColors.current.danger) }, leadingIcon = { Icon(Icons.Default.Delete, null, tint = LocalBlColors.current.danger) }, onClick = { menu = false; dialog = "delete" })
+                            DropdownMenuItem(text = { Text("Share / export") }, leadingIcon = { Icon(Icons.Rounded.IosShare, null) }, onClick = { menu = false; dialog = "export" })
+                            DropdownMenuItem(text = { Text("Live Share") }, leadingIcon = { Icon(Icons.Rounded.Wifi, null) }, onClick = { menu = false; scope.launch { flush() }; dialog = "live" })
+                            DropdownMenuItem(text = { Text("Comments") }, leadingIcon = { Icon(Icons.AutoMirrored.Rounded.Comment, null) }, onClick = { menu = false; dialog = "comments" })
+                            DropdownMenuItem(text = { Text("Page history") }, leadingIcon = { Icon(Icons.Rounded.History, null) }, onClick = { menu = false; scope.launch { flush(); dialog = "history" } })
+                            DropdownMenuItem(text = { Text(if (page?.reminderAt != null) "Reminder · " + Time.dateTime(page!!.reminderAt!!) else "Remind me") }, leadingIcon = { Icon(Icons.Rounded.NotificationsActive, null) }, onClick = { menu = false; dialog = "reminder" })
+                            DropdownMenuItem(text = { Text("Find on page") }, leadingIcon = { Icon(Icons.Rounded.Search, null) }, onClick = { menu = false; findOpen = true })
+                            DropdownMenuItem(text = { Text("Move page…") }, leadingIcon = { Icon(Icons.AutoMirrored.Rounded.DriveFileMove, null) }, onClick = { menu = false; dialog = "move" })
+                            DropdownMenuItem(text = { Text("Copy page to…") }, leadingIcon = { Icon(Icons.Rounded.FileCopy, null) }, onClick = { menu = false; dialog = "copy" })
+                            DropdownMenuItem(text = { Text("Page info") }, leadingIcon = { Icon(Icons.Rounded.Info, null) }, onClick = { menu = false; dialog = "info" })
+                            DropdownMenuItem(text = { Text("Delete page", color = LocalBlColors.current.danger) }, leadingIcon = { Icon(Icons.Rounded.Delete, null, tint = LocalBlColors.current.danger) }, onClick = { menu = false; dialog = "delete" })
                         }
                     }
                 },
@@ -436,62 +436,62 @@ fun PageEditorScreen(pageId: Long) {
                                     }
                                 }
                                 MenuChip("Size", 52) { close -> listOf(9f, 10f, 11f, 12f, 14f, 16f, 18f, 24f, 32f).forEach { s -> DropdownMenuItem(text = { Text(s.toInt().toString()) }, onClick = { controller.call("fontSize", s); close() }) } }
-                                RB(Icons.Default.FormatBold, "Bold", st.bold) { controller.call("exec", "bold") }
-                                RB(Icons.Default.FormatItalic, "Italic", st.italic) { controller.call("exec", "italic") }
-                                RB(Icons.Default.FormatUnderlined, "Underline", st.underline) { controller.call("exec", "underline") }
-                                RB(Icons.Default.FormatStrikethrough, "Strikethrough", st.strike) { controller.call("exec", "strikeThrough") }
-                                RB(Icons.Default.FormatColorText, "Font color") { dialog = "color" }
-                                RB(Icons.Default.BorderColor, "Highlight") { dialog = "highlight" }
-                                RB(Icons.Default.FormatClear, "Clear formatting") { controller.call("exec", "removeFormat") }
+                                RB(Icons.Rounded.FormatBold, "Bold", st.bold) { controller.call("exec", "bold") }
+                                RB(Icons.Rounded.FormatItalic, "Italic", st.italic) { controller.call("exec", "italic") }
+                                RB(Icons.Rounded.FormatUnderlined, "Underline", st.underline) { controller.call("exec", "underline") }
+                                RB(Icons.Rounded.FormatStrikethrough, "Strikethrough", st.strike) { controller.call("exec", "strikeThrough") }
+                                RB(Icons.Rounded.FormatColorText, "Font color") { dialog = "color" }
+                                RB(Icons.Rounded.BorderColor, "Highlight") { dialog = "highlight" }
+                                RB(Icons.Rounded.FormatClear, "Clear formatting") { controller.call("exec", "removeFormat") }
                                 Sep()
-                                RB(Icons.Default.CheckBox, "To Do tag", st.tag == "todo") { controller.call("tag", "todo") }
+                                RB(Icons.Rounded.CheckBox, "To Do tag", st.tag == "todo") { controller.call("tag", "todo") }
                                 MenuChip(if (st.tag.isNotEmpty() && st.tag != "todo") Tags.of(st.tag).symbol + " " + Tags.of(st.tag).label else "Tag", 92) { close ->
                                     Tags.all.forEach { t -> DropdownMenuItem(text = { Text(t.symbol + "  " + t.label) }, onClick = { controller.call("tag", t.id); close() }) }
                                     HorizontalDivider()
                                     DropdownMenuItem(text = { Text("Remove tag") }, onClick = { controller.call("tag", ""); close() })
                                 }
                                 Sep()
-                                RB(Icons.AutoMirrored.Filled.FormatListBulleted, "Bullets", st.ul) { controller.call("exec", "insertUnorderedList") }
-                                RB(Icons.Default.FormatListNumbered, "Numbering", st.ol) { controller.call("exec", "insertOrderedList") }
-                                RB(Icons.Default.Checklist, "Checklist", st.check) { controller.call("checklist") }
-                                RB(Icons.AutoMirrored.Filled.FormatIndentDecrease, "Outdent") { controller.call("indent", -1) }
-                                RB(Icons.AutoMirrored.Filled.FormatIndentIncrease, "Indent") { controller.call("indent", 1) }
+                                RB(Icons.AutoMirrored.Rounded.FormatListBulleted, "Bullets", st.ul) { controller.call("exec", "insertUnorderedList") }
+                                RB(Icons.Rounded.FormatListNumbered, "Numbering", st.ol) { controller.call("exec", "insertOrderedList") }
+                                RB(Icons.Rounded.Checklist, "Checklist", st.check) { controller.call("checklist") }
+                                RB(Icons.AutoMirrored.Rounded.FormatIndentDecrease, "Outdent") { controller.call("indent", -1) }
+                                RB(Icons.AutoMirrored.Rounded.FormatIndentIncrease, "Indent") { controller.call("indent", 1) }
                                 Sep()
-                                RB(Icons.AutoMirrored.Filled.FormatAlignLeft, "Align left", st.align == "left") { controller.call("exec", "justifyLeft") }
-                                RB(Icons.Default.FormatAlignCenter, "Center", st.align == "center") { controller.call("exec", "justifyCenter") }
-                                RB(Icons.AutoMirrored.Filled.FormatAlignRight, "Align right", st.align == "right") { controller.call("exec", "justifyRight") }
+                                RB(Icons.AutoMirrored.Rounded.FormatAlignLeft, "Align left", st.align == "left") { controller.call("exec", "justifyLeft") }
+                                RB(Icons.Rounded.FormatAlignCenter, "Center", st.align == "center") { controller.call("exec", "justifyCenter") }
+                                RB(Icons.AutoMirrored.Rounded.FormatAlignRight, "Align right", st.align == "right") { controller.call("exec", "justifyRight") }
                             }
                             PTab.INSERT -> {
-                                RL(Icons.Default.TextFields, "Text box") { controller.call("addText") }
-                                RL(Icons.Default.TableChart, "Table") { dialog = "table" }
-                                RL(Icons.Default.Image, "Pictures") { pickImages.launch(androidx.activity.result.PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) }
-                                RL(Icons.Default.PhotoCamera, "Camera") { takePhoto.launch(camUri) }
-                                RL(Icons.Default.DocumentScanner, "Scan") { scan() }
-                                RL(Icons.Default.Draw, "Signature") { dialog = "signature" }
-                                RL(Icons.Default.AttachFile, "File") { pickFile.launch(arrayOf("*/*")) }
-                                RL(Icons.Default.Mic, "Recording") { dialog = "voice" }
-                                RL(Icons.Default.RecordVoiceOver, "Dictate") {
+                                RL(Icons.Rounded.TextFields, "Text box") { controller.call("addText") }
+                                RL(Icons.Rounded.TableChart, "Table") { dialog = "table" }
+                                RL(Icons.Rounded.Image, "Pictures") { pickImages.launch(androidx.activity.result.PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) }
+                                RL(Icons.Rounded.PhotoCamera, "Camera") { takePhoto.launch(camUri) }
+                                RL(Icons.Rounded.DocumentScanner, "Scan") { scan() }
+                                RL(Icons.Rounded.Draw, "Signature") { dialog = "signature" }
+                                RL(Icons.Rounded.AttachFile, "File") { pickFile.launch(arrayOf("*/*")) }
+                                RL(Icons.Rounded.Mic, "Recording") { dialog = "voice" }
+                                RL(Icons.Rounded.RecordVoiceOver, "Dictate") {
                                     runCatching { dictate.launch(android.content.Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM).putExtra(RecognizerIntent.EXTRA_PREFER_OFFLINE, true)) }
                                 }
                                 Sep()
-                                RL(Icons.Default.Link, "Link") { dialog = "link" }
-                                RL(Icons.Default.Description, "Page link") { dialog = "pagelink" }
-                                RL(Icons.Default.Today, "Date") { controller.call("insertText", Time.longDate(Time.today()) + " ") }
-                                RL(Icons.Default.AccessTime, "Time") { controller.call("insertText", Time.time(Time.now()) + " ") }
-                                RL(Icons.Default.HorizontalRule, "Line") { controller.call("insertHtml", "<hr><p><br></p>") }
-                                RL(Icons.Default.Calculate, "Math tip") { shell.toast("Type an expression ending in “=” then a space, e.g. 1250*1.08= ") }
+                                RL(Icons.Rounded.Link, "Link") { dialog = "link" }
+                                RL(Icons.Rounded.Description, "Page link") { dialog = "pagelink" }
+                                RL(Icons.Rounded.Today, "Date") { controller.call("insertText", Time.longDate(Time.today()) + " ") }
+                                RL(Icons.Rounded.AccessTime, "Time") { controller.call("insertText", Time.time(Time.now()) + " ") }
+                                RL(Icons.Rounded.HorizontalRule, "Line") { controller.call("insertHtml", "<hr><p><br></p>") }
+                                RL(Icons.Rounded.Calculate, "Math tip") { shell.toast("Type an expression ending in “=” then a space, e.g. 1250*1.08= ") }
                             }
                             PTab.DRAW -> {
                                 fun apply() = controller.call("setTool", toolJson(drawTool, penColor, hlColor, penWidth, penOnly))
-                                RB(Icons.Default.Keyboard, "Type", st.mode == "type") { controller.call("setMode", "type") }
-                                RB(Icons.Default.Gesture, "Lasso select", st.mode == "draw" && drawTool == "lasso") { drawTool = "lasso"; apply() }
-                                RB(Icons.Default.Create, "Pen", st.mode == "draw" && drawTool == "pen") { drawTool = "pen"; apply() }
-                                RB(Icons.Default.BorderColor, "Highlighter", st.mode == "draw" && drawTool == "highlighter") { drawTool = "highlighter"; apply() }
-                                RB(Icons.Default.AutoFixOff, "Eraser", st.mode == "draw" && drawTool == "eraser") { drawTool = "eraser"; apply() }
-                                RB(Icons.Default.HorizontalRule, "Line", drawTool == "line" && st.mode == "draw") { drawTool = "line"; apply() }
-                                RB(Icons.AutoMirrored.Filled.TrendingFlat, "Arrow", drawTool == "arrow" && st.mode == "draw") { drawTool = "arrow"; apply() }
-                                RB(Icons.Default.CropSquare, "Rectangle", drawTool == "rect" && st.mode == "draw") { drawTool = "rect"; apply() }
-                                RB(Icons.Default.RadioButtonUnchecked, "Ellipse", drawTool == "ellipse" && st.mode == "draw") { drawTool = "ellipse"; apply() }
+                                RB(Icons.Rounded.Keyboard, "Type", st.mode == "type") { controller.call("setMode", "type") }
+                                RB(Icons.Rounded.Gesture, "Lasso select", st.mode == "draw" && drawTool == "lasso") { drawTool = "lasso"; apply() }
+                                RB(Icons.Rounded.Create, "Pen", st.mode == "draw" && drawTool == "pen") { drawTool = "pen"; apply() }
+                                RB(Icons.Rounded.BorderColor, "Highlighter", st.mode == "draw" && drawTool == "highlighter") { drawTool = "highlighter"; apply() }
+                                RB(Icons.Rounded.AutoFixOff, "Eraser", st.mode == "draw" && drawTool == "eraser") { drawTool = "eraser"; apply() }
+                                RB(Icons.Rounded.HorizontalRule, "Line", drawTool == "line" && st.mode == "draw") { drawTool = "line"; apply() }
+                                RB(Icons.AutoMirrored.Rounded.TrendingFlat, "Arrow", drawTool == "arrow" && st.mode == "draw") { drawTool = "arrow"; apply() }
+                                RB(Icons.Rounded.CropSquare, "Rectangle", drawTool == "rect" && st.mode == "draw") { drawTool = "rect"; apply() }
+                                RB(Icons.Rounded.RadioButtonUnchecked, "Ellipse", drawTool == "ellipse" && st.mode == "draw") { drawTool = "ellipse"; apply() }
                                 Sep()
                                 (if (drawTool == "highlighter") HlColors else PenColors).forEach { hex ->
                                     val c = Color(android.graphics.Color.parseColor(hex))
@@ -511,16 +511,16 @@ fun PageEditorScreen(pageId: Long) {
                                 FilterChip(penOnly, { penOnly = !penOnly; apply() }, label = { Text("Stylus only") }, modifier = Modifier.padding(horizontal = 2.dp))
                             }
                             PTab.VIEW -> {
-                                RL(Icons.Default.FormatColorFill, "Page color") { dialog = "paper" }
-                                RL(Icons.Default.Reorder, "Rule lines") { dialog = "rules" }
+                                RL(Icons.Rounded.FormatColorFill, "Page color") { dialog = "paper" }
+                                RL(Icons.Rounded.Reorder, "Rule lines") { dialog = "rules" }
                                 Sep()
-                                RB(Icons.Default.ZoomOut, "Zoom out") { controller.call("zoomBy", 0.8) }
+                                RB(Icons.Rounded.ZoomOut, "Zoom out") { controller.call("zoomBy", 0.8) }
                                 Text("${st.zoom}%", style = MaterialTheme.typography.labelLarge, modifier = Modifier.clickable { controller.call("setZoom", 1) }.padding(horizontal = 6.dp))
-                                RB(Icons.Default.ZoomIn, "Zoom in") { controller.call("zoomBy", 1.25) }
-                                RL(Icons.Default.FitScreen, "Fit width") { controller.call("fitWidth") }
+                                RB(Icons.Rounded.ZoomIn, "Zoom in") { controller.call("zoomBy", 1.25) }
+                                RL(Icons.Rounded.FitScreen, "Fit width") { controller.call("fitWidth") }
                                 Sep()
-                                RL(Icons.Default.Search, "Find") { findOpen = true }
-                                RL(if (speaking) Icons.Default.StopCircle else Icons.AutoMirrored.Filled.VolumeUp, if (speaking) "Stop" else "Read aloud") {
+                                RL(Icons.Rounded.Search, "Find") { findOpen = true }
+                                RL(if (speaking) Icons.Rounded.StopCircle else Icons.AutoMirrored.Rounded.VolumeUp, if (speaking) "Stop" else "Read aloud") {
                                     if (speaking) { tts?.stop(); speaking = false }
                                     else scope.launch {
                                         val text = controller.eval("bl.plainText()").orEmpty()
@@ -531,15 +531,15 @@ fun PageEditorScreen(pageId: Long) {
                                 }
                             }
                             PTab.REVIEW -> {
-                                RL(Icons.Default.Summarize, "Summarize") { scope.launch { busy = "Reading the page…"; aiText = Brainstorm.summarize(app, controller.eval("bl.plainText()").orEmpty()); busy = null } }
-                                RL(Icons.Default.AddTask, "Action items") { scope.launch { busy = "Finding action items…"; actions = Brainstorm.actionItems(app, controller.eval("bl.plainText()").orEmpty()); busy = null } }
-                                RL(Icons.Default.Lightbulb, "Ideas") { dialog = "ideas" }
-                                RL(Icons.Default.Hub, "Mind map") { dialog = "mindmap" }
+                                RL(Icons.Rounded.Summarize, "Summarize") { scope.launch { busy = "Reading the page…"; aiText = Brainstorm.summarize(app, controller.eval("bl.plainText()").orEmpty()); busy = null } }
+                                RL(Icons.Rounded.AddTask, "Action items") { scope.launch { busy = "Finding action items…"; actions = Brainstorm.actionItems(app, controller.eval("bl.plainText()").orEmpty()); busy = null } }
+                                RL(Icons.Rounded.Lightbulb, "Ideas") { dialog = "ideas" }
+                                RL(Icons.Rounded.Hub, "Mind map") { dialog = "mindmap" }
                                 Sep()
-                                RL(Icons.AutoMirrored.Filled.Comment, "Comments") { dialog = "comments" }
-                                RL(Icons.Default.History, "History") { scope.launch { flush(); dialog = "history" } }
-                                RL(Icons.Default.Wifi, "Live Share") { scope.launch { flush() }; dialog = "live" }
-                                RL(Icons.Default.IosShare, "Export") { dialog = "export" }
+                                RL(Icons.AutoMirrored.Rounded.Comment, "Comments") { dialog = "comments" }
+                                RL(Icons.Rounded.History, "History") { scope.launch { flush(); dialog = "history" } }
+                                RL(Icons.Rounded.Wifi, "Live Share") { scope.launch { flush() }; dialog = "live" }
+                                RL(Icons.Rounded.IosShare, "Export") { dialog = "export" }
                             }
                         }
                     }
@@ -550,25 +550,25 @@ fun PageEditorScreen(pageId: Long) {
                         Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 8.dp, vertical = 2.dp), verticalAlignment = Alignment.CenterVertically) {
                             if (st.sel > 0) {
                                 Text("${st.sel} selected", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(end = 6.dp))
-                                AssistChip({ controller.call("duplicateSelection") }, { Text("Duplicate") }, leadingIcon = { Icon(Icons.Default.ContentCopy, null) })
+                                AssistChip({ controller.call("duplicateSelection") }, { Text("Duplicate") }, leadingIcon = { Icon(Icons.Rounded.ContentCopy, null) })
                                 Spacer(Modifier.width(6.dp))
-                                AssistChip({ controller.call("deleteSelection") }, { Text("Delete") }, leadingIcon = { Icon(Icons.Default.Delete, null) })
+                                AssistChip({ controller.call("deleteSelection") }, { Text("Delete") }, leadingIcon = { Icon(Icons.Rounded.Delete, null) })
                             } else if (item != null) {
                                 val kind = item.optString("t")
-                                if (kind == "audio" || kind == "file") AssistChip({ scope.launch { openItem(item) } }, { Text(if (kind == "audio") "Play" else "Open") }, leadingIcon = { Icon(if (kind == "audio") Icons.Default.PlayArrow else Icons.AutoMirrored.Filled.OpenInNew, null) })
-                                if (kind == "image") AssistChip({ scope.launch { openItem(item) } }, { Text("View") }, leadingIcon = { Icon(Icons.Default.Fullscreen, null) })
+                                if (kind == "audio" || kind == "file") AssistChip({ scope.launch { openItem(item) } }, { Text(if (kind == "audio") "Play" else "Open") }, leadingIcon = { Icon(if (kind == "audio") Icons.Rounded.PlayArrow else Icons.AutoMirrored.Rounded.OpenInNew, null) })
+                                if (kind == "image") AssistChip({ scope.launch { openItem(item) } }, { Text("View") }, leadingIcon = { Icon(Icons.Rounded.Fullscreen, null) })
                                 val text = item.optString("ocr").ifBlank { item.optString("transcript") }
-                                if (text.isNotBlank()) { Spacer(Modifier.width(6.dp)); AssistChip({ copy(ctx, text) }, { Text(if (kind == "image") "Copy text from picture" else "Copy transcript") }, leadingIcon = { Icon(Icons.AutoMirrored.Filled.TextSnippet, null) }) }
-                                if (text.isNotBlank()) { Spacer(Modifier.width(6.dp)); AssistChip({ controller.call("insertText", text) ; controller.call("addText") }, { Text("Paste as text") }, leadingIcon = { Icon(Icons.Default.ContentPaste, null) }) }
+                                if (text.isNotBlank()) { Spacer(Modifier.width(6.dp)); AssistChip({ copy(ctx, text) }, { Text(if (kind == "image") "Copy text from picture" else "Copy transcript") }, leadingIcon = { Icon(Icons.AutoMirrored.Rounded.TextSnippet, null) }) }
+                                if (text.isNotBlank()) { Spacer(Modifier.width(6.dp)); AssistChip({ controller.call("insertText", text) ; controller.call("addText") }, { Text("Paste as text") }, leadingIcon = { Icon(Icons.Rounded.ContentPaste, null) }) }
                                 Spacer(Modifier.width(6.dp))
-                                AssistChip({ controller.call("toFront") }, { Text("Bring to front") }, leadingIcon = { Icon(Icons.Default.FlipToFront, null) })
+                                AssistChip({ controller.call("toFront") }, { Text("Bring to front") }, leadingIcon = { Icon(Icons.Rounded.FlipToFront, null) })
                                 Spacer(Modifier.width(6.dp))
-                                AssistChip({ controller.call("removeSelected") }, { Text("Delete") }, leadingIcon = { Icon(Icons.Default.Delete, null) })
+                                AssistChip({ controller.call("removeSelected") }, { Text("Delete") }, leadingIcon = { Icon(Icons.Rounded.Delete, null) })
                             } else if (st.focus == "text" && !st.table) {
                                 Text("Text box", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(end = 6.dp))
-                                AssistChip({ controller.call("toFront") }, { Text("Bring to front") }, leadingIcon = { Icon(Icons.Default.FlipToFront, null) })
+                                AssistChip({ controller.call("toFront") }, { Text("Bring to front") }, leadingIcon = { Icon(Icons.Rounded.FlipToFront, null) })
                                 Spacer(Modifier.width(6.dp))
-                                AssistChip({ controller.call("removeSelected") }, { Text("Delete box") }, leadingIcon = { Icon(Icons.Default.Delete, null) })
+                                AssistChip({ controller.call("removeSelected") }, { Text("Delete box") }, leadingIcon = { Icon(Icons.Rounded.Delete, null) })
                             } else if (st.table) {
                                 listOf("rowAbove" to "Row above", "rowBelow" to "Row below", "colLeft" to "Column left", "colRight" to "Column right", "delRow" to "Delete row", "delCol" to "Delete column", "delTable" to "Delete table").forEach { (op, l) ->
                                     AssistChip({ controller.call("tableOp", op) }, { Text(l) }, modifier = Modifier.padding(end = 6.dp))
@@ -576,9 +576,9 @@ fun PageEditorScreen(pageId: Long) {
                             }
                             if (st.link.isNotEmpty()) {
                                 Spacer(Modifier.width(6.dp))
-                                AssistChip({ openLink(shell, ctx, st.link) }, { Text(if (st.link.startsWith("bl-page:")) "Go to page" else "Open link", maxLines = 1) }, leadingIcon = { Icon(Icons.AutoMirrored.Filled.OpenInNew, null) })
+                                AssistChip({ openLink(shell, ctx, st.link) }, { Text(if (st.link.startsWith("bl-page:")) "Go to page" else "Open link", maxLines = 1) }, leadingIcon = { Icon(Icons.AutoMirrored.Rounded.OpenInNew, null) })
                                 Spacer(Modifier.width(6.dp))
-                                AssistChip({ controller.call("unlink") }, { Text("Remove link") }, leadingIcon = { Icon(Icons.Default.LinkOff, null) })
+                                AssistChip({ controller.call("unlink") }, { Text("Remove link") }, leadingIcon = { Icon(Icons.Rounded.LinkOff, null) })
                             }
                         }
                     }
@@ -632,7 +632,7 @@ fun PageEditorScreen(pageId: Long) {
                 modifier = Modifier.clickable { controller.call("setBg", JSONObject().put("color", hex).put("dark", hex == "#1e1f24").toString()); dialog = null }, colors = ListItemDefaults.colors(containerColor = Color.Transparent)) } }
         }, confirmButton = { TextButton(onClick = { dialog = null }) { Text("Close") } })
         "rules" -> AlertDialog(onDismissRequest = { dialog = null }, title = { Text("Rule lines") }, text = {
-            Column { Rules.forEach { (id, name) -> ListItem(headlineContent = { Text(name) }, leadingContent = { Icon(if (id.contains("grid")) Icons.Default.GridOn else if (id == "dots") Icons.Default.Apps else if (id == "none") Icons.Default.CheckBoxOutlineBlank else Icons.AutoMirrored.Filled.Notes, null) },
+            Column { Rules.forEach { (id, name) -> ListItem(headlineContent = { Text(name) }, leadingContent = { Icon(if (id.contains("grid")) Icons.Rounded.GridOn else if (id == "dots") Icons.Rounded.Apps else if (id == "none") Icons.Rounded.CheckBoxOutlineBlank else Icons.AutoMirrored.Rounded.Notes, null) },
                 modifier = Modifier.clickable { controller.call("setBg", JSONObject().put("rule", id).toString()); dialog = null }, colors = ListItemDefaults.colors(containerColor = Color.Transparent)) } }
         }, confirmButton = { TextButton(onClick = { dialog = null }) { Text("Close") } })
         "comments" -> CommentsSheet(pageId, null) { dialog = null }
@@ -733,9 +733,9 @@ private fun PageFindBar(controller: PageController, onClose: () -> Unit) {
     Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
         OutlinedTextField(term, { term = it; controller.call("find", it, false) }, placeholder = { Text("Find on page") }, singleLine = true, modifier = Modifier.weight(1f))
         Text(if (count > 0) "${idx + 1}/$count" else "0", style = MaterialTheme.typography.labelMedium, modifier = Modifier.padding(horizontal = 6.dp))
-        IconButton(onClick = { controller.call("findStep", -1) }) { Icon(Icons.Default.KeyboardArrowUp, "Previous") }
-        IconButton(onClick = { controller.call("findStep", 1) }) { Icon(Icons.Default.KeyboardArrowDown, "Next") }
-        IconButton(onClick = onClose) { Icon(Icons.Default.Close, "Close") }
+        IconButton(onClick = { controller.call("findStep", -1) }) { Icon(Icons.Rounded.KeyboardArrowUp, "Previous") }
+        IconButton(onClick = { controller.call("findStep", 1) }) { Icon(Icons.Rounded.KeyboardArrowDown, "Next") }
+        IconButton(onClick = onClose) { Icon(Icons.Rounded.Close, "Close") }
     }
 }
 
@@ -776,7 +776,7 @@ private fun HistorySheet(app: AppContainer, page: PageEntity, onDismiss: () -> U
                 if (versions.isEmpty()) item { Text("No earlier versions yet.", modifier = Modifier.padding(vertical = 20.dp)) }
                 items(versions) { v ->
                     ListItem(headlineContent = { Text(Time.dateTime(v.time)) }, supportingContent = { Text(Time.ago(v.time) + " · " + Files.formatSize(v.file.length())) },
-                        leadingContent = { Icon(Icons.Default.History, null) },
+                        leadingContent = { Icon(Icons.Rounded.History, null) },
                         modifier = Modifier.clip(RoundedCornerShape(12.dp)).clickable { scope.launch { runCatching { preview = v to Brainstorm.staticHtml(app, page, Brainstorm.readVersion(app, page, v)) } } },
                         colors = ListItemDefaults.colors(containerColor = Color.Transparent))
                 }
@@ -825,15 +825,15 @@ private fun ExportSheet(app: AppContainer, page: PageEntity, onDismiss: () -> Un
     ActionSheet(
         title = "Share “${page.title.ifBlank { "Untitled page" }}”", subtitle = "Exports are also saved to BlackLab › Exports", onDismiss = onDismiss,
         quick = listOf(
-            SheetAction("PDF", Icons.Default.PictureAsPdf) { run(ExportFormat.PDF) },
-            SheetAction("Word", Icons.Default.Description) { run(ExportFormat.DOCX) },
-            SheetAction("Print", Icons.Default.Print) { scope.launch { before(); printHtml(ctx, page.title, Brainstorm.staticHtml(app, dao(app).page(page.id) ?: page)) } },
+            SheetAction("PDF", Icons.Rounded.PictureAsPdf) { run(ExportFormat.PDF) },
+            SheetAction("Word", Icons.Rounded.Description) { run(ExportFormat.DOCX) },
+            SheetAction("Print", Icons.Rounded.Print) { scope.launch { before(); printHtml(ctx, page.title, Brainstorm.staticHtml(app, dao(app).page(page.id) ?: page)) } },
         ),
         actions = listOf(
-            SheetAction("Web page (exact layout)", Icons.Default.Language, hint = "Keeps boxes, ink and pictures where you put them") { run(ExportFormat.HTML) },
-            SheetAction("Markdown", Icons.Default.Code) { run(ExportFormat.MD) },
-            SheetAction("Plain text", Icons.AutoMirrored.Filled.Notes) { run(ExportFormat.TXT) },
-            SheetAction("Send as text", Icons.AutoMirrored.Filled.Send, hint = "Paste into email or chat") {
+            SheetAction("Web page (exact layout)", Icons.Rounded.Language, hint = "Keeps boxes, ink and pictures where you put them") { run(ExportFormat.HTML) },
+            SheetAction("Markdown", Icons.Rounded.Code) { run(ExportFormat.MD) },
+            SheetAction("Plain text", Icons.AutoMirrored.Rounded.Notes) { run(ExportFormat.TXT) },
+            SheetAction("Send as text", Icons.AutoMirrored.Rounded.Send, hint = "Paste into email or chat") {
                 scope.launch { before(); val txt = dao(app).page(page.id)?.searchText.orEmpty(); Files.shareText(ctx, (page.title + "\n\n" + txt).trim(), page.title) }
             },
         ),

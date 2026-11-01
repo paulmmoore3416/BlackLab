@@ -31,8 +31,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Star
-import androidx.compose.material.icons.filled.StarBorder
+import androidx.compose.material.icons.rounded.Star
+import androidx.compose.material.icons.rounded.StarBorder
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.FilterChip
@@ -171,7 +171,7 @@ class QuickCaptureActivity : ComponentActivity() {
                     }
                     Spacer(Modifier.weight(1f))
                     IconButton(onClick = { important = !important }) {
-                        Icon(if (important) Icons.Default.Star else Icons.Default.StarBorder, "Important", tint = if (important) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant)
+                        Icon(if (important) Icons.Rounded.Star else Icons.Rounded.StarBorder, "Important", tint = if (important) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
             }

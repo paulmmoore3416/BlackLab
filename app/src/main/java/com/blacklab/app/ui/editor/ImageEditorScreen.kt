@@ -36,9 +36,9 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.Redo
-import androidx.compose.material.icons.automirrored.filled.Undo
-import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.automirrored.rounded.Redo
+import androidx.compose.material.icons.automirrored.rounded.Undo
+import androidx.compose.material.icons.rounded.*
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
@@ -107,8 +107,8 @@ private val InkColors = listOf(
 ).map { it.toInt() }
 
 private enum class EditTab(val label: String, val icon: androidx.compose.ui.graphics.vector.ImageVector) {
-    CROP("Crop", Icons.Default.Crop), ADJUST("Adjust", Icons.Default.Tune), DRAW("Draw", Icons.Default.Brush), TEXT("Text", Icons.Default.TextFields), LOOKS("Looks", Icons.Default.AutoAwesome),
-    WATERMARK("Watermark", Icons.Default.BrandingWatermark), CUTOUT("Remove BG", Icons.Default.ContentCut),
+    CROP("Crop", Icons.Rounded.Crop), ADJUST("Adjust", Icons.Rounded.Tune), DRAW("Draw", Icons.Rounded.Brush), TEXT("Text", Icons.Rounded.TextFields), LOOKS("Looks", Icons.Rounded.AutoAwesome),
+    WATERMARK("Watermark", Icons.Rounded.BrandingWatermark), CUTOUT("Remove BG", Icons.Rounded.ContentCut),
 }
 
 /**
@@ -226,19 +226,19 @@ fun ImageEditorScreen(relPath: String, initialTab: String) {
         Column(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding()) {
             // ---------------- top bar
             Row(Modifier.fillMaxWidth().padding(horizontal = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-                IconButton(onClick = { if (dirty) confirmExit = true else shell.back() }) { Icon(Icons.Default.Close, "Close", tint = Color.White) }
+                IconButton(onClick = { if (dirty) confirmExit = true else shell.back() }) { Icon(Icons.Rounded.Close, "Close", tint = Color.White) }
                 Text("Edit", color = Color.White, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
                 IconButton(enabled = undo.isNotEmpty(), onClick = { redo += marks.toList(); val p = undo.removeAt(undo.lastIndex); marks.clear(); marks += p }) {
-                    Icon(Icons.AutoMirrored.Filled.Undo, "Undo", tint = if (undo.isNotEmpty()) Color.White else Color.White.copy(alpha = 0.3f))
+                    Icon(Icons.AutoMirrored.Rounded.Undo, "Undo", tint = if (undo.isNotEmpty()) Color.White else Color.White.copy(alpha = 0.3f))
                 }
                 IconButton(enabled = redo.isNotEmpty(), onClick = { undo += marks.toList(); val n = redo.removeAt(redo.lastIndex); marks.clear(); marks += n }) {
-                    Icon(Icons.AutoMirrored.Filled.Redo, "Redo", tint = if (redo.isNotEmpty()) Color.White else Color.White.copy(alpha = 0.3f))
+                    Icon(Icons.AutoMirrored.Rounded.Redo, "Redo", tint = if (redo.isNotEmpty()) Color.White else Color.White.copy(alpha = 0.3f))
                 }
                 Box {
                     TextButton(onClick = { saveMenu = true }, enabled = !saving && dirty) { Text("Save", color = if (dirty) Color(0xFFFFD54F) else Color.White.copy(alpha = 0.4f), fontWeight = FontWeight.Bold) }
                     DropdownMenu(saveMenu, { saveMenu = false }) {
-                        DropdownMenuItem(text = { Text("Save as copy") }, leadingIcon = { Icon(Icons.Default.FileCopy, null) }, onClick = { saveMenu = false; save(true) })
-                        DropdownMenuItem(text = { Text("Replace original") }, leadingIcon = { Icon(Icons.Default.Save, null) }, onClick = { saveMenu = false; save(false) })
+                        DropdownMenuItem(text = { Text("Save as copy") }, leadingIcon = { Icon(Icons.Rounded.FileCopy, null) }, onClick = { saveMenu = false; save(true) })
+                        DropdownMenuItem(text = { Text("Replace original") }, leadingIcon = { Icon(Icons.Rounded.Save, null) }, onClick = { saveMenu = false; save(false) })
                     }
                 }
             }
@@ -378,9 +378,9 @@ fun ImageEditorScreen(relPath: String, initialTab: String) {
                 when (tab) {
                     EditTab.CROP -> {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            PanelButton(Icons.Default.RotateLeft, "Left") { setGeo(geo.copy(rotate = (geo.rotate + 270) % 360, crop = RectF(0f, 0f, 1f, 1f))); cropDraft = RectF(0f, 0f, 1f, 1f) }
-                            PanelButton(Icons.Default.RotateRight, "Right") { setGeo(geo.copy(rotate = (geo.rotate + 90) % 360, crop = RectF(0f, 0f, 1f, 1f))); cropDraft = RectF(0f, 0f, 1f, 1f) }
-                            PanelButton(Icons.Default.Flip, "Flip") { setGeo(geo.copy(flipH = !geo.flipH)) }
+                            PanelButton(Icons.Rounded.RotateLeft, "Left") { setGeo(geo.copy(rotate = (geo.rotate + 270) % 360, crop = RectF(0f, 0f, 1f, 1f))); cropDraft = RectF(0f, 0f, 1f, 1f) }
+                            PanelButton(Icons.Rounded.RotateRight, "Right") { setGeo(geo.copy(rotate = (geo.rotate + 90) % 360, crop = RectF(0f, 0f, 1f, 1f))); cropDraft = RectF(0f, 0f, 1f, 1f) }
+                            PanelButton(Icons.Rounded.Flip, "Flip") { setGeo(geo.copy(flipH = !geo.flipH)) }
                         }
                         val o = original
                         val pic = if (o != null) geo.rotatedAspect(o.width, o.height) else 1f
@@ -429,10 +429,10 @@ fun ImageEditorScreen(relPath: String, initialTab: String) {
                             val i = marks.indexOfFirst { it.id == selectedText }; if (i >= 0) commit { marks[i] = f(marks[i] as TextMark) }
                         }
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            PanelButton(Icons.Default.Add, "Add text") { newText = true }
+                            PanelButton(Icons.Rounded.Add, "Add text") { newText = true }
                             if (sel != null) {
-                                PanelButton(Icons.Default.Edit, "Edit") { editText = sel }
-                                PanelButton(Icons.Default.Delete, "Delete") { commit { marks.removeAll { it.id == sel.id } }; selectedText = null }
+                                PanelButton(Icons.Rounded.Edit, "Edit") { editText = sel }
+                                PanelButton(Icons.Rounded.Delete, "Delete") { commit { marks.removeAll { it.id == sel.id } }; selectedText = null }
                             }
                         }
                         if (sel == null) Text("Tap “Add text”, then drag text to move it. Tap text to select it, double-tap to edit.", color = Color.White.copy(alpha = 0.7f), fontSize = 13.sp, modifier = Modifier.padding(vertical = 8.dp))
@@ -467,14 +467,14 @@ fun ImageEditorScreen(relPath: String, initialTab: String) {
                         LabeledSlider("Size", watermark.size, 0.015f..0.12f) { watermark = watermark.copy(size = it) }
                         LabeledSlider("Opacity", watermark.opacity, 0.1f..1f) { watermark = watermark.copy(opacity = it) }
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            PanelButton(Icons.Default.Image, if (watermark.logo == null) "Add logo" else "Change logo") { logoPicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) }
-                            if (watermark.logo != null) PanelButton(Icons.Default.HideImage, "Remove logo") { watermark = watermark.copy(logo = null) }
+                            PanelButton(Icons.Rounded.Image, if (watermark.logo == null) "Add logo" else "Change logo") { logoPicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) }
+                            if (watermark.logo != null) PanelButton(Icons.Rounded.HideImage, "Remove logo") { watermark = watermark.copy(logo = null) }
                         }
                         if (watermark.logo != null) LabeledSlider("Logo size", watermark.logoScale, 0.05f..0.5f) { watermark = watermark.copy(logoScale = it) }
                     }
                     EditTab.CUTOUT -> {
                         if (mask == null) {
-                            PanelButton(Icons.Default.AutoFixHigh, "Remove background") {
+                            PanelButton(Icons.Rounded.AutoFixHigh, "Remove background") {
                                 val o = geoBase ?: original ?: return@PanelButton
                                 cutoutBusy = true
                                 scope.launch {
@@ -555,13 +555,13 @@ private fun checkerboard(): Bitmap {
 }
 
 private fun toolIcon(t: DrawTool) = when (t) {
-    DrawTool.PEN -> Icons.Default.Edit
-    DrawTool.HIGHLIGHTER -> Icons.Default.BorderColor
-    DrawTool.LINE -> Icons.Default.HorizontalRule
-    DrawTool.ARROW -> Icons.Default.NorthEast
-    DrawTool.RECT -> Icons.Default.CropSquare
-    DrawTool.CIRCLE -> Icons.Default.RadioButtonUnchecked
-    DrawTool.ERASER -> Icons.Default.AutoFixNormal
+    DrawTool.PEN -> Icons.Rounded.Edit
+    DrawTool.HIGHLIGHTER -> Icons.Rounded.BorderColor
+    DrawTool.LINE -> Icons.Rounded.HorizontalRule
+    DrawTool.ARROW -> Icons.Rounded.NorthEast
+    DrawTool.RECT -> Icons.Rounded.CropSquare
+    DrawTool.CIRCLE -> Icons.Rounded.RadioButtonUnchecked
+    DrawTool.ERASER -> Icons.Rounded.AutoFixNormal
 }
 
 @Composable

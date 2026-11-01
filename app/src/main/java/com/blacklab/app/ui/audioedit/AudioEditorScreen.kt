@@ -25,9 +25,9 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.Redo
-import androidx.compose.material.icons.automirrored.filled.Undo
-import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.automirrored.rounded.Redo
+import androidx.compose.material.icons.automirrored.rounded.Undo
+import androidx.compose.material.icons.rounded.*
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.CircularProgressIndicator
@@ -199,15 +199,15 @@ fun AudioEditorScreen(path: String) {
     Scaffold(topBar = {
         BlTopBar(file.nameWithoutExtension, subtitle = c?.let { "${t(it.durationMs)} · ${it.rate / 1000.0} kHz · ${if (it.channels == 1) "mono" else "stereo"}" + if (dirty) " · edited" else "" } ?: "Audio editor",
             onBack = { if (dirty) dialog = "exit" else shell.back() }, actions = {
-                IconButton(enabled = undo.isNotEmpty(), onClick = { clip?.let { redo += it }; clip = undo.removeAt(undo.lastIndex); viewStart = 0; viewLen = clip!!.frames; selA = 0; selB = 0 }) { Icon(Icons.AutoMirrored.Filled.Undo, "Undo") }
-                IconButton(enabled = redo.isNotEmpty(), onClick = { clip?.let { undo += it }; clip = redo.removeAt(redo.lastIndex); viewStart = 0; viewLen = clip!!.frames; selA = 0; selB = 0 }) { Icon(Icons.AutoMirrored.Filled.Redo, "Redo") }
+                IconButton(enabled = undo.isNotEmpty(), onClick = { clip?.let { redo += it }; clip = undo.removeAt(undo.lastIndex); viewStart = 0; viewLen = clip!!.frames; selA = 0; selB = 0 }) { Icon(Icons.AutoMirrored.Rounded.Undo, "Undo") }
+                IconButton(enabled = redo.isNotEmpty(), onClick = { clip?.let { undo += it }; clip = redo.removeAt(redo.lastIndex); viewStart = 0; viewLen = clip!!.frames; selA = 0; selB = 0 }) { Icon(Icons.AutoMirrored.Rounded.Redo, "Redo") }
                 Box {
                     TextButton(enabled = c != null, onClick = { saveMenu = true }) { Text("Save", fontWeight = FontWeight.Bold) }
                     DropdownMenu(saveMenu, { saveMenu = false }) {
-                        DropdownMenuItem(text = { Text("Save as M4A (AAC)") }, leadingIcon = { Icon(Icons.Default.AudioFile, null) }, onClick = { saveMenu = false; save(Files.unique(outDir(), file.nameWithoutExtension.removeSuffix("_edit") + "_edit", "m4a"), false) })
-                        DropdownMenuItem(text = { Text("Save as WAV (lossless)") }, leadingIcon = { Icon(Icons.Default.GraphicEq, null) }, onClick = { saveMenu = false; save(Files.unique(outDir(), file.nameWithoutExtension.removeSuffix("_edit") + "_edit", "wav"), false) })
-                        if (app.storage.contains(file) && file.extension.lowercase() in setOf("m4a", "wav")) DropdownMenuItem(text = { Text("Replace original") }, leadingIcon = { Icon(Icons.Default.Save, null) }, onClick = { saveMenu = false; dialog = "replace" })
-                        DropdownMenuItem(text = { Text("Export selection only") }, enabled = hasSel, leadingIcon = { Icon(Icons.Default.ContentCut, null) }, onClick = {
+                        DropdownMenuItem(text = { Text("Save as M4A (AAC)") }, leadingIcon = { Icon(Icons.Rounded.AudioFile, null) }, onClick = { saveMenu = false; save(Files.unique(outDir(), file.nameWithoutExtension.removeSuffix("_edit") + "_edit", "m4a"), false) })
+                        DropdownMenuItem(text = { Text("Save as WAV (lossless)") }, leadingIcon = { Icon(Icons.Rounded.GraphicEq, null) }, onClick = { saveMenu = false; save(Files.unique(outDir(), file.nameWithoutExtension.removeSuffix("_edit") + "_edit", "wav"), false) })
+                        if (app.storage.contains(file) && file.extension.lowercase() in setOf("m4a", "wav")) DropdownMenuItem(text = { Text("Replace original") }, leadingIcon = { Icon(Icons.Rounded.Save, null) }, onClick = { saveMenu = false; dialog = "replace" })
+                        DropdownMenuItem(text = { Text("Export selection only") }, enabled = hasSel, leadingIcon = { Icon(Icons.Rounded.ContentCut, null) }, onClick = {
                             saveMenu = false
                             val part = AudioEdit.slice(clip!!, selA, selB)
                             busy = "Saving selection…"
@@ -284,19 +284,19 @@ fun AudioEditorScreen(path: String) {
                             style = MaterialTheme.typography.labelMedium)
                         Text("Peak ${String.format(Locale.US, "%.1f", AudioEdit.peakDb(c, a(), b()))} dBFS", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
-                    IconButton(onClick = { val center = vs + vl / 2; val nl = max(c.rate / 10, vl / 2); viewLen = nl; viewStart = (center - nl / 2).coerceIn(0, c.frames - nl) }) { Icon(Icons.Default.ZoomIn, "Zoom in") }
-                    IconButton(onClick = { val center = vs + vl / 2; val nl = min(c.frames, vl * 2); viewLen = nl; viewStart = (center - nl / 2).coerceIn(0, c.frames - nl) }) { Icon(Icons.Default.ZoomOut, "Zoom out") }
-                    IconButton(enabled = hasSel, onClick = { viewStart = selA; viewLen = max(c.rate / 20, selB - selA) }) { Icon(Icons.Default.CenterFocusStrong, "Zoom to selection") }
-                    IconButton(onClick = { viewStart = 0; viewLen = c.frames }) { Icon(Icons.Default.FitScreen, "Show all") }
+                    IconButton(onClick = { val center = vs + vl / 2; val nl = max(c.rate / 10, vl / 2); viewLen = nl; viewStart = (center - nl / 2).coerceIn(0, c.frames - nl) }) { Icon(Icons.Rounded.ZoomIn, "Zoom in") }
+                    IconButton(onClick = { val center = vs + vl / 2; val nl = min(c.frames, vl * 2); viewLen = nl; viewStart = (center - nl / 2).coerceIn(0, c.frames - nl) }) { Icon(Icons.Rounded.ZoomOut, "Zoom out") }
+                    IconButton(enabled = hasSel, onClick = { viewStart = selA; viewLen = max(c.rate / 20, selB - selA) }) { Icon(Icons.Rounded.CenterFocusStrong, "Zoom to selection") }
+                    IconButton(onClick = { viewStart = 0; viewLen = c.frames }) { Icon(Icons.Rounded.FitScreen, "Show all") }
                 }
                 // ---------------- transport
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
-                    IconButton(onClick = { cursor = 0; selA = 0; selB = 0 }) { Icon(Icons.Default.SkipPrevious, "To start") }
+                    IconButton(onClick = { cursor = 0; selA = 0; selB = 0 }) { Icon(Icons.Rounded.SkipPrevious, "To start") }
                     FilledIconButton(onClick = {
                         if (playing) { player.stop(); playing = false; playhead = -1 }
                         else { player.play(c, if (hasSel) selA else cursor, if (hasSel) selB else c.frames) { }; playing = true }
-                    }, Modifier.size(60.dp)) { Icon(if (playing) Icons.Default.Stop else Icons.Default.PlayArrow, if (playing) "Stop" else "Play", Modifier.size(34.dp)) }
-                    IconButton(onClick = { cursor = c.frames; selA = 0; selB = 0 }) { Icon(Icons.Default.SkipNext, "To end") }
+                    }, Modifier.size(60.dp)) { Icon(if (playing) Icons.Rounded.Stop else Icons.Rounded.PlayArrow, if (playing) "Stop" else "Play", Modifier.size(34.dp)) }
+                    IconButton(onClick = { cursor = c.frames; selA = 0; selB = 0 }) { Icon(Icons.Rounded.SkipNext, "To end") }
                     TextButton(onClick = { selA = 0; selB = c.frames }) { Text("Select all") }
                 }
                 // ---------------- tools
@@ -308,19 +308,19 @@ fun AudioEditorScreen(path: String) {
                     when (tab) {
                         "Edit" -> {
                             ToolRow {
-                                Tool(Icons.Default.Crop, "Trim to selection", hasSel) { apply("Trimming", false) { AudioEdit.trim(it, selA, selB) } }
-                                Tool(Icons.Default.Delete, "Delete", hasSel) { apply("Deleting", false) { AudioEdit.delete(it, selA, selB) } }
-                                Tool(Icons.Default.VolumeOff, "Silence", hasSel) { apply("Silencing") { AudioEdit.silence(it, selA, selB) } }
+                                Tool(Icons.Rounded.Crop, "Trim to selection", hasSel) { apply("Trimming", false) { AudioEdit.trim(it, selA, selB) } }
+                                Tool(Icons.Rounded.Delete, "Delete", hasSel) { apply("Deleting", false) { AudioEdit.delete(it, selA, selB) } }
+                                Tool(Icons.Rounded.VolumeOff, "Silence", hasSel) { apply("Silencing") { AudioEdit.silence(it, selA, selB) } }
                             }
                             ToolRow {
-                                Tool(Icons.Default.ContentCopy, "Copy", hasSel) { clipboard = AudioEdit.slice(c, selA, selB); shell.toast("Copied ${t(clipboard!!.durationMs)}") }
-                                Tool(Icons.Default.ContentCut, "Cut", hasSel) { clipboard = AudioEdit.slice(c, selA, selB); apply("Cutting", false) { AudioEdit.delete(it, selA, selB) } }
-                                Tool(Icons.Default.ContentPaste, "Paste at cursor", clipboard != null) { val p = clipboard!!; apply("Pasting", false) { AudioEdit.insert(it, cursor, p) } }
+                                Tool(Icons.Rounded.ContentCopy, "Copy", hasSel) { clipboard = AudioEdit.slice(c, selA, selB); shell.toast("Copied ${t(clipboard!!.durationMs)}") }
+                                Tool(Icons.Rounded.ContentCut, "Cut", hasSel) { clipboard = AudioEdit.slice(c, selA, selB); apply("Cutting", false) { AudioEdit.delete(it, selA, selB) } }
+                                Tool(Icons.Rounded.ContentPaste, "Paste at cursor", clipboard != null) { val p = clipboard!!; apply("Pasting", false) { AudioEdit.insert(it, cursor, p) } }
                             }
                             ToolRow {
-                                Tool(Icons.Default.HourglassEmpty, "Insert silence", true) { dialog = "silence" }
-                                Tool(Icons.Default.Repeat, "Duplicate selection", hasSel) { val p = AudioEdit.slice(c, selA, selB); apply("Duplicating", false) { AudioEdit.insert(it, selB, p) } }
-                                Tool(Icons.Default.CallSplit, "Split here (save 2 files)", cursor in 1 until c.frames) {
+                                Tool(Icons.Rounded.HourglassEmpty, "Insert silence", true) { dialog = "silence" }
+                                Tool(Icons.Rounded.Repeat, "Duplicate selection", hasSel) { val p = AudioEdit.slice(c, selA, selB); apply("Duplicating", false) { AudioEdit.insert(it, selB, p) } }
+                                Tool(Icons.Rounded.CallSplit, "Split here (save 2 files)", cursor in 1 until c.frames) {
                                     busy = "Splitting…"
                                     scope.launch {
                                         val r = withContext(Dispatchers.IO) {
@@ -339,9 +339,9 @@ fun AudioEditorScreen(path: String) {
                         "Volume" -> {
                             Text("Applies to the $scope2.", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             ToolRow {
-                                Tool(Icons.Default.TrendingUp, "Fade in", true) { val (x, y) = fadeRange(c, hasSel, selA, selB, true); apply("Fading in") { AudioEdit.fadeIn(it, x, y) } }
-                                Tool(Icons.Default.TrendingDown, "Fade out", true) { val (x, y) = fadeRange(c, hasSel, selA, selB, false); apply("Fading out") { AudioEdit.fadeOut(it, x, y) } }
-                                Tool(Icons.Default.Tune, "Normalize (−1 dB)", true) { apply("Normalizing") { AudioEdit.normalize(it, a(), b()) } }
+                                Tool(Icons.Rounded.TrendingUp, "Fade in", true) { val (x, y) = fadeRange(c, hasSel, selA, selB, true); apply("Fading in") { AudioEdit.fadeIn(it, x, y) } }
+                                Tool(Icons.Rounded.TrendingDown, "Fade out", true) { val (x, y) = fadeRange(c, hasSel, selA, selB, false); apply("Fading out") { AudioEdit.fadeOut(it, x, y) } }
+                                Tool(Icons.Rounded.Tune, "Normalize (−1 dB)", true) { apply("Normalizing") { AudioEdit.normalize(it, a(), b()) } }
                             }
                             var db by remember { mutableFloatStateOf(3f) }
                             Text("Gain ${if (db >= 0) "+" else ""}${String.format(Locale.US, "%.1f", db)} dB", style = MaterialTheme.typography.labelLarge, modifier = Modifier.padding(top = 6.dp))
@@ -350,15 +350,15 @@ fun AudioEditorScreen(path: String) {
                                 TextButton(onClick = { apply("Changing volume") { AudioEdit.gain(it, a(), b(), db) } }) { Text("Apply") }
                             }
                             ToolRow {
-                                Tool(Icons.Default.SurroundSound, if (c.channels == 2) "Convert to mono" else "Convert to stereo", true) { apply("Converting", false) { if (it.channels == 2) AudioEdit.toMono(it) else AudioEdit.toStereo(it) } }
+                                Tool(Icons.Rounded.SurroundSound, if (c.channels == 2) "Convert to mono" else "Convert to stereo", true) { apply("Converting", false) { if (it.channels == 2) AudioEdit.toMono(it) else AudioEdit.toStereo(it) } }
                             }
                         }
                         "Effects" -> {
                             Text("Applies to the $scope2.", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             ToolRow {
-                                Tool(Icons.Default.SwapHoriz, "Reverse", true) { apply("Reversing") { AudioEdit.reverse(it, a(), b()) } }
-                                Tool(Icons.Default.GraphicEq, "Remove rumble (high-pass 80 Hz)", true) { apply("Filtering") { AudioEdit.filter(it, a(), b(), true, 80f) } }
-                                Tool(Icons.Default.BlurOn, "Soften hiss (low-pass 8 kHz)", true) { apply("Filtering") { AudioEdit.filter(it, a(), b(), false, 8000f) } }
+                                Tool(Icons.Rounded.SwapHoriz, "Reverse", true) { apply("Reversing") { AudioEdit.reverse(it, a(), b()) } }
+                                Tool(Icons.Rounded.GraphicEq, "Remove rumble (high-pass 80 Hz)", true) { apply("Filtering") { AudioEdit.filter(it, a(), b(), true, 80f) } }
+                                Tool(Icons.Rounded.BlurOn, "Soften hiss (low-pass 8 kHz)", true) { apply("Filtering") { AudioEdit.filter(it, a(), b(), false, 8000f) } }
                             }
                             var delay by remember { mutableFloatStateOf(280f) }
                             var decay by remember { mutableFloatStateOf(0.4f) }
@@ -394,9 +394,9 @@ fun AudioEditorScreen(path: String) {
                         "Mix" -> {
                             Text("Bring in another audio file (any format). It's matched to this clip's sample rate.", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             ToolRow {
-                                Tool(Icons.Default.Add, "Append file to end", true) { pendingFileOp = "append"; picker.launch(arrayOf("audio/*", "video/*")) }
-                                Tool(Icons.Default.Input, "Insert file at cursor", true) { pendingFileOp = "insert"; picker.launch(arrayOf("audio/*", "video/*")) }
-                                Tool(Icons.Default.Layers, "Mix file in at cursor", true) { pendingFileOp = "mix"; picker.launch(arrayOf("audio/*", "video/*")) }
+                                Tool(Icons.Rounded.Add, "Append file to end", true) { pendingFileOp = "append"; picker.launch(arrayOf("audio/*", "video/*")) }
+                                Tool(Icons.Rounded.Input, "Insert file at cursor", true) { pendingFileOp = "insert"; picker.launch(arrayOf("audio/*", "video/*")) }
+                                Tool(Icons.Rounded.Layers, "Mix file in at cursor", true) { pendingFileOp = "mix"; picker.launch(arrayOf("audio/*", "video/*")) }
                             }
                         }
                     }

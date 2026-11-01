@@ -1,6 +1,9 @@
 package com.blacklab.app.ui.home
 
+import com.blacklab.app.ui.components.sharedCard
+import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.background
+import androidx.compose.ui.draw.alpha
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -21,7 +24,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.rounded.*
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
@@ -92,7 +95,13 @@ fun HomeScreen() {
     val rec by RecorderService.state.collectAsState()
     val dict by DictationService.state.collectAsState()
     val ctx = androidx.compose.ui.platform.LocalContext.current
-    val tasks by remember(profile) { app.db.tasks().observe(profile.name) }.collectAsState(emptyList())
+    // null until the first database read, so Home shows placeholders instead of a "no tasks" flash
+    val tasksOrNull by remember(profile) { app.db.tasks().observe(profile.name) }.collectAsState(null)
+    val tasks = tasksOrNull.orEmpty()
+    val tasksLoading = tasksOrNull == null
+    val haptics = com.blacklab.app.ui.components.rememberHaptics()
+    // Optimistic completion: a ticked task shows done at once, then leaves when the save lands
+    val completing = remember { androidx.compose.runtime.mutableStateListOf<Long>() }
     val docs by remember(profile) { app.db.documents().observe(profile.name) }.collectAsState(emptyList())
     // "Since you last looked": the window starts at your previous visit to Home and stays put while you're here
     val feedPrefs = remember { ctx.getSharedPreferences("blacklab_home", 0) }
@@ -122,58 +131,60 @@ fun HomeScreen() {
     val overdue = open.count { it.dueDay != null && it.dueDay < todayEpoch }
     val startOfToday = Time.millis(today, 0)
     val doneToday = tasks.count { it.completed && (it.completedAt ?: 0) >= startOfToday }
-    val feed = com.blacklab.app.core.ActivityFeed.build(feedSince, System.currentTimeMillis() + 1, tasks, feedEvents, docs, feedRecordings, feedNotes, feedComments,
-        timeLabel = { t -> Time.relativeDay(Time.toDate(t)) + " " + Time.time(Time.toLdt(t)) })
+    val feed = remember(feedSince, tasks, feedEvents, docs, feedRecordings, feedNotes, feedComments, now) {
+        com.blacklab.app.core.ActivityFeed.build(feedSince, System.currentTimeMillis() + 1, tasks, feedEvents, docs, feedRecordings, feedNotes, feedComments,
+            timeLabel = { t -> Time.relativeDay(Time.toDate(t)) + " " + Time.time(Time.toLdt(t)) })
+    }
     val dayItems = agenda.filter { it.kind != CalKind.TASK }
     val upcoming = dayItems.filter { it.allDay || it.end > now }
     val finishedToday = dayItems.size - upcoming.size
 
     val actions = listOf(
-        QuickAction("Photo", Icons.Default.PhotoCamera, Mint, more = listOf(
-            SA("Photo", Icons.Default.PhotoCamera) { shell.go("camera?mode=photo") },
-            SA("Panorama", Icons.Default.Panorama, hint = "Stitched, full-resolution sweep") { shell.go("camera?mode=pano") },
-            SA("Pro mode", Icons.Default.Tune, hint = "Manual ISO, shutter, focus, white balance") { shell.go("camera?mode=pro") },
-            SA("Photo library", Icons.Default.PhotoLibrary) { shell.go("library?tab=PHOTOS") },
+        QuickAction("Photo", Icons.Rounded.PhotoCamera, Mint, more = listOf(
+            SA("Photo", Icons.Rounded.PhotoCamera) { shell.go("camera?mode=photo") },
+            SA("Panorama", Icons.Rounded.Panorama, hint = "Stitched, full-resolution sweep") { shell.go("camera?mode=pano") },
+            SA("Pro mode", Icons.Rounded.Tune, hint = "Manual ISO, shutter, focus, white balance") { shell.go("camera?mode=pro") },
+            SA("Photo library", Icons.Rounded.PhotoLibrary) { shell.go("library?tab=PHOTOS") },
         )) { shell.go("camera?mode=photo") },
-        QuickAction("Video", Icons.Default.Videocam, Coral, more = listOf(
-            SA("Record video", Icons.Default.Videocam) { shell.go("camera?mode=video") },
-            SA("Video library", Icons.Default.VideoLibrary) { shell.go("library?tab=VIDEOS") },
+        QuickAction("Video", Icons.Rounded.Videocam, Coral, more = listOf(
+            SA("Record video", Icons.Rounded.Videocam) { shell.go("camera?mode=video") },
+            SA("Video library", Icons.Rounded.VideoLibrary) { shell.go("library?tab=VIDEOS") },
         )) { shell.go("camera?mode=video") },
-        QuickAction("Dictate", Icons.Default.RecordVoiceOver, Color(0xFF8B6CFF), more = listOf(
-            SA("Start dictating now", Icons.Default.Mic) { DictationService.send(ctx, DictationService.ACTION_START); shell.go("dictation") },
-            SA("Hands-free standby", Icons.Default.Hearing, hint = "Waits for “start recording”") { DictationService.send(ctx, DictationService.ACTION_STANDBY); shell.go("dictation") },
-            SA("Audio recorder", Icons.Default.Mic) { shell.go("recorder") },
+        QuickAction("Dictate", Icons.Rounded.RecordVoiceOver, Color(0xFF8B6CFF), more = listOf(
+            SA("Start dictating now", Icons.Rounded.Mic) { DictationService.send(ctx, DictationService.ACTION_START); shell.go("dictation") },
+            SA("Hands-free standby", Icons.Rounded.Hearing, hint = "Waits for “start recording”") { DictationService.send(ctx, DictationService.ACTION_STANDBY); shell.go("dictation") },
+            SA("Audio recorder", Icons.Rounded.Mic) { shell.go("recorder") },
         )) { shell.go("dictation") },
-        QuickAction("Record", Icons.Default.Mic, Color(0xFFE53935), more = listOf(
-            SA("Recorder", Icons.Default.Mic) { shell.go("recorder") },
-            SA("Dictation", Icons.Default.RecordVoiceOver) { shell.go("dictation") },
-            SA("Audio files", Icons.Default.AudioFile) { shell.go("library?tab=RECORDINGS") },
+        QuickAction("Record", Icons.Rounded.Mic, Color(0xFFE53935), more = listOf(
+            SA("Recorder", Icons.Rounded.Mic) { shell.go("recorder") },
+            SA("Dictation", Icons.Rounded.RecordVoiceOver) { shell.go("dictation") },
+            SA("Audio files", Icons.Rounded.AudioFile) { shell.go("library?tab=RECORDINGS") },
         )) { shell.go("recorder") },
-        QuickAction("Scan", Icons.Default.DocumentScanner, Cobalt, more = listOf(
-            SA("Scan a document", Icons.Default.DocumentScanner) { docScanner() },
-            SA("QR / barcode", Icons.Default.QrCodeScanner) { codeScanner() },
-            SA("Saved scans", Icons.Default.FolderOpen) { shell.go("library?tab=SCANS") },
+        QuickAction("Scan", Icons.Rounded.DocumentScanner, Cobalt, more = listOf(
+            SA("Scan a document", Icons.Rounded.DocumentScanner) { docScanner() },
+            SA("QR / barcode", Icons.Rounded.QrCodeScanner) { codeScanner() },
+            SA("Saved scans", Icons.Rounded.FolderOpen) { shell.go("library?tab=SCANS") },
         )) { docScanner() },
-        QuickAction("Document", Icons.Default.NoteAdd, Violet, more = listOf(
-            SA("All documents", Icons.Default.Description) { shell.go("documents") },
-            SA("Blank document", Icons.Default.NoteAdd) { shell.go("doc/0?template=blank") },
-            SA("Meeting minutes", Icons.Default.Groups) { shell.go("doc/0?template=meeting") },
+        QuickAction("Document", Icons.Rounded.NoteAdd, Violet, more = listOf(
+            SA("All documents", Icons.Rounded.Description) { shell.go("documents") },
+            SA("Blank document", Icons.Rounded.NoteAdd) { shell.go("doc/0?template=blank") },
+            SA("Meeting minutes", Icons.Rounded.Groups) { shell.go("doc/0?template=meeting") },
         )) { shell.go("documents") },
-        QuickAction("Journal", Icons.Default.AutoStories, Amber, more = listOf(
-            SA("New entry", Icons.Default.Add) { shell.go("journal/0") },
-            SA("Journal", Icons.Default.AutoStories) { shell.go("journal") },
+        QuickAction("Journal", Icons.Rounded.AutoStories, Amber, more = listOf(
+            SA("New entry", Icons.Rounded.Add) { shell.go("journal/0") },
+            SA("Journal", Icons.Rounded.AutoStories) { shell.go("journal") },
         )) { shell.go("journal/0") },
-        QuickAction("Task", Icons.Default.AddTask, Mint, more = listOf(
-            SA("New task", Icons.Default.AddTask) { shell.go("task/0") },
-            SA("All tasks", Icons.Default.Checklist) { shell.go("tasks") },
+        QuickAction("Task", Icons.Rounded.AddTask, Mint, more = listOf(
+            SA("New task", Icons.Rounded.AddTask) { shell.go("task/0") },
+            SA("All tasks", Icons.Rounded.Checklist) { shell.go("tasks") },
         )) { shell.go("task/0") },
-        QuickAction("Event", Icons.Default.EventAvailable, Cobalt, more = listOf(
-            SA("New event", Icons.Default.EventAvailable) { shell.go("event/0?start=${Time.millis(today, ((java.time.LocalTime.now().hour + 1) * 60).coerceAtMost(23 * 60))}") },
-            SA("Schedule", Icons.Default.CalendarMonth) { shell.go("schedule") },
+        QuickAction("Event", Icons.Rounded.EventAvailable, Cobalt, more = listOf(
+            SA("New event", Icons.Rounded.EventAvailable) { shell.go("event/0?start=${Time.millis(today, ((java.time.LocalTime.now().hour + 1) * 60).coerceAtMost(23 * 60))}") },
+            SA("Schedule", Icons.Rounded.CalendarMonth) { shell.go("schedule") },
         )) { shell.go("event/0?start=${Time.millis(today, ((java.time.LocalTime.now().hour + 1) * 60).coerceAtMost(23 * 60))}") },
-        QuickAction("Focus", Icons.Default.Timer, Violet, more = listOf(
-            SA("Focus timer", Icons.Default.Timer) { shell.go("education?tab=Study") },
-            SA("QR / asset tag", Icons.Default.QrCodeScanner) { codeScanner() },
+        QuickAction("Focus", Icons.Rounded.Timer, Violet, more = listOf(
+            SA("Focus timer", Icons.Rounded.Timer) { shell.go("education?tab=Study") },
+            SA("QR / asset tag", Icons.Rounded.QrCodeScanner) { codeScanner() },
         )) { shell.go("education?tab=Study") },
     )
     var quickMenu by remember { mutableStateOf<QuickAction?>(null) }
@@ -182,10 +193,10 @@ fun HomeScreen() {
     LazyColumn(Modifier.fillMaxSize().statusBarsPadding(), contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 24.dp)) {
         item {
             Row(Modifier.fillMaxWidth().padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                IconButton(onClick = shell.openDrawer) { Icon(Icons.Default.Menu, "Menu") }
+                IconButton(onClick = shell.openDrawer) { Icon(Icons.Rounded.Menu, "Menu") }
                 Spacer(Modifier.weight(1f))
                 ProfileBadge(profile, app.settings.profileName(profile)) { shell.switchProfile(profile.other) }
-                IconButton(onClick = { shell.go("settings") }) { Icon(Icons.Default.Settings, "Settings") }
+                IconButton(onClick = { shell.go("settings") }) { Icon(Icons.Rounded.Settings, "Settings") }
             }
             Text("$greeting${s.userName.takeIf { it.isNotBlank() }?.let { ", ${it.substringBefore(' ')}" } ?: ""}",
                 style = MaterialTheme.typography.headlineMedium, modifier = Modifier.padding(top = 4.dp))
@@ -201,7 +212,7 @@ fun HomeScreen() {
                 modifier = Modifier.fillMaxWidth().padding(top = 14.dp),
             ) {
                 Row(Modifier.padding(start = 18.dp, end = 6.dp, top = 6.dp, bottom = 6.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Default.AutoAwesome, null, tint = MaterialTheme.colorScheme.primary)
+                    Icon(Icons.Rounded.AutoAwesome, null, tint = MaterialTheme.colorScheme.primary)
                     Text("Ask ${s.asstName}…", Modifier.weight(1f).padding(start = 12.dp), color = MaterialTheme.colorScheme.onSurfaceVariant)
                     IconButton(onClick = {
                         app.appScope.launch {
@@ -210,8 +221,8 @@ fun HomeScreen() {
                             app.speaker.speak(text)
                         }
                         shell.go("assistant")
-                    }) { Icon(Icons.Default.WbSunny, "Brief me", tint = Amber) }
-                    androidx.compose.material3.FilledIconButton(onClick = { shell.go("assistant?listen=true") }) { Icon(Icons.Default.Mic, "Talk") }
+                    }) { Icon(Icons.Rounded.WbSunny, "Brief me", tint = Amber) }
+                    androidx.compose.material3.FilledIconButton(onClick = { shell.go("assistant?listen=true") }) { Icon(Icons.Rounded.Mic, "Talk") }
                 }
             }
         }
@@ -221,7 +232,7 @@ fun HomeScreen() {
                     Box(Modifier.size(10.dp).clip(CircleShape).background(Color(0xFF8B6CFF)))
                     Spacer(Modifier.width(10.dp))
                     Text(when (dict.status) { com.blacklab.app.dictation.DictState.Status.STANDBY -> "Dictation standby"; com.blacklab.app.dictation.DictState.Status.PAUSED -> "Dictation paused"; else -> "Dictating" }, Modifier.weight(1f), fontWeight = FontWeight.SemiBold)
-                    Text(Time.duration(dict.elapsedMs), fontWeight = FontWeight.Bold)
+                    Text(Time.duration(dict.elapsedMs), style = com.blacklab.app.ui.theme.MonoDigits, fontWeight = FontWeight.Bold)
                 }
             }
         }
@@ -258,14 +269,14 @@ fun HomeScreen() {
                     feed.forEach { f ->
                         Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).clickable { shell.go(f.route) }.padding(horizontal = 8.dp, vertical = 7.dp), verticalAlignment = Alignment.CenterVertically) {
                             val (icon, tint) = when (f.kind) {
-                                com.blacklab.app.core.ActivityFeed.Kind.TASK_DONE -> Icons.Default.TaskAlt to LocalBlColors.current.success
-                                com.blacklab.app.core.ActivityFeed.Kind.TASK_NEW -> Icons.Default.AddTask to MaterialTheme.colorScheme.primary
-                                com.blacklab.app.core.ActivityFeed.Kind.EVENT_NEW -> Icons.Default.EventAvailable to MaterialTheme.colorScheme.tertiary
-                                com.blacklab.app.core.ActivityFeed.Kind.REMINDER -> Icons.Default.NotificationsActive to LocalBlColors.current.warning
-                                com.blacklab.app.core.ActivityFeed.Kind.RECORDING -> Icons.Default.Mic to MaterialTheme.colorScheme.secondary
-                                com.blacklab.app.core.ActivityFeed.Kind.DOCUMENT -> Icons.Default.Description to MaterialTheme.colorScheme.primary
-                                com.blacklab.app.core.ActivityFeed.Kind.NOTE -> Icons.Default.Lightbulb to MaterialTheme.colorScheme.tertiary
-                                com.blacklab.app.core.ActivityFeed.Kind.COMMENT -> Icons.Default.Forum to MaterialTheme.colorScheme.secondary
+                                com.blacklab.app.core.ActivityFeed.Kind.TASK_DONE -> Icons.Rounded.TaskAlt to LocalBlColors.current.success
+                                com.blacklab.app.core.ActivityFeed.Kind.TASK_NEW -> Icons.Rounded.AddTask to MaterialTheme.colorScheme.primary
+                                com.blacklab.app.core.ActivityFeed.Kind.EVENT_NEW -> Icons.Rounded.EventAvailable to MaterialTheme.colorScheme.tertiary
+                                com.blacklab.app.core.ActivityFeed.Kind.REMINDER -> Icons.Rounded.NotificationsActive to LocalBlColors.current.warning
+                                com.blacklab.app.core.ActivityFeed.Kind.RECORDING -> Icons.Rounded.Mic to MaterialTheme.colorScheme.secondary
+                                com.blacklab.app.core.ActivityFeed.Kind.DOCUMENT -> Icons.Rounded.Description to MaterialTheme.colorScheme.primary
+                                com.blacklab.app.core.ActivityFeed.Kind.NOTE -> Icons.Rounded.Lightbulb to MaterialTheme.colorScheme.tertiary
+                                com.blacklab.app.core.ActivityFeed.Kind.COMMENT -> Icons.Rounded.Forum to MaterialTheme.colorScheme.secondary
                             }
                             Icon(icon, null, tint = tint, modifier = Modifier.size(20.dp))
                             Spacer(Modifier.width(12.dp))
@@ -300,19 +311,21 @@ fun HomeScreen() {
             SectionHeader("Focus · ${focus.size} task(s)" + (if (overdue > 0) " · $overdue overdue" else "") + (if (doneToday > 0) " · $doneToday done" else ""), action = "To-Do") { shell.go("tasks") }
         }
         item {
-            BlCard(Modifier.fillMaxWidth(), contentPadding = PaddingValues(vertical = 4.dp, horizontal = 4.dp)) {
-                if (focus.isEmpty()) Text("No tasks due. Add one to My Day from To-Do.", color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(12.dp))
+            BlCard(Modifier.fillMaxWidth().animateContentSize(com.blacklab.app.ui.theme.Motion.emphasized()), contentPadding = PaddingValues(vertical = 4.dp, horizontal = 4.dp)) {
+                if (tasksLoading) com.blacklab.app.ui.components.SkeletonRows(3, Modifier.padding(12.dp))
+                else if (focus.isEmpty()) Text("No tasks due. Add one to My Day from To-Do.", color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(12.dp))
                 focus.take(6).forEach { t ->
-                    Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).clickable { shell.go("task/${t.id}") }, verticalAlignment = Alignment.CenterVertically) {
-                        Checkbox(false, { app.io { TaskOps.setCompleted(app, t, true) }; shell.toast("Completed “${t.title.take(30)}”") })
-                        Column(Modifier.weight(1f)) {
-                            Text(t.title, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    val done = t.id in completing
+                    Row(Modifier.fillMaxWidth().sharedCard("task-${t.id}").clip(RoundedCornerShape(10.dp)).clickable { shell.go("task/${t.id}") }, verticalAlignment = Alignment.CenterVertically) {
+                        Checkbox(done, { if (!done) { completing += t.id; haptics.confirm(); app.io { TaskOps.setCompleted(app, t, true) }; shell.toast("Completed “${t.title.take(30)}”") } })
+                        Column(Modifier.weight(1f).alpha(if (done) 0.55f else 1f)) {
+                            Text(t.title, maxLines = 1, overflow = TextOverflow.Ellipsis, textDecoration = if (done) androidx.compose.ui.text.style.TextDecoration.LineThrough else null)
                             t.dueDay?.let { d ->
                                 Text(Time.relativeDay(LocalDate.ofEpochDay(d)) + (t.dueMinute?.let { " " + Time.time(it) } ?: ""), style = MaterialTheme.typography.labelSmall,
                                     color = if (d < todayEpoch) LocalBlColors.current.danger else MaterialTheme.colorScheme.onSurfaceVariant)
                             }
                         }
-                        if (t.important) Icon(Icons.Default.Star, null, tint = Amber, modifier = Modifier.padding(end = 12.dp).size(18.dp))
+                        if (t.important) Icon(Icons.Rounded.Star, null, tint = Amber, modifier = Modifier.padding(end = 12.dp).size(18.dp))
                     }
                 }
             }
@@ -327,7 +340,7 @@ fun HomeScreen() {
                 BlCard(Modifier.fillMaxWidth()) {
                     classes.firstOrNull()?.let { o ->
                         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.clickable { shell.go("course/${o.course.id}") }.padding(vertical = 4.dp)) {
-                            Icon(Icons.Default.School, null, tint = Color(o.course.color))
+                            Icon(Icons.Rounded.School, null, tint = Color(o.course.color))
                             Spacer(Modifier.width(10.dp))
                             Column {
                                 Text("Next class: ${o.course.code.ifBlank { o.course.title }}", style = MaterialTheme.typography.titleSmall)
@@ -339,7 +352,7 @@ fun HomeScreen() {
                     dueSoon.take(3).forEach { a ->
                         val c = edu.courseById[a.courseId]
                         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.clickable { shell.go("course/${a.courseId}") }.padding(vertical = 4.dp)) {
-                            Icon(Icons.Default.Assignment, null, tint = c?.let { Color(it.color) } ?: Cobalt, modifier = Modifier.size(20.dp))
+                            Icon(Icons.Rounded.Assignment, null, tint = c?.let { Color(it.color) } ?: Cobalt, modifier = Modifier.size(20.dp))
                             Spacer(Modifier.width(12.dp))
                             Text(a.title, Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
                             Text(Time.relativeDay(Time.toDate(a.dueAt!!)), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -347,7 +360,7 @@ fun HomeScreen() {
                     }
                     certAlerts.take(2).forEach { c ->
                         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.clickable { shell.go("education?tab=Certifications") }.padding(vertical = 4.dp)) {
-                            Icon(Icons.Default.WorkspacePremium, null, tint = Amber, modifier = Modifier.size(20.dp))
+                            Icon(Icons.Rounded.WorkspacePremium, null, tint = Amber, modifier = Modifier.size(20.dp))
                             Spacer(Modifier.width(12.dp))
                             Text(c.name.substringBefore(" —"), Modifier.weight(1f), maxLines = 1)
                             Text(c.examAt?.takeIf { c.status != "EARNED" }?.let { "Exam ${Time.relativeDay(Time.toDate(it))}" } ?: "Renew in ${c.expiresDay!! - todayEpoch}d",
@@ -364,7 +377,7 @@ fun HomeScreen() {
                     items(docs.sortedByDescending { it.updatedAt }.take(8), key = { it.id }) { d ->
                         Surface(onClick = { shell.go("doc/${d.id}") }, shape = RoundedCornerShape(16.dp), color = MaterialTheme.colorScheme.surfaceContainer, modifier = Modifier.width(150.dp)) {
                             Column(Modifier.padding(12.dp)) {
-                                Icon(Icons.Default.Description, null, tint = MaterialTheme.colorScheme.primary)
+                                Icon(Icons.Rounded.Description, null, tint = MaterialTheme.colorScheme.primary)
                                 Text(d.title, style = MaterialTheme.typography.titleSmall, maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 6.dp))
                                 Text(Time.ago(d.updatedAt), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             }

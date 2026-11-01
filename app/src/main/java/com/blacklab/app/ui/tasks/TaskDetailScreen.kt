@@ -1,5 +1,6 @@
 package com.blacklab.app.ui.tasks
 
+import com.blacklab.app.ui.components.sharedCard
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -25,9 +26,9 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.List
-import androidx.compose.material.icons.automirrored.filled.Notes
-import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.automirrored.rounded.List
+import androidx.compose.material.icons.automirrored.rounded.Notes
+import androidx.compose.material.icons.rounded.*
 import androidx.compose.material.icons.outlined.StarBorder
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Checkbox
@@ -122,15 +123,16 @@ fun TaskDetailScreen(id: Long) {
 
     val t = task
     Scaffold(
+        modifier = Modifier.sharedCard("task-$id"),
         topBar = {
             BlTopBar(
                 title = lists.firstOrNull { it.id == t?.listId }?.let { "${it.emoji} ${it.name}" } ?: "Task",
                 onBack = { leave() },
                 actions = {
                     if (t != null) IconButton(onClick = { task = t.copy(important = !t.important) }) {
-                        if (t.important) Icon(Icons.Default.Star, "Important", tint = Amber) else Icon(Icons.Outlined.StarBorder, "Important")
+                        if (t.important) Icon(Icons.Rounded.Star, "Important", tint = Amber) else Icon(Icons.Outlined.StarBorder, "Important")
                     }
-                    IconButton(onClick = { dialog = "delete" }) { Icon(Icons.Default.Delete, "Delete") }
+                    IconButton(onClick = { dialog = "delete" }) { Icon(Icons.Rounded.Delete, "Delete") }
                 },
             )
         },
@@ -144,7 +146,7 @@ fun TaskDetailScreen(id: Long) {
                         .border(2.dp, if (t.completed) LocalBlColors.current.accent else PriorityColors[t.priority].takeIf { t.priority > 0 } ?: MaterialTheme.colorScheme.outline, CircleShape)
                         .clickable { app.io { TaskOps.setCompleted(app, t, !t.completed) }; task = t.copy(completed = !t.completed, completedAt = if (!t.completed) Time.now() else null) },
                     contentAlignment = Alignment.Center,
-                ) { if (t.completed) Icon(Icons.Default.Check, null, tint = MaterialTheme.colorScheme.onPrimary, modifier = Modifier.size(16.dp)) }
+                ) { if (t.completed) Icon(Icons.Rounded.Check, null, tint = MaterialTheme.colorScheme.onPrimary, modifier = Modifier.size(16.dp)) }
                 TextField(
                     value = t.title, onValueChange = { task = t.copy(title = it) },
                     placeholder = { Text("Task name") },
@@ -160,7 +162,7 @@ fun TaskDetailScreen(id: Long) {
             steps.forEach { s -> StepRow(s) }
             var newStep by remember { mutableStateOf("") }
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(Icons.Default.Add, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(start = 12.dp, end = 4.dp))
+                Icon(Icons.Rounded.Add, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(start = 12.dp, end = 4.dp))
                 TextField(
                     newStep, { newStep = it }, placeholder = { Text(if (steps.isEmpty()) "Add step" else "Next step") }, singleLine = true,
                     colors = TextFieldDefaults.colors(focusedContainerColor = Color.Transparent, unfocusedContainerColor = Color.Transparent,
@@ -179,12 +181,12 @@ fun TaskDetailScreen(id: Long) {
 
             BlCard(Modifier.fillMaxWidth()) {
                 val today = Time.today().toEpochDay()
-                PickerRow(Icons.Default.WbSunny, "Add to My Day", if (t.myDayDay == today) "Added to My Day" else null, onClear = { task = t.copy(myDayDay = null) }) {
+                PickerRow(Icons.Rounded.WbSunny, "Add to My Day", if (t.myDayDay == today) "Added to My Day" else null, onClear = { task = t.copy(myDayDay = null) }) {
                     task = t.copy(myDayDay = if (t.myDayDay == today) null else today)
                 }
                 HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-                PickerRow(Icons.Default.NotificationsActive, "Remind me", t.reminderAt?.let { Time.dateTime(it) }, onClear = { task = t.copy(reminderAt = null) }) { dialog = "remindDate" }
-                PickerRow(Icons.Default.Event, "Add due date", t.dueDay?.let { "Due " + Time.relativeDay(LocalDate.ofEpochDay(it)) },
+                PickerRow(Icons.Rounded.NotificationsActive, "Remind me", t.reminderAt?.let { Time.dateTime(it) }, onClear = { task = t.copy(reminderAt = null) }) { dialog = "remindDate" }
+                PickerRow(Icons.Rounded.Event, "Add due date", t.dueDay?.let { "Due " + Time.relativeDay(LocalDate.ofEpochDay(it)) },
                     valueColor = if ((t.dueDay ?: Long.MAX_VALUE) < today && !t.completed) LocalBlColors.current.danger else null,
                     onClear = { task = t.copy(dueDay = null, dueMinute = null) }) { dialog = "due" }
                 if (t.dueDay == null) {
@@ -194,9 +196,9 @@ fun TaskDetailScreen(id: Long) {
                         AssistChip({ task = t.copy(dueDay = Time.today().with(java.time.temporal.TemporalAdjusters.next(java.time.DayOfWeek.MONDAY)).toEpochDay()) }, { Text("Next week") })
                     }
                 } else {
-                    PickerRow(Icons.Default.Schedule, "Add time", t.dueMinute?.let { Time.time(it) }, onClear = { task = t.copy(dueMinute = null) }) { dialog = "dueTime" }
+                    PickerRow(Icons.Rounded.Schedule, "Add time", t.dueMinute?.let { Time.time(it) }, onClear = { task = t.copy(dueMinute = null) }) { dialog = "dueTime" }
                 }
-                PickerRow(Icons.Default.Repeat, "Repeat", t.repeatRule?.let { Recurrence.parse(it)?.describe(t.dueDay?.let(LocalDate::ofEpochDay)) },
+                PickerRow(Icons.Rounded.Repeat, "Repeat", t.repeatRule?.let { Recurrence.parse(it)?.describe(t.dueDay?.let(LocalDate::ofEpochDay)) },
                     onClear = { task = t.copy(repeatRule = null) }) { dialog = "repeat" }
             }
             Spacer(Modifier.height(12.dp))
@@ -212,21 +214,21 @@ fun TaskDetailScreen(id: Long) {
                 DropdownField("List", listOf<Pair<Long?, String>>(null to "📥 Tasks") + lists.map { it.id to "${it.emoji} ${it.name}" }, t.listId, { task = t.copy(listId = it) })
                 Spacer(Modifier.height(10.dp))
                 OutlinedTextField(t.tags, { task = t.copy(tags = it) }, label = { Text("Tags (comma separated)") }, singleLine = true,
-                    leadingIcon = { Icon(Icons.Default.Sell, null) }, modifier = Modifier.fillMaxWidth())
+                    leadingIcon = { Icon(Icons.Rounded.Sell, null) }, modifier = Modifier.fillMaxWidth())
                 Spacer(Modifier.height(10.dp))
                 DropdownField("Time estimate", listOf<Pair<Int?, String>>(null to "None", 15 to "15 min", 30 to "30 min", 45 to "45 min", 60 to "1 hour", 90 to "1.5 hours", 120 to "2 hours", 240 to "Half day", 480 to "Full day"),
                     t.estimateMinutes, { task = t.copy(estimateMinutes = it) })
             }
             Spacer(Modifier.height(12.dp))
             BlCard(Modifier.fillMaxWidth()) {
-                PickerRow(Icons.Default.AttachFile, "Add file", t.attachmentPath?.substringAfterLast('/'), onClear = { task = t.copy(attachmentPath = null) }) {
+                PickerRow(Icons.Rounded.AttachFile, "Add file", t.attachmentPath?.substringAfterLast('/'), onClear = { task = t.copy(attachmentPath = null) }) {
                     val p = t.attachmentPath
                     if (p != null) Files.open(ctx, app.storage.resolve(p)) else attach.launch(arrayOf("*/*"))
                 }
             }
             Spacer(Modifier.height(12.dp))
             OutlinedTextField(t.notes, { task = t.copy(notes = it) }, label = { Text("Notes") }, minLines = 4,
-                leadingIcon = { Icon(Icons.AutoMirrored.Filled.Notes, null) },
+                leadingIcon = { Icon(Icons.AutoMirrored.Rounded.Notes, null) },
                 keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences), modifier = Modifier.fillMaxWidth())
             Text(
                 "Created ${Time.dateTime(t.createdAt)}" + (t.completedAt?.let { " · Completed ${Time.dateTime(it)}" } ?: ""),
@@ -275,6 +277,6 @@ private fun StepRow(s: SubtaskEntity) {
                 focusedIndicatorColor = Color.Transparent, unfocusedIndicatorColor = Color.Transparent),
             modifier = Modifier.weight(1f),
         )
-        IconButton(onClick = { app.io { app.db.tasks().deleteSubtask(s) } }) { Icon(Icons.Default.Close, "Remove step", Modifier.size(18.dp)) }
+        IconButton(onClick = { app.io { app.db.tasks().deleteSubtask(s) } }) { Icon(Icons.Rounded.Close, "Remove step", Modifier.size(18.dp)) }
     }
 }

@@ -59,7 +59,7 @@ class TodayWidget : GlanceAppWidget() {
         provideContent {
             val v by Widgets.version.collectAsState()
             val model by produceState(initial, v) { value = Widgets.today(context, onLock) }
-            GlanceTheme { Content(model) }
+            GlanceTheme(colors = WUi.colors(context)) { Content(model) }
         }
     }
 

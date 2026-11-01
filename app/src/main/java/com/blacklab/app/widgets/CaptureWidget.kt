@@ -53,7 +53,7 @@ class CaptureWidget : GlanceAppWidget() {
     )
 
     override suspend fun provideGlance(context: Context, id: GlanceId) {
-        provideContent { GlanceTheme { Content() } }
+        provideContent { GlanceTheme(colors = WUi.colors(context)) { Content() } }
     }
 
     @Composable

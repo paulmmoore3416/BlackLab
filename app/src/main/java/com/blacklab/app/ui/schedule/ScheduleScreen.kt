@@ -34,7 +34,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.rounded.*
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.DropdownMenu
@@ -184,29 +184,29 @@ fun ScheduleScreen() {
                     IconButton(onClick = {
                         selected = today.toEpochDay()
                         scope.launch { monthPager.animateScrollToPage(CENTER); gridPager.animateScrollToPage(CENTER) }
-                    }) { Icon(Icons.Default.Today, "Today") }
+                    }) { Icon(Icons.Rounded.Today, "Today") }
                     var viewMenu by remember { mutableStateOf(false) }
                     Box {
                         IconButton(onClick = { viewMenu = true }) {
-                            Icon(when (view) { CalView.MONTH -> Icons.Default.CalendarViewMonth; CalView.WEEK -> Icons.Default.CalendarViewWeek; CalView.AGENDA -> Icons.Default.ViewAgenda; else -> Icons.Default.CalendarViewDay }, "View")
+                            Icon(when (view) { CalView.MONTH -> Icons.Rounded.CalendarViewMonth; CalView.WEEK -> Icons.Rounded.CalendarViewWeek; CalView.AGENDA -> Icons.Rounded.ViewAgenda; else -> Icons.Rounded.CalendarViewDay }, "View")
                         }
                         DropdownMenu(viewMenu, { viewMenu = false }) {
                             CalView.entries.forEach { v ->
                                 DropdownMenuItem(text = { Text(v.label) }, onClick = {
                                     app.settings.update { putString(Keys.CALENDAR_VIEW, v.name) }; viewMenu = false
                                     scope.launch { gridPager.scrollToPage(CENTER) }
-                                }, trailingIcon = { if (v == view) Icon(Icons.Default.Check, null) })
+                                }, trailingIcon = { if (v == view) Icon(Icons.Rounded.Check, null) })
                             }
                         }
                     }
                     var more by remember { mutableStateOf(false) }
                     Box {
-                        IconButton(onClick = { more = true }) { Icon(Icons.Default.MoreVert, "More") }
+                        IconButton(onClick = { more = true }) { Icon(Icons.Rounded.MoreVert, "More") }
                         DropdownMenu(more, { more = false }) {
-                            DropdownMenuItem(text = { Text("Find a time") }, leadingIcon = { Icon(Icons.Default.EventAvailable, null) }, onClick = { more = false; dialog = "find" })
-                            DropdownMenuItem(text = { Text("Calendars & sources") }, leadingIcon = { Icon(Icons.Default.Layers, null) }, onClick = { more = false; dialog = "calendars" })
-                            DropdownMenuItem(text = { Text("Import .ics") }, leadingIcon = { Icon(Icons.Default.Upload, null) }, onClick = { more = false; icsImport.launch(arrayOf("text/calendar", "*/*")) })
-                            DropdownMenuItem(text = { Text("Export all to .ics") }, leadingIcon = { Icon(Icons.Default.Download, null) }, onClick = {
+                            DropdownMenuItem(text = { Text("Find a time") }, leadingIcon = { Icon(Icons.Rounded.EventAvailable, null) }, onClick = { more = false; dialog = "find" })
+                            DropdownMenuItem(text = { Text("Calendars & sources") }, leadingIcon = { Icon(Icons.Rounded.Layers, null) }, onClick = { more = false; dialog = "calendars" })
+                            DropdownMenuItem(text = { Text("Import .ics") }, leadingIcon = { Icon(Icons.Rounded.Upload, null) }, onClick = { more = false; icsImport.launch(arrayOf("text/calendar", "*/*")) })
+                            DropdownMenuItem(text = { Text("Export all to .ics") }, leadingIcon = { Icon(Icons.Rounded.Download, null) }, onClick = {
                                 more = false
                                 app.io {
                                     val evs = app.db.events().all().filter { it.profile == settings.activeProfile.name }
@@ -227,7 +227,7 @@ fun ScheduleScreen() {
                     val startMin = if (d == today) ((LocalTime.now().hour + 1) * 60).coerceAtMost(23 * 60) else 9 * 60
                     shell.go("event/0?start=${Time.millis(d, startMin)}")
                 },
-                icon = { Icon(Icons.Default.Add, null) }, text = { Text("Event") },
+                icon = { Icon(Icons.Rounded.Add, null) }, text = { Text("Event") },
             )
         },
     ) { pad ->
@@ -358,9 +358,9 @@ fun ItemRow(it: CalItem, day: LocalDate?, onClick: () -> Unit) {
             if (sub.isNotBlank()) Text(sub, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
         when (it.kind) {
-            CalKind.DEVICE -> Icon(Icons.Default.Sync, "Device calendar", Modifier.size(14.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
-            CalKind.CLASS -> Icon(Icons.Default.School, null, Modifier.size(16.dp), tint = it.color)
-            else -> if (it.event?.repeatRule != null) Icon(Icons.Default.Repeat, null, Modifier.size(14.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+            CalKind.DEVICE -> Icon(Icons.Rounded.Sync, "Device calendar", Modifier.size(14.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+            CalKind.CLASS -> Icon(Icons.Rounded.School, null, Modifier.size(16.dp), tint = it.color)
+            else -> if (it.event?.repeatRule != null) Icon(Icons.Rounded.Repeat, null, Modifier.size(14.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
 }
@@ -375,7 +375,7 @@ private fun AgendaList(today: LocalDate, byDay: Map<LocalDate, List<CalItem>>, o
         state.scrollToItem(idx)
     }
     if (days.size <= 1 && byDay[today].isNullOrEmpty()) {
-        EmptyState(Icons.Default.EventAvailable, "Your schedule is clear", "Events, classes, deadlines and dated tasks show up here.")
+        EmptyState(Icons.Rounded.EventAvailable, "Your schedule is clear", "Events, classes, deadlines and dated tasks show up here.")
         return
     }
     LazyColumn(state = state, contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 96.dp)) {
@@ -578,17 +578,17 @@ private fun ItemDetailSheet(item: CalItem, onDismiss: () -> Unit) {
                 }
             }
             Spacer(Modifier.height(12.dp))
-            if (item.subtitle.isNotBlank()) DetailLine(Icons.Default.Layers, item.subtitle + " · " + app.settings.profileName(Profile.from(e.profile)))
-            if (e.location.isNotBlank()) DetailLine(Icons.Default.LocationOn, e.location) { Files.openMap(ctx, e.location) }
-            if (e.url.isNotBlank()) DetailLine(Icons.Default.VideoCall, e.url) { Files.openUrl(ctx, e.url) }
-            if (e.attendees.isNotBlank()) DetailLine(Icons.Default.Group, e.attendees) { Files.email(ctx, e.attendees, e.title) }
-            if (e.reminders.isNotBlank()) DetailLine(Icons.Default.Notifications, e.reminders.split(',').mapNotNull { it.trim().toIntOrNull() }.joinToString(", ") { Time.minutesLabel(it) + if (it > 0) " before" else "" })
-            if (!e.busy) DetailLine(Icons.Default.EventAvailable, "Shown as free")
+            if (item.subtitle.isNotBlank()) DetailLine(Icons.Rounded.Layers, item.subtitle + " · " + app.settings.profileName(Profile.from(e.profile)))
+            if (e.location.isNotBlank()) DetailLine(Icons.Rounded.LocationOn, e.location) { Files.openMap(ctx, e.location) }
+            if (e.url.isNotBlank()) DetailLine(Icons.Rounded.VideoCall, e.url) { Files.openUrl(ctx, e.url) }
+            if (e.attendees.isNotBlank()) DetailLine(Icons.Rounded.Group, e.attendees) { Files.email(ctx, e.attendees, e.title) }
+            if (e.reminders.isNotBlank()) DetailLine(Icons.Rounded.Notifications, e.reminders.split(',').mapNotNull { it.trim().toIntOrNull() }.joinToString(", ") { Time.minutesLabel(it) + if (it > 0) " before" else "" })
+            if (!e.busy) DetailLine(Icons.Rounded.EventAvailable, "Shown as free")
             if (e.notes.isNotBlank()) { Spacer(Modifier.height(8.dp)); Text(e.notes, style = MaterialTheme.typography.bodyMedium) }
             Spacer(Modifier.height(16.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Button(onClick = { onDismiss(); shell.go("event/${e.id}") }, modifier = Modifier.weight(1f)) { Icon(Icons.Default.Edit, null); Spacer(Modifier.width(6.dp)); Text("Edit") }
-                FilledTonalButton(onClick = { confirmDelete = true }, modifier = Modifier.weight(1f)) { Icon(Icons.Default.Delete, null); Spacer(Modifier.width(6.dp)); Text("Delete") }
+                Button(onClick = { onDismiss(); shell.go("event/${e.id}") }, modifier = Modifier.weight(1f)) { Icon(Icons.Rounded.Edit, null); Spacer(Modifier.width(6.dp)); Text("Edit") }
+                FilledTonalButton(onClick = { confirmDelete = true }, modifier = Modifier.weight(1f)) { Icon(Icons.Rounded.Delete, null); Spacer(Modifier.width(6.dp)); Text("Delete") }
             }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(top = 8.dp)) {
                 OutlinedButton(onClick = {

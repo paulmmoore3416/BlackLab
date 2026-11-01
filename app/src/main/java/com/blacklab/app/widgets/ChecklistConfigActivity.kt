@@ -23,10 +23,10 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.Notes
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Checklist
-import androidx.compose.material.icons.filled.PushPin
+import androidx.compose.material.icons.automirrored.rounded.Notes
+import androidx.compose.material.icons.rounded.Add
+import androidx.compose.material.icons.rounded.Checklist
+import androidx.compose.material.icons.rounded.PushPin
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
@@ -91,7 +91,7 @@ class ChecklistConfigActivity : FragmentActivity() {
                     LazyColumn(Modifier.fillMaxSize().padding(pad), contentPadding = PaddingValues(vertical = 8.dp)) {
                         item {
                             Row(Modifier.fillMaxWidth().clickable { newChecklist() }.padding(horizontal = 20.dp, vertical = 14.dp), verticalAlignment = Alignment.CenterVertically) {
-                                Icon(Icons.Default.Add, null, tint = MaterialTheme.colorScheme.primary)
+                                Icon(Icons.Rounded.Add, null, tint = MaterialTheme.colorScheme.primary)
                                 Spacer(Modifier.size(16.dp))
                                 Text("New checklist", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary)
                             }
@@ -102,14 +102,14 @@ class ChecklistConfigActivity : FragmentActivity() {
                         }
                         items(list.orEmpty(), key = { it.id }) { n ->
                             Row(Modifier.fillMaxWidth().clickable { choose(n.id) }.padding(horizontal = 20.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-                                Icon(if (n.checklist) Icons.Default.Checklist else Icons.AutoMirrored.Filled.Notes, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                                Icon(if (n.checklist) Icons.Rounded.Checklist else Icons.AutoMirrored.Rounded.Notes, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
                                 Spacer(Modifier.size(16.dp))
                                 Column(Modifier.weight(1f)) {
                                     Text(n.title.ifBlank { if (n.checklist) "Checklist" else "Note" }, style = MaterialTheme.typography.titleSmall, maxLines = 1)
                                     val sub = NoteOps.summary(n)
                                     if (sub.isNotBlank()) Text(sub, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
                                 }
-                                if (n.pinned) Icon(Icons.Default.PushPin, "Pinned", Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                                if (n.pinned) Icon(Icons.Rounded.PushPin, "Pinned", Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
                             }
                         }
                     }

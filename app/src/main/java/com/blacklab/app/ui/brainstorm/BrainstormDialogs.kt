@@ -26,10 +26,10 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.Send
-import androidx.compose.material.icons.automirrored.filled.Undo
-import androidx.compose.material.icons.automirrored.filled.*
-import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.automirrored.rounded.Send
+import androidx.compose.material.icons.automirrored.rounded.Undo
+import androidx.compose.material.icons.automirrored.rounded.*
+import androidx.compose.material.icons.rounded.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -159,9 +159,9 @@ fun VoiceRecorderSheet(onDismiss: () -> Unit, onDone: (file: File, transcript: S
                 !micOk -> Button(onClick = { perm.launch(Manifest.permission.RECORD_AUDIO) }) { Text("Allow microphone") }
                 finishing -> Row(verticalAlignment = Alignment.CenterVertically) { CircularProgressIndicator(Modifier.size(22.dp)); Spacer(Modifier.width(10.dp)); Text("Finishing transcript…") }
                 engine == null -> FilledIconButton(onClick = { start() }, Modifier.size(76.dp), colors = IconButtonDefaults.filledIconButtonColors(containerColor = Color(0xFFE53935))) {
-                    Icon(Icons.Default.Mic, "Record", Modifier.size(36.dp), tint = Color.White)
+                    Icon(Icons.Rounded.Mic, "Record", Modifier.size(36.dp), tint = Color.White)
                 }
-                else -> FilledIconButton(onClick = { finish() }, Modifier.size(76.dp)) { Icon(Icons.Default.Stop, "Stop", Modifier.size(36.dp)) }
+                else -> FilledIconButton(onClick = { finish() }, Modifier.size(76.dp)) { Icon(Icons.Rounded.Stop, "Stop", Modifier.size(36.dp)) }
             }
             Spacer(Modifier.height(8.dp))
         }
@@ -210,10 +210,10 @@ fun DrawingPadDialog(base: File? = null, onDismiss: () -> Unit, onSave: (File) -
         Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.surface) {
             Column(Modifier.fillMaxSize().systemBarsPadding()) {
                 Row(Modifier.fillMaxWidth().padding(horizontal = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-                    IconButton(onClick = onDismiss) { Icon(Icons.Default.Close, "Cancel") }
+                    IconButton(onClick = onDismiss) { Icon(Icons.Rounded.Close, "Cancel") }
                     Text("Drawing", style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
-                    IconButton(onClick = { if (strokes.isNotEmpty()) strokes.removeAt(strokes.lastIndex) }, enabled = strokes.isNotEmpty()) { Icon(Icons.AutoMirrored.Filled.Undo, "Undo") }
-                    IconButton(onClick = { strokes.clear() }) { Icon(Icons.Default.DeleteSweep, "Clear") }
+                    IconButton(onClick = { if (strokes.isNotEmpty()) strokes.removeAt(strokes.lastIndex) }, enabled = strokes.isNotEmpty()) { Icon(Icons.AutoMirrored.Rounded.Undo, "Undo") }
+                    IconButton(onClick = { strokes.clear() }) { Icon(Icons.Rounded.DeleteSweep, "Clear") }
                     TextButton(onClick = { onSave(render()) }, enabled = strokes.isNotEmpty() || baseBmp != null) { Text("Save") }
                 }
                 Box(
@@ -242,7 +242,7 @@ fun DrawingPadDialog(base: File? = null, onDismiss: () -> Unit, onSave: (File) -
                     }
                 }
                 Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 8.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
-                    listOf("pen" to Icons.Default.Create, "marker" to Icons.Default.BorderColor, "eraser" to Icons.Default.AutoFixOff).forEach { (t, ic) ->
+                    listOf("pen" to Icons.Rounded.Create, "marker" to Icons.Rounded.BorderColor, "eraser" to Icons.Rounded.AutoFixOff).forEach { (t, ic) ->
                         FilledTonalIconToggleButton(checked = tool == t, onCheckedChange = { tool = t }) { Icon(ic, t) }
                     }
                     Spacer(Modifier.width(8.dp))
@@ -305,8 +305,8 @@ fun ReminderDialog(
             Column(Modifier.verticalScroll(rememberScrollState())) {
                 if (allowPlace) {
                     TabRow(tab, containerColor = Color.Transparent) {
-                        Tab(tab == 0, { tab = 0 }, text = { Text("Time") }, icon = { Icon(Icons.Default.Schedule, null) })
-                        Tab(tab == 1, { tab = 1 }, text = { Text("Place") }, icon = { Icon(Icons.Default.Place, null) })
+                        Tab(tab == 0, { tab = 0 }, text = { Text("Time") }, icon = { Icon(Icons.Rounded.Schedule, null) })
+                        Tab(tab == 1, { tab = 1 }, text = { Text("Place") }, icon = { Icon(Icons.Rounded.Place, null) })
                     }
                     Spacer(Modifier.height(10.dp))
                 }
@@ -323,9 +323,9 @@ fun ReminderDialog(
                             modifier = Modifier.clickable { day = v.first; minute = v.second }, colors = ListItemDefaults.colors(containerColor = Color.Transparent))
                     }
                     HorizontalDivider()
-                    ListItem(headlineContent = { Text(Time.longDate(day)) }, leadingContent = { Icon(Icons.Default.Event, null) }, modifier = Modifier.clickable { pickDay = true }, colors = ListItemDefaults.colors(containerColor = Color.Transparent))
-                    ListItem(headlineContent = { Text(Time.time(minute)) }, leadingContent = { Icon(Icons.Default.AccessTime, null) }, modifier = Modifier.clickable { pickTime = true }, colors = ListItemDefaults.colors(containerColor = Color.Transparent))
-                    ListItem(headlineContent = { Text(com.blacklab.app.core.Recurrence.parse(rule)?.describe(day) ?: "Does not repeat") }, leadingContent = { Icon(Icons.Default.Repeat, null) },
+                    ListItem(headlineContent = { Text(Time.longDate(day)) }, leadingContent = { Icon(Icons.Rounded.Event, null) }, modifier = Modifier.clickable { pickDay = true }, colors = ListItemDefaults.colors(containerColor = Color.Transparent))
+                    ListItem(headlineContent = { Text(Time.time(minute)) }, leadingContent = { Icon(Icons.Rounded.AccessTime, null) }, modifier = Modifier.clickable { pickTime = true }, colors = ListItemDefaults.colors(containerColor = Color.Transparent))
+                    ListItem(headlineContent = { Text(com.blacklab.app.core.Recurrence.parse(rule)?.describe(day) ?: "Does not repeat") }, leadingContent = { Icon(Icons.Rounded.Repeat, null) },
                         modifier = Modifier.clickable { pickRepeat = true }, colors = ListItemDefaults.colors(containerColor = Color.Transparent))
                 } else {
                     if (!locOk || !bgOk) {
@@ -343,7 +343,7 @@ fun ReminderDialog(
                                     val r = geocode(ctx, placeName)
                                     if (r != null) { lat = r.first; lon = r.second; busy = null } else busy = "Couldn't find that place"
                                 }
-                            }, enabled = placeName.isNotBlank()) { Icon(Icons.Default.Search, "Find") }
+                            }, enabled = placeName.isNotBlank()) { Icon(Icons.Rounded.Search, "Find") }
                         })
                     TextButton(onClick = {
                         if (!locOk) { finePerm.launch(Manifest.permission.ACCESS_FINE_LOCATION); return@TextButton }
@@ -355,7 +355,7 @@ fun ReminderDialog(
                             if (placeName.isBlank()) placeName = Geo.address(ctx, l.latitude, l.longitude) ?: "Current location"
                             busy = null
                         }
-                    }) { Icon(Icons.Default.MyLocation, null); Spacer(Modifier.width(6.dp)); Text("Use where I am now") }
+                    }) { Icon(Icons.Rounded.MyLocation, null); Spacer(Modifier.width(6.dp)); Text("Use where I am now") }
                     busy?.let { Text(it, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant) }
                     if (lat != null) Text(String.format(java.util.Locale.US, "📍 %.5f, %.5f", lat, lon), style = MaterialTheme.typography.labelMedium)
                     Spacer(Modifier.height(6.dp))
@@ -432,7 +432,7 @@ fun SectionPickerDialog(title: String, profile: Profile, excludeSection: Long? =
                             Spacer(Modifier.width(10.dp))
                             Text((if (s.groupName.isNotBlank()) s.groupName + " › " else "") + s.name, modifier = Modifier.weight(1f),
                                 color = if (disabled) MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f) else MaterialTheme.colorScheme.onSurface)
-                            if (s.locked) Icon(Icons.Default.Lock, null, Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                            if (s.locked) Icon(Icons.Rounded.Lock, null, Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                     }
                 }
@@ -462,10 +462,10 @@ fun TemplatePickerDialog(onDismiss: () -> Unit, onPick: (PageTemplate) -> Unit) 
 }
 
 fun templateIcon(id: String) = when (id) {
-    "lined" -> Icons.AutoMirrored.Filled.Notes; "grid", "dots" -> Icons.Default.GridOn; "todo" -> Icons.Default.Checklist; "meeting" -> Icons.Default.Groups
-    "lecture" -> Icons.Default.School; "project" -> Icons.Default.Flag; "mindmap" -> Icons.Default.Hub; "swot" -> Icons.Default.Dashboard
-    "decision" -> Icons.Default.Balance; "daily" -> Icons.Default.Today; "weekly" -> Icons.Default.DateRange; "retro" -> Icons.Default.Replay
-    else -> Icons.Default.Description
+    "lined" -> Icons.AutoMirrored.Rounded.Notes; "grid", "dots" -> Icons.Rounded.GridOn; "todo" -> Icons.Rounded.Checklist; "meeting" -> Icons.Rounded.Groups
+    "lecture" -> Icons.Rounded.School; "project" -> Icons.Rounded.Flag; "mindmap" -> Icons.Rounded.Hub; "swot" -> Icons.Rounded.Dashboard
+    "decision" -> Icons.Rounded.Balance; "daily" -> Icons.Rounded.Today; "weekly" -> Icons.Rounded.DateRange; "retro" -> Icons.Rounded.Replay
+    else -> Icons.Rounded.Description
 }
 
 // ====================================================================== passwords
@@ -524,7 +524,7 @@ fun CommentsSheet(pageId: Long?, noteId: Long?, onDismiss: () -> Unit) {
                     val t = text.trim(); if (t.isEmpty()) return@IconButton
                     app.io { app.db.brainstorm().insertComment(CommentEntity(pageId = pageId, noteId = noteId, author = me, text = t)) }
                     text = ""
-                }) { Icon(Icons.AutoMirrored.Filled.Send, "Send") }
+                }) { Icon(Icons.AutoMirrored.Rounded.Send, "Send") }
             }
         }
     }
@@ -536,7 +536,7 @@ private fun CommentRow(c: CommentEntity) {
     Surface(Modifier.fillMaxWidth().padding(vertical = 4.dp), shape = RoundedCornerShape(14.dp), color = MaterialTheme.colorScheme.surfaceContainer) {
         Column(Modifier.padding(12.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(if (c.guest) Icons.Default.Wifi else Icons.Default.Person, null, Modifier.size(16.dp), tint = MaterialTheme.colorScheme.primary)
+                Icon(if (c.guest) Icons.Rounded.Wifi else Icons.Rounded.Person, null, Modifier.size(16.dp), tint = MaterialTheme.colorScheme.primary)
                 Spacer(Modifier.width(6.dp))
                 Text(c.author + if (c.guest) " · guest" else "", style = MaterialTheme.typography.labelLarge, modifier = Modifier.weight(1f))
                 Text(Time.dateTime(c.createdAt), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -590,9 +590,9 @@ fun LiveShareSheet(kind: String, refId: Long, title: String, locked: Boolean = f
                 else -> {
                     Text("Guests can", style = MaterialTheme.typography.labelLarge)
                     Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        FilterChip(permission == "VIEW", { permission = "VIEW" }, label = { Text("View") }, leadingIcon = { Icon(Icons.Default.Visibility, null) })
-                        FilterChip(permission == "COMMENT", { permission = "COMMENT" }, label = { Text("Comment") }, leadingIcon = { Icon(Icons.AutoMirrored.Filled.Comment, null) })
-                        if (kind == "NOTE") FilterChip(permission == "EDIT", { permission = "EDIT" }, label = { Text("Edit list") }, leadingIcon = { Icon(Icons.Default.Checklist, null) })
+                        FilterChip(permission == "VIEW", { permission = "VIEW" }, label = { Text("View") }, leadingIcon = { Icon(Icons.Rounded.Visibility, null) })
+                        FilterChip(permission == "COMMENT", { permission = "COMMENT" }, label = { Text("Comment") }, leadingIcon = { Icon(Icons.AutoMirrored.Rounded.Comment, null) })
+                        if (kind == "NOTE") FilterChip(permission == "EDIT", { permission = "EDIT" }, label = { Text("Edit list") }, leadingIcon = { Icon(Icons.Rounded.Checklist, null) })
                     }
                     Spacer(Modifier.height(8.dp))
                     Text("Link works for", style = MaterialTheme.typography.labelLarge)
@@ -601,7 +601,7 @@ fun LiveShareSheet(kind: String, refId: Long, title: String, locked: Boolean = f
                     }
                     Spacer(Modifier.height(10.dp))
                     Button(onClick = { scope.launch { showQr = LiveShare.create(app, kind, refId, title, permission, hours) } }, modifier = Modifier.fillMaxWidth()) {
-                        Icon(Icons.Default.Link, null); Spacer(Modifier.width(8.dp)); Text("Create link")
+                        Icon(Icons.Rounded.Link, null); Spacer(Modifier.width(8.dp)); Text("Create link")
                     }
                     if (app.link.lanAddress() == null) Text("Connect the phone to Wi-Fi so others can reach it.", color = LocalBlColors.current.warning, style = MaterialTheme.typography.labelMedium)
                     if (mine.isNotEmpty()) {
@@ -628,10 +628,10 @@ fun ShareRow(s: ShareLinkEntity, onQr: () -> Unit) {
                 Text(s.title, style = MaterialTheme.typography.labelLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 Text("${s.permission.lowercase().replaceFirstChar { it.uppercase() }} · until ${Time.dateTime(s.expiresAt)} · opened ${s.opens}×", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
-            IconButton(onClick = onQr) { Icon(Icons.Default.QrCode2, "QR code") }
-            IconButton(onClick = { url?.let { copy(ctx, it) } }, enabled = url != null) { Icon(Icons.Default.ContentCopy, "Copy link") }
-            IconButton(onClick = { url?.let { Files.shareText(ctx, "Open “${s.title}” (same Wi-Fi): $it", s.title) } }, enabled = url != null) { Icon(Icons.Default.Share, "Send link") }
-            IconButton(onClick = { app.io { LiveShare.revoke(app, s) } }) { Icon(Icons.Default.LinkOff, "Turn off", tint = LocalBlColors.current.danger) }
+            IconButton(onClick = onQr) { Icon(Icons.Rounded.QrCode2, "QR code") }
+            IconButton(onClick = { url?.let { copy(ctx, it) } }, enabled = url != null) { Icon(Icons.Rounded.ContentCopy, "Copy link") }
+            IconButton(onClick = { url?.let { Files.shareText(ctx, "Open “${s.title}” (same Wi-Fi): $it", s.title) } }, enabled = url != null) { Icon(Icons.Rounded.Share, "Send link") }
+            IconButton(onClick = { app.io { LiveShare.revoke(app, s) } }) { Icon(Icons.Rounded.LinkOff, "Turn off", tint = LocalBlColors.current.danger) }
         }
     }
 }

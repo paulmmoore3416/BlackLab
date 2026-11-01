@@ -7,13 +7,13 @@
 **A private, all-in-one personal & professional workspace for Android.**
 Pro camera & photo editor · dictation · audio recorder · Word-class documents · journal · to-do · calendar · education & certification tracking — in one app, with every file saved to a real folder on your phone.
 
-[![Version](https://img.shields.io/badge/version-4.5.0-2BD9A8)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-4.6.0-2BD9A8)](CHANGELOG.md)
 [![Android](https://img.shields.io/badge/Android-15%2B-3DDC84?logo=android&logoColor=white)](#requirements)
 [![Kotlin](https://img.shields.io/badge/Kotlin-2.1-7F52FF?logo=kotlin&logoColor=white)](https://kotlinlang.org)
 [![Jetpack Compose](https://img.shields.io/badge/Jetpack%20Compose-Material%203-4285F4?logo=jetpackcompose&logoColor=white)](https://developer.android.com/compose)
 [![Android CI](https://github.com/paulmmoore3416/BlackLab/actions/workflows/android.yml/badge.svg)](https://github.com/paulmmoore3416/BlackLab/actions/workflows/android.yml)
 
-[Download APK](releases/BlackLab-v4.5.0.apk) · [Features](#features) · [Install](#install) · [Build from source](#build-from-source) · [Architecture](docs/ARCHITECTURE.md)
+[Download APK](releases/BlackLab-v4.6.0.apk) · [Features](#features) · [Install](#install) · [Build from source](#build-from-source) · [Architecture](docs/ARCHITECTURE.md)
 
 </div>
 
@@ -159,6 +159,8 @@ Rich-text entries saved as dated files, mood tracking, tags & location, favorite
 ### 🎨 Look & feel
 - Nine color palettes per account (Mint, Cobalt, Violet, Coral, Rose, Forest, Amber, Ocean, Graphite), each with a complementary secondary color; pick your own secondary; live light/dark preview; all WCAG AA contrast
 - Dark, light, system, or **automatic** (sunset to sunrise, worked out on the phone, or your own hours)
+- Smooth by design: task and note cards grow into their screens, haptic feedback, instant task ticks, loading placeholders instead of spinners, large titles that collapse, a bottom bar that hides while you scroll, an animated launch screen, and a **Reduce motion** option
+- **Inter** typeface with even-width digits for timers and counts; one rounded icon style; widgets in your palette
 - **Live Home dashboard**: finished events drop off, *NOW* marks what's on, tasks done today are counted, your phone's calendar updates as it syncs, and **Since you last looked** lists what happened while you were away
 
 ### 🔐 Accounts, privacy & storage
@@ -190,13 +192,13 @@ Internal storage/BlackLab/
 
 ## Install
 
-1. Download **[`BlackLab-v4.5.0.apk`](releases/BlackLab-v4.5.0.apk)** (also attached to the [v4.5.0 release](https://github.com/paulmmoore3416/BlackLab/releases/tag/v4.5.0)).
-   Verify it with the published SHA-256: [`BlackLab-v4.5.0.apk.sha256`](releases/BlackLab-v4.5.0.apk.sha256).
+1. Download **[`BlackLab-v4.6.0.apk`](releases/BlackLab-v4.6.0.apk)** (also attached to the [v4.6.0 release](https://github.com/paulmmoore3416/BlackLab/releases/tag/v4.6.0)).
+   Verify it with the published SHA-256: [`BlackLab-v4.6.0.apk.sha256`](releases/BlackLab-v4.6.0.apk.sha256).
 2. On the phone, allow your browser/Files app to **install unknown apps** when prompted.
 3. Open BlackLab and follow onboarding: name & title, account names, then grant
    **All-files access** (creates the BlackLab folder), **camera & microphone**, **notifications** and optionally **calendars**.
 
-Or with USB debugging: `adb install releases/BlackLab-v4.5.0.apk`
+Or with USB debugging: `adb install releases/BlackLab-v4.6.0.apk`
 
 From 4.3.0 on, BlackLab can update itself: **Settings › App updates › Check now**. Android asks once for permission to install updates.
 
@@ -302,6 +304,10 @@ BlackLab has no backend and collects no analytics of its own — documents, reco
 **Updates & problem reports:** the update check is a single anonymous request to GitHub's public API, made only when you tap *Check now* or turn on the weekly check. Problem reports stay in the app's private storage (not in backups) until you share them.
 
 Signing keys, passwords and machine-specific files are excluded from this repository by `.gitignore`. See [SECURITY.md](SECURITY.md).
+
+## Third-party assets
+
+The Inter typeface (© The Inter Project Authors) is bundled under the SIL Open Font License 1.1; see `app/src/main/assets/licenses/Inter-OFL.txt`.
 
 ## License
 

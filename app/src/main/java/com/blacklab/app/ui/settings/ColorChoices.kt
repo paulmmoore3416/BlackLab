@@ -20,7 +20,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SegmentedButton
@@ -122,7 +122,7 @@ private fun PaletteSwatch(p: AccentPalette, dark: Boolean, selected: Boolean, on
                 drawArc(p.secondary(dark), 0f, 90f, useCenter = true, topLeft = Offset.Zero, size = Size(size.width, size.height))
                 drawArc(p.tertiary(dark), 90f, 45f, useCenter = true, topLeft = Offset.Zero, size = Size(size.width, size.height))
             }
-            if (selected) Icon(Icons.Default.Check, null, tint = Color.White, modifier = Modifier.size(20.dp).background(Color.Black.copy(alpha = 0.35f), CircleShape).padding(2.dp))
+            if (selected) Icon(Icons.Rounded.Check, null, tint = Color.White, modifier = Modifier.size(20.dp).background(Color.Black.copy(alpha = 0.35f), CircleShape).padding(2.dp))
         }
         Text(p.label, style = MaterialTheme.typography.labelSmall, modifier = Modifier.padding(top = 3.dp), maxLines = 1)
     }
@@ -136,7 +136,7 @@ private fun Dot(c: Color, selected: Boolean, label: String, onClick: () -> Unit)
             .clickable(onClick = onClick)
             .semantics { contentDescription = label; this.selected = selected },
         contentAlignment = Alignment.Center,
-    ) { if (selected) Icon(Icons.Default.Check, null, tint = Color.White, modifier = Modifier.size(18.dp)) }
+    ) { if (selected) Icon(Icons.Rounded.Check, null, tint = Color.White, modifier = Modifier.size(18.dp)) }
 }
 
 /** A small mock of a screen in the chosen colors, in both light and dark. */

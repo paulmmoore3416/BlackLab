@@ -25,9 +25,10 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.MenuBook
-import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.automirrored.rounded.MenuBook
+import androidx.compose.material.icons.rounded.*
 import androidx.compose.material.icons.outlined.CalendarMonth
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.material.icons.outlined.CheckCircle
 import androidx.compose.material.icons.outlined.FolderOpen
 import androidx.compose.material.icons.outlined.Home
@@ -55,6 +56,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
@@ -121,32 +123,33 @@ fun AppRoot(activity: MainActivity) {
     }
 }
 
-private data class Dest(val route: String, val label: String, val icon: ImageVector)
+private data class Dest(val route: String, val label: String, val icon: ImageVector, val selectedIcon: ImageVector = icon)
 
+/** Outlined when idle, filled (rounded) when selected, so the current tab reads at a glance. */
 private val bottomDests = listOf(
-    Dest("home", "Home", Icons.Outlined.Home),
-    Dest("tasks", "Tasks", Icons.Outlined.CheckCircle),
-    Dest("schedule", "Schedule", Icons.Outlined.CalendarMonth),
-    Dest("education", "Learn", Icons.Outlined.School),
-    Dest("library", "Library", Icons.Outlined.FolderOpen),
+    Dest("home", "Home", Icons.Outlined.Home, Icons.Rounded.Home),
+    Dest("tasks", "Tasks", Icons.Outlined.CheckCircle, Icons.Rounded.CheckCircle),
+    Dest("schedule", "Schedule", Icons.Outlined.CalendarMonth, Icons.Rounded.CalendarMonth),
+    Dest("education", "Learn", Icons.Outlined.School, Icons.Rounded.School),
+    Dest("library", "Library", Icons.Outlined.FolderOpen, Icons.Rounded.Folder),
 )
 
 private val drawerDests = listOf(
-    Dest("home", "Home", Icons.Default.Dashboard),
-    Dest("assistant", "Assistant", Icons.Default.AutoAwesome),
-    Dest("camera", "Camera", Icons.Default.PhotoCamera),
-    Dest("recorder", "Recorder", Icons.Default.Mic),
-    Dest("music", "Music", Icons.Default.LibraryMusic),
-    Dest("dictation", "Dictation", Icons.Default.RecordVoiceOver),
-    Dest("library", "Library & Files", Icons.Default.Folder),
-    Dest("create", "Create & Edit", Icons.Default.AddCircle),
-    Dest("brainstorm", "Brainstorm", Icons.Default.Lightbulb),
-    Dest("documents", "Documents", Icons.Default.Description),
-    Dest("signatures", "Signatures", Icons.Default.Draw),
-    Dest("journal", "Journal", Icons.AutoMirrored.Filled.MenuBook),
-    Dest("tasks", "To-Do", Icons.Default.TaskAlt),
-    Dest("schedule", "Schedule", Icons.Default.CalendarMonth),
-    Dest("education", "Education", Icons.Default.School),
+    Dest("home", "Home", Icons.Rounded.Dashboard),
+    Dest("assistant", "Assistant", Icons.Rounded.AutoAwesome),
+    Dest("camera", "Camera", Icons.Rounded.PhotoCamera),
+    Dest("recorder", "Recorder", Icons.Rounded.Mic),
+    Dest("music", "Music", Icons.Rounded.LibraryMusic),
+    Dest("dictation", "Dictation", Icons.Rounded.RecordVoiceOver),
+    Dest("library", "Library & Files", Icons.Rounded.Folder),
+    Dest("create", "Create & Edit", Icons.Rounded.AddCircle),
+    Dest("brainstorm", "Brainstorm", Icons.Rounded.Lightbulb),
+    Dest("documents", "Documents", Icons.Rounded.Description),
+    Dest("signatures", "Signatures", Icons.Rounded.Draw),
+    Dest("journal", "Journal", Icons.AutoMirrored.Rounded.MenuBook),
+    Dest("tasks", "To-Do", Icons.Rounded.TaskAlt),
+    Dest("schedule", "Schedule", Icons.Rounded.CalendarMonth),
+    Dest("education", "Education", Icons.Rounded.School),
 )
 
 @Composable
@@ -185,6 +188,19 @@ private fun AppShell(activity: MainActivity) {
     val backStack by nav.currentBackStackEntryAsState()
     val route = backStack?.destination?.route?.substringBefore('?')?.substringBefore('/') ?: "home"
     val showBottom = bottomDests.any { it.route == route }
+    // The bottom bar slides away while you scroll down a list and comes back when you scroll up
+    var barShown by remember { androidx.compose.runtime.mutableStateOf(true) }
+    LaunchedEffect(route) { barShown = true; com.blacklab.app.core.FrameStats.route = route }
+    val navHaptics = com.blacklab.app.ui.components.rememberHaptics()
+    val barScroll = remember {
+        object : androidx.compose.ui.input.nestedscroll.NestedScrollConnection {
+            override fun onPreScroll(available: androidx.compose.ui.geometry.Offset, source: androidx.compose.ui.input.nestedscroll.NestedScrollSource): androidx.compose.ui.geometry.Offset {
+                if (available.y < -12f && barShown) barShown = false
+                else if (available.y > 12f && !barShown) barShown = true
+                return androidx.compose.ui.geometry.Offset.Zero
+            }
+        }
+    }
 
     // Deep links from notifications
     val pending by MainActivity.pendingRoute.collectAsState()
@@ -235,7 +251,7 @@ private fun AppShell(activity: MainActivity) {
                                     modifier = Modifier.weight(1f),
                                 ) {
                                     Column(Modifier.padding(12.dp)) {
-                                        Icon(if (p == Profile.PERSONAL) Icons.Default.Person else Icons.Default.Work, null, tint = c)
+                                        Icon(if (p == Profile.PERSONAL) Icons.Rounded.Person else Icons.Rounded.Work, null, tint = c)
                                         Spacer(Modifier.height(6.dp))
                                         Text(app.settings.profileName(p), style = MaterialTheme.typography.labelLarge, maxLines = 1)
                                         Text(if (sel) "Active" else "Switch", style = MaterialTheme.typography.labelSmall, color = if (sel) c else MaterialTheme.colorScheme.onSurfaceVariant)
@@ -260,12 +276,12 @@ private fun AppShell(activity: MainActivity) {
                         }
                         HorizontalDivider(Modifier.padding(vertical = 8.dp), color = MaterialTheme.colorScheme.outlineVariant)
                         NavigationDrawerItem(
-                            label = { Text("Settings") }, icon = { Icon(Icons.Default.Settings, null) }, selected = route == "settings",
+                            label = { Text("Settings") }, icon = { Icon(Icons.Rounded.Settings, null) }, selected = route == "settings",
                             onClick = { scope.launch { drawer.close() }; nav.navigate("settings") { launchSingleTop = true } },
                             colors = NavigationDrawerItemDefaults.colors(unselectedContainerColor = Color.Transparent),
                         )
                         Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-                            Icon(Icons.Default.FolderSpecial, null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(16.dp))
+                            Icon(Icons.Rounded.FolderSpecial, null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(16.dp))
                             Spacer(Modifier.width(8.dp))
                             Text(if (app.storage.isPublic) "Internal storage › BlackLab" else "App storage (grant All-files access in Settings)",
                                 style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -279,13 +295,17 @@ private fun AppShell(activity: MainActivity) {
                 bottomBar = { Column {
                     val musicOn by com.blacklab.app.media.PlaybackService.running.collectAsState()
                     if (showBottom && musicOn) com.blacklab.app.ui.music.MiniPlayer(com.blacklab.app.ui.music.rememberPlayer(), bottomInset = false) { nav.navigate("nowplaying") { launchSingleTop = true } }
-                    AnimatedVisibility(showBottom, enter = slideInVertically(Motion.enter()) { it } + fadeIn(Motion.enter()), exit = slideOutVertically(Motion.exit()) { it } + fadeOut(Motion.exit())) {
+                    AnimatedVisibility(showBottom && barShown, enter = slideInVertically(Motion.enter()) { it } + fadeIn(Motion.enter()), exit = slideOutVertically(Motion.exit()) { it } + fadeOut(Motion.exit())) {
                         NavigationBar(containerColor = MaterialTheme.colorScheme.surfaceContainerLow, tonalElevation = 0.dp) {
                             bottomDests.forEach { d ->
                                 NavigationBarItem(
                                     selected = route == d.route,
-                                    onClick = { nav.navigate(d.route) { popUpTo("home") { saveState = true }; launchSingleTop = true; restoreState = true } },
-                                    icon = { Icon(d.icon, d.label) },
+                                    onClick = { if (route != d.route) navHaptics.tick(); nav.navigate(d.route) { popUpTo("home") { saveState = true }; launchSingleTop = true; restoreState = true } },
+                                    icon = {
+                                        androidx.compose.animation.Crossfade(route == d.route, animationSpec = Motion.enter(200), label = "tab") { sel ->
+                                            Icon(if (sel) d.selectedIcon else d.icon, d.label)
+                                        }
+                                    },
                                     label = { Text(d.label) },
                                     colors = androidx.compose.material3.NavigationBarItemDefaults.colors(indicatorColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.16f)),
                                 )
@@ -295,7 +315,8 @@ private fun AppShell(activity: MainActivity) {
                 } },
                 contentWindowInsets = androidx.compose.foundation.layout.WindowInsets(0, 0, 0, 0),
             ) { pad ->
-                Box(Modifier.fillMaxSize().padding(bottom = if (showBottom) pad.calculateBottomPadding() else 0.dp).background(MaterialTheme.colorScheme.background)) {
+                Box(Modifier.fillMaxSize().padding(bottom = if (showBottom && barShown) pad.calculateBottomPadding() else 0.dp).background(MaterialTheme.colorScheme.background)
+                    .nestedScroll(barScroll)) {
                     NavGraph(nav)
                 }
             }
@@ -304,8 +325,21 @@ private fun AppShell(activity: MainActivity) {
     }
 }
 
+/** composable() that also exposes its animation scope for shared-element transitions. */
+private fun androidx.navigation.NavGraphBuilder.screen(
+    route: String,
+    arguments: List<androidx.navigation.NamedNavArgument> = emptyList(),
+    content: @Composable (androidx.navigation.NavBackStackEntry) -> Unit,
+) = composable(route, arguments) { entry ->
+    androidx.compose.runtime.CompositionLocalProvider(com.blacklab.app.ui.components.LocalNavAnimScope provides this) { content(entry) }
+}
+
+@OptIn(androidx.compose.animation.ExperimentalSharedTransitionApi::class)
 @Composable
 private fun NavGraph(nav: androidx.navigation.NavHostController) {
+    // Shared-element scope: lets a task or note card grow into its screen and shrink back
+    androidx.compose.animation.SharedTransitionLayout {
+    androidx.compose.runtime.CompositionLocalProvider(com.blacklab.app.ui.components.LocalSharedScope provides this) {
     NavHost(
         nav, startDestination = "home",
         enterTransition = { fadeIn(Motion.enter(320)) + androidx.compose.animation.slideInHorizontally(Motion.enter()) { it / 12 } },
@@ -313,58 +347,58 @@ private fun NavGraph(nav: androidx.navigation.NavHostController) {
         popEnterTransition = { fadeIn(Motion.enter(320)) + androidx.compose.animation.slideInHorizontally(Motion.enter()) { -it / 24 } },
         popExitTransition = { fadeOut(Motion.exit(200)) + androidx.compose.animation.slideOutHorizontally(Motion.enter()) { it / 12 } },
     ) {
-        composable("home") { HomeScreen() }
-        composable("camera?mode={mode}", arguments = listOf(navArgument("mode") { defaultValue = "photo" })) {
+        screen("home") { HomeScreen() }
+        screen("camera?mode={mode}", arguments = listOf(navArgument("mode") { defaultValue = "photo" })) {
             CameraScreen(it.arguments?.getString("mode") ?: "photo")
         }
-        composable("recorder") { RecorderScreen() }
-        composable("dictation") { com.blacklab.app.ui.dictation.DictationScreen() }
-        composable("dictation/session?path={path}", arguments = listOf(navArgument("path") { defaultValue = "" })) {
+        screen("recorder") { RecorderScreen() }
+        screen("dictation") { com.blacklab.app.ui.dictation.DictationScreen() }
+        screen("dictation/session?path={path}", arguments = listOf(navArgument("path") { defaultValue = "" })) {
             com.blacklab.app.ui.dictation.DictationDetailScreen(Uri.decode(it.arguments?.getString("path") ?: ""))
         }
-        composable("imgedit?path={path}&tab={tab}", arguments = listOf(navArgument("path") { defaultValue = "" }, navArgument("tab") { defaultValue = "draw" })) {
+        screen("imgedit?path={path}&tab={tab}", arguments = listOf(navArgument("path") { defaultValue = "" }, navArgument("tab") { defaultValue = "draw" })) {
             com.blacklab.app.ui.editor.ImageEditorScreen(Uri.decode(it.arguments?.getString("path") ?: ""), it.arguments?.getString("tab") ?: "draw")
         }
-        composable("recording/{id}", arguments = listOf(navArgument("id") { type = NavType.LongType })) {
+        screen("recording/{id}", arguments = listOf(navArgument("id") { type = NavType.LongType })) {
             RecordingDetailScreen(it.arguments?.getLong("id") ?: 0)
         }
-        composable("library?tab={tab}", arguments = listOf(navArgument("tab") { defaultValue = "PHOTOS" })) {
+        screen("library?tab={tab}", arguments = listOf(navArgument("tab") { defaultValue = "PHOTOS" })) {
             LibraryScreen(it.arguments?.getString("tab") ?: "PHOTOS")
         }
-        composable("media?path={path}", arguments = listOf(navArgument("path") { defaultValue = "" })) {
+        screen("media?path={path}", arguments = listOf(navArgument("path") { defaultValue = "" })) {
             MediaViewerScreen(Uri.decode(it.arguments?.getString("path") ?: ""))
         }
-        composable("view?path={path}&text={text}&sign={sign}", arguments = listOf(navArgument("path") { defaultValue = "" }, navArgument("text") { type = NavType.BoolType; defaultValue = false },
+        screen("view?path={path}&text={text}&sign={sign}", arguments = listOf(navArgument("path") { defaultValue = "" }, navArgument("text") { type = NavType.BoolType; defaultValue = false },
             navArgument("sign") { type = NavType.BoolType; defaultValue = false })) {
             com.blacklab.app.ui.viewer.FileViewerScreen(Uri.decode(it.arguments?.getString("path") ?: ""), it.arguments?.getBoolean("text") ?: false, it.arguments?.getBoolean("sign") ?: false)
         }
-        composable("signatures") { com.blacklab.app.ui.signature.SignaturesScreen() }
-        composable("player?path={path}", arguments = listOf(navArgument("path") { defaultValue = "" })) {
+        screen("signatures") { com.blacklab.app.ui.signature.SignaturesScreen() }
+        screen("player?path={path}", arguments = listOf(navArgument("path") { defaultValue = "" })) {
             com.blacklab.app.ui.music.PlayFileScreen(Uri.decode(it.arguments?.getString("path") ?: ""))
         }
-        composable("nowplaying") { com.blacklab.app.ui.music.NowPlayingScreen() }
-        composable("music") { com.blacklab.app.ui.music.MusicScreen() }
-        composable("create") { com.blacklab.app.ui.create.CreateScreen() }
-        composable("brainstorm?tab={tab}", arguments = listOf(navArgument("tab") { defaultValue = "" })) {
+        screen("nowplaying") { com.blacklab.app.ui.music.NowPlayingScreen() }
+        screen("music") { com.blacklab.app.ui.music.MusicScreen() }
+        screen("create") { com.blacklab.app.ui.create.CreateScreen() }
+        screen("brainstorm?tab={tab}", arguments = listOf(navArgument("tab") { defaultValue = "" })) {
             com.blacklab.app.ui.brainstorm.BrainstormScreen(it.arguments?.getString("tab") ?: "")
         }
-        composable("notebook/{id}?section={section}", arguments = listOf(navArgument("id") { type = NavType.LongType }, navArgument("section") { type = NavType.LongType; defaultValue = 0L })) {
+        screen("notebook/{id}?section={section}", arguments = listOf(navArgument("id") { type = NavType.LongType }, navArgument("section") { type = NavType.LongType; defaultValue = 0L })) {
             com.blacklab.app.ui.brainstorm.NotebookScreen(it.arguments?.getLong("id") ?: 0, it.arguments?.getLong("section") ?: 0)
         }
-        composable("page/{id}", arguments = listOf(navArgument("id") { type = NavType.LongType })) {
+        screen("page/{id}", arguments = listOf(navArgument("id") { type = NavType.LongType })) {
             com.blacklab.app.ui.brainstorm.PageEditorScreen(it.arguments?.getLong("id") ?: 0)
         }
-        composable("note/{id}?kind={kind}", arguments = listOf(navArgument("id") { type = NavType.LongType }, navArgument("kind") { defaultValue = "" })) {
+        screen("note/{id}?kind={kind}", arguments = listOf(navArgument("id") { type = NavType.LongType }, navArgument("kind") { defaultValue = "" })) {
             com.blacklab.app.ui.brainstorm.NoteEditorScreen(it.arguments?.getLong("id") ?: 0, it.arguments?.getString("kind") ?: "")
         }
-        composable("audioedit?path={path}", arguments = listOf(navArgument("path") { defaultValue = "" })) {
+        screen("audioedit?path={path}", arguments = listOf(navArgument("path") { defaultValue = "" })) {
             com.blacklab.app.ui.audioedit.AudioEditorScreen(Uri.decode(it.arguments?.getString("path") ?: ""))
         }
-        composable("videoedit?path={path}&paths={paths}", arguments = listOf(navArgument("path") { defaultValue = "" }, navArgument("paths") { defaultValue = "" })) {
+        screen("videoedit?path={path}&paths={paths}", arguments = listOf(navArgument("path") { defaultValue = "" }, navArgument("paths") { defaultValue = "" })) {
             com.blacklab.app.ui.videoedit.VideoEditorScreen(Uri.decode(it.arguments?.getString("path") ?: ""), it.arguments?.getString("paths") ?: "")
         }
-        composable("documents") { DocumentsScreen() }
-        composable(
+        screen("documents") { DocumentsScreen() }
+        screen(
             "doc/{id}?template={template}&course={course}",
             arguments = listOf(
                 navArgument("id") { type = NavType.LongType },
@@ -378,8 +412,8 @@ private fun NavGraph(nav: androidx.navigation.NavHostController) {
                 it.arguments?.getLong("course")?.takeIf { c -> c > 0 },
             )
         }
-        composable("journal") { JournalScreen() }
-        composable(
+        screen("journal") { JournalScreen() }
+        screen(
             "journal/{id}?day={day}&template={template}",
             arguments = listOf(
                 navArgument("id") { type = NavType.LongType },
@@ -393,12 +427,12 @@ private fun NavGraph(nav: androidx.navigation.NavHostController) {
                 it.arguments?.getString("template")?.ifBlank { null },
             )
         }
-        composable("tasks") { TasksScreen() }
-        composable("task/{id}", arguments = listOf(navArgument("id") { type = NavType.LongType })) {
+        screen("tasks") { TasksScreen() }
+        screen("task/{id}", arguments = listOf(navArgument("id") { type = NavType.LongType })) {
             TaskDetailScreen(it.arguments?.getLong("id") ?: 0)
         }
-        composable("schedule") { ScheduleScreen() }
-        composable(
+        screen("schedule") { ScheduleScreen() }
+        screen(
             "event/{id}?start={start}&allDay={allDay}",
             arguments = listOf(
                 navArgument("id") { type = NavType.LongType },
@@ -408,25 +442,27 @@ private fun NavGraph(nav: androidx.navigation.NavHostController) {
         ) {
             EventEditorScreen(it.arguments?.getLong("id") ?: 0, it.arguments?.getLong("start")?.takeIf { s -> s > 0 }, it.arguments?.getBoolean("allDay") ?: false)
         }
-        composable("education?tab={tab}", arguments = listOf(navArgument("tab") { defaultValue = "" })) {
+        screen("education?tab={tab}", arguments = listOf(navArgument("tab") { defaultValue = "" })) {
             EducationScreen(it.arguments?.getString("tab")?.ifBlank { null })
         }
-        composable("course/{id}", arguments = listOf(navArgument("id") { type = NavType.LongType })) {
+        screen("course/{id}", arguments = listOf(navArgument("id") { type = NavType.LongType })) {
             CourseDetailScreen(it.arguments?.getLong("id") ?: 0)
         }
-        composable("deck/{id}", arguments = listOf(navArgument("id") { type = NavType.LongType })) {
+        screen("deck/{id}", arguments = listOf(navArgument("id") { type = NavType.LongType })) {
             DeckScreen(it.arguments?.getLong("id") ?: 0)
         }
-        composable("review/{id}", arguments = listOf(navArgument("id") { type = NavType.LongType })) {
+        screen("review/{id}", arguments = listOf(navArgument("id") { type = NavType.LongType })) {
             ReviewScreen(it.arguments?.getLong("id") ?: 0)
         }
-        composable("settings") { SettingsScreen() }
-        composable("updates") { com.blacklab.app.ui.settings.UpdatesScreen() }
-        composable("diagnostics") { com.blacklab.app.ui.settings.DiagnosticsScreen() }
-        composable("assistant?listen={listen}", arguments = listOf(navArgument("listen") { type = NavType.BoolType; defaultValue = false })) {
+        screen("settings") { SettingsScreen() }
+        screen("updates") { com.blacklab.app.ui.settings.UpdatesScreen() }
+        screen("diagnostics") { com.blacklab.app.ui.settings.DiagnosticsScreen() }
+        screen("assistant?listen={listen}", arguments = listOf(navArgument("listen") { type = NavType.BoolType; defaultValue = false })) {
             com.blacklab.app.ui.assistant.AssistantScreen(it.arguments?.getBoolean("listen") ?: false)
         }
-        composable("assistant/settings") { com.blacklab.app.ui.assistant.AssistantSettingsScreen() }
+        screen("assistant/settings") { com.blacklab.app.ui.assistant.AssistantSettingsScreen() }
+    }
+    }
     }
 }
 

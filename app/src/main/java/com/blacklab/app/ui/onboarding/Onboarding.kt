@@ -27,7 +27,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.rounded.*
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
 import androidx.compose.material3.FilledTonalButton
@@ -121,10 +121,10 @@ fun OnboardingScreen() {
                         Text("Your personal & professional command center.", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurfaceVariant,
                             textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth().padding(top = 8.dp))
                         Spacer(Modifier.height(32.dp))
-                        Feature(Icons.Default.PhotoCamera, "Pro camera & recorder", "Full-resolution capture, night & portrait modes, 4K HDR video, lossless audio with live transcription.")
-                        Feature(Icons.Default.Description, "Documents & journal", "Word-class editing with tables, images and styles. Export to DOCX, PDF, Markdown.")
-                        Feature(Icons.Default.TaskAlt, "Tasks & schedule", "Smart lists, My Day, natural-language entry, recurring events, free-time finder.")
-                        Feature(Icons.Default.School, "Education", "Courses, grades & GPA, certifications with CEUs, focus timer and flashcards.")
+                        Feature(Icons.Rounded.PhotoCamera, "Pro camera & recorder", "Full-resolution capture, night & portrait modes, 4K HDR video, lossless audio with live transcription.")
+                        Feature(Icons.Rounded.Description, "Documents & journal", "Word-class editing with tables, images and styles. Export to DOCX, PDF, Markdown.")
+                        Feature(Icons.Rounded.TaskAlt, "Tasks & schedule", "Smart lists, My Day, natural-language entry, recurring events, free-time finder.")
+                        Feature(Icons.Rounded.School, "Education", "Courses, grades & GPA, certifications with CEUs, focus timer and flashcards.")
                     }
                     1 -> {
                         Header("About you", "Personalizes greetings, document headers and templates.")
@@ -141,10 +141,10 @@ fun OnboardingScreen() {
                         Spacer(Modifier.height(24.dp))
                         Header("Your two accounts", "Everything — files, tasks, calendars, courses — is kept separate per account.")
                         OutlinedTextField(personal, { personal = it }, label = { Text("Personal account name") }, singleLine = true, modifier = Modifier.fillMaxWidth(),
-                            leadingIcon = { Icon(Icons.Default.Person, null, tint = Mint) })
+                            leadingIcon = { Icon(Icons.Rounded.Person, null, tint = Mint) })
                         Spacer(Modifier.height(10.dp))
                         OutlinedTextField(professional, { professional = it }, label = { Text("Professional account name") }, singleLine = true, modifier = Modifier.fillMaxWidth(),
-                            leadingIcon = { Icon(Icons.Default.Work, null, tint = com.blacklab.app.ui.theme.Cobalt) })
+                            leadingIcon = { Icon(Icons.Rounded.Work, null, tint = com.blacklab.app.ui.theme.Cobalt) })
                         Spacer(Modifier.height(14.dp))
                         Text("Open BlackLab in", style = MaterialTheme.typography.labelLarge)
                         Spacer(Modifier.height(6.dp))
@@ -158,23 +158,23 @@ fun OnboardingScreen() {
                     }
                     2 -> {
                         Header("Storage & permissions", "BlackLab creates a “BlackLab” folder on your phone. Every photo, video, recording, scan, document and journal entry is saved there as a real file — viewable in the Files app and on your PC over USB.")
-                        PermCard(Icons.Default.FolderSpecial, "All-files access", "Lets BlackLab create /BlackLab in internal storage (kept even if the app is reinstalled).", allFiles) {
+                        PermCard(Icons.Rounded.FolderSpecial, "All-files access", "Lets BlackLab create /BlackLab in internal storage (kept even if the app is reinstalled).", allFiles) {
                             allFilesLauncher.launch(app.storage.allFilesAccessIntent())
                         }
-                        PermCard(Icons.Default.PhotoCamera, "Camera & microphone", "For photos, video, document scans and audio recording.", camMic) {
+                        PermCard(Icons.Rounded.PhotoCamera, "Camera & microphone", "For photos, video, document scans and audio recording.", camMic) {
                             permLauncher.launch(arrayOf(Manifest.permission.CAMERA, Manifest.permission.RECORD_AUDIO))
                         }
-                        PermCard(Icons.Default.NotificationsActive, "Notifications", "Reminders for tasks, events, classes, deadlines and certification renewals.", notif) {
+                        PermCard(Icons.Rounded.NotificationsActive, "Notifications", "Reminders for tasks, events, classes, deadlines and certification renewals.", notif) {
                             permLauncher.launch(arrayOf(Manifest.permission.POST_NOTIFICATIONS))
                         }
-                        PermCard(Icons.Default.CalendarMonth, "Calendars (optional)", "Show your Google / Outlook calendars alongside BlackLab events.", cal) {
+                        PermCard(Icons.Rounded.CalendarMonth, "Calendars (optional)", "Show your Google / Outlook calendars alongside BlackLab events.", cal) {
                             permLauncher.launch(arrayOf(Manifest.permission.READ_CALENDAR))
                         }
                     }
                     3 -> {
                         Header("Security", "Protect your workspace with your fingerprint, face or screen lock.")
-                        LabeledSwitchRow("Lock BlackLab", "Require unlock when opening the app", appLock, icon = Icons.Default.Fingerprint) { appLock = it }
-                        LabeledSwitchRow("Lock ${professional.ifBlank { "Professional" }} account", "Require unlock when switching to it", lockPro, icon = Icons.Default.Lock) { lockPro = it }
+                        LabeledSwitchRow("Lock BlackLab", "Require unlock when opening the app", appLock, icon = Icons.Rounded.Fingerprint) { appLock = it }
+                        LabeledSwitchRow("Lock ${professional.ifBlank { "Professional" }} account", "Require unlock when switching to it", lockPro, icon = Icons.Rounded.Lock) { lockPro = it }
                         Spacer(Modifier.height(24.dp))
                         Text("You're all set.", style = MaterialTheme.typography.headlineSmall)
                         Text("Folder: ${if (allFiles) "Internal storage/BlackLab" else "App storage (you can enable All-files access later in Settings)"}",
@@ -241,7 +241,7 @@ private fun PermCard(icon: ImageVector, title: String, body: String, granted: Bo
                 Text(body, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
             Spacer(Modifier.width(8.dp))
-            if (granted) Icon(Icons.Default.CheckCircle, "Granted", tint = LocalBlColors.current.success)
+            if (granted) Icon(Icons.Rounded.CheckCircle, "Granted", tint = LocalBlColors.current.success)
             else FilledTonalButton(onClick = onGrant) { Text("Allow") }
         }
     }
@@ -262,7 +262,7 @@ fun LockScreen(activity: MainActivity) {
         Text("BlackLab is locked", style = MaterialTheme.typography.headlineSmall)
         Spacer(Modifier.height(24.dp))
         Button(onClick = unlock) {
-            Icon(Icons.Default.Fingerprint, null); Spacer(Modifier.width(8.dp)); Text("Unlock")
+            Icon(Icons.Rounded.Fingerprint, null); Spacer(Modifier.width(8.dp)); Text("Unlock")
         }
     }
 }

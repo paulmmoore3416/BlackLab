@@ -104,6 +104,13 @@ fun rememberThemeMode(s: com.blacklab.app.core.Settings): String {
     return com.blacklab.app.core.AutoTheme.resolve(s.themeMode, now, sun, s.themeDarkFrom, s.themeDarkTo)
 }
 
+/** The full color scheme for an account outside Compose screens (home-screen widgets). */
+fun colorSchemeFor(choice: ThemeChoice, profile: Profile, dark: Boolean): ColorScheme {
+    val pal = choice.palette(profile)
+    return if (dark) dark(pal.accent(true), choice.secondary(profile, true), pal.tertiary(true), choice.secondaryChosen(profile))
+    else light(pal.accent(false), choice.secondary(profile, false), pal.tertiary(false))
+}
+
 /** The accent of an account (used for its badge and switcher), in the current light/dark shade. */
 @Composable
 fun profileAccent(p: Profile): Color = LocalThemeChoice.current.palette(p).accent(LocalBlColors.current.isDark)
@@ -210,6 +217,24 @@ private val BlShapes = androidx.compose.material3.Shapes(
     extraLarge = androidx.compose.foundation.shape.RoundedCornerShape(32.dp),
 )
 
+/**
+ * Inter (variable, SIL OFL; license in assets/licenses) at real weights, with tabular figures
+ * everywhere so times, counts and timers don't shift as their digits change.
+ */
+@OptIn(androidx.compose.ui.text.ExperimentalTextApi::class)
+val InterFamily = androidx.compose.ui.text.font.FontFamily(
+    listOf(300, 400, 500, 600, 700).map { w ->
+        androidx.compose.ui.text.font.Font(
+            com.blacklab.app.R.font.inter, FontWeight(w),
+            variationSettings = androidx.compose.ui.text.font.FontVariation.Settings(androidx.compose.ui.text.font.FontVariation.weight(w)),
+        )
+    },
+)
+
+private fun TextStyle.bl() = copy(fontFamily = InterFamily)
+/** Display sizes are mostly numbers (timers, big counts): tabular figures so they don't shift. */
+private fun TextStyle.blNum() = copy(fontFamily = InterFamily, fontFeatureSettings = "tnum")
+
 private val BlTypography = Typography().let { t ->
     t.copy(
         bodyLarge = t.bodyLarge.copy(lineHeight = 25.sp, letterSpacing = 0.2.sp),
@@ -222,16 +247,32 @@ private val BlTypography = Typography().let { t ->
         titleLarge = t.titleLarge.copy(fontWeight = FontWeight.SemiBold),
         titleMedium = t.titleMedium.copy(fontWeight = FontWeight.SemiBold),
         labelLarge = t.labelLarge.copy(fontWeight = FontWeight.SemiBold),
-    )
+    ).let { c ->
+        c.copy(
+            displayLarge = c.displayLarge.blNum(), displayMedium = c.displayMedium.blNum(), displaySmall = c.displaySmall.blNum(),
+            headlineLarge = c.headlineLarge.bl(), headlineMedium = c.headlineMedium.bl(), headlineSmall = c.headlineSmall.bl(),
+            titleLarge = c.titleLarge.bl(), titleMedium = c.titleMedium.bl(), titleSmall = c.titleSmall.bl(),
+            bodyLarge = c.bodyLarge.bl(), bodyMedium = c.bodyMedium.bl(), bodySmall = c.bodySmall.bl(),
+            labelLarge = c.labelLarge.bl(), labelMedium = c.labelMedium.bl(), labelSmall = c.labelSmall.bl(),
+        )
+    }
 }
 
-val MonoDigits = TextStyle(fontFeatureSettings = "tnum")
+/** For live numbers (timers, positions, counters) in body text: Inter with tabular figures. */
+val MonoDigits = TextStyle(fontFamily = InterFamily, fontFeatureSettings = "tnum")
 
 /** Shared motion: gentle ease-out for screen and content transitions. */
 object Motion {
+    /** Set from Settings › Reduce motion and the system "Remove animations" switch; animations become instant. */
+    @Volatile var reduced: Boolean = false
     val ease = androidx.compose.animation.core.CubicBezierEasing(0.2f, 0f, 0f, 1f)
-    fun <T> enter(ms: Int = 360) = androidx.compose.animation.core.tween<T>(ms, easing = ease)
-    fun <T> exit(ms: Int = 220) = androidx.compose.animation.core.tween<T>(ms, easing = androidx.compose.animation.core.FastOutLinearInEasing)
+    /** Emphasized decelerate (Material 3) for things arriving on screen. */
+    val emphasized = androidx.compose.animation.core.CubicBezierEasing(0.05f, 0.7f, 0.1f, 1f)
+    fun <T> enter(ms: Int = 360) = androidx.compose.animation.core.tween<T>(if (reduced) 0 else ms, easing = ease)
+    fun <T> exit(ms: Int = 220) = androidx.compose.animation.core.tween<T>(if (reduced) 0 else ms, easing = androidx.compose.animation.core.FastOutLinearInEasing)
+    fun <T> emphasized(ms: Int = 420) = androidx.compose.animation.core.tween<T>(if (reduced) 0 else ms, easing = emphasized)
+    /** Springy settle for small things (checks, chips, icons). */
+    fun <T> settle() = if (reduced) androidx.compose.animation.core.snap<T>() else androidx.compose.animation.core.spring<T>(dampingRatio = 0.72f, stiffness = 520f)
 }
 
 @Composable

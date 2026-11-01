@@ -20,7 +20,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.rounded.*
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExtendedFloatingActionButton
@@ -85,7 +85,7 @@ fun CourseDetailScreen(id: Long) {
     var meetingEdit by remember { mutableStateOf<ClassMeetingEntity?>(null) }
 
     if (course == null) {
-        Scaffold(topBar = { BlTopBar("Course", onBack = { shell.back() }) }) { pad -> Box(Modifier.padding(pad)) { EmptyState(Icons.Default.School, "Course not found", "It may have been deleted.") } }
+        Scaffold(topBar = { BlTopBar("Course", onBack = { shell.back() }) }) { pad -> Box(Modifier.padding(pad)) { EmptyState(Icons.Rounded.School, "Course not found", "It may have been deleted.") } }
         return
     }
     val color = Color(course.color)
@@ -99,10 +99,10 @@ fun CourseDetailScreen(id: Long) {
     Scaffold(
         topBar = {
             BlTopBar(course.code.ifBlank { "Course" }, onBack = { shell.back() }, actions = {
-                IconButton(onClick = { edit = "course" }) { Icon(Icons.Default.Edit, "Edit") }
+                IconButton(onClick = { edit = "course" }) { Icon(Icons.Rounded.Edit, "Edit") }
             })
         },
-        floatingActionButton = { ExtendedFloatingActionButton(onClick = { edit = "assignment" }, icon = { Icon(Icons.Default.Add, null) }, text = { Text("Assignment") }) },
+        floatingActionButton = { ExtendedFloatingActionButton(onClick = { edit = "assignment" }, icon = { Icon(Icons.Rounded.Add, null) }, text = { Text("Assignment") }) },
     ) { pad ->
         LazyColumn(Modifier.padding(pad).fillMaxSize(), contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 96.dp)) {
             item {
@@ -124,18 +124,18 @@ fun CourseDetailScreen(id: Long) {
                     if (course.instructor.isNotBlank() || course.officeHours.isNotBlank()) {
                         Spacer(Modifier.height(10.dp))
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(Icons.Default.Person, null, Modifier.size(18.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Icon(Icons.Rounded.Person, null, Modifier.size(18.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
                             Spacer(Modifier.width(8.dp))
                             Column(Modifier.weight(1f)) {
                                 Text(course.instructor.ifBlank { "Instructor" })
                                 if (course.officeHours.isNotBlank()) Text("Office hours: ${course.officeHours}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             }
-                            if (course.instructorEmail.isNotBlank()) IconButton(onClick = { Files.email(ctx, course.instructorEmail, "${course.code} ${course.title}".trim()) }) { Icon(Icons.Default.Email, "Email instructor") }
+                            if (course.instructorEmail.isNotBlank()) IconButton(onClick = { Files.email(ctx, course.instructorEmail, "${course.code} ${course.title}".trim()) }) { Icon(Icons.Rounded.Email, "Email instructor") }
                         }
                     }
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(top = 8.dp)) {
-                        if (course.onlineUrl.isNotBlank()) FilledTonalButton(onClick = { Files.openUrl(ctx, course.onlineUrl) }) { Icon(Icons.Default.OpenInNew, null, Modifier.size(16.dp)); Spacer(Modifier.width(6.dp)); Text("Course site") }
-                        if (course.location.isNotBlank()) OutlinedButton(onClick = { Files.openMap(ctx, course.location) }) { Icon(Icons.Default.LocationOn, null, Modifier.size(16.dp)); Spacer(Modifier.width(6.dp)); Text(course.location, maxLines = 1) }
+                        if (course.onlineUrl.isNotBlank()) FilledTonalButton(onClick = { Files.openUrl(ctx, course.onlineUrl) }) { Icon(Icons.Rounded.OpenInNew, null, Modifier.size(16.dp)); Spacer(Modifier.width(6.dp)); Text("Course site") }
+                        if (course.location.isNotBlank()) OutlinedButton(onClick = { Files.openMap(ctx, course.location) }) { Icon(Icons.Rounded.LocationOn, null, Modifier.size(16.dp)); Spacer(Modifier.width(6.dp)); Text(course.location, maxLines = 1) }
                     }
                 }
             }
@@ -145,11 +145,11 @@ fun CourseDetailScreen(id: Long) {
                 BlCard(Modifier.fillMaxWidth()) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text("${course.modulesDone} of ${course.modulesTotal} modules", Modifier.weight(1f), style = MaterialTheme.typography.titleSmall)
-                        IconButton(onClick = { app.io { app.db.education().updateCourse(course.copy(modulesDone = (course.modulesDone - 1).coerceAtLeast(0))) } }) { Icon(Icons.Default.Remove, "Less") }
+                        IconButton(onClick = { app.io { app.db.education().updateCourse(course.copy(modulesDone = (course.modulesDone - 1).coerceAtLeast(0))) } }) { Icon(Icons.Rounded.Remove, "Less") }
                         IconButton(onClick = {
                             val done = (course.modulesDone + 1).coerceAtMost(course.modulesTotal)
                             app.io { app.db.education().updateCourse(course.copy(modulesDone = done, status = if (done == course.modulesTotal && course.kind != "COLLEGE") "COMPLETED" else course.status)) }
-                        }) { Icon(Icons.Default.Add, "More") }
+                        }) { Icon(Icons.Rounded.Add, "More") }
                     }
                     LinearProgressIndicator(progress = { course.modulesDone.toFloat() / course.modulesTotal }, color = color, modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(4.dp)))
                 }
@@ -203,7 +203,7 @@ fun CourseDetailScreen(id: Long) {
             item { SectionHeader("Notes (${notes.size})", action = "New note") { shell.go("doc/0?template=cornell&course=$id") } }
             items(notes, key = { "n${it.id}" }) { d ->
                 Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).clickable { shell.go("doc/${d.id}") }.padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Default.Description, null, tint = color, modifier = Modifier.size(18.dp))
+                    Icon(Icons.Rounded.Description, null, tint = color, modifier = Modifier.size(18.dp))
                     Spacer(Modifier.width(10.dp))
                     Text(d.title, Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
                     Text(Time.ago(d.updatedAt), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -218,7 +218,7 @@ fun CourseDetailScreen(id: Long) {
                             Text("${Time.hoursLabel(studied)} studied", style = MaterialTheme.typography.titleMedium)
                             Text("${data.decks.count { it.courseId == id }} flashcard deck(s)", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
-                        Button(onClick = { StudyTimer.get(ctx).setCourse(id); shell.go("education?tab=Study") }) { Icon(Icons.Default.Timer, null); Spacer(Modifier.width(6.dp)); Text("Focus") }
+                        Button(onClick = { StudyTimer.get(ctx).setCourse(id); shell.go("education?tab=Study") }) { Icon(Icons.Rounded.Timer, null); Spacer(Modifier.width(6.dp)); Text("Focus") }
                     }
                 }
             }
@@ -249,19 +249,19 @@ fun DeckScreen(id: Long) {
     Scaffold(
         topBar = {
             BlTopBar(deck?.name ?: "Deck", subtitle = "${cards.size} cards · $due due", onBack = { shell.back() }, actions = {
-                IconButton(onClick = { editDeck = true }) { Icon(Icons.Default.Edit, "Edit deck") }
-                IconButton(onClick = { confirmDelete = true }) { Icon(Icons.Default.Delete, "Delete deck") }
+                IconButton(onClick = { editDeck = true }) { Icon(Icons.Rounded.Edit, "Edit deck") }
+                IconButton(onClick = { confirmDelete = true }) { Icon(Icons.Rounded.Delete, "Delete deck") }
             })
         },
-        floatingActionButton = { ExtendedFloatingActionButton(onClick = { editCard = FlashcardEntity(deckId = id, front = "", back = "", dueDay = Time.today().toEpochDay()) }, icon = { Icon(Icons.Default.Add, null) }, text = { Text("Card") }) },
+        floatingActionButton = { ExtendedFloatingActionButton(onClick = { editCard = FlashcardEntity(deckId = id, front = "", back = "", dueDay = Time.today().toEpochDay()) }, icon = { Icon(Icons.Rounded.Add, null) }, text = { Text("Card") }) },
     ) { pad ->
         LazyColumn(Modifier.padding(pad).fillMaxSize(), contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 96.dp)) {
             item {
                 Button(onClick = { shell.go("review/$id") }, enabled = cards.isNotEmpty(), modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
-                    Icon(Icons.Default.PlayArrow, null); Spacer(Modifier.width(6.dp)); Text(if (due > 0) "Review $due due card(s)" else "Practice all cards")
+                    Icon(Icons.Rounded.PlayArrow, null); Spacer(Modifier.width(6.dp)); Text(if (due > 0) "Review $due due card(s)" else "Practice all cards")
                 }
             }
-            if (cards.isEmpty()) item { EmptyState(Icons.Default.Style, "No cards yet", "Add a question on the front and the answer on the back.") }
+            if (cards.isEmpty()) item { EmptyState(Icons.Rounded.Style, "No cards yet", "Add a question on the front and the answer on the back.") }
             items(cards, key = { it.id }) { c ->
                 Surface(onClick = { editCard = c }, shape = RoundedCornerShape(14.dp), color = MaterialTheme.colorScheme.surfaceContainer, modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
                     Column(Modifier.padding(12.dp)) {
@@ -322,7 +322,7 @@ fun ReviewScreen(deckId: Long) {
         Column(Modifier.padding(pad).fillMaxSize().padding(16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
             val card = queue.firstOrNull()
             if (loaded && card == null) {
-                EmptyState(Icons.Default.EmojiEvents, "Session complete", if (reviewed > 0) "$reviewed cards reviewed · ${correct * 100 / reviewed.coerceAtLeast(1)}% recalled" else "No cards to review right now.") {
+                EmptyState(Icons.Rounded.EmojiEvents, "Session complete", if (reviewed > 0) "$reviewed cards reviewed · ${correct * 100 / reviewed.coerceAtLeast(1)}% recalled" else "No cards to review right now.") {
                     Button(onClick = { shell.back() }) { Text("Done") }
                 }
                 return@Column

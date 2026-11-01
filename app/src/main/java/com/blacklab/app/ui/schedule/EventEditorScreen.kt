@@ -15,8 +15,8 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.Notes
-import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.automirrored.rounded.Notes
+import androidx.compose.material.icons.rounded.*
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -119,7 +119,7 @@ fun EventEditorScreen(id: Long, start: Long?, allDayDefault: Boolean) {
                 title = if (id == 0L) "New event" else "Edit event",
                 onBack = { shell.back() },
                 actions = {
-                    if (id != 0L) IconButton(onClick = { dialog = "delete" }) { Icon(Icons.Default.Delete, "Delete") }
+                    if (id != 0L) IconButton(onClick = { dialog = "delete" }) { Icon(Icons.Rounded.Delete, "Delete") }
                     TextButton(onClick = { save() }) { Text("Save") }
                 },
             )
@@ -138,7 +138,7 @@ fun EventEditorScreen(id: Long, start: Long?, allDayDefault: Boolean) {
             if (conflicts.isNotEmpty()) {
                 BlCard(Modifier.fillMaxWidth().padding(bottom = 8.dp), accent = Amber) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Default.Warning, null, tint = Amber)
+                        Icon(Icons.Rounded.Warning, null, tint = Amber)
                         Spacer(Modifier.width(10.dp))
                         Column {
                             Text("Conflicts with ${conflicts.size} item(s)", style = MaterialTheme.typography.titleSmall)
@@ -149,7 +149,7 @@ fun EventEditorScreen(id: Long, start: Long?, allDayDefault: Boolean) {
             }
             BlCard(Modifier.fillMaxWidth()) {
                 Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(horizontal = 8.dp)) {
-                    Icon(Icons.Default.Schedule, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Icon(Icons.Rounded.Schedule, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
                     Spacer(Modifier.width(16.dp))
                     Text("All-day", Modifier.weight(1f))
                     Switch(ev.allDay, { on ->
@@ -158,12 +158,12 @@ fun EventEditorScreen(id: Long, start: Long?, allDayDefault: Boolean) {
                     })
                 }
                 Row {
-                    PickerRow(Icons.Default.Event, "Starts", Time.date(sLdt.toLocalDate()), Modifier.weight(1f)) { dialog = "startDate" }
+                    PickerRow(Icons.Rounded.Event, "Starts", Time.date(sLdt.toLocalDate()), Modifier.weight(1f)) { dialog = "startDate" }
                     if (!ev.allDay) TextButton(onClick = { dialog = "startTime" }, modifier = Modifier.align(Alignment.CenterVertically)) { Text(Time.time(sLdt)) }
                 }
                 Row {
                     val shownEnd = if (ev.allDay) eLdt.toLocalDate().minusDays(1).let { if (it < sLdt.toLocalDate()) sLdt.toLocalDate() else it } else eLdt.toLocalDate()
-                    PickerRow(Icons.Default.EventBusy, "Ends", Time.date(shownEnd), Modifier.weight(1f)) { dialog = "endDate" }
+                    PickerRow(Icons.Rounded.EventBusy, "Ends", Time.date(shownEnd), Modifier.weight(1f)) { dialog = "endDate" }
                     if (!ev.allDay) TextButton(onClick = { dialog = "endTime" }, modifier = Modifier.align(Alignment.CenterVertically)) { Text(Time.time(eLdt)) }
                 }
                 if (!ev.allDay) {
@@ -175,7 +175,7 @@ fun EventEditorScreen(id: Long, start: Long?, allDayDefault: Boolean) {
                     }
                 }
                 HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-                PickerRow(Icons.Default.Repeat, "Does not repeat", ev.repeatRule?.let { Recurrence.parse(it)?.describe(sLdt.toLocalDate()) }, onClear = { e = ev.copy(repeatRule = null) }) { dialog = "repeat" }
+                PickerRow(Icons.Rounded.Repeat, "Does not repeat", ev.repeatRule?.let { Recurrence.parse(it)?.describe(sLdt.toLocalDate()) }, onClear = { e = ev.copy(repeatRule = null) }) { dialog = "repeat" }
             }
             Spacer(Modifier.height(12.dp))
             BlCard(Modifier.fillMaxWidth()) {
@@ -209,20 +209,20 @@ fun EventEditorScreen(id: Long, start: Long?, allDayDefault: Boolean) {
             }
             Spacer(Modifier.height(12.dp))
             OutlinedTextField(ev.location, { e = ev.copy(location = it) }, label = { Text("Location / building / room") }, singleLine = true,
-                leadingIcon = { Icon(Icons.Default.LocationOn, null) },
-                trailingIcon = { if (ev.location.isNotBlank()) IconButton(onClick = { Files.openMap(ctx, ev.location) }) { Icon(Icons.Default.Map, "Map") } },
+                leadingIcon = { Icon(Icons.Rounded.LocationOn, null) },
+                trailingIcon = { if (ev.location.isNotBlank()) IconButton(onClick = { Files.openMap(ctx, ev.location) }) { Icon(Icons.Rounded.Map, "Map") } },
                 modifier = Modifier.fillMaxWidth())
             Spacer(Modifier.height(8.dp))
             OutlinedTextField(ev.url, { e = ev.copy(url = it) }, label = { Text("Meeting link (Teams, Zoom, Meet)") }, singleLine = true,
-                leadingIcon = { Icon(Icons.Default.VideoCall, null) }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri), modifier = Modifier.fillMaxWidth())
+                leadingIcon = { Icon(Icons.Rounded.VideoCall, null) }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri), modifier = Modifier.fillMaxWidth())
             Spacer(Modifier.height(8.dp))
             OutlinedTextField(ev.attendees, { e = ev.copy(attendees = it) }, label = { Text("Attendees (emails, comma separated)") },
-                leadingIcon = { Icon(Icons.Default.Group, null) },
-                trailingIcon = { if (ev.attendees.isNotBlank()) IconButton(onClick = { Files.email(ctx, ev.attendees, ev.title, "${Time.dateTime(ev.start)}\n${ev.location}\n${ev.url}") }) { Icon(Icons.Default.Email, "Email") } },
+                leadingIcon = { Icon(Icons.Rounded.Group, null) },
+                trailingIcon = { if (ev.attendees.isNotBlank()) IconButton(onClick = { Files.email(ctx, ev.attendees, ev.title, "${Time.dateTime(ev.start)}\n${ev.location}\n${ev.url}") }) { Icon(Icons.Rounded.Email, "Email") } },
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email), modifier = Modifier.fillMaxWidth())
             Spacer(Modifier.height(8.dp))
             OutlinedTextField(ev.notes, { e = ev.copy(notes = it) }, label = { Text("Notes / agenda") }, minLines = 4,
-                leadingIcon = { Icon(Icons.AutoMirrored.Filled.Notes, null) }, keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences), modifier = Modifier.fillMaxWidth())
+                leadingIcon = { Icon(Icons.AutoMirrored.Rounded.Notes, null) }, keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences), modifier = Modifier.fillMaxWidth())
             Spacer(Modifier.height(80.dp))
         }
     }

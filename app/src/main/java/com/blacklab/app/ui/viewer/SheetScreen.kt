@@ -23,9 +23,9 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.Redo
-import androidx.compose.material.icons.automirrored.filled.Undo
-import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.automirrored.rounded.Redo
+import androidx.compose.material.icons.automirrored.rounded.Undo
+import androidx.compose.material.icons.rounded.*
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.CircularProgressIndicator
@@ -137,31 +137,31 @@ fun SheetScreen(file: File) {
 
     Scaffold(topBar = {
         BlTopBar(file.name, subtitle = (if (dirty) "● Edited · " else "") + (sheet?.let { s -> val rows = s.cells.count { r -> r.any { c -> c.isNotEmpty() } }; val cols = (s.cells.maxOfOrNull { r -> r.indexOfLast { c -> c.isNotEmpty() } } ?: -1) + 1; "$rows rows × $cols columns" + if (sheets.size > 1) " · ${sheets.size} sheets" else "" } ?: "Spreadsheet"), onBack = { if (dirty) dialog = "exit" else shell.back() }, actions = {
-            IconButton(enabled = undo.isNotEmpty(), onClick = { restore(undo, redo) }) { Icon(Icons.AutoMirrored.Filled.Undo, "Undo") }
-            IconButton(enabled = redo.isNotEmpty(), onClick = { restore(redo, undo) }) { Icon(Icons.AutoMirrored.Filled.Redo, "Redo") }
-            IconButton(enabled = dirty, onClick = { save(file) }) { Icon(Icons.Default.Save, "Save") }
+            IconButton(enabled = undo.isNotEmpty(), onClick = { restore(undo, redo) }) { Icon(Icons.AutoMirrored.Rounded.Undo, "Undo") }
+            IconButton(enabled = redo.isNotEmpty(), onClick = { restore(redo, undo) }) { Icon(Icons.AutoMirrored.Rounded.Redo, "Redo") }
+            IconButton(enabled = dirty, onClick = { save(file) }) { Icon(Icons.Rounded.Save, "Save") }
             FileMenu(file, listOf(
-                MenuItem("Find / filter rows", Icons.Default.FilterAlt) { filterOpen = true },
-                MenuItem(if (wide) "Narrow columns" else "Wide columns", Icons.Default.ViewColumn) { wide = !wide },
-                MenuItem(if (headerRow) "First row is data" else "First row is a header", Icons.Default.TableRows) { headerRow = !headerRow },
-                MenuItem("Add sheet", Icons.Default.AddBox) { snapshot(); sheets += Sheet("Sheet${sheets.size + 1}").also { it.normalize(40, 8) }; tab = sheets.lastIndex; version++ },
-                MenuItem("Rename sheet", Icons.Default.DriveFileRenameOutline) { dialog = "rename" },
-                MenuItem("Delete sheet", Icons.Default.Delete) { if (sheets.size > 1) { snapshot(); sheets.removeAt(tab); tab = tab.coerceAtMost(sheets.lastIndex); version++ } else shell.toast("A workbook needs at least one sheet") },
-                MenuItem("Save as Excel (.xlsx)", Icons.Default.GridOn) { save(FileOps.sibling(file, "", "xlsx")) { } },
-                MenuItem("Save as CSV", Icons.Default.Notes) { save(FileOps.sibling(file, "", "csv")) { } },
-                MenuItem("Export as PDF", Icons.Default.PictureAsPdf) {
+                MenuItem("Find / filter rows", Icons.Rounded.FilterAlt) { filterOpen = true },
+                MenuItem(if (wide) "Narrow columns" else "Wide columns", Icons.Rounded.ViewColumn) { wide = !wide },
+                MenuItem(if (headerRow) "First row is data" else "First row is a header", Icons.Rounded.TableRows) { headerRow = !headerRow },
+                MenuItem("Add sheet", Icons.Rounded.AddBox) { snapshot(); sheets += Sheet("Sheet${sheets.size + 1}").also { it.normalize(40, 8) }; tab = sheets.lastIndex; version++ },
+                MenuItem("Rename sheet", Icons.Rounded.DriveFileRenameOutline) { dialog = "rename" },
+                MenuItem("Delete sheet", Icons.Rounded.Delete) { if (sheets.size > 1) { snapshot(); sheets.removeAt(tab); tab = tab.coerceAtMost(sheets.lastIndex); version++ } else shell.toast("A workbook needs at least one sheet") },
+                MenuItem("Save as Excel (.xlsx)", Icons.Rounded.GridOn) { save(FileOps.sibling(file, "", "xlsx")) { } },
+                MenuItem("Save as CSV", Icons.Rounded.Notes) { save(FileOps.sibling(file, "", "csv")) { } },
+                MenuItem("Export as PDF", Icons.Rounded.PictureAsPdf) {
                     val s = sheet ?: return@MenuItem
                     app.io {
                         val out = runCatching { DocExporter.export("<h1>${s.name}</h1>" + Sheets.html(s.copy().also { trim(it) }), file.nameWithoutExtension, PageSetup(landscape = true), ExportFormat.PDF, app.storage.dir(app.settings.current.activeProfile, Folder.EXPORTS)) }.getOrNull()
                         withContext(Dispatchers.Main) { if (out != null) shell.toast("Saved ${out.name} to Exports", "Open") { openInApp(shell, app, out) } else shell.toast("Export failed") }
                     }
                 },
-                MenuItem("Edit as text", Icons.Default.Code) { if (isCsv) shell.go("view?path=" + encodePath(app, file) + "&text=true") else shell.toast("Only CSV/TSV files can be edited as text") },
+                MenuItem("Edit as text", Icons.Rounded.Code) { if (isCsv) shell.go("view?path=" + encodePath(app, file) + "&text=true") else shell.toast("Only CSV/TSV files can be edited as text") },
             ))
         })
     }) { pad ->
         Column(Modifier.padding(pad).fillMaxSize().imePadding()) {
-            if (!loaded) { Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }; return@Column }
+            if (!loaded) { com.blacklab.app.ui.components.SkeletonPage(); return@Column }
             if (error != null || sheet == null) { Text("Couldn't open this spreadsheet: ${error ?: "empty"}", Modifier.padding(16.dp)); return@Column }
             if (sheets.size > 1) ScrollableTabRow(selectedTabIndex = tab, edgePadding = 8.dp, divider = {}) {
                 sheets.forEachIndexed { i, s -> Tab(selected = i == tab, onClick = { commit(); tab = i; sel = 0 to 0 }, text = { Text(s.name) }) }
@@ -171,19 +171,19 @@ fun SheetScreen(file: File) {
                 Text(Sheets.colName(sel.second) + (sel.first + 1), fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace, modifier = Modifier.width(56.dp))
                 OutlinedTextField(editText, { editText = it }, Modifier.weight(1f), singleLine = true, placeholder = { Text("Value or =formula") },
                     keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done), keyboardActions = KeyboardActions(onDone = { commit(); sel = (sel.first + 1) to sel.second }))
-                IconButton(onClick = { commit() }) { Icon(Icons.Default.Check, "Apply") }
+                IconButton(onClick = { commit() }) { Icon(Icons.Rounded.Check, "Apply") }
             }
             if (filterOpen) Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                OutlinedTextField(filter, { filter = it }, Modifier.weight(1f), singleLine = true, placeholder = { Text("Show rows containing…") }, leadingIcon = { Icon(Icons.Default.FilterAlt, null) })
-                IconButton(onClick = { filter = ""; filterOpen = false }) { Icon(Icons.Default.Close, "Clear filter") }
+                OutlinedTextField(filter, { filter = it }, Modifier.weight(1f), singleLine = true, placeholder = { Text("Show rows containing…") }, leadingIcon = { Icon(Icons.Rounded.FilterAlt, null) })
+                IconButton(onClick = { filter = ""; filterOpen = false }) { Icon(Icons.Rounded.Close, "Clear filter") }
             }
             // quick actions
             Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) {
                 AssistChip({ change { s -> s.cells.add(minOf(sel.first + 1, s.cells.size), MutableList(s.colCount) { "" }) } }, { Text("+ Row") }, Modifier.padding(end = 6.dp))
                 AssistChip({ change { s -> s.cells.forEach { r -> r.add(minOf(sel.second + 1, r.size), "") } } }, { Text("+ Column") }, Modifier.padding(end = 6.dp))
-                AssistChip({ snapshot(); sortBy(sheet, sel.second, true, headerRow, eval); version++ }, { Text("Sort A→Z") }, Modifier.padding(end = 6.dp), leadingIcon = { Icon(Icons.Default.ArrowUpward, null, Modifier.size(16.dp)) })
-                AssistChip({ snapshot(); sortBy(sheet, sel.second, false, headerRow, eval); version++ }, { Text("Z→A") }, Modifier.padding(end = 6.dp), leadingIcon = { Icon(Icons.Default.ArrowDownward, null, Modifier.size(16.dp)) })
-                AssistChip({ dialog = "stats" }, { Text("Column stats") }, Modifier.padding(end = 6.dp), leadingIcon = { Icon(Icons.Default.Functions, null, Modifier.size(16.dp)) })
+                AssistChip({ snapshot(); sortBy(sheet, sel.second, true, headerRow, eval); version++ }, { Text("Sort A→Z") }, Modifier.padding(end = 6.dp), leadingIcon = { Icon(Icons.Rounded.ArrowUpward, null, Modifier.size(16.dp)) })
+                AssistChip({ snapshot(); sortBy(sheet, sel.second, false, headerRow, eval); version++ }, { Text("Z→A") }, Modifier.padding(end = 6.dp), leadingIcon = { Icon(Icons.Rounded.ArrowDownward, null, Modifier.size(16.dp)) })
+                AssistChip({ dialog = "stats" }, { Text("Column stats") }, Modifier.padding(end = 6.dp), leadingIcon = { Icon(Icons.Rounded.Functions, null, Modifier.size(16.dp)) })
                 AssistChip({
                     val c = Sheets.colName(sel.second); val last = sheet.rowCount
                     val start = if (headerRow) 2 else 1

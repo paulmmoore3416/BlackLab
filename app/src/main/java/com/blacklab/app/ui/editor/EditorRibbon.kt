@@ -28,14 +28,14 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.FormatAlignLeft
-import androidx.compose.material.icons.automirrored.filled.FormatAlignRight
-import androidx.compose.material.icons.automirrored.filled.FormatIndentDecrease
-import androidx.compose.material.icons.automirrored.filled.FormatIndentIncrease
-import androidx.compose.material.icons.automirrored.filled.FormatListBulleted
-import androidx.compose.material.icons.automirrored.filled.Redo
-import androidx.compose.material.icons.automirrored.filled.Undo
-import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.automirrored.rounded.FormatAlignLeft
+import androidx.compose.material.icons.automirrored.rounded.FormatAlignRight
+import androidx.compose.material.icons.automirrored.rounded.FormatIndentDecrease
+import androidx.compose.material.icons.automirrored.rounded.FormatIndentIncrease
+import androidx.compose.material.icons.automirrored.rounded.FormatListBulleted
+import androidx.compose.material.icons.automirrored.rounded.Redo
+import androidx.compose.material.icons.automirrored.rounded.Undo
+import androidx.compose.material.icons.rounded.*
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.DropdownMenu
@@ -160,8 +160,8 @@ fun EditorRibbon(
             ) {
                 when (tab) {
                     RibbonTab.HOME -> {
-                        RB(Icons.AutoMirrored.Filled.Undo, "Undo") { controller.exec("undo") }
-                        RB(Icons.AutoMirrored.Filled.Redo, "Redo") { controller.exec("redo") }
+                        RB(Icons.AutoMirrored.Rounded.Undo, "Undo") { controller.exec("undo") }
+                        RB(Icons.AutoMirrored.Rounded.Redo, "Redo") { controller.exec("redo") }
                         Sep()
                         MenuChip(Styles.firstOrNull { it.first == st.block }?.second ?: "Normal", 96) { close ->
                             Styles.forEach { (tag, label) -> DropdownMenuItem(text = { Text(label) }, onClick = { controller.block(tag); close() }) }
@@ -172,52 +172,52 @@ fun EditorRibbon(
                         MenuChip(fmtSize(st.size), 52) { close ->
                             FontSizes.forEach { s -> DropdownMenuItem(text = { Text(fmtSize(s)) }, onClick = { controller.fontSize(s); close() }) }
                         }
-                        RB(Icons.Default.TextIncrease, "Grow font") { controller.fontSize(FontSizes.firstOrNull { it > st.size } ?: 72f) }
-                        RB(Icons.Default.TextDecrease, "Shrink font") { controller.fontSize(FontSizes.lastOrNull { it < st.size } ?: 8f) }
+                        RB(Icons.Rounded.TextIncrease, "Grow font") { controller.fontSize(FontSizes.firstOrNull { it > st.size } ?: 72f) }
+                        RB(Icons.Rounded.TextDecrease, "Shrink font") { controller.fontSize(FontSizes.lastOrNull { it < st.size } ?: 8f) }
                         Sep()
-                        RB(Icons.Default.FormatBold, "Bold", st.bold) { controller.exec("bold") }
-                        RB(Icons.Default.FormatItalic, "Italic", st.italic) { controller.exec("italic") }
-                        RB(Icons.Default.FormatUnderlined, "Underline", st.underline) { controller.exec("underline") }
-                        RB(Icons.Default.FormatStrikethrough, "Strikethrough", st.strike) { controller.exec("strikeThrough") }
-                        RB(Icons.Default.Superscript, "Superscript", st.sup) { controller.exec("superscript") }
-                        RB(Icons.Default.Subscript, "Subscript", st.sub) { controller.exec("subscript") }
-                        RB(Icons.Default.FormatColorText, "Text color") { dialog = "color" }
-                        RB(Icons.Default.BorderColor, "Highlight") { dialog = "highlight" }
-                        RB(Icons.Default.FormatClear, "Clear formatting") { controller.exec("removeFormat") }
+                        RB(Icons.Rounded.FormatBold, "Bold", st.bold) { controller.exec("bold") }
+                        RB(Icons.Rounded.FormatItalic, "Italic", st.italic) { controller.exec("italic") }
+                        RB(Icons.Rounded.FormatUnderlined, "Underline", st.underline) { controller.exec("underline") }
+                        RB(Icons.Rounded.FormatStrikethrough, "Strikethrough", st.strike) { controller.exec("strikeThrough") }
+                        RB(Icons.Rounded.Superscript, "Superscript", st.sup) { controller.exec("superscript") }
+                        RB(Icons.Rounded.Subscript, "Subscript", st.sub) { controller.exec("subscript") }
+                        RB(Icons.Rounded.FormatColorText, "Text color") { dialog = "color" }
+                        RB(Icons.Rounded.BorderColor, "Highlight") { dialog = "highlight" }
+                        RB(Icons.Rounded.FormatClear, "Clear formatting") { controller.exec("removeFormat") }
                         Sep()
-                        RB(Icons.AutoMirrored.Filled.FormatListBulleted, "Bullets", st.ul && !st.check) { controller.exec("insertUnorderedList") }
-                        RB(Icons.Default.FormatListNumbered, "Numbering", st.ol) { controller.exec("insertOrderedList") }
-                        RB(Icons.Default.Checklist, "Checklist", st.check) { controller.checklist() }
-                        RB(Icons.AutoMirrored.Filled.FormatIndentDecrease, "Decrease indent") { controller.indent(-1) }
-                        RB(Icons.AutoMirrored.Filled.FormatIndentIncrease, "Increase indent") { controller.indent(1) }
+                        RB(Icons.AutoMirrored.Rounded.FormatListBulleted, "Bullets", st.ul && !st.check) { controller.exec("insertUnorderedList") }
+                        RB(Icons.Rounded.FormatListNumbered, "Numbering", st.ol) { controller.exec("insertOrderedList") }
+                        RB(Icons.Rounded.Checklist, "Checklist", st.check) { controller.checklist() }
+                        RB(Icons.AutoMirrored.Rounded.FormatIndentDecrease, "Decrease indent") { controller.indent(-1) }
+                        RB(Icons.AutoMirrored.Rounded.FormatIndentIncrease, "Increase indent") { controller.indent(1) }
                         Sep()
-                        RB(Icons.AutoMirrored.Filled.FormatAlignLeft, "Align left", st.align == "left") { controller.exec("justifyLeft") }
-                        RB(Icons.Default.FormatAlignCenter, "Center", st.align == "center") { controller.exec("justifyCenter") }
-                        RB(Icons.AutoMirrored.Filled.FormatAlignRight, "Align right", st.align == "right") { controller.exec("justifyRight") }
-                        RB(Icons.Default.FormatAlignJustify, "Justify", st.align == "justify") { controller.exec("justifyFull") }
+                        RB(Icons.AutoMirrored.Rounded.FormatAlignLeft, "Align left", st.align == "left") { controller.exec("justifyLeft") }
+                        RB(Icons.Rounded.FormatAlignCenter, "Center", st.align == "center") { controller.exec("justifyCenter") }
+                        RB(Icons.AutoMirrored.Rounded.FormatAlignRight, "Align right", st.align == "right") { controller.exec("justifyRight") }
+                        RB(Icons.Rounded.FormatAlignJustify, "Justify", st.align == "justify") { controller.exec("justifyFull") }
                         MenuChip("↕ " + (st.lineHeight.ifBlank { "1.15" }), 64) { close ->
                             listOf("1.0", "1.15", "1.5", "2.0", "2.5", "3.0").forEach { v -> DropdownMenuItem(text = { Text("Line spacing $v") }, onClick = { controller.lineHeight(v); close() }) }
                         }
                     }
                     RibbonTab.INSERT -> {
-                        RL(Icons.Default.Image, "Picture") { pickImage.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) }
-                        RL(Icons.Default.Draw, "Signature") { dialog = "signature" }
-                        RL(Icons.Default.TableChart, "Table") { dialog = "table" }
-                        RL(Icons.Default.Link, "Link") { dialog = "link" }
-                        RL(Icons.Default.HorizontalRule, "Line") { controller.exec("insertHorizontalRule") }
-                        RL(Icons.Default.InsertPageBreak, "Page break") { controller.pageBreak() }
-                        RL(Icons.Default.Today, "Date") { controller.insertText(LocalDateTime.now().format(DateTimeFormatter.ofPattern("MMMM d, yyyy", Locale.US))) }
-                        RL(Icons.Default.Schedule, "Time") { controller.insertText(Time.time(LocalDateTime.now())) }
-                        RL(Icons.Default.EmojiSymbols, "Symbol") { dialog = "symbol" }
-                        RL(Icons.Default.FormatQuote, "Quote") { controller.block("BLOCKQUOTE") }
-                        RL(Icons.Default.Code, "Code") { controller.block("PRE") }
-                        RL(Icons.Default.CheckBox, "Checkbox") { controller.checklist() }
+                        RL(Icons.Rounded.Image, "Picture") { pickImage.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) }
+                        RL(Icons.Rounded.Draw, "Signature") { dialog = "signature" }
+                        RL(Icons.Rounded.TableChart, "Table") { dialog = "table" }
+                        RL(Icons.Rounded.Link, "Link") { dialog = "link" }
+                        RL(Icons.Rounded.HorizontalRule, "Line") { controller.exec("insertHorizontalRule") }
+                        RL(Icons.Rounded.InsertPageBreak, "Page break") { controller.pageBreak() }
+                        RL(Icons.Rounded.Today, "Date") { controller.insertText(LocalDateTime.now().format(DateTimeFormatter.ofPattern("MMMM d, yyyy", Locale.US))) }
+                        RL(Icons.Rounded.Schedule, "Time") { controller.insertText(Time.time(LocalDateTime.now())) }
+                        RL(Icons.Rounded.EmojiSymbols, "Symbol") { dialog = "symbol" }
+                        RL(Icons.Rounded.FormatQuote, "Quote") { controller.block("BLOCKQUOTE") }
+                        RL(Icons.Rounded.Code, "Code") { controller.block("PRE") }
+                        RL(Icons.Rounded.CheckBox, "Checkbox") { controller.checklist() }
                     }
                     RibbonTab.LAYOUT -> {
                         MenuChip(PageSetup.sizes.first { it.first == page.size }.second.substringBefore(" ("), 80) { close ->
                             PageSetup.sizes.forEach { (k, l) -> DropdownMenuItem(text = { Text(l) }, onClick = { onPageChange(page.copy(size = k)); close() }) }
                         }
-                        RL(if (page.landscape) Icons.Default.StayCurrentLandscape else Icons.Default.StayCurrentPortrait, if (page.landscape) "Landscape" else "Portrait") {
+                        RL(if (page.landscape) Icons.Rounded.StayCurrentLandscape else Icons.Rounded.StayCurrentPortrait, if (page.landscape) "Landscape" else "Portrait") {
                             onPageChange(page.copy(landscape = !page.landscape))
                         }
                         MenuChip("Margins ${page.marginMm}mm", 110) { close ->
@@ -226,20 +226,20 @@ fun EditorRibbon(
                             }
                         }
                         Sep()
-                        RL(Icons.Default.ZoomOut, "Smaller") { zoom(controller, -10) }
-                        RL(Icons.Default.ZoomIn, "Larger") { zoom(controller, 10) }
-                        RL(Icons.Default.InsertPageBreak, "Page break") { controller.pageBreak() }
+                        RL(Icons.Rounded.ZoomOut, "Smaller") { zoom(controller, -10) }
+                        RL(Icons.Rounded.ZoomIn, "Larger") { zoom(controller, 10) }
+                        RL(Icons.Rounded.InsertPageBreak, "Page break") { controller.pageBreak() }
                     }
                     RibbonTab.REVIEW -> {
-                        RL(Icons.Default.FindReplace, "Find") { findOpen = true }
-                        RL(Icons.Default.Numbers, "Word count") { dialog = "count" }
-                        RL(Icons.Default.KeyboardVoice, "Dictate") {
+                        RL(Icons.Rounded.FindReplace, "Find") { findOpen = true }
+                        RL(Icons.Rounded.Numbers, "Word count") { dialog = "count" }
+                        RL(Icons.Rounded.KeyboardVoice, "Dictate") {
                             val i = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH)
                                 .putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
                                 .putExtra(RecognizerIntent.EXTRA_PROMPT, "Dictate into your document")
                             runCatching { dictate.launch(i) }
                         }
-                        RL(if (speaking) Icons.Default.StopCircle else Icons.Default.RecordVoiceOver, if (speaking) "Stop" else "Read aloud") {
+                        RL(if (speaking) Icons.Rounded.StopCircle else Icons.Rounded.RecordVoiceOver, if (speaking) "Stop" else "Read aloud") {
                             if (speaking) { tts?.stop(); speaking = false }
                             else scope.launch {
                                 val text = controller.plainText()
@@ -255,26 +255,26 @@ fun EditorRibbon(
                                 }
                             }
                         }
-                        RL(Icons.Default.Link, if (st.link.isNotBlank()) "Edit link" else "Link") { dialog = "link" }
-                        if (st.link.isNotBlank()) RL(Icons.Default.LinkOff, "Remove link") { controller.unlink() }
+                        RL(Icons.Rounded.Link, if (st.link.isNotBlank()) "Edit link" else "Link") { dialog = "link" }
+                        if (st.link.isNotBlank()) RL(Icons.Rounded.LinkOff, "Remove link") { controller.unlink() }
                     }
                     RibbonTab.TABLE -> {
-                        RL(Icons.Default.VerticalAlignTop, "Row above") { controller.tableOp("rowAbove") }
-                        RL(Icons.Default.VerticalAlignBottom, "Row below") { controller.tableOp("rowBelow") }
-                        RL(Icons.Default.KeyboardDoubleArrowLeft, "Col left") { controller.tableOp("colLeft") }
-                        RL(Icons.Default.KeyboardDoubleArrowRight, "Col right") { controller.tableOp("colRight") }
-                        RL(Icons.Default.Title, "Header row") { controller.tableOp("header") }
-                        RL(Icons.Default.Remove, "Delete row") { controller.tableOp("delRow") }
-                        RL(Icons.Default.ViewColumn, "Delete col") { controller.tableOp("delCol") }
-                        RL(Icons.Default.Delete, "Delete table") { controller.tableOp("delTable") }
+                        RL(Icons.Rounded.VerticalAlignTop, "Row above") { controller.tableOp("rowAbove") }
+                        RL(Icons.Rounded.VerticalAlignBottom, "Row below") { controller.tableOp("rowBelow") }
+                        RL(Icons.Rounded.KeyboardDoubleArrowLeft, "Col left") { controller.tableOp("colLeft") }
+                        RL(Icons.Rounded.KeyboardDoubleArrowRight, "Col right") { controller.tableOp("colRight") }
+                        RL(Icons.Rounded.Title, "Header row") { controller.tableOp("header") }
+                        RL(Icons.Rounded.Remove, "Delete row") { controller.tableOp("delRow") }
+                        RL(Icons.Rounded.ViewColumn, "Delete col") { controller.tableOp("delCol") }
+                        RL(Icons.Rounded.Delete, "Delete table") { controller.tableOp("delTable") }
                     }
                     RibbonTab.IMAGE -> {
-                        listOf("25%", "50%", "75%", "100%").forEach { w -> RL(Icons.Default.PhotoSizeSelectLarge, w) { controller.imageOp("width", w) } }
+                        listOf("25%", "50%", "75%", "100%").forEach { w -> RL(Icons.Rounded.PhotoSizeSelectLarge, w) { controller.imageOp("width", w) } }
                         Sep()
-                        RL(Icons.AutoMirrored.Filled.FormatAlignLeft, "Left") { controller.imageOp("align", "left") }
-                        RL(Icons.Default.FormatAlignCenter, "Center") { controller.imageOp("align", "center") }
-                        RL(Icons.AutoMirrored.Filled.FormatAlignRight, "Right") { controller.imageOp("align", "right") }
-                        RL(Icons.Default.Delete, "Delete") { controller.imageOp("delete") }
+                        RL(Icons.AutoMirrored.Rounded.FormatAlignLeft, "Left") { controller.imageOp("align", "left") }
+                        RL(Icons.Rounded.FormatAlignCenter, "Center") { controller.imageOp("align", "center") }
+                        RL(Icons.AutoMirrored.Rounded.FormatAlignRight, "Right") { controller.imageOp("align", "right") }
+                        RL(Icons.Rounded.Delete, "Delete") { controller.imageOp("delete") }
                     }
                 }
             }
@@ -386,7 +386,7 @@ internal fun MenuChip(label: String, minWidth: Int, items: @Composable (close: (
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(label, style = MaterialTheme.typography.labelLarge, maxLines = 1, modifier = Modifier.weight(1f))
-            Icon(Icons.Default.ArrowDropDown, null, modifier = Modifier.size(18.dp))
+            Icon(Icons.Rounded.ArrowDropDown, null, modifier = Modifier.size(18.dp))
         }
         DropdownMenu(open, { open = false }) { items { open = false } }
     }
@@ -450,9 +450,9 @@ internal fun TableDialog(onDismiss: () -> Unit, onInsert: (Int, Int, Boolean) ->
 fun Stepper(label: String, value: Int, range: IntRange, onChange: (Int) -> Unit) {
     Row(verticalAlignment = Alignment.CenterVertically) {
         Text(label, Modifier.weight(1f))
-        IconButton(onClick = { onChange((value - 1).coerceIn(range)) }) { Icon(Icons.Default.Remove, "Less") }
+        IconButton(onClick = { onChange((value - 1).coerceIn(range)) }) { Icon(Icons.Rounded.Remove, "Less") }
         Text("$value", style = MaterialTheme.typography.titleMedium, modifier = Modifier.width(32.dp), textAlign = androidx.compose.ui.text.style.TextAlign.Center)
-        IconButton(onClick = { onChange((value + 1).coerceIn(range)) }) { Icon(Icons.Default.Add, "More") }
+        IconButton(onClick = { onChange((value + 1).coerceIn(range)) }) { Icon(Icons.Rounded.Add, "More") }
     }
 }
 
@@ -491,10 +491,10 @@ private fun FindReplaceBar(controller: EditorController, onClose: () -> Unit) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             OutlinedTextField(term, { term = it }, placeholder = { Text("Find") }, singleLine = true, modifier = Modifier.weight(1f),
                 trailingIcon = { Text(if (result.first == 0) (if (term.isBlank()) "" else "0") else "${result.second + 1}/${result.first}", style = MaterialTheme.typography.labelMedium) })
-            IconButton(onClick = { controller.findStep(-1) }) { Icon(Icons.Default.KeyboardArrowUp, "Previous") }
-            IconButton(onClick = { controller.findStep(1) }) { Icon(Icons.Default.KeyboardArrowDown, "Next") }
-            IconButton(onClick = { showReplace = !showReplace }) { Icon(Icons.Default.FindReplace, "Replace") }
-            IconButton(onClick = onClose) { Icon(Icons.Default.Close, "Close") }
+            IconButton(onClick = { controller.findStep(-1) }) { Icon(Icons.Rounded.KeyboardArrowUp, "Previous") }
+            IconButton(onClick = { controller.findStep(1) }) { Icon(Icons.Rounded.KeyboardArrowDown, "Next") }
+            IconButton(onClick = { showReplace = !showReplace }) { Icon(Icons.Rounded.FindReplace, "Replace") }
+            IconButton(onClick = onClose) { Icon(Icons.Rounded.Close, "Close") }
         }
         if (showReplace) {
             Row(verticalAlignment = Alignment.CenterVertically) {

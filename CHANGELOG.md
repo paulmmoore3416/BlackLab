@@ -2,6 +2,40 @@
 
 All notable changes to BlackLab are documented here. The project follows [Semantic Versioning](https://semver.org/).
 
+## [4.6.0] — 2026-11-01
+
+A polish release: BlackLab should feel smoother, more consistent and more responsive in the hand.
+
+### Added
+- **Connected motion**:
+  - A task (on Home or in To-Do) or a note card grows into its full screen and shrinks back when you return.
+  - Screens slide and fade with a consistent easing, and the back gesture previews the screen underneath.
+- **Haptic feedback**:
+  - A tick when you switch tabs or reopen a task; a confirm buzz when you complete a task or place a signature.
+  - A firmer buzz for deletes and swipe-to-delete, the long-press buzz on menus, and on/off clicks on every switch.
+  - Settings › Appearance › **Haptic feedback** turns it off.
+- **Reduce motion** (Settings › Appearance): instant, simpler transitions and still placeholders. It switches on by itself when Android's *Remove animations* is set.
+- **Loading placeholders** in place of spinners: Home's task list, PDFs, documents, journal entries, spreadsheets, the music library and the form dialog show soft shapes of the content, so nothing jumps around when it arrives.
+- **Instant task ticks**: completing a task on Home or in To-Do checks and strikes it through immediately with a springy check, then the save follows.
+- **Smoothness meter** (Settings › Problem reports): the share of frames drawn on time this session, and the slowest screens. Counted on the phone only.
+- **Animated launch screen**: the flask draws itself, fills and bubbles while BlackLab starts.
+
+### Changed
+- **Typeface**: BlackLab now uses **Inter** (SIL Open Font License 1.1, bundled). Timers, clocks and big numbers use even-width digits so they don't shift as they count.
+- **Icons**: one rounded icon style across the app. Bottom-bar icons are outlined and fill in when selected.
+- **Empty screens** show a small illustration in your palette's main, secondary and third colors, easing in.
+- **Large titles** on Settings, Signatures, App updates and Problem reports shrink into the top bar as you scroll.
+- **Bottom bar** slides away while you scroll down a list and returns when you scroll up.
+- **Widgets** (Today, Checklist, Quick capture) use your account's palette and BlackLab's light/dark setting, including Auto. They follow your wallpaper colors when Material You is on, and redraw when you change colors.
+- **Faster start and first scrolls**: a bundled baseline profile has Android precompile BlackLab's code at install (`profileinstaller`).
+- Home builds "Since you last looked" only when its data changes.
+
+### Fixed
+- Long-press menus could vibrate twice, and they now respect the haptics setting.
+
+### Notes
+- Tests: 50 JVM unit tests (new: the frame-timing rules) and 15 on-device tests.
+
 ## [4.5.0] — 2026-11-01
 
 ### Added

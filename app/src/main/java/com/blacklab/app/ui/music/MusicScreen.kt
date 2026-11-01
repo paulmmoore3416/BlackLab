@@ -39,10 +39,10 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.automirrored.filled.PlaylistAdd
-import androidx.compose.material.icons.automirrored.filled.QueueMusic
-import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.automirrored.rounded.ArrowBack
+import androidx.compose.material.icons.automirrored.rounded.PlaylistAdd
+import androidx.compose.material.icons.automirrored.rounded.QueueMusic
+import androidx.compose.material.icons.rounded.*
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.FilledTonalButton
@@ -193,16 +193,16 @@ fun MusicScreen() {
 
     Scaffold(topBar = {
         if (searching) Row(Modifier.statusBarsPadding().padding(8.dp), verticalAlignment = Alignment.CenterVertically) {
-            IconButton(onClick = { searching = false; query = "" }) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Close search") }
+            IconButton(onClick = { searching = false; query = "" }) { Icon(Icons.AutoMirrored.Rounded.ArrowBack, "Close search") }
             OutlinedTextField(query, { query = it }, Modifier.weight(1f), singleLine = true, placeholder = { Text("Songs, artists, albums") })
         } else BlTopBar(drill?.first ?: "Music", subtitle = drill?.let { "${it.second.size} songs" } ?: library?.let { "${it.size} songs on this phone" }, onBack = drill?.let { { drill = null } }, actions = {
-            IconButton(onClick = { searching = true; tab = 0; drill = null }) { Icon(Icons.Default.Search, "Search") }
-            IconButton(onClick = { refresh++ }) { Icon(Icons.Default.Refresh, "Rescan") }
+            IconButton(onClick = { searching = true; tab = 0; drill = null }) { Icon(Icons.Rounded.Search, "Search") }
+            IconButton(onClick = { refresh++ }) { Icon(Icons.Rounded.Refresh, "Rescan") }
         })
     }, bottomBar = { MiniPlayer(player) { shell.go("nowplaying") } }) { pad ->
         Column(Modifier.padding(pad).fillMaxSize()) {
             if (!granted) {
-                EmptyState(Icons.Default.LibraryMusic, "Allow access to music", "BlackLab needs permission to read audio files to show your songs. BlackLab's own recordings work without it.",
+                EmptyState(Icons.Rounded.LibraryMusic, "Allow access to music", "BlackLab needs permission to read audio files to show your songs. BlackLab's own recordings work without it.",
                     action = { FilledTonalButton(onClick = { ask.launch(Manifest.permission.READ_MEDIA_AUDIO) }) { Text("Allow") } })
             }
             drill?.let { (_, list) -> SongList(list, onPlay = { play(list, it) }, onShuffle = { play(list, 0, true) }, onMenu = { menu = it }); return@Column }
@@ -214,8 +214,8 @@ fun MusicScreen() {
                     Row(Modifier.padding(horizontal = 12.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                         listOf("title" to "A–Z", "artist" to "Artist", "recent" to "Recently added").forEach { (k, l) -> FilterChip(sort == k, { sort = k }, label = { Text(l) }) }
                     }
-                    if (library == null) Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { androidx.compose.material3.CircularProgressIndicator() }
-                    else if (songs.isEmpty() && granted) EmptyState(Icons.Default.MusicOff, if (query.isBlank()) "No music found" else "No matches", "Songs saved to the phone (Music, Downloads…) show up here automatically.")
+                    if (library == null) com.blacklab.app.ui.components.SkeletonRows(8, Modifier.padding(16.dp), leading = 44.dp)
+                    else if (songs.isEmpty() && granted) EmptyState(Icons.Rounded.MusicOff, if (query.isBlank()) "No music found" else "No matches", "Songs saved to the phone (Music, Downloads…) show up here automatically.")
                     else SongList(songs, onPlay = { play(songs, it) }, onShuffle = { play(songs, 0, true) }, onMenu = { menu = it })
                 }
                 "Albums" -> {
@@ -249,7 +249,7 @@ fun MusicScreen() {
                 else -> {
                     Text("Recordings, dictation and audio you've imported into BlackLab (${app.settings.profileName(s.activeProfile)}).",
                         style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp))
-                    if (blacklab.isEmpty()) EmptyState(Icons.Default.Mic, "No audio yet", "Record in the Recorder or import audio files in the Library.")
+                    if (blacklab.isEmpty()) EmptyState(Icons.Rounded.Mic, "No audio yet", "Record in the Recorder or import audio files in the Library.")
                     else SongList(blacklab, onPlay = { play(blacklab, it) }, onShuffle = null, onMenu = { menu = it })
                 }
             }
@@ -262,16 +262,16 @@ fun MusicScreen() {
         ActionSheet(title = song.title, subtitle = "${song.artist} · ${song.album} · ${fmt(song.duration)}", onDismiss = { menu = null },
             leading = { Artwork(song.uri, Modifier.fillMaxSize(), 160) },
             quick = listOf(
-                SheetAction("Play next", Icons.Default.PlaylistPlay) { scope.launch { Music.enqueue(ctx, listOf(song), true); shell.toast("Playing next") } },
-                SheetAction("Queue", Icons.AutoMirrored.Filled.QueueMusic) { scope.launch { Music.enqueue(ctx, listOf(song), false); shell.toast("Added to queue") } },
-                SheetAction(if (fav) "Unfavorite" else "Favorite", if (fav) Icons.Default.Favorite else Icons.Default.FavoriteBorder) { fav = Music.toggleFavorite(ctx, song); refresh++ },
+                SheetAction("Play next", Icons.Rounded.PlaylistPlay) { scope.launch { Music.enqueue(ctx, listOf(song), true); shell.toast("Playing next") } },
+                SheetAction("Queue", Icons.AutoMirrored.Rounded.QueueMusic) { scope.launch { Music.enqueue(ctx, listOf(song), false); shell.toast("Added to queue") } },
+                SheetAction(if (fav) "Unfavorite" else "Favorite", if (fav) Icons.Rounded.Favorite else Icons.Rounded.FavoriteBorder) { fav = Music.toggleFavorite(ctx, song); refresh++ },
             ),
             actions = buildList {
-                add(SheetAction("Add to playlist…", Icons.AutoMirrored.Filled.PlaylistAdd) { addTo = listOf(song) })
+                add(SheetAction("Add to playlist…", Icons.AutoMirrored.Rounded.PlaylistAdd) { addTo = listOf(song) })
                 if (file != null) {
-                    add(SheetAction("Edit audio", Icons.Default.GraphicEq, hint = "Trim, fade, normalize, speed, effects") { shell.go("audioedit?path=" + Uri.encode(app.storage.relative(file))) })
-                    add(SheetAction("Share", Icons.Default.Share) { Files.share(ctx, listOf(file)) })
-                    add(SheetAction("Save a copy to BlackLab", Icons.Default.SaveAlt) { app.io { val f = com.blacklab.app.files.FileOps.saveToBlackLab(app, file); withContext(Dispatchers.Main) { shell.toast("Saved to ${f.parentFile?.name}") } } })
+                    add(SheetAction("Edit audio", Icons.Rounded.GraphicEq, hint = "Trim, fade, normalize, speed, effects") { shell.go("audioedit?path=" + Uri.encode(app.storage.relative(file))) })
+                    add(SheetAction("Share", Icons.Rounded.Share) { Files.share(ctx, listOf(file)) })
+                    add(SheetAction("Save a copy to BlackLab", Icons.Rounded.SaveAlt) { app.io { val f = com.blacklab.app.files.FileOps.saveToBlackLab(app, file); withContext(Dispatchers.Main) { shell.toast("Saved to ${f.parentFile?.name}") } } })
                 }
             })
     }
@@ -283,8 +283,8 @@ private fun SongList(songs: List<Song>, onPlay: (Int) -> Unit, onShuffle: (() ->
     LazyColumn(contentPadding = PaddingValues(bottom = 24.dp)) {
         item {
             Row(Modifier.padding(horizontal = 12.dp, vertical = 6.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                FilledTonalButton(onClick = { onPlay(0) }, enabled = songs.isNotEmpty()) { Icon(Icons.Default.PlayArrow, null); Spacer(Modifier.width(6.dp)); Text("Play all") }
-                if (onShuffle != null) FilledTonalButton(onClick = onShuffle, enabled = songs.isNotEmpty()) { Icon(Icons.Default.Shuffle, null); Spacer(Modifier.width(6.dp)); Text("Shuffle") }
+                FilledTonalButton(onClick = { onPlay(0) }, enabled = songs.isNotEmpty()) { Icon(Icons.Rounded.PlayArrow, null); Spacer(Modifier.width(6.dp)); Text("Play all") }
+                if (onShuffle != null) FilledTonalButton(onClick = onShuffle, enabled = songs.isNotEmpty()) { Icon(Icons.Rounded.Shuffle, null); Spacer(Modifier.width(6.dp)); Text("Shuffle") }
             }
         }
         itemsIndexed(songs, key = { i, s -> s.uri.toString() + i }) { i, s ->
@@ -295,7 +295,7 @@ private fun SongList(songs: List<Song>, onPlay: (Int) -> Unit, onShuffle: (() ->
                     Text(s.title, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     Text("${s.artist} · ${fmt(s.duration)}", maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
-                IconButton(onClick = { onMenu(s) }) { Icon(Icons.Default.MoreVert, "More") }
+                IconButton(onClick = { onMenu(s) }) { Icon(Icons.Rounded.MoreVert, "More") }
             }
         }
     }
@@ -309,16 +309,16 @@ private fun PlaylistsTab(playlists: List<Playlist>, library: List<Song>, onOpen:
     var create by remember { mutableStateOf(false) }
     var manage by remember { mutableStateOf<Playlist?>(null) }
     LazyColumn(contentPadding = PaddingValues(bottom = 24.dp)) {
-        item { TextButton(onClick = { create = true }, modifier = Modifier.padding(horizontal = 8.dp)) { Icon(Icons.Default.Add, null); Spacer(Modifier.width(6.dp)); Text("New playlist") } }
-        if (playlists.isEmpty()) item { EmptyState(Icons.AutoMirrored.Filled.QueueMusic, "No playlists", "Long-press any song to add it to a playlist or your Favorites.") }
+        item { TextButton(onClick = { create = true }, modifier = Modifier.padding(horizontal = 8.dp)) { Icon(Icons.Rounded.Add, null); Spacer(Modifier.width(6.dp)); Text("New playlist") } }
+        if (playlists.isEmpty()) item { EmptyState(Icons.AutoMirrored.Rounded.QueueMusic, "No playlists", "Long-press any song to add it to a playlist or your Favorites.") }
         items(playlists, key = { it.name }) { p ->
             Row(Modifier.fillMaxWidth().pressable(onClick = { onOpen(p) }, onLongClick = { manage = p }).padding(horizontal = 16.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
                 Box(Modifier.size(46.dp).clip(RoundedCornerShape(10.dp)).background(MaterialTheme.colorScheme.primaryContainer), contentAlignment = Alignment.Center) {
-                    Icon(if (p.name == Music.FAVORITES) Icons.Default.Favorite else Icons.AutoMirrored.Filled.QueueMusic, null, tint = MaterialTheme.colorScheme.onPrimaryContainer)
+                    Icon(if (p.name == Music.FAVORITES) Icons.Rounded.Favorite else Icons.AutoMirrored.Rounded.QueueMusic, null, tint = MaterialTheme.colorScheme.onPrimaryContainer)
                 }
                 Spacer(Modifier.width(14.dp))
                 Column(Modifier.weight(1f)) { Text(p.name); Text("${p.items.size} songs", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
-                IconButton(onClick = { manage = p }) { Icon(Icons.Default.MoreVert, "More") }
+                IconButton(onClick = { manage = p }) { Icon(Icons.Rounded.MoreVert, "More") }
             }
         }
     }
@@ -327,14 +327,14 @@ private fun PlaylistsTab(playlists: List<Playlist>, library: List<Song>, onOpen:
     }
     manage?.let { p ->
         ActionSheet(title = p.name, subtitle = "${p.items.size} songs", onDismiss = { manage = null }, actions = listOf(
-            SheetAction("Export as .m3u8", Icons.Default.Upload) {
+            SheetAction("Export as .m3u8", Icons.Rounded.Upload) {
                 app.io {
                     val out = Files.unique(app.storage.dir(app.settings.current.activeProfile, Folder.EXPORTS), p.name, "m3u8")
                     Music.exportM3u(Music.resolve(p, library), out)
                     withContext(Dispatchers.Main) { shell.toast("Saved ${out.name} to Exports") }
                 }
             },
-            SheetAction("Delete playlist", Icons.Default.Delete, destructive = true) { Music.savePlaylists(ctx, playlists.filter { it.name != p.name }); onChanged() },
+            SheetAction("Delete playlist", Icons.Rounded.Delete, destructive = true) { Music.savePlaylists(ctx, playlists.filter { it.name != p.name }); onChanged() },
         ))
     }
 }
@@ -367,7 +367,7 @@ fun Artwork(uri: Uri?, modifier: Modifier, px: Int, data: ByteArray? = null) {
     Box(modifier.background(Brush.linearGradient(listOf(MaterialTheme.colorScheme.primary.copy(alpha = 0.55f), MaterialTheme.colorScheme.tertiary.copy(alpha = 0.45f)))), contentAlignment = Alignment.Center) {
         val b = bmp
         if (b != null) Image(b.asImageBitmap(), null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
-        else Icon(Icons.Default.MusicNote, null, tint = Color.White.copy(alpha = 0.85f), modifier = Modifier.fillMaxSize(0.45f))
+        else Icon(Icons.Rounded.MusicNote, null, tint = Color.White.copy(alpha = 0.85f), modifier = Modifier.fillMaxSize(0.45f))
     }
 }
 
@@ -381,9 +381,9 @@ fun MiniPlayer(p: PlayerUi, bottomInset: Boolean = true, onOpen: () -> Unit) {
             Text(p.meta.title?.toString() ?: "Playing", maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.titleSmall)
             Text(p.meta.artist?.toString() ?: "", maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
-        IconButton(onClick = { p.controller?.seekToPrevious() }) { Icon(Icons.Default.SkipPrevious, "Previous") }
-        IconButton(onClick = { p.controller?.let { if (it.isPlaying) it.pause() else it.play() } }) { Icon(if (p.playing) Icons.Default.Pause else Icons.Default.PlayArrow, "Play/pause") }
-        IconButton(onClick = { p.controller?.seekToNext() }) { Icon(Icons.Default.SkipNext, "Next") }
+        IconButton(onClick = { p.controller?.seekToPrevious() }) { Icon(Icons.Rounded.SkipPrevious, "Previous") }
+        IconButton(onClick = { p.controller?.let { if (it.isPlaying) it.pause() else it.play() } }) { Icon(if (p.playing) Icons.Rounded.Pause else Icons.Rounded.PlayArrow, "Play/pause") }
+        IconButton(onClick = { p.controller?.seekToNext() }) { Icon(Icons.Rounded.SkipNext, "Next") }
     }
 }
 
@@ -426,12 +426,12 @@ fun NowPlayingScreen() {
     Box(Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(MaterialTheme.colorScheme.primary.copy(alpha = 0.28f), MaterialTheme.colorScheme.background, MaterialTheme.colorScheme.background)))) {
         Column(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding().padding(horizontal = 20.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                IconButton(onClick = { shell.back() }) { Icon(Icons.Default.KeyboardArrowDown, "Close") }
+                IconButton(onClick = { shell.back() }) { Icon(Icons.Rounded.KeyboardArrowDown, "Close") }
                 Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
                     Text("NOW PLAYING", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     if (p.count > 0) Text("${p.index + 1} of ${p.count}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
-                IconButton(onClick = { shell.go("music") }) { Icon(Icons.Default.LibraryMusic, "Library") }
+                IconButton(onClick = { shell.go("music") }) { Icon(Icons.Rounded.LibraryMusic, "Library") }
             }
             Spacer(Modifier.height(12.dp))
             Artwork(p.uri, Modifier.fillMaxWidth().aspectRatio(1f).clip(RoundedCornerShape(24.dp)), 900, p.meta.artworkData)
@@ -444,7 +444,7 @@ fun NowPlayingScreen() {
                 IconButton(onClick = {
                     val u = p.uri ?: return@IconButton
                     fav = Music.toggleFavorite(ctx, Song(u, p.meta.title?.toString() ?: "", p.meta.artist?.toString() ?: "", p.meta.albumTitle?.toString() ?: ""))
-                }) { Icon(if (fav) Icons.Default.Favorite else Icons.Default.FavoriteBorder, "Favorite", tint = if (fav) Color(0xFFFF5C7A) else MaterialTheme.colorScheme.onSurface) }
+                }) { Icon(if (fav) Icons.Rounded.Favorite else Icons.Rounded.FavoriteBorder, "Favorite", tint = if (fav) Color(0xFFFF5C7A) else MaterialTheme.colorScheme.onSurface) }
             }
             // seek bar with A-B markers
             Box {
@@ -459,29 +459,29 @@ fun NowPlayingScreen() {
             }
             Spacer(Modifier.height(8.dp))
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly, verticalAlignment = Alignment.CenterVertically) {
-                IconButton(onClick = { c?.shuffleModeEnabled = !p.shuffle }) { Icon(Icons.Default.Shuffle, "Shuffle", tint = if (p.shuffle) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface) }
-                IconButton(onClick = { c?.seekBack() }) { Icon(Icons.Default.Replay10, "Back 10 seconds") }
-                IconButton(onClick = { c?.seekToPrevious() }, Modifier.size(56.dp)) { Icon(Icons.Default.SkipPrevious, "Previous", Modifier.size(36.dp)) }
+                IconButton(onClick = { c?.shuffleModeEnabled = !p.shuffle }) { Icon(Icons.Rounded.Shuffle, "Shuffle", tint = if (p.shuffle) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface) }
+                IconButton(onClick = { c?.seekBack() }) { Icon(Icons.Rounded.Replay10, "Back 10 seconds") }
+                IconButton(onClick = { c?.seekToPrevious() }, Modifier.size(56.dp)) { Icon(Icons.Rounded.SkipPrevious, "Previous", Modifier.size(36.dp)) }
                 FilledIconButton(onClick = { c?.let { if (it.isPlaying) it.pause() else { if (it.playbackState == Player.STATE_ENDED) it.seekTo(0); it.play() } } }, Modifier.size(76.dp),
                     colors = IconButtonDefaults.filledIconButtonColors(containerColor = MaterialTheme.colorScheme.primary)) {
-                    Icon(if (p.playing) Icons.Default.Pause else Icons.Default.PlayArrow, "Play/pause", Modifier.size(42.dp))
+                    Icon(if (p.playing) Icons.Rounded.Pause else Icons.Rounded.PlayArrow, "Play/pause", Modifier.size(42.dp))
                 }
-                IconButton(onClick = { c?.seekToNext() }, Modifier.size(56.dp)) { Icon(Icons.Default.SkipNext, "Next", Modifier.size(36.dp)) }
-                IconButton(onClick = { c?.seekForward() }) { Icon(Icons.Default.Forward30, "Forward 30 seconds") }
+                IconButton(onClick = { c?.seekToNext() }, Modifier.size(56.dp)) { Icon(Icons.Rounded.SkipNext, "Next", Modifier.size(36.dp)) }
+                IconButton(onClick = { c?.seekForward() }) { Icon(Icons.Rounded.Forward30, "Forward 30 seconds") }
                 IconButton(onClick = { c?.repeatMode = when (p.repeat) { Player.REPEAT_MODE_OFF -> Player.REPEAT_MODE_ALL; Player.REPEAT_MODE_ALL -> Player.REPEAT_MODE_ONE; else -> Player.REPEAT_MODE_OFF } }) {
-                    Icon(if (p.repeat == Player.REPEAT_MODE_ONE) Icons.Default.RepeatOne else Icons.Default.Repeat, "Repeat", tint = if (p.repeat != Player.REPEAT_MODE_OFF) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface)
+                    Icon(if (p.repeat == Player.REPEAT_MODE_ONE) Icons.Rounded.RepeatOne else Icons.Rounded.Repeat, "Repeat", tint = if (p.repeat != Player.REPEAT_MODE_OFF) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface)
                 }
             }
             Spacer(Modifier.weight(1f))
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
-                NpAction(Icons.Default.Speed, if (p.speed == 1f && p.pitch == 1f) "Speed" else "${"%.2f".format(p.speed).trimEnd('0').trimEnd('.')}×") { dialog = "speed" }
-                NpAction(Icons.Default.Bedtime, if (sleepAt > 0) "${((sleepAt - System.currentTimeMillis()) / 60000 + 1)} min" else "Sleep", sleepAt > 0) { dialog = "sleep" }
-                NpAction(Icons.Default.Equalizer, "EQ", Fx.state.collectAsState().value.enabled) { dialog = "eq" }
-                NpAction(Icons.Default.Loop, when { loopA == null -> "A-B"; loopB == null -> "Set B"; else -> "Clear" }, loopA != null) {
+                NpAction(Icons.Rounded.Speed, if (p.speed == 1f && p.pitch == 1f) "Speed" else "${"%.2f".format(p.speed).trimEnd('0').trimEnd('.')}×") { dialog = "speed" }
+                NpAction(Icons.Rounded.Bedtime, if (sleepAt > 0) "${((sleepAt - System.currentTimeMillis()) / 60000 + 1)} min" else "Sleep", sleepAt > 0) { dialog = "sleep" }
+                NpAction(Icons.Rounded.Equalizer, "EQ", Fx.state.collectAsState().value.enabled) { dialog = "eq" }
+                NpAction(Icons.Rounded.Loop, when { loopA == null -> "A-B"; loopB == null -> "Set B"; else -> "Clear" }, loopA != null) {
                     when { loopA == null -> PlaybackService.loopA.value = p.position; loopB == null -> PlaybackService.loopB.value = p.position.takeIf { it > loopA!! }; else -> { PlaybackService.loopA.value = null; PlaybackService.loopB.value = null } }
                 }
-                NpAction(Icons.AutoMirrored.Filled.QueueMusic, "Queue") { dialog = "queue" }
-                if (file != null) NpAction(Icons.Default.GraphicEq, "Edit") { shell.go("audioedit?path=" + Uri.encode(app.storage.relative(file))) }
+                NpAction(Icons.AutoMirrored.Rounded.QueueMusic, "Queue") { dialog = "queue" }
+                if (file != null) NpAction(Icons.Rounded.GraphicEq, "Edit") { shell.go("audioedit?path=" + Uri.encode(app.storage.relative(file))) }
             }
             Spacer(Modifier.height(12.dp))
         }
@@ -583,7 +583,7 @@ private fun QueueSheet(c: MediaController?, p: PlayerUi, onDismiss: () -> Unit) 
                         Text(item.mediaMetadata.title?.toString() ?: "Track ${i + 1}", maxLines = 1, overflow = TextOverflow.Ellipsis, fontWeight = if (i == p.index) FontWeight.Bold else FontWeight.Normal)
                         Text(item.mediaMetadata.artist?.toString() ?: "", maxLines = 1, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
-                    if (i != p.index) IconButton(onClick = { c?.removeMediaItem(i) }) { Icon(Icons.Default.Close, "Remove") }
+                    if (i != p.index) IconButton(onClick = { c?.removeMediaItem(i) }) { Icon(Icons.Rounded.Close, "Remove") }
                 }
             }
         }

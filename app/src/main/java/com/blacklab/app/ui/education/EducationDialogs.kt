@@ -16,7 +16,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.rounded.*
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.FilterChip
@@ -108,7 +108,7 @@ fun CourseEditor(course: CourseEntity?, data: EduData, onDismiss: () -> Unit) {
         DropdownField("Type", CourseKinds, c.kind, { c = c.copy(kind = it) })
         Row(verticalAlignment = Alignment.CenterVertically) {
             DropdownField("Term", listOf<Pair<Long?, String>>(null to "None") + data.terms.map { it.id to it.name }, c.termId, { c = c.copy(termId = it) }, Modifier.weight(1f))
-            IconButton(onClick = { newTerm = true }) { Icon(Icons.Default.Add, "New term") }
+            IconButton(onClick = { newTerm = true }) { Icon(Icons.Rounded.Add, "New term") }
         }
         Field(c.institution, { c = c.copy(institution = it) }, if (c.kind == "COLLEGE") "College / university" else "Provider")
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -130,8 +130,8 @@ fun CourseEditor(course: CourseEntity?, data: EduData, onDismiss: () -> Unit) {
             Field(modulesTotal, { modulesTotal = it }, "Modules / units", number = true, modifier = Modifier.weight(1f))
         }
         LabeledSwitchRow("Pass / fail", "Excluded from GPA", c.passFail) { c = c.copy(passFail = it) }
-        PickerRow(Icons.Default.Event, "Start date", c.startDay?.let { Time.date(LocalDate.ofEpochDay(it)) }, onClear = { c = c.copy(startDay = null) }) { pick = "start" }
-        PickerRow(Icons.Default.EventBusy, "End date", c.endDay?.let { Time.date(LocalDate.ofEpochDay(it)) }, onClear = { c = c.copy(endDay = null) }) { pick = "end" }
+        PickerRow(Icons.Rounded.Event, "Start date", c.startDay?.let { Time.date(LocalDate.ofEpochDay(it)) }, onClear = { c = c.copy(startDay = null) }) { pick = "start" }
+        PickerRow(Icons.Rounded.EventBusy, "End date", c.endDay?.let { Time.date(LocalDate.ofEpochDay(it)) }, onClear = { c = c.copy(endDay = null) }) { pick = "end" }
         Text("Color", style = MaterialTheme.typography.labelLarge)
         ColorPickerRow(c.color, { c = c.copy(color = it) })
         Field(c.notes, { c = c.copy(notes = it) }, "Notes", minLines = 3)
@@ -162,11 +162,11 @@ fun TermsDialog(data: EduData, onDismiss: () -> Unit) {
                             Text(listOfNotNull(t.institution.takeIf { it.isNotBlank() }, t.startDay?.let { Time.short(LocalDate.ofEpochDay(it)) }, t.endDay?.let { Time.short(LocalDate.ofEpochDay(it)) }).joinToString(" · "),
                                 style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
-                        IconButton(onClick = { edit = t }) { Icon(Icons.Default.Edit, "Edit") }
+                        IconButton(onClick = { edit = t }) { Icon(Icons.Rounded.Edit, "Edit") }
                     }
                 }
                 if (data.terms.isEmpty()) Text("No terms yet.", color = MaterialTheme.colorScheme.onSurfaceVariant)
-                TextButton(onClick = { creating = true }) { Icon(Icons.Default.Add, null); Text("Add term") }
+                TextButton(onClick = { creating = true }) { Icon(Icons.Rounded.Add, null); Text("Add term") }
             }
         },
         confirmButton = { TextButton(onClick = onDismiss) { Text("Done") } },
@@ -192,8 +192,8 @@ fun TermEditor(term: TermEntity?, onDismiss: () -> Unit) {
                     listOf("Spring $year", "Summer $year", "Fall $year", "Winter ${year + 1}", "Spring ${year + 1}").forEach { n -> AssistChip({ t = t.copy(name = n) }, { Text(n) }) }
                 }
                 Field(t.institution, { t = t.copy(institution = it) }, "School")
-                PickerRow(Icons.Default.Event, "Start date", t.startDay?.let { Time.date(LocalDate.ofEpochDay(it)) }) { pick = "s" }
-                PickerRow(Icons.Default.EventBusy, "End date", t.endDay?.let { Time.date(LocalDate.ofEpochDay(it)) }) { pick = "e" }
+                PickerRow(Icons.Rounded.Event, "Start date", t.startDay?.let { Time.date(LocalDate.ofEpochDay(it)) }) { pick = "s" }
+                PickerRow(Icons.Rounded.EventBusy, "End date", t.endDay?.let { Time.date(LocalDate.ofEpochDay(it)) }) { pick = "e" }
                 if (term != null) TextButton(onClick = { app.io { app.db.education().detachTerm(term.id); app.db.education().deleteTerm(term) }; onDismiss() }) {
                     Text("Delete term", color = LocalBlColors.current.danger)
                 }
@@ -279,10 +279,10 @@ fun CategoriesEditor(courseId: Long, existing: List<GradeCategoryEntity>, onDism
                         Spacer(Modifier.width(6.dp))
                         OutlinedTextField(w, { rows[i] = Triple(id, name, it) }, label = { Text("%") }, singleLine = true, modifier = Modifier.width(76.dp),
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal))
-                        IconButton(onClick = { existing.firstOrNull { it.id == id }?.let(removed::add); rows.removeAt(i) }) { Icon(Icons.Default.Close, "Remove", Modifier.size(18.dp)) }
+                        IconButton(onClick = { existing.firstOrNull { it.id == id }?.let(removed::add); rows.removeAt(i) }) { Icon(Icons.Rounded.Close, "Remove", Modifier.size(18.dp)) }
                     }
                 }
-                TextButton(onClick = { rows.add(Triple(0L, "", "")) }) { Icon(Icons.Default.Add, null); Text("Add category") }
+                TextButton(onClick = { rows.add(Triple(0L, "", "")) }) { Icon(Icons.Rounded.Add, null); Text("Add category") }
                 if (rows.isEmpty()) {
                     Text("Quick start", style = MaterialTheme.typography.labelLarge)
                     ChipFlow {
@@ -343,7 +343,7 @@ fun AssignmentEditor(assignment: AssignmentEntity?, data: EduData, courseId: Lon
         ChipFlow { AssignmentKinds.forEach { k -> FilterChip(a.kind == k, { a = a.copy(kind = k) }, label = { Text(k) }) } }
         if (cats.isNotEmpty()) DropdownField("Grade category", listOf<Pair<Long?, String>>(null to "None") + cats.map { it.id to "${it.name} (${it.weight.clean()}%)" }, a.categoryId, { a = a.copy(categoryId = it) })
         Row {
-            PickerRow(Icons.Default.Event, "Due date", a.dueAt?.let { Time.date(it) }, Modifier.weight(1f), onClear = { a = a.copy(dueAt = null) }) { pick = "date" }
+            PickerRow(Icons.Rounded.Event, "Due date", a.dueAt?.let { Time.date(it) }, Modifier.weight(1f), onClear = { a = a.copy(dueAt = null) }) { pick = "date" }
             if (a.dueAt != null) TextButton(onClick = { pick = "time" }, modifier = Modifier.align(Alignment.CenterVertically)) { Text(Time.time(a.dueAt!!)) }
         }
         DropdownField("Reminder", listOf<Pair<Int?, String>>(null to "None", 60 to "1 hour before", 180 to "3 hours before", 1440 to "1 day before", 2880 to "2 days before", 10080 to "1 week before"),
@@ -408,9 +408,9 @@ fun CertEditor(cert: CertificationEntity?, data: EduData, onDismiss: () -> Unit)
             Field(c.credentialId, { c = c.copy(credentialId = it) }, "Credential ID", modifier = Modifier.weight(1f))
         }
         DropdownField("Status", CertStatuses, c.status, { c = c.copy(status = it) })
-        PickerRow(Icons.Default.Quiz, "Exam date & time", c.examAt?.let { Time.dateTime(it) }, onClear = { c = c.copy(examAt = null) }) { pick = "exam" }
-        PickerRow(Icons.Default.EmojiEvents, "Date earned", c.earnedDay?.let { Time.date(LocalDate.ofEpochDay(it)) }, onClear = { c = c.copy(earnedDay = null) }) { pick = "earned" }
-        PickerRow(Icons.Default.EventBusy, "Expires / renewal due", c.expiresDay?.let { Time.date(LocalDate.ofEpochDay(it)) }, onClear = { c = c.copy(expiresDay = null) }) { pick = "expires" }
+        PickerRow(Icons.Rounded.Quiz, "Exam date & time", c.examAt?.let { Time.dateTime(it) }, onClear = { c = c.copy(examAt = null) }) { pick = "exam" }
+        PickerRow(Icons.Rounded.EmojiEvents, "Date earned", c.earnedDay?.let { Time.date(LocalDate.ofEpochDay(it)) }, onClear = { c = c.copy(earnedDay = null) }) { pick = "earned" }
+        PickerRow(Icons.Rounded.EventBusy, "Expires / renewal due", c.expiresDay?.let { Time.date(LocalDate.ofEpochDay(it)) }, onClear = { c = c.copy(expiresDay = null) }) { pick = "expires" }
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Field(renewal, { renewal = it }, "Renewal cycle (months)", number = true, modifier = Modifier.weight(1f))
             Field(ceuReq, { ceuReq = it }, "CEUs / PDHs required", number = true, modifier = Modifier.weight(1f))
@@ -421,11 +421,11 @@ fun CertEditor(cert: CertificationEntity?, data: EduData, onDismiss: () -> Unit)
         }
         Field(c.url, { c = c.copy(url = it) }, "Verification / portal URL")
         Row(verticalAlignment = Alignment.CenterVertically) {
-            PickerRow(Icons.Default.AttachFile, "Attach certificate (PDF/image)", c.filePath.takeIf { it.isNotBlank() }?.substringAfterLast('/'), Modifier.weight(1f),
+            PickerRow(Icons.Rounded.AttachFile, "Attach certificate (PDF/image)", c.filePath.takeIf { it.isNotBlank() }?.substringAfterLast('/'), Modifier.weight(1f),
                 onClear = { c = c.copy(filePath = "") }) {
                 if (c.filePath.isNotBlank()) Files.open(ctx, app.storage.resolve(c.filePath)) else attach.launch(arrayOf("application/pdf", "image/*"))
             }
-            if (c.url.isNotBlank()) IconButton(onClick = { Files.openUrl(ctx, c.url) }) { Icon(Icons.Default.OpenInNew, "Open portal") }
+            if (c.url.isNotBlank()) IconButton(onClick = { Files.openUrl(ctx, c.url) }) { Icon(Icons.Rounded.OpenInNew, "Open portal") }
         }
         Field(c.notes, { c = c.copy(notes = it) }, "Notes / study plan", minLines = 3)
         if (cert != null) {
@@ -433,7 +433,7 @@ fun CertEditor(cert: CertificationEntity?, data: EduData, onDismiss: () -> Unit)
             val entries = data.ceus.filter { it.certificationId == cert.id }
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text("CEU log · ${fmt(data.ceuEarned(cert))} hrs this cycle", style = MaterialTheme.typography.titleSmall, modifier = Modifier.weight(1f))
-                TextButton(onClick = { addCeu = true }) { Icon(Icons.Default.Add, null); Text("Log") }
+                TextButton(onClick = { addCeu = true }) { Icon(Icons.Rounded.Add, null); Text("Log") }
             }
             entries.forEach { e ->
                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -442,7 +442,7 @@ fun CertEditor(cert: CertificationEntity?, data: EduData, onDismiss: () -> Unit)
                         Text("${Time.date(LocalDate.ofEpochDay(e.day))}${if (e.provider.isNotBlank()) " · ${e.provider}" else ""}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                     Text("${fmt(e.hours)} h", style = MaterialTheme.typography.labelLarge)
-                    IconButton(onClick = { app.io { app.db.education().deleteCeu(e) } }) { Icon(Icons.Default.Close, "Remove", Modifier.size(16.dp)) }
+                    IconButton(onClick = { app.io { app.db.education().deleteCeu(e) } }) { Icon(Icons.Rounded.Close, "Remove", Modifier.size(16.dp)) }
                 }
             }
         }
@@ -475,7 +475,7 @@ private fun CeuDialog(certId: Long, onDismiss: () -> Unit) {
                 Field(activity, { activity = it }, "Activity (course, webinar, conference)")
                 Field(provider, { provider = it }, "Provider")
                 Field(hours, { hours = it }, "Hours", number = true)
-                PickerRow(Icons.Default.Event, "Date", Time.date(day)) { pick = true }
+                PickerRow(Icons.Rounded.Event, "Date", Time.date(day)) { pick = true }
             }
         },
         confirmButton = {
@@ -574,10 +574,10 @@ fun WhatIfDialog(data: EduData, onDismiss: () -> Unit) {
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal))
                         Spacer(Modifier.width(8.dp))
                         DropdownField("Grade", Grades.letters.map { it to it }, letter, { rows[i] = cr to it }, Modifier.weight(1f))
-                        IconButton(onClick = { rows.removeAt(i) }) { Icon(Icons.Default.Close, "Remove", Modifier.size(18.dp)) }
+                        IconButton(onClick = { rows.removeAt(i) }) { Icon(Icons.Rounded.Close, "Remove", Modifier.size(18.dp)) }
                     }
                 }
-                TextButton(onClick = { rows.add("3" to "A") }) { Icon(Icons.Default.Add, null); Text("Add course") }
+                TextButton(onClick = { rows.add("3" to "A") }) { Icon(Icons.Rounded.Add, null); Text("Add course") }
                 HorizontalDivider()
                 Text("Projected GPA: ${projected?.let { String.format(Locale.US, "%.3f", it) } ?: "—"}", style = MaterialTheme.typography.titleLarge)
             }

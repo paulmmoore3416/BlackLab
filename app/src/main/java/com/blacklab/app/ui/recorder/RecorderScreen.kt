@@ -29,7 +29,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.rounded.*
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
@@ -141,7 +141,7 @@ fun RecorderScreen() {
 
     Scaffold(topBar = {
         BlTopBar("Recorder", subtitle = config.summary(), actions = {
-            IconButton(onClick = { settingsOpen = true }, enabled = rec.status == RecState.Status.IDLE) { Icon(Icons.Default.Tune, "Recording settings") }
+            IconButton(onClick = { settingsOpen = true }, enabled = rec.status == RecState.Status.IDLE) { Icon(Icons.Rounded.Tune, "Recording settings") }
         })
     }) { pad ->
         LazyColumn(Modifier.padding(pad).fillMaxSize(), contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 32.dp)) {
@@ -149,10 +149,10 @@ fun RecorderScreen() {
             item {
                 SectionHeader("Recordings (${recordings.size})")
                 if (recordings.size > 5) OutlinedTextField(query, { query = it }, placeholder = { Text("Search titles & transcripts") }, singleLine = true,
-                    leadingIcon = { Icon(Icons.Default.Search, null) }, modifier = Modifier.fillMaxWidth().padding(bottom = 6.dp))
+                    leadingIcon = { Icon(Icons.Rounded.Search, null) }, modifier = Modifier.fillMaxWidth().padding(bottom = 6.dp))
             }
             val shown = recordings.filter { query.isBlank() || it.title.contains(query, true) || it.transcript.contains(query, true) || it.notes.contains(query, true) }
-            if (shown.isEmpty()) item { EmptyState(Icons.Default.GraphicEq, "No recordings yet", "Recordings are saved to BlackLab/${app.settings.profileName(s.activeProfile)}/Recordings.") }
+            if (shown.isEmpty()) item { EmptyState(Icons.Rounded.GraphicEq, "No recordings yet", "Recordings are saved to BlackLab/${app.settings.profileName(s.activeProfile)}/Recordings.") }
             items(shown, key = { it.id }) { r -> RecordingRow(r) { shell.go("recording/${r.id}") } }
         }
     }
@@ -166,7 +166,7 @@ private fun RecorderPanel(rec: RecState, config: RecConfig, micOk: Boolean, onRe
     val idle = rec.status == RecState.Status.IDLE
     BlCard(Modifier.fillMaxWidth().padding(top = 4.dp)) {
         Text(Time.duration(rec.elapsedMs) + if (rec.elapsedMs < 3_600_000) "." + ((rec.elapsedMs / 100) % 10) else "",
-            fontSize = 56.sp, fontWeight = FontWeight.Light, modifier = Modifier.align(Alignment.CenterHorizontally),
+            style = com.blacklab.app.ui.theme.MonoDigits, fontSize = 56.sp, fontWeight = FontWeight.Light, modifier = Modifier.align(Alignment.CenterHorizontally),
             color = if (rec.status == RecState.Status.RECORDING) RecRed else MaterialTheme.colorScheme.onSurface)
         Text(
             when (rec.status) { RecState.Status.IDLE -> "Ready"; RecState.Status.RECORDING -> "Recording"; RecState.Status.PAUSED -> "Paused" } +
@@ -189,7 +189,7 @@ private fun RecorderPanel(rec: RecState, config: RecConfig, micOk: Boolean, onRe
         rec.error?.let { Text(it, color = LocalBlColors.current.danger, style = MaterialTheme.typography.bodySmall) }
         Spacer(Modifier.height(16.dp))
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly, verticalAlignment = Alignment.CenterVertically) {
-            if (!idle) RoundBtn(Icons.Default.Close, "Discard", MaterialTheme.colorScheme.surfaceContainerHighest) { RecorderService.send(ctx, RecorderService.ACTION_CANCEL) }
+            if (!idle) RoundBtn(Icons.Rounded.Close, "Discard", MaterialTheme.colorScheme.surfaceContainerHighest) { RecorderService.send(ctx, RecorderService.ACTION_CANCEL) }
             else Spacer(Modifier.size(56.dp))
             Box(
                 Modifier.size(84.dp).clip(CircleShape).background(RecRed.copy(alpha = 0.18f)).clickable {
@@ -204,18 +204,18 @@ private fun RecorderPanel(rec: RecState, config: RecConfig, micOk: Boolean, onRe
             ) {
                 Box(Modifier.size(64.dp).clip(CircleShape).background(RecRed), contentAlignment = Alignment.Center) {
                     when (rec.status) {
-                        RecState.Status.IDLE -> Icon(Icons.Default.Mic, "Record", tint = Color.White, modifier = Modifier.size(32.dp))
-                        RecState.Status.RECORDING -> Icon(Icons.Default.Pause, "Pause", tint = Color.White, modifier = Modifier.size(32.dp))
-                        RecState.Status.PAUSED -> Icon(Icons.Default.FiberManualRecord, "Resume", tint = Color.White, modifier = Modifier.size(28.dp))
+                        RecState.Status.IDLE -> Icon(Icons.Rounded.Mic, "Record", tint = Color.White, modifier = Modifier.size(32.dp))
+                        RecState.Status.RECORDING -> Icon(Icons.Rounded.Pause, "Pause", tint = Color.White, modifier = Modifier.size(32.dp))
+                        RecState.Status.PAUSED -> Icon(Icons.Rounded.FiberManualRecord, "Resume", tint = Color.White, modifier = Modifier.size(28.dp))
                     }
                 }
             }
-            if (!idle) RoundBtn(Icons.Default.Check, "Save", MaterialTheme.colorScheme.primary.copy(alpha = 0.3f)) { RecorderService.send(ctx, RecorderService.ACTION_STOP) }
+            if (!idle) RoundBtn(Icons.Rounded.Check, "Save", MaterialTheme.colorScheme.primary.copy(alpha = 0.3f)) { RecorderService.send(ctx, RecorderService.ACTION_STOP) }
             else Spacer(Modifier.size(56.dp))
         }
         if (!idle) {
             Row(Modifier.fillMaxWidth().padding(top = 10.dp).horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                AssistChip(onClick = { RecorderService.mark(ctx) }, label = { Text("Add marker") }, leadingIcon = { Icon(Icons.Default.Flag, null, Modifier.size(16.dp)) })
+                AssistChip(onClick = { RecorderService.mark(ctx) }, label = { Text("Add marker") }, leadingIcon = { Icon(Icons.Rounded.Flag, null, Modifier.size(16.dp)) })
                 listOf("Action item", "Decision", "Question").forEach { l ->
                     AssistChip(onClick = { RecorderService.mark(ctx, l) }, label = { Text(l, maxLines = 1) })
                 }
@@ -268,15 +268,15 @@ private fun RecordingRow(r: RecordingEntity, onClick: () -> Unit) {
     if (menu) ActionSheet(
         title = r.title, subtitle = "${Time.dateTime(r.createdAt)} · ${Time.duration(r.durationMs)}", onDismiss = { menu = false },
         quick = listOf(
-            SheetAction("Play", Icons.Default.PlayArrow) { onClick() },
-            SheetAction("Share", Icons.Default.Share) { Files.share(ctx, listOf(f), r.title) },
-            SheetAction("Rename", Icons.Default.DriveFileRenameOutline) { step = "rename" },
-            SheetAction("Delete", Icons.Default.Delete, destructive = true) { step = "delete" },
+            SheetAction("Play", Icons.Rounded.PlayArrow) { onClick() },
+            SheetAction("Share", Icons.Rounded.Share) { Files.share(ctx, listOf(f), r.title) },
+            SheetAction("Rename", Icons.Rounded.DriveFileRenameOutline) { step = "rename" },
+            SheetAction("Delete", Icons.Rounded.Delete, destructive = true) { step = "delete" },
         ),
         actions = buildList {
             if (r.transcript.isNotBlank()) {
-                add(SheetAction("Share transcript", Icons.Default.Subject) { Files.shareText(ctx, r.transcript, r.title) })
-                add(SheetAction("Transcript to document", Icons.Default.NoteAdd) {
+                add(SheetAction("Share transcript", Icons.Rounded.Subject) { Files.shareText(ctx, r.transcript, r.title) })
+                add(SheetAction("Transcript to document", Icons.Rounded.NoteAdd) {
                     app.io {
                         val profile = app.settings.current.activeProfile
                         val html = "<h1>${com.blacklab.app.data.ContentStore.escape(r.title)}</h1><p><i>${Time.dateTime(r.createdAt)} · ${Time.duration(r.durationMs)}</i></p>" + com.blacklab.app.data.ContentStore.textToHtml(r.transcript)
@@ -286,7 +286,7 @@ private fun RecordingRow(r: RecordingEntity, onClick: () -> Unit) {
                     }
                 })
             }
-            add(SheetAction("Open with…", Icons.Default.OpenInNew) { Files.open(ctx, f) })
+            add(SheetAction("Open with…", Icons.Rounded.OpenInNew) { Files.open(ctx, f) })
         },
     )
     when (step) {
@@ -299,7 +299,7 @@ private fun RecordingRow(r: RecordingEntity, onClick: () -> Unit) {
         modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp).clip(RoundedCornerShape(18.dp)).pressable(onClick = onClick, onLongClick = { menu = true })) {
         Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
             Box(Modifier.size(44.dp).clip(CircleShape).background(MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)), contentAlignment = Alignment.Center) {
-                Icon(Icons.Default.PlayArrow, null, tint = MaterialTheme.colorScheme.primary)
+                Icon(Icons.Rounded.PlayArrow, null, tint = MaterialTheme.colorScheme.primary)
             }
             Spacer(Modifier.width(12.dp))
             Column(Modifier.weight(1f)) {

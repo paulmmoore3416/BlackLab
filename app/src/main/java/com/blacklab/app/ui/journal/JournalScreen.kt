@@ -22,7 +22,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.rounded.*
 import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
@@ -144,18 +144,18 @@ fun JournalScreen() {
     Scaffold(
         topBar = {
             BlTopBar("Journal", subtitle = app.settings.profileName(profile), actions = {
-                IconButton(onClick = { searching = !searching; if (!searching) query = "" }) { Icon(Icons.Default.Search, "Search") }
-                IconButton(onClick = { favoritesOnly = !favoritesOnly }) { Icon(if (favoritesOnly) Icons.Default.Star else Icons.Default.StarOutline, "Favorites", tint = if (favoritesOnly) Amber else MaterialTheme.colorScheme.onSurface) }
-                IconButton(onClick = { showCalendar = !showCalendar; if (!showCalendar) dayFilter = null }) { Icon(Icons.Default.CalendarMonth, "Calendar") }
+                IconButton(onClick = { searching = !searching; if (!searching) query = "" }) { Icon(Icons.Rounded.Search, "Search") }
+                IconButton(onClick = { favoritesOnly = !favoritesOnly }) { Icon(if (favoritesOnly) Icons.Rounded.Star else Icons.Rounded.StarOutline, "Favorites", tint = if (favoritesOnly) Amber else MaterialTheme.colorScheme.onSurface) }
+                IconButton(onClick = { showCalendar = !showCalendar; if (!showCalendar) dayFilter = null }) { Icon(Icons.Rounded.CalendarMonth, "Calendar") }
             })
         },
         floatingActionButton = {
-            ExtendedFloatingActionButton(onClick = { newSheet = "" }, icon = { Icon(Icons.Default.Edit, null) }, text = { Text("Write") })
+            ExtendedFloatingActionButton(onClick = { newSheet = "" }, icon = { Icon(Icons.Rounded.Edit, null) }, text = { Text("Write") })
         },
     ) { pad ->
         LazyColumn(Modifier.padding(pad).fillMaxSize(), contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 96.dp)) {
             if (searching) item {
-                OutlinedTextField(query, { query = it }, placeholder = { Text("Search entries") }, singleLine = true, leadingIcon = { Icon(Icons.Default.Search, null) },
+                OutlinedTextField(query, { query = it }, placeholder = { Text("Search entries") }, singleLine = true, leadingIcon = { Icon(Icons.Rounded.Search, null) },
                     modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp))
             }
             item {
@@ -168,9 +168,9 @@ fun JournalScreen() {
             if (showCalendar) item {
                 BlCard(Modifier.fillMaxWidth().padding(vertical = 6.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        IconButton(onClick = { month = month.minusMonths(1) }) { Icon(Icons.Default.ChevronLeft, "Previous") }
+                        IconButton(onClick = { month = month.minusMonths(1) }) { Icon(Icons.Rounded.ChevronLeft, "Previous") }
                         Text(Time.monthYear(month.atDay(1)), Modifier.weight(1f), style = MaterialTheme.typography.titleSmall, textAlign = androidx.compose.ui.text.style.TextAlign.Center)
-                        IconButton(onClick = { month = month.plusMonths(1) }) { Icon(Icons.Default.ChevronRight, "Next") }
+                        IconButton(onClick = { month = month.plusMonths(1) }) { Icon(Icons.Rounded.ChevronRight, "Next") }
                     }
                     WeekdayHeader(s.weekStart)
                     val byDay = entries.groupBy { it.entryDay }
@@ -214,7 +214,7 @@ fun JournalScreen() {
             }
             item { SectionHeader(if (dayFilter != null) Time.date(LocalDate.ofEpochDay(dayFilter!!)) else "Entries") }
             if (shown.isEmpty()) item {
-                EmptyState(Icons.Default.AutoStories, if (entries.isEmpty()) "Start your journal" else "No entries match",
+                EmptyState(Icons.Rounded.AutoStories, if (entries.isEmpty()) "Start your journal" else "No entries match",
                     if (entries.isEmpty()) "A few lines a day builds a record you'll value. Your entries are saved as files in BlackLab/Journal." else "Try clearing filters.")
             }
             items(shown, key = { it.id }) { EntryCard(it) }
@@ -271,16 +271,16 @@ private fun EntryCard(e: JournalEntity) {
         title = e.title.ifBlank { "Untitled entry" }, subtitle = Time.longDate(d) + if (e.wordCount > 0) " · ${e.wordCount} words" else "",
         onDismiss = { menu = false },
         quick = listOf(
-            com.blacklab.app.ui.components.SheetAction("Open", Icons.Default.Edit) { shell.go("journal/${e.id}") },
-            com.blacklab.app.ui.components.SheetAction(if (e.favorite) "Unfavorite" else "Favorite", Icons.Default.Star) { app.io { app.db.journal().update(e.copy(favorite = !e.favorite)) } },
-            com.blacklab.app.ui.components.SheetAction("Share", Icons.Default.Share) {
+            com.blacklab.app.ui.components.SheetAction("Open", Icons.Rounded.Edit) { shell.go("journal/${e.id}") },
+            com.blacklab.app.ui.components.SheetAction(if (e.favorite) "Unfavorite" else "Favorite", Icons.Rounded.Star) { app.io { app.db.journal().update(e.copy(favorite = !e.favorite)) } },
+            com.blacklab.app.ui.components.SheetAction("Share", Icons.Rounded.Share) {
                 app.io { val text = com.blacklab.app.data.ContentStore.plainText(app.content.readBody(e.filePath)); kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) { com.blacklab.app.core.Files.shareText(ctx, text, e.title) } }
             },
-            com.blacklab.app.ui.components.SheetAction("Delete", Icons.Default.Delete, destructive = true) { confirmDelete = true },
+            com.blacklab.app.ui.components.SheetAction("Delete", Icons.Rounded.Delete, destructive = true) { confirmDelete = true },
         ),
         actions = listOf(
-            com.blacklab.app.ui.components.SheetAction("Open .html file", Icons.Default.Html) { com.blacklab.app.core.Files.open(ctx, app.content.file(e.filePath)) },
-            com.blacklab.app.ui.components.SheetAction("New entry for this day", Icons.Default.Add) { shell.go("journal/0?day=${e.entryDay}") },
+            com.blacklab.app.ui.components.SheetAction("Open .html file", Icons.Rounded.Html) { com.blacklab.app.core.Files.open(ctx, app.content.file(e.filePath)) },
+            com.blacklab.app.ui.components.SheetAction("New entry for this day", Icons.Rounded.Add) { shell.go("journal/0?day=${e.entryDay}") },
         ),
     )
     if (confirmDelete) com.blacklab.app.ui.components.ConfirmDialog("Delete entry?", "“${e.title.ifBlank { "Untitled entry" }}” will be permanently deleted.", onDismiss = { confirmDelete = false }) {
@@ -300,7 +300,7 @@ private fun EntryCard(e: JournalEntity) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(e.title.ifBlank { "Untitled entry" }, style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
                     if (e.mood > 0) Text(Moods[e.mood].first, fontSize = 18.sp)
-                    if (e.favorite) Icon(Icons.Default.Star, null, tint = Amber, modifier = Modifier.size(16.dp))
+                    if (e.favorite) Icon(Icons.Rounded.Star, null, tint = Amber, modifier = Modifier.size(16.dp))
                 }
                 Text(e.preview.ifBlank { "…" }, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 3, overflow = TextOverflow.Ellipsis)
                 val tags = e.tags.split(',').map { it.trim() }.filter { it.isNotEmpty() }

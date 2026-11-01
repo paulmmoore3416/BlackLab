@@ -21,10 +21,10 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.automirrored.filled.ArrowForward
-import androidx.compose.material.icons.automirrored.filled.List
-import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.automirrored.rounded.ArrowBack
+import androidx.compose.material.icons.automirrored.rounded.ArrowForward
+import androidx.compose.material.icons.automirrored.rounded.List
+import androidx.compose.material.icons.rounded.*
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
@@ -82,7 +82,7 @@ fun FileViewerScreen(path: String, forceText: Boolean = false, sign: Boolean = f
     val file = remember(path) { app.storage.resolve(path) }
     if (!file.exists()) {
         Scaffold(topBar = { BlTopBar("Not found", onBack = { shell.back() }) }) { pad ->
-            EmptyState(Icons.Default.SearchOff, "File not found", "It may have been moved, renamed or deleted.", Modifier.padding(pad))
+            EmptyState(Icons.Rounded.SearchOff, "File not found", "It may have been moved, renamed or deleted.", Modifier.padding(pad))
         }
         return
     }
@@ -164,15 +164,15 @@ private fun DocumentViewerScreen(file: File) {
     Scaffold(topBar = {
         BlTopBar(title, subtitle = if (kind == FileKind.EPUB && list != null) "${list.getOrNull(chapter)?.first ?: ""} · ${chapter + 1}/${list.size}" else kind.label + " · " + Files.formatSize(file.length()),
             onBack = { shell.back() }, actions = {
-                if (kind == FileKind.EPUB) IconButton(onClick = { toc = true }) { Icon(Icons.AutoMirrored.Filled.List, "Contents") }
-                IconButton(onClick = { zoom = (zoom - 10).coerceAtLeast(60) }) { Icon(Icons.Default.TextDecrease, "Smaller text") }
-                IconButton(onClick = { zoom = (zoom + 10).coerceAtMost(220) }) { Icon(Icons.Default.TextIncrease, "Larger text") }
+                if (kind == FileKind.EPUB) IconButton(onClick = { toc = true }) { Icon(Icons.AutoMirrored.Rounded.List, "Contents") }
+                IconButton(onClick = { zoom = (zoom - 10).coerceAtLeast(60) }) { Icon(Icons.Rounded.TextDecrease, "Smaller text") }
+                IconButton(onClick = { zoom = (zoom + 10).coerceAtMost(220) }) { Icon(Icons.Rounded.TextIncrease, "Larger text") }
                 FileMenu(file, buildList {
-                    add(MenuItem("Edit in Documents", Icons.Default.EditNote) { editInDocuments() })
-                    add(MenuItem("Export as PDF", Icons.Default.PictureAsPdf) { export(ExportFormat.PDF) })
-                    if (kind != FileKind.WORD) add(MenuItem("Export as Word", Icons.Default.Description) { export(ExportFormat.DOCX) })
-                    add(MenuItem("Export as text", Icons.Default.TextSnippet) { export(ExportFormat.TXT) })
-                    add(MenuItem("Theme: " + when (theme) { "auto" -> "Auto"; "light" -> "Light"; "sepia" -> "Sepia"; else -> "Dark" }, Icons.Default.Contrast) {
+                    add(MenuItem("Edit in Documents", Icons.Rounded.EditNote) { editInDocuments() })
+                    add(MenuItem("Export as PDF", Icons.Rounded.PictureAsPdf) { export(ExportFormat.PDF) })
+                    if (kind != FileKind.WORD) add(MenuItem("Export as Word", Icons.Rounded.Description) { export(ExportFormat.DOCX) })
+                    add(MenuItem("Export as text", Icons.Rounded.TextSnippet) { export(ExportFormat.TXT) })
+                    add(MenuItem("Theme: " + when (theme) { "auto" -> "Auto"; "light" -> "Light"; "sepia" -> "Sepia"; else -> "Dark" }, Icons.Rounded.Contrast) {
                         theme = when (theme) { "auto" -> "light"; "light" -> "sepia"; "sepia" -> "dark"; else -> "auto" }
                     })
                 })
@@ -184,9 +184,9 @@ private fun DocumentViewerScreen(file: File) {
                 Column(Modifier.fillMaxSize()) {
                     HtmlView(list.getOrNull(chapter)?.second.orEmpty(), Modifier.weight(1f).fillMaxWidth(), dark = dark, zoom = zoom, extraCss = css)
                     if (list.size > 1) Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-                        IconButton(enabled = chapter > 0, onClick = { chapter-- }) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Previous chapter") }
+                        IconButton(enabled = chapter > 0, onClick = { chapter-- }) { Icon(Icons.AutoMirrored.Rounded.ArrowBack, "Previous chapter") }
                         Text(list[chapter].first, Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.labelLarge)
-                        IconButton(enabled = chapter < list.lastIndex, onClick = { chapter++ }) { Icon(Icons.AutoMirrored.Filled.ArrowForward, "Next chapter") }
+                        IconButton(enabled = chapter < list.lastIndex, onClick = { chapter++ }) { Icon(Icons.AutoMirrored.Rounded.ArrowForward, "Next chapter") }
                     }
                 }
             }
@@ -251,8 +251,8 @@ private fun ArchiveScreen(file: File) {
 
     Scaffold(topBar = {
         BlTopBar(file.name, subtitle = entries?.let { "${it.count { e -> !e.dir }} files · ${Files.formatSize(totalSize)} uncompressed" } ?: "Reading…", onBack = { if (dir.isNotEmpty()) dir = dir.dropLast(1).substringBeforeLast('/', "").let { if (it.isEmpty()) "" else "$it/" } else shell.back() }, actions = {
-            if (selected.isNotEmpty()) IconButton(onClick = { extract(selected) }) { Icon(Icons.Default.Unarchive, "Extract selected") }
-            FileMenu(file, listOf(MenuItem("Extract all", Icons.Default.Unarchive) { extract(null) }))
+            if (selected.isNotEmpty()) IconButton(onClick = { extract(selected) }) { Icon(Icons.Rounded.Unarchive, "Extract selected") }
+            FileMenu(file, listOf(MenuItem("Extract all", Icons.Rounded.Unarchive) { extract(null) }))
         })
     }) { pad ->
         Box(Modifier.padding(pad).fillMaxSize()) {
@@ -260,7 +260,7 @@ private fun ArchiveScreen(file: File) {
                 item {
                     Row(Modifier.fillMaxWidth().padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
                         Text("/" + dir, Modifier.weight(1f), style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        FilledTonalButton(onClick = { extract(null) }) { Icon(Icons.Default.Unarchive, null); Spacer(Modifier.width(6.dp)); Text("Extract all") }
+                        FilledTonalButton(onClick = { extract(null) }) { Icon(Icons.Rounded.Unarchive, null); Spacer(Modifier.width(6.dp)); Text("Extract all") }
                     }
                 }
                 items(children, key = { it.name }) { e ->
@@ -273,7 +273,7 @@ private fun ArchiveScreen(file: File) {
                         }
                     }.padding(horizontal = 6.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
                         Checkbox(e.name in selected, { selected = if (it) selected + e.name else selected - e.name })
-                        Icon(if (e.dir) Icons.Default.Folder else iconFor(File(name)), null, tint = MaterialTheme.colorScheme.primary)
+                        Icon(if (e.dir) Icons.Rounded.Folder else iconFor(File(name)), null, tint = MaterialTheme.colorScheme.primary)
                         Spacer(Modifier.width(12.dp))
                         Column(Modifier.weight(1f)) {
                             Text(name, maxLines = 1, overflow = TextOverflow.Ellipsis)
@@ -300,11 +300,11 @@ private fun CalendarFileScreen(file: File) {
     val events by produceState(emptyList<Map<String, String>>(), file) { value = withContext(Dispatchers.IO) { runCatching { FileOps.icsEvents(file.readText()) }.getOrDefault(emptyList()) } }
     Scaffold(topBar = {
         BlTopBar(file.nameWithoutExtension, subtitle = "${events.size} event(s)", onBack = { shell.back() }, actions = {
-            FileMenu(file, listOf(MenuItem("Edit as text", Icons.Default.Code) { asText = true }))
+            FileMenu(file, listOf(MenuItem("Edit as text", Icons.Rounded.Code) { asText = true }))
         })
     }) { pad ->
         LazyColumn(Modifier.padding(pad), contentPadding = PaddingValues(16.dp, 0.dp, 16.dp, 96.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            if (events.isEmpty()) item { EmptyState(Icons.Default.Event, "No events", "This calendar file doesn't contain any events.") }
+            if (events.isEmpty()) item { EmptyState(Icons.Rounded.Event, "No events", "This calendar file doesn't contain any events.") }
             items(events) { e ->
                 com.blacklab.app.ui.components.BlCard(Modifier.fillMaxWidth()) {
                     Text(e["SUMMARY"] ?: "(No title)", style = MaterialTheme.typography.titleMedium)
@@ -343,8 +343,8 @@ private fun UnknownFileScreen(file: File) {
             Text("BlackLab doesn't have a dedicated viewer for .${file.extension.ifBlank { "?" }} files. You can view it as text, inspect the raw bytes below, or hand it to another app.",
                 color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
             Row(Modifier.padding(vertical = 10.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                FilledTonalButton(onClick = { text = true }) { Icon(Icons.Default.TextSnippet, null); Spacer(Modifier.width(6.dp)); Text("Open as text") }
-                FilledTonalButton(onClick = { Files.open(ctx, file) }) { Icon(Icons.Default.OpenInNew, null); Spacer(Modifier.width(6.dp)); Text("Open with…") }
+                FilledTonalButton(onClick = { text = true }) { Icon(Icons.Rounded.TextSnippet, null); Spacer(Modifier.width(6.dp)); Text("Open as text") }
+                FilledTonalButton(onClick = { Files.open(ctx, file) }) { Icon(Icons.Rounded.OpenInNew, null); Spacer(Modifier.width(6.dp)); Text("Open with…") }
             }
             Box(Modifier.weight(1f).fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(MaterialTheme.colorScheme.surfaceContainer)) {
                 SelectionContainer {

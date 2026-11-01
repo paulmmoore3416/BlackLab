@@ -75,6 +75,8 @@ object SettingsSchema {
                 "DARK" to "Dark", "LIGHT" to "Light", "SYSTEM" to "System", "AUTO" to "Sunset to sunrise", "SCHEDULE" to "Custom hours"),
             time(Keys.THEME_DARK_FROM, "Dark from", "Custom hours: when the dark theme starts.", d.themeDarkFrom),
             time(Keys.THEME_DARK_TO, "Dark until", "Custom hours: when the light theme comes back.", d.themeDarkTo),
+            bool(Keys.HAPTICS, "Haptic feedback", "Small vibrations when you complete, toggle, place or delete something.", d.haptics),
+            bool(Keys.REDUCE_MOTION, "Reduce motion", "Shorter, simpler animations. Also follows the phone's \"Remove animations\" setting.", d.reduceMotion),
             bool(Keys.DYNAMIC_COLOR, "Material You colors", "Use wallpaper colors instead of the account accents.", d.dynamicColor),
             choice(Keys.ACCENT_PERSONAL, "Personal color", "Main color of the Personal account. Each comes with a complementary secondary color.", d.accentPersonal, *PALETTES),
             choice(Keys.SECONDARY_PERSONAL, "Personal secondary color", "Used for selections, highlights and the navigation bar. Auto picks the complement.", d.secondaryPersonal, "AUTO" to "Auto (complementary)", *PALETTES),

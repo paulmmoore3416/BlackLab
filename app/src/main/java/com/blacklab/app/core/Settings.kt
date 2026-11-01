@@ -143,6 +143,9 @@ data class Settings(
     val secondaryProfessional: String = "AUTO",
     // signatures
     val sigConfirm: Boolean = true,
+    // feel
+    val haptics: Boolean = true,
+    val reduceMotion: Boolean = false,
 )
 
 object Keys {
@@ -265,6 +268,8 @@ object Keys {
     const val SECONDARY_PERSONAL = "secondary_personal"
     const val SECONDARY_PROFESSIONAL = "secondary_professional"
     const val SIG_CONFIRM = "sig_confirm"
+    const val HAPTICS = "haptics"
+    const val REDUCE_MOTION = "reduce_motion"
 }
 
 class SettingsRepository(context: Context) {
@@ -407,6 +412,8 @@ class SettingsRepository(context: Context) {
             secondaryPersonal = getString(Keys.SECONDARY_PERSONAL, d.secondaryPersonal) ?: d.secondaryPersonal,
             secondaryProfessional = getString(Keys.SECONDARY_PROFESSIONAL, d.secondaryProfessional) ?: d.secondaryProfessional,
             sigConfirm = getBoolean(Keys.SIG_CONFIRM, d.sigConfirm),
+            haptics = getBoolean(Keys.HAPTICS, d.haptics),
+            reduceMotion = getBoolean(Keys.REDUCE_MOTION, d.reduceMotion),
         )
     }
 }

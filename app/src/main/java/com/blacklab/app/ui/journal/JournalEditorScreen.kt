@@ -18,8 +18,8 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.automirrored.rounded.ArrowBack
+import androidx.compose.material.icons.rounded.*
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
@@ -144,26 +144,26 @@ fun JournalEditorScreen(id: Long, day: Long?, template: String?) {
                     Text(app.settings.profileName(s.activeProfile) + " journal", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             },
-            navigationIcon = { IconButton(onClick = leave) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back") } },
+            navigationIcon = { IconButton(onClick = leave) { Icon(Icons.AutoMirrored.Rounded.ArrowBack, "Back") } },
             actions = {
                 if (e != null) IconButton(onClick = { meta { it.copy(favorite = !it.favorite) } }) {
-                    Icon(if (e.favorite) Icons.Default.Star else Icons.Default.StarOutline, "Favorite", tint = if (e.favorite) Amber else MaterialTheme.colorScheme.onSurface)
+                    Icon(if (e.favorite) Icons.Rounded.Star else Icons.Rounded.StarOutline, "Favorite", tint = if (e.favorite) Amber else MaterialTheme.colorScheme.onSurface)
                 }
-                IconButton(onClick = { scope.launch { save(); dialog = "export" } }) { Icon(Icons.Default.IosShare, "Export") }
+                IconButton(onClick = { scope.launch { save(); dialog = "export" } }) { Icon(Icons.Rounded.IosShare, "Export") }
                 var more by remember { mutableStateOf(false) }
                 Box {
-                    IconButton(onClick = { more = true }) { Icon(Icons.Default.MoreVert, "More") }
+                    IconButton(onClick = { more = true }) { Icon(Icons.Rounded.MoreVert, "More") }
                     DropdownMenu(more, { more = false }) {
-                        DropdownMenuItem(text = { Text("Tags & location") }, leadingIcon = { Icon(Icons.Default.Sell, null) }, onClick = { more = false; dialog = "meta" })
-                        DropdownMenuItem(text = { Text("Change date") }, leadingIcon = { Icon(Icons.Default.Event, null) }, onClick = { more = false; dialog = "date" })
-                        DropdownMenuItem(text = { Text("Delete entry") }, leadingIcon = { Icon(Icons.Default.Delete, null) }, onClick = { more = false; dialog = "delete" })
+                        DropdownMenuItem(text = { Text("Tags & location") }, leadingIcon = { Icon(Icons.Rounded.Sell, null) }, onClick = { more = false; dialog = "meta" })
+                        DropdownMenuItem(text = { Text("Change date") }, leadingIcon = { Icon(Icons.Rounded.Event, null) }, onClick = { more = false; dialog = "date" })
+                        DropdownMenuItem(text = { Text("Delete entry") }, leadingIcon = { Icon(Icons.Rounded.Delete, null) }, onClick = { more = false; dialog = "delete" })
                     }
                 }
             },
             colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
         )
         if (e == null || c == null) {
-            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
+            com.blacklab.app.ui.components.SkeletonPage(Modifier.fillMaxSize())
             return@Column
         }
         TextField(

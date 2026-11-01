@@ -31,8 +31,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.*
-import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.automirrored.rounded.*
+import androidx.compose.material.icons.rounded.*
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
 import androidx.compose.material3.DropdownMenu
@@ -210,17 +210,17 @@ fun AssistantScreen(startListening: Boolean = false) {
                 if (speaking) "speaking…" else null,
             ).filterNotNull().joinToString(" · "), onBack = { shell.back() }) {
                 IconButton(onClick = { if (speaking) app.speaker.stop() else app.settings.update { putBoolean(com.blacklab.app.core.Keys.ASST_SPEAK, !s.asstSpeak) } }) {
-                    Icon(if (speaking) Icons.Default.StopCircle else if (s.asstSpeak) Icons.AutoMirrored.Filled.VolumeUp else Icons.AutoMirrored.Filled.VolumeOff, "Voice")
+                    Icon(if (speaking) Icons.Rounded.StopCircle else if (s.asstSpeak) Icons.AutoMirrored.Rounded.VolumeUp else Icons.AutoMirrored.Rounded.VolumeOff, "Voice")
                 }
                 Box {
-                    IconButton(onClick = { menu = true }) { Icon(Icons.Default.MoreVert, "More") }
+                    IconButton(onClick = { menu = true }) { Icon(Icons.Rounded.MoreVert, "More") }
                     DropdownMenu(menu, { menu = false }) {
-                        DropdownMenuItem(text = { Text("Assistant settings") }, leadingIcon = { Icon(Icons.Default.Tune, null) }, onClick = { menu = false; shell.go("assistant/settings") })
-                        DropdownMenuItem(text = { Text("What can you do?") }, leadingIcon = { Icon(Icons.AutoMirrored.Filled.Help, null) }, onClick = { menu = false; send("help") })
-                        DropdownMenuItem(text = { Text("Rebuild file index") }, leadingIcon = { Icon(Icons.Default.Refresh, null) }, onClick = {
+                        DropdownMenuItem(text = { Text("Assistant settings") }, leadingIcon = { Icon(Icons.Rounded.Tune, null) }, onClick = { menu = false; shell.go("assistant/settings") })
+                        DropdownMenuItem(text = { Text("What can you do?") }, leadingIcon = { Icon(Icons.AutoMirrored.Rounded.Help, null) }, onClick = { menu = false; send("help") })
+                        DropdownMenuItem(text = { Text("Rebuild file index") }, leadingIcon = { Icon(Icons.Rounded.Refresh, null) }, onClick = {
                             menu = false; scope.launch { assistant.index.rebuild(); shell.toast("Indexed ${assistant.index.size} passages") }
                         })
-                        DropdownMenuItem(text = { Text("Clear conversation") }, leadingIcon = { Icon(Icons.Default.DeleteSweep, null) }, onClick = { menu = false; assistant.clearHistory() })
+                        DropdownMenuItem(text = { Text("Clear conversation") }, leadingIcon = { Icon(Icons.Rounded.DeleteSweep, null) }, onClick = { menu = false; assistant.clearHistory() })
                     }
                 }
             }
@@ -230,7 +230,7 @@ fun AssistantScreen(startListening: Boolean = false) {
             if (nano == Nano.Status.DOWNLOADABLE || nano == Nano.Status.DOWNLOADING) {
                 Surface(color = MaterialTheme.colorScheme.primary.copy(alpha = 0.10f), modifier = Modifier.fillMaxWidth()) {
                     Row(Modifier.padding(horizontal = 16.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Default.AutoAwesome, null, tint = MaterialTheme.colorScheme.primary)
+                        Icon(Icons.Rounded.AutoAwesome, null, tint = MaterialTheme.colorScheme.primary)
                         Text(if (nano == Nano.Status.DOWNLOADING) "Downloading Gemini Nano for offline AI…" else "Get Gemini Nano for smarter offline answers",
                             Modifier.weight(1f).padding(horizontal = 10.dp), style = MaterialTheme.typography.bodySmall)
                         if (nano == Nano.Status.DOWNLOADABLE) OutlinedButton(onClick = { Nano.download() }) { Text("Download") }
@@ -276,14 +276,14 @@ fun AssistantScreen(startListening: Boolean = false) {
                 )
                 Spacer(Modifier.size(8.dp))
                 if (input.isNotBlank() && !listening) {
-                    FilledIconButton(onClick = { send(input) }, modifier = Modifier.size(56.dp)) { Icon(Icons.AutoMirrored.Filled.Send, "Send") }
+                    FilledIconButton(onClick = { send(input) }, modifier = Modifier.size(56.dp)) { Icon(Icons.AutoMirrored.Rounded.Send, "Send") }
                 } else {
                     val pulse by animateFloatAsState(if (listening) 1f + level * 0.35f else 1f, label = "mic")
                     FilledIconButton(
                         onClick = { if (listening) { voice.stop(); listening = false } else listen() },
                         modifier = Modifier.size(56.dp).scale(pulse),
                         colors = if (listening) IconButtonDefaults.filledIconButtonColors(containerColor = MaterialTheme.colorScheme.error) else IconButtonDefaults.filledIconButtonColors(),
-                    ) { Icon(if (listening) Icons.Default.Stop else Icons.Default.Mic, "Talk") }
+                    ) { Icon(if (listening) Icons.Rounded.Stop else Icons.Rounded.Mic, "Talk") }
                 }
             }
         }
@@ -314,7 +314,7 @@ private suspend fun runNameplate(app: com.blacklab.app.AppContainer, ctx: androi
 private fun Welcome(name: String, user: String) {
     Column(Modifier.fillMaxWidth().padding(vertical = 24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
         Box(Modifier.size(72.dp).clip(CircleShape).background(MaterialTheme.colorScheme.primary.copy(alpha = 0.16f)), contentAlignment = Alignment.Center) {
-            Icon(Icons.Default.AutoAwesome, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(36.dp))
+            Icon(Icons.Rounded.AutoAwesome, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(36.dp))
         }
         Spacer(Modifier.height(12.dp))
         Text("Hey${user.substringBefore(' ').takeIf { it.isNotBlank() }?.let { " $it" } ?: ""}, I'm $name.", style = MaterialTheme.typography.titleLarge)
@@ -340,7 +340,7 @@ private fun Bubble(m: Msg, onLink: (com.blacklab.app.assistant.Link) -> Unit) {
         AnimatedVisibility(m.links.isNotEmpty()) {
             LazyRow(Modifier.padding(top = 4.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 items(m.links) { l -> AssistChip(onClick = { onLink(l) }, label = { Text(l.label, fontWeight = FontWeight.Medium) },
-                    leadingIcon = { Icon(if (l.url != null) Icons.AutoMirrored.Filled.OpenInNew else Icons.Default.ChevronRight, null, Modifier.size(16.dp)) }) }
+                    leadingIcon = { Icon(if (l.url != null) Icons.AutoMirrored.Rounded.OpenInNew else Icons.Rounded.ChevronRight, null, Modifier.size(16.dp)) }) }
             }
         }
     }

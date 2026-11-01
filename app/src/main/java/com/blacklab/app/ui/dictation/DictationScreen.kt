@@ -37,7 +37,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.rounded.*
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
@@ -143,7 +143,7 @@ fun DictationScreen() {
 
     Scaffold(topBar = {
         BlTopBar("Dictation", subtitle = "BlackLab/${app.settings.profileName(s.activeProfile)}/Dictation", actions = {
-            IconButton(onClick = { settingsOpen = true }) { Icon(Icons.Default.Tune, "Dictation settings") }
+            IconButton(onClick = { settingsOpen = true }) { Icon(Icons.Rounded.Tune, "Dictation settings") }
         })
     }) { pad ->
         LazyColumn(Modifier.padding(pad).fillMaxSize(), contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 32.dp)) {
@@ -151,13 +151,13 @@ fun DictationScreen() {
             item {
                 SectionHeader("Sessions (${sessions.size})")
                 if (sessions.size > 4) OutlinedTextField(query, { query = it }, placeholder = { Text("Search transcripts & places") }, singleLine = true,
-                    leadingIcon = { Icon(Icons.Default.Search, null) }, modifier = Modifier.fillMaxWidth().padding(bottom = 6.dp))
+                    leadingIcon = { Icon(Icons.Rounded.Search, null) }, modifier = Modifier.fillMaxWidth().padding(bottom = 6.dp))
             }
             val shown = sessions.filter { (_, m) ->
                 query.isBlank() || m.title.contains(query, true) || (m.geo?.address ?: "").contains(query, true) || DictationStore.plainText(m, false).contains(query, true)
             }
             if (shown.isEmpty()) item {
-                EmptyState(Icons.Default.RecordVoiceOver, "No dictations yet", "Tap record and speak. Each session is saved to its own dated folder with the audio, transcript and location.")
+                EmptyState(Icons.Rounded.RecordVoiceOver, "No dictations yet", "Tap record and speak. Each session is saved to its own dated folder with the audio, transcript and location.")
             }
             items(shown, key = { it.first.path }) { (dir, m) -> SessionRow(dir, m) { refresh++ } }
         }
@@ -185,7 +185,7 @@ private fun LivePanel(st: DictState, commands: Boolean, onStart: () -> Unit, onS
         }
         st.geo?.let { g ->
             Row(Modifier.padding(top = 4.dp).clip(RoundedCornerShape(8.dp)).clickable { openMap(ctx, g.lat, g.lon) }, verticalAlignment = Alignment.CenterVertically) {
-                Icon(Icons.Default.LocationOn, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(14.dp))
+                Icon(Icons.Rounded.LocationOn, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(14.dp))
                 Spacer(Modifier.width(4.dp))
                 Text(g.label, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
@@ -219,8 +219,8 @@ private fun LivePanel(st: DictState, commands: Boolean, onStart: () -> Unit, onS
         // controls
         Spacer(Modifier.height(14.dp))
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly, verticalAlignment = Alignment.CenterVertically) {
-            if (st.active) Round(Icons.Default.Close, "Discard", MaterialTheme.colorScheme.surfaceContainerHighest) { DictationService.send(ctx, DictationService.ACTION_CANCEL) }
-            else Round(Icons.Default.Hearing, "Hands-free standby", DictViolet.copy(alpha = 0.22f), onStandby)
+            if (st.active) Round(Icons.Rounded.Close, "Discard", MaterialTheme.colorScheme.surfaceContainerHighest) { DictationService.send(ctx, DictationService.ACTION_CANCEL) }
+            else Round(Icons.Rounded.Hearing, "Hands-free standby", DictViolet.copy(alpha = 0.22f), onStandby)
             Box(
                 Modifier.size(88.dp).scale(if (recording) pulse.value else 1f).clip(CircleShape).background(color.copy(alpha = 0.2f)).clickable {
                     when (st.status) {
@@ -232,16 +232,16 @@ private fun LivePanel(st: DictState, commands: Boolean, onStart: () -> Unit, onS
                 contentAlignment = Alignment.Center,
             ) {
                 Box(Modifier.size(66.dp).clip(CircleShape).background(color), contentAlignment = Alignment.Center) {
-                    Icon(when (st.status) { DictState.Status.RECORDING -> Icons.Default.Pause; DictState.Status.IDLE -> Icons.Default.Mic; else -> Icons.Default.FiberManualRecord },
+                    Icon(when (st.status) { DictState.Status.RECORDING -> Icons.Rounded.Pause; DictState.Status.IDLE -> Icons.Rounded.Mic; else -> Icons.Rounded.FiberManualRecord },
                         "Record", tint = Color.White, modifier = Modifier.size(32.dp))
                 }
             }
-            if (st.active) Round(Icons.Default.Check, "Stop & save", MaterialTheme.colorScheme.primary.copy(alpha = 0.3f)) { DictationService.send(ctx, DictationService.ACTION_STOP) }
+            if (st.active) Round(Icons.Rounded.Check, "Stop & save", MaterialTheme.colorScheme.primary.copy(alpha = 0.3f)) { DictationService.send(ctx, DictationService.ACTION_STOP) }
             else Spacer(Modifier.size(56.dp))
         }
         if (st.active) Row(Modifier.fillMaxWidth().padding(top = 10.dp).horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             AssistChip(onClick = { DictationService.send(ctx, DictationService.ACTION_MARK) }, label = { Text("Add marker${if (st.markers.isNotEmpty()) " (${st.markers.size})" else ""}") },
-                leadingIcon = { Icon(Icons.Default.Flag, null, Modifier.size(16.dp)) })
+                leadingIcon = { Icon(Icons.Rounded.Flag, null, Modifier.size(16.dp)) })
         }
         if (commands) {
             Text("Voice commands: " + VoiceCommands.help.joinToString(" · "), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 10.dp))
@@ -267,19 +267,19 @@ private fun SessionRow(dir: File, m: DictationMeta, onChanged: () -> Unit) {
     if (menu) ActionSheet(
         title = m.title, subtitle = "${Time.dateTime(m.startedAt)} · ${Time.duration(m.durationMs)} · ${m.wordCount} words", onDismiss = { menu = false },
         quick = listOf(
-            SheetAction("Open", Icons.Default.Article) { open() },
-            SheetAction("Share text", Icons.Default.Share) { Files.share(ctx, listOf(DictationStore.transcriptFile(dir)), m.title) },
-            SheetAction("Share audio", Icons.Default.AudioFile) { Files.share(ctx, listOf(DictationStore.audioFile(dir, m)), m.title) },
-            SheetAction("Delete", Icons.Default.Delete, destructive = true) { confirm = true },
+            SheetAction("Open", Icons.Rounded.Article) { open() },
+            SheetAction("Share text", Icons.Rounded.Share) { Files.share(ctx, listOf(DictationStore.transcriptFile(dir)), m.title) },
+            SheetAction("Share audio", Icons.Rounded.AudioFile) { Files.share(ctx, listOf(DictationStore.audioFile(dir, m)), m.title) },
+            SheetAction("Delete", Icons.Rounded.Delete, destructive = true) { confirm = true },
         ),
         actions = buildList {
-            add(SheetAction("Copy transcript", Icons.Default.ContentCopy) {
+            add(SheetAction("Copy transcript", Icons.Rounded.ContentCopy) {
                 ctx.getSystemService(android.content.ClipboardManager::class.java)?.setPrimaryClip(android.content.ClipData.newPlainText(m.title, DictationStore.plainText(m, false)))
                 shell.toast("Transcript copied")
             })
-            add(SheetAction("Save as document", Icons.Default.NoteAdd, hint = "Edit, then export to Word or PDF") { saveAsDocument(app, shell, m) })
-            m.geo?.let { g -> add(SheetAction("Show on map", Icons.Default.Map, hint = g.label) { openMap(ctx, g.lat, g.lon, m.title) }) }
-            add(SheetAction("Open transcript file", Icons.Default.Description, hint = "BlackLab/$rel") { Files.open(ctx, DictationStore.transcriptFile(dir)) })
+            add(SheetAction("Save as document", Icons.Rounded.NoteAdd, hint = "Edit, then export to Word or PDF") { saveAsDocument(app, shell, m) })
+            m.geo?.let { g -> add(SheetAction("Show on map", Icons.Rounded.Map, hint = g.label) { openMap(ctx, g.lat, g.lon, m.title) }) }
+            add(SheetAction("Open transcript file", Icons.Rounded.Description, hint = "BlackLab/$rel") { Files.open(ctx, DictationStore.transcriptFile(dir)) })
         },
     )
     if (confirm) ConfirmDialog("Delete dictation?", "“${m.title}” — audio, transcript and folder will be permanently deleted.", onDismiss = { confirm = false }) {
@@ -289,7 +289,7 @@ private fun SessionRow(dir: File, m: DictationMeta, onChanged: () -> Unit) {
         modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp).clip(RoundedCornerShape(18.dp)).pressable(onClick = { open() }, onLongClick = { menu = true })) {
         Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
             Box(Modifier.size(44.dp).clip(CircleShape).background(DictViolet.copy(alpha = 0.16f)), contentAlignment = Alignment.Center) {
-                Icon(Icons.Default.RecordVoiceOver, null, tint = DictViolet)
+                Icon(Icons.Rounded.RecordVoiceOver, null, tint = DictViolet)
             }
             Spacer(Modifier.width(12.dp))
             Column(Modifier.weight(1f)) {

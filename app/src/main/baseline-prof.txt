@@ -1,0 +1,4 @@
+# Baseline profile: precompile BlackLab's own code paths used at start-up and while scrolling.
+# (Compose, Room, Media3 and other AndroidX libraries ship their own profiles.)
+HSPLcom/blacklab/app/**->**(**)**
+Lcom/blacklab/app/**;

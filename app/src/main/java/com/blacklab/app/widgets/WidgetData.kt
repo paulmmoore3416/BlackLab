@@ -109,7 +109,9 @@ object Widgets {
             override fun onInvalidated(tables: Set<String>) = refresh(app.context)
         })
         app.appScope.launch {
-            app.settings.state.map { Triple(it.activeProfile, it.widgetPrivacy, it.professionalName + it.personalName) }
+            app.settings.state.map { listOf(it.activeProfile, it.widgetPrivacy, it.professionalName + it.personalName,
+                // colors and theme: widgets follow the app's palette and light/dark choice
+                it.themeMode, it.dynamicColor, it.accentPersonal, it.accentProfessional, it.secondaryPersonal, it.secondaryProfessional, it.themeDarkFrom, it.themeDarkTo) }
                 .distinctUntilChanged().drop(1).collect { refresh(app.context) }
         }
     }

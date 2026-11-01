@@ -49,8 +49,8 @@ data class SheetAction(
 /** Tap → [onClick]; long-press → [onLongClick] with a haptic tick. */
 @OptIn(ExperimentalFoundationApi::class)
 fun Modifier.pressable(onClick: () -> Unit, onLongClick: () -> Unit): Modifier = composed {
-    val haptics = LocalHapticFeedback.current
-    combinedClickable(onClick = onClick, onLongClick = { haptics.performHapticFeedback(HapticFeedbackType.LongPress); onLongClick() })
+    val haptics = rememberHaptics() // follows Settings › Haptic feedback
+    combinedClickable(onClick = onClick, onLongClick = { haptics.longPress(); onLongClick() })
 }
 
 /**

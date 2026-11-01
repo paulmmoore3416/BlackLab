@@ -18,7 +18,7 @@ import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.rounded.*
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -127,34 +127,34 @@ fun CreateScreen() {
     }
 
     val create = listOf(
-        CreateItem("Notebook page", "Free-form canvas: type anywhere, ink, tags, pictures", Icons.Default.MenuBook, Violet) { shell.go("brainstorm?tab=notebooks") },
-        CreateItem("Quick note", "Keep-style note, list, sketch or voice memo", Icons.Default.StickyNote2, Amber) { shell.go("note/0?kind=") },
-        CreateItem("Mind map", "Brainstorm a topic around a central idea", Icons.Default.Hub, Mint) { shell.go("brainstorm?tab=mindmap") },
-        CreateItem("Document", "Rich text, tables, pictures — exports to Word & PDF", Icons.Default.Description, Cobalt) { shell.go("doc/0") },
-        CreateItem("Spreadsheet", "Excel-compatible .xlsx with formulas", Icons.Default.TableChart, Mint) {
+        CreateItem("Notebook page", "Free-form canvas: type anywhere, ink, tags, pictures", Icons.Rounded.MenuBook, Violet) { shell.go("brainstorm?tab=notebooks") },
+        CreateItem("Quick note", "Keep-style note, list, sketch or voice memo", Icons.Rounded.StickyNote2, Amber) { shell.go("note/0?kind=") },
+        CreateItem("Mind map", "Brainstorm a topic around a central idea", Icons.Rounded.Hub, Mint) { shell.go("brainstorm?tab=mindmap") },
+        CreateItem("Document", "Rich text, tables, pictures — exports to Word & PDF", Icons.Rounded.Description, Cobalt) { shell.go("doc/0") },
+        CreateItem("Spreadsheet", "Excel-compatible .xlsx with formulas", Icons.Rounded.TableChart, Mint) {
             make(Folder.DOCUMENTS, "Spreadsheet ${stamp()}", "xlsx") { Sheets.writeXlsx(listOf(Sheet("Sheet1", mutableListOf(mutableListOf("Item", "Qty", "Cost", "Total"), mutableListOf("", "", "", "=B2*C2")))), it) }
         },
-        CreateItem("Text note", "Plain .txt", Icons.Default.Notes, Amber) { make(Folder.DOCUMENTS, "Note ${stamp()}", "txt") { it.writeText("") } },
-        CreateItem("Markdown note", "Headings, lists, links — with preview", Icons.Default.Code, Violet) { make(Folder.DOCUMENTS, "Note ${stamp()}", "md") { it.writeText("# Title\n\n- \n") } },
-        CreateItem("CSV table", "Simple comma-separated data", Icons.Default.GridOn, Mint) { make(Folder.DOCUMENTS, "Table ${stamp()}", "csv") { it.writeText("Name,Value\r\n") } },
-        CreateItem("Drawing", "Blank canvas with pens, shapes & text", Icons.Default.Brush, Coral) {
+        CreateItem("Text note", "Plain .txt", Icons.Rounded.Notes, Amber) { make(Folder.DOCUMENTS, "Note ${stamp()}", "txt") { it.writeText("") } },
+        CreateItem("Markdown note", "Headings, lists, links — with preview", Icons.Rounded.Code, Violet) { make(Folder.DOCUMENTS, "Note ${stamp()}", "md") { it.writeText("# Title\n\n- \n") } },
+        CreateItem("CSV table", "Simple comma-separated data", Icons.Rounded.GridOn, Mint) { make(Folder.DOCUMENTS, "Table ${stamp()}", "csv") { it.writeText("Name,Value\r\n") } },
+        CreateItem("Drawing", "Blank canvas with pens, shapes & text", Icons.Rounded.Brush, Coral) {
             make(Folder.PHOTOS, "Drawing ${stamp()}", "png") { f ->
                 val b = Bitmap.createBitmap(2400, 1800, Bitmap.Config.ARGB_8888).apply { eraseColor(android.graphics.Color.WHITE) }
                 f.outputStream().use { b.compress(Bitmap.CompressFormat.PNG, 100, it) }
             }
         },
-        CreateItem("PDF from photos", "Pick pictures, get one PDF", Icons.Default.PictureAsPdf, Coral) { photosToPdf.launch(arrayOf("image/*")) },
-        CreateItem("Blank PDF", "A page to write, sign or annotate", Icons.Default.NoteAdd, Cobalt) { make(Folder.DOCUMENTS, "Blank ${stamp()}", "pdf") { PdfTools.init(ctx); PdfTools.blank(it) } },
-        CreateItem("Video montage", "Photos & clips → one video with music & titles", Icons.Default.Movie, Violet) { montage.launch(arrayOf("image/*", "video/*")) },
-        CreateItem("Audio recording", "Studio recorder with markers & transcript", Icons.Default.Mic, Coral) { shell.go("recorder") },
-        CreateItem("Photo or video", "BlackLab camera", Icons.Default.PhotoCamera, Amber) { shell.go("camera") },
+        CreateItem("PDF from photos", "Pick pictures, get one PDF", Icons.Rounded.PictureAsPdf, Coral) { photosToPdf.launch(arrayOf("image/*")) },
+        CreateItem("Blank PDF", "A page to write, sign or annotate", Icons.Rounded.NoteAdd, Cobalt) { make(Folder.DOCUMENTS, "Blank ${stamp()}", "pdf") { PdfTools.init(ctx); PdfTools.blank(it) } },
+        CreateItem("Video montage", "Photos & clips → one video with music & titles", Icons.Rounded.Movie, Violet) { montage.launch(arrayOf("image/*", "video/*")) },
+        CreateItem("Audio recording", "Studio recorder with markers & transcript", Icons.Rounded.Mic, Coral) { shell.go("recorder") },
+        CreateItem("Photo or video", "BlackLab camera", Icons.Rounded.PhotoCamera, Amber) { shell.go("camera") },
     )
     val edit = listOf(
-        CreateItem("Open any file", "PDF, Word, Excel, PowerPoint, EPUB, ZIP, code…", Icons.Default.FileOpen, Cobalt) { openAny.launch(arrayOf("*/*")) },
-        CreateItem("Edit a photo", "Crop, adjust, looks, markup, remove background", Icons.Default.AutoFixHigh, Coral) { editPhoto.launch(arrayOf("image/*")) },
-        CreateItem("Edit a video", "Trim, split, filters, titles, music, speed", Icons.Default.VideoSettings, Violet) { editVideo.launch(arrayOf("video/*")) },
-        CreateItem("Edit audio", "Waveform editor: cut, fade, normalize, effects", Icons.Default.GraphicEq, Mint) { editAudio.launch(arrayOf("audio/*", "video/*")) },
-        CreateItem("Music", "Play songs on this phone", Icons.Default.LibraryMusic, Amber) { shell.go("music") },
+        CreateItem("Open any file", "PDF, Word, Excel, PowerPoint, EPUB, ZIP, code…", Icons.Rounded.FileOpen, Cobalt) { openAny.launch(arrayOf("*/*")) },
+        CreateItem("Edit a photo", "Crop, adjust, looks, markup, remove background", Icons.Rounded.AutoFixHigh, Coral) { editPhoto.launch(arrayOf("image/*")) },
+        CreateItem("Edit a video", "Trim, split, filters, titles, music, speed", Icons.Rounded.VideoSettings, Violet) { editVideo.launch(arrayOf("video/*")) },
+        CreateItem("Edit audio", "Waveform editor: cut, fade, normalize, effects", Icons.Rounded.GraphicEq, Mint) { editAudio.launch(arrayOf("audio/*", "video/*")) },
+        CreateItem("Music", "Play songs on this phone", Icons.Rounded.LibraryMusic, Amber) { shell.go("music") },
     )
 
     Scaffold(topBar = { BlTopBar("Create & Edit", subtitle = "Start something new, or open any file") }) { pad ->

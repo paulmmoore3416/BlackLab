@@ -15,7 +15,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.rounded.*
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
@@ -66,20 +66,20 @@ fun FileMenu(file: File, items: List<MenuItem> = emptyList()) {
     val ctx = LocalContext.current
     var open by remember { mutableStateOf(false) }
     var info by remember { mutableStateOf(false) }
-    IconButton(onClick = { open = true }) { Icon(Icons.Default.MoreVert, "More") }
+    IconButton(onClick = { open = true }) { Icon(Icons.Rounded.MoreVert, "More") }
     DropdownMenu(open, { open = false }) {
         items.forEach { m -> DropdownMenuItem(text = { Text(m.label) }, leadingIcon = { Icon(m.icon, null) }, onClick = { open = false; m.onClick() }) }
         if (items.isNotEmpty()) HorizontalDivider()
-        DropdownMenuItem(text = { Text("Share") }, leadingIcon = { Icon(Icons.Default.Share, null) }, onClick = { open = false; Files.share(ctx, listOf(file)) })
-        DropdownMenuItem(text = { Text("Open with…") }, leadingIcon = { Icon(Icons.Default.OpenInNew, null) }, onClick = { open = false; Files.open(ctx, file) })
-        if (!app.storage.contains(file)) DropdownMenuItem(text = { Text("Save to BlackLab") }, leadingIcon = { Icon(Icons.Default.SaveAlt, null) }, onClick = {
+        DropdownMenuItem(text = { Text("Share") }, leadingIcon = { Icon(Icons.Rounded.Share, null) }, onClick = { open = false; Files.share(ctx, listOf(file)) })
+        DropdownMenuItem(text = { Text("Open with…") }, leadingIcon = { Icon(Icons.Rounded.OpenInNew, null) }, onClick = { open = false; Files.open(ctx, file) })
+        if (!app.storage.contains(file)) DropdownMenuItem(text = { Text("Save to BlackLab") }, leadingIcon = { Icon(Icons.Rounded.SaveAlt, null) }, onClick = {
             open = false
             app.io {
                 val f = runCatching { FileOps.saveToBlackLab(app, file) }.getOrNull()
                 withContext(Dispatchers.Main) { shell.toast(if (f != null) "Saved to BlackLab › ${f.parentFile?.name}" else "Couldn't save a copy") }
             }
         })
-        DropdownMenuItem(text = { Text("Details") }, leadingIcon = { Icon(Icons.Default.Info, null) }, onClick = { open = false; info = true })
+        DropdownMenuItem(text = { Text("Details") }, leadingIcon = { Icon(Icons.Rounded.Info, null) }, onClick = { open = false; info = true })
     }
     if (info) {
         val details = remember(file) { mediaInfo(file) + ("Type" to FileKinds.of(file).label) }

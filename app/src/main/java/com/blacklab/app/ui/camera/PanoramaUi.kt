@@ -21,8 +21,8 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Public
+import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material.icons.rounded.Public
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
@@ -92,7 +92,7 @@ fun PanoramaReview(pano: Bitmap, onDiscard: () -> Unit, onSaved: (List<File>) ->
     Box(Modifier.fillMaxSize().background(Color.Black)) {
         Column(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding()) {
             Row(Modifier.fillMaxWidth().padding(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                Icon(Icons.Default.Close, "Discard", tint = Color.White, modifier = Modifier.clip(RoundedCornerShape(50)).clickable(enabled = !saving) { onDiscard() }.padding(10.dp))
+                Icon(Icons.Rounded.Close, "Discard", tint = Color.White, modifier = Modifier.clip(RoundedCornerShape(50)).clickable(enabled = !saving) { onDiscard() }.padding(10.dp))
                 Column(Modifier.weight(1f)) {
                     Text("Panorama", color = Color.White, fontWeight = FontWeight.SemiBold)
                     Text(String.format(Locale.US, "%,d × %,d px · %.1f MP", pano.width, pano.height, pano.width * pano.height / 1_000_000f), color = Color.White.copy(alpha = 0.7f), fontSize = 12.sp)
@@ -106,7 +106,7 @@ fun PanoramaReview(pano: Bitmap, onDiscard: () -> Unit, onSaved: (List<File>) ->
                     modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp).then(if (planet) Modifier.clip(RoundedCornerShape(24.dp)) else Modifier))
             }
             Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically) {
-                Icon(Icons.Default.Public, null, tint = Color.White)
+                Icon(Icons.Rounded.Public, null, tint = Color.White)
                 Spacer(Modifier.width(10.dp))
                 Column(Modifier.weight(1f)) {
                     Text("Tiny planet", color = Color.White, fontWeight = FontWeight.SemiBold)

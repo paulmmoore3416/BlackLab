@@ -10,12 +10,12 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.automirrored.filled.DriveFileMove
-import androidx.compose.material.icons.automirrored.filled.FormatIndentDecrease
-import androidx.compose.material.icons.automirrored.filled.FormatIndentIncrease
-import androidx.compose.material.icons.automirrored.filled.*
-import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.automirrored.rounded.ArrowBack
+import androidx.compose.material.icons.automirrored.rounded.DriveFileMove
+import androidx.compose.material.icons.automirrored.rounded.FormatIndentDecrease
+import androidx.compose.material.icons.automirrored.rounded.FormatIndentIncrease
+import androidx.compose.material.icons.automirrored.rounded.*
+import androidx.compose.material.icons.rounded.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -91,23 +91,23 @@ fun NotebookScreen(notebookId: Long, startSection: Long = 0) {
                         }
                     }
                 },
-                navigationIcon = { IconButton(onClick = { shell.back() }) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back") } },
+                navigationIcon = { IconButton(onClick = { shell.back() }) { Icon(Icons.AutoMirrored.Rounded.ArrowBack, "Back") } },
                 actions = {
-                    IconButton(onClick = { shell.go("brainstorm?tab=search") }) { Icon(Icons.Default.Search, "Search") }
+                    IconButton(onClick = { shell.go("brainstorm?tab=search") }) { Icon(Icons.Rounded.Search, "Search") }
                     IconButton(onClick = { editSection = SectionEntity(notebookId = notebookId, name = "New Section ${sections.size + 1}", color = Brainstorm.SectionColors[(sections.size + 1) % Brainstorm.SectionColors.size]); dialog = "section" }) {
-                        Icon(Icons.Default.PostAdd, "New section")
+                        Icon(Icons.Rounded.PostAdd, "New section")
                     }
                     Box {
-                        IconButton(onClick = { menu = true }) { Icon(Icons.Default.MoreVert, "More") }
+                        IconButton(onClick = { menu = true }) { Icon(Icons.Rounded.MoreVert, "More") }
                         DropdownMenu(menu, { menu = false }) {
-                            DropdownMenuItem(text = { Text("Rename notebook") }, leadingIcon = { Icon(Icons.Default.Edit, null) }, onClick = { menu = false; dialog = "rename" })
-                            DropdownMenuItem(text = { Text("Notebook color") }, leadingIcon = { Icon(Icons.Default.Palette, null) }, onClick = { menu = false; dialog = "color" })
-                            DropdownMenuItem(text = { Text("Export notebook (.blnotebook)") }, leadingIcon = { Icon(Icons.Default.Archive, null) }, onClick = {
+                            DropdownMenuItem(text = { Text("Rename notebook") }, leadingIcon = { Icon(Icons.Rounded.Edit, null) }, onClick = { menu = false; dialog = "rename" })
+                            DropdownMenuItem(text = { Text("Notebook color") }, leadingIcon = { Icon(Icons.Rounded.Palette, null) }, onClick = { menu = false; dialog = "color" })
+                            DropdownMenuItem(text = { Text("Export notebook (.blnotebook)") }, leadingIcon = { Icon(Icons.Rounded.Archive, null) }, onClick = {
                                 menu = false
                                 notebook?.let { nb -> scope.launch { runCatching { Brainstorm.exportNotebook(app, nb) }.onSuccess { f -> Files.share(ctx, listOf(f), nb.name); shell.toast("Saved to Exports › ${f.name}") }.onFailure { shell.toast("Export failed: ${it.message}") } } }
                             })
-                            if (SectionKeys.anyUnlocked) DropdownMenuItem(text = { Text("Lock all sections") }, leadingIcon = { Icon(Icons.Default.Lock, null) }, onClick = { menu = false; SectionKeys.lockAll(); unlockTick++ })
-                            DropdownMenuItem(text = { Text("Delete notebook", color = LocalBlColors.current.danger) }, leadingIcon = { Icon(Icons.Default.Delete, null, tint = LocalBlColors.current.danger) }, onClick = { menu = false; dialog = "delete" })
+                            if (SectionKeys.anyUnlocked) DropdownMenuItem(text = { Text("Lock all sections") }, leadingIcon = { Icon(Icons.Rounded.Lock, null) }, onClick = { menu = false; SectionKeys.lockAll(); unlockTick++ })
+                            DropdownMenuItem(text = { Text("Delete notebook", color = LocalBlColors.current.danger) }, leadingIcon = { Icon(Icons.Rounded.Delete, null, tint = LocalBlColors.current.danger) }, onClick = { menu = false; dialog = "delete" })
                         }
                     }
                 },
@@ -116,9 +116,9 @@ fun NotebookScreen(notebookId: Long, startSection: Long = 0) {
         floatingActionButton = {
             if (current != null) {
                 Column(horizontalAlignment = Alignment.End) {
-                    SmallFloatingActionButton(onClick = { dialog = "template" }, containerColor = MaterialTheme.colorScheme.surfaceContainerHighest) { Icon(Icons.Default.Dashboard, "From template") }
+                    SmallFloatingActionButton(onClick = { dialog = "template" }, containerColor = MaterialTheme.colorScheme.surfaceContainerHighest) { Icon(Icons.Rounded.Dashboard, "From template") }
                     Spacer(Modifier.height(10.dp))
-                    ExtendedFloatingActionButton(onClick = { newPage() }, icon = { Icon(Icons.Default.Add, null) }, text = { Text("Page") })
+                    ExtendedFloatingActionButton(onClick = { newPage() }, icon = { Icon(Icons.Rounded.Add, null) }, text = { Text("Page") })
                 }
             }
         },
@@ -130,7 +130,7 @@ fun NotebookScreen(notebookId: Long, startSection: Long = 0) {
                 sections.forEach { s ->
                     if (s.groupName.isNotBlank() && s.groupName != lastGroup) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(Icons.Default.FolderOpen, null, Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Icon(Icons.Rounded.FolderOpen, null, Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
                             Text(s.groupName, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(start = 2.dp))
                         }
                     }
@@ -144,7 +144,7 @@ fun NotebookScreen(notebookId: Long, startSection: Long = 0) {
                         modifier = Modifier.pressable(onClick = { selected = s.id }, onLongClick = { sectionSheet = s }),
                     ) {
                         Row(Modifier.padding(horizontal = 12.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                            if (s.locked) { Icon(if (SectionKeys.get(s.id) != null) Icons.Default.LockOpen else Icons.Default.Lock, null, Modifier.size(14.dp)); Spacer(Modifier.width(4.dp)) }
+                            if (s.locked) { Icon(if (SectionKeys.get(s.id) != null) Icons.Rounded.LockOpen else Icons.Rounded.Lock, null, Modifier.size(14.dp)); Spacer(Modifier.width(4.dp)) }
                             Text(s.name, style = MaterialTheme.typography.labelLarge, fontWeight = if (sel) FontWeight.Bold else FontWeight.Normal, maxLines = 1)
                         }
                     }
@@ -152,13 +152,13 @@ fun NotebookScreen(notebookId: Long, startSection: Long = 0) {
             }
             HorizontalDivider(color = current?.let { Color(it.color).copy(alpha = 0.6f) } ?: MaterialTheme.colorScheme.outlineVariant, thickness = 2.dp)
             when {
-                current == null -> EmptyState(Icons.Default.Folder, "No sections", "Add a section to start writing pages.") {
+                current == null -> EmptyState(Icons.Rounded.Folder, "No sections", "Add a section to start writing pages.") {
                     Button(onClick = { editSection = SectionEntity(notebookId = notebookId, name = "New Section 1", color = Brainstorm.SectionColors[1]); dialog = "section" }) { Text("New section") }
                 }
-                !unlocked -> EmptyState(Icons.Default.Lock, "“${current.name}” is password protected", "Its pages are encrypted on this phone." + if (current.lockHint.isNotBlank()) "\nHint: ${current.lockHint}" else "") {
+                !unlocked -> EmptyState(Icons.Rounded.Lock, "“${current.name}” is password protected", "Its pages are encrypted on this phone." + if (current.lockHint.isNotBlank()) "\nHint: ${current.lockHint}" else "") {
                     Button(onClick = { dialog = "unlock" }) { Text("Unlock") }
                 }
-                pages.isEmpty() -> EmptyState(Icons.AutoMirrored.Filled.NoteAdd, "No pages yet", "Tap + Page, or start from a template — meeting notes, Cornell lecture notes, mind map and more.")
+                pages.isEmpty() -> EmptyState(Icons.AutoMirrored.Rounded.NoteAdd, "No pages yet", "Tap + Page, or start from a template — meeting notes, Cornell lecture notes, mind map and more.")
                 else -> LazyColumn(contentPadding = PaddingValues(start = 12.dp, end = 12.dp, top = 6.dp, bottom = 140.dp)) {
                     itemsIndexed(pages, key = { _, p -> p.id }) { _, p ->
                         Surface(
@@ -173,8 +173,8 @@ fun NotebookScreen(notebookId: Long, startSection: Long = 0) {
                                     Text(listOf(Time.ago(p.updatedAt), p.preview.take(80)).filter { it.isNotBlank() }.joinToString(" · ").ifBlank { if (current.locked) "Encrypted" else "" },
                                         style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
                                 }
-                                if (p.reminderAt != null) Icon(Icons.Default.NotificationsActive, null, Modifier.size(16.dp), tint = MaterialTheme.colorScheme.primary)
-                                if (p.tagIndex.isNotBlank()) { Spacer(Modifier.width(6.dp)); Icon(Icons.Default.Sell, null, Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant) }
+                                if (p.reminderAt != null) Icon(Icons.Rounded.NotificationsActive, null, Modifier.size(16.dp), tint = MaterialTheme.colorScheme.primary)
+                                if (p.tagIndex.isNotBlank()) { Spacer(Modifier.width(6.dp)); Icon(Icons.Rounded.Sell, null, Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant) }
                             }
                         }
                     }
@@ -188,14 +188,14 @@ fun NotebookScreen(notebookId: Long, startSection: Long = 0) {
         ActionSheet(
             title = s.name, subtitle = if (s.locked) "Password protected" else if (s.groupName.isNotBlank()) "Group: ${s.groupName}" else null, onDismiss = { sectionSheet = null },
             actions = listOfNotNull(
-                SheetAction("Rename, color & group", Icons.Default.Edit) { editSection = s; dialog = "section" },
-                SheetAction("Move left", Icons.Default.ChevronLeft) { scope.launch { moveSection(app, sections, s, -1) } },
-                SheetAction("Move right", Icons.Default.ChevronRight) { scope.launch { moveSection(app, sections, s, 1) } },
-                if (!s.locked) SheetAction("Password protect", Icons.Default.Lock, hint = "Encrypts every page in this section") { selected = s.id; dialog = "lock" } else null,
-                if (s.locked && SectionKeys.get(s.id) != null) SheetAction("Lock now", Icons.Default.Lock) { SectionKeys.lock(s.id); unlockTick++ } else null,
-                if (s.locked) SheetAction("Remove password", Icons.Default.LockOpen) { selected = s.id; dialog = "unlockRemove" } else null,
-                SheetAction("Merge into another section", Icons.AutoMirrored.Filled.CallMerge) { selected = s.id; dialog = "merge" },
-                SheetAction("Delete section", Icons.Default.Delete, destructive = true, hint = "Pages go to the recycle bin") { selected = s.id; dialog = "deleteSection" },
+                SheetAction("Rename, color & group", Icons.Rounded.Edit) { editSection = s; dialog = "section" },
+                SheetAction("Move left", Icons.Rounded.ChevronLeft) { scope.launch { moveSection(app, sections, s, -1) } },
+                SheetAction("Move right", Icons.Rounded.ChevronRight) { scope.launch { moveSection(app, sections, s, 1) } },
+                if (!s.locked) SheetAction("Password protect", Icons.Rounded.Lock, hint = "Encrypts every page in this section") { selected = s.id; dialog = "lock" } else null,
+                if (s.locked && SectionKeys.get(s.id) != null) SheetAction("Lock now", Icons.Rounded.Lock) { SectionKeys.lock(s.id); unlockTick++ } else null,
+                if (s.locked) SheetAction("Remove password", Icons.Rounded.LockOpen) { selected = s.id; dialog = "unlockRemove" } else null,
+                SheetAction("Merge into another section", Icons.AutoMirrored.Rounded.CallMerge) { selected = s.id; dialog = "merge" },
+                SheetAction("Delete section", Icons.Rounded.Delete, destructive = true, hint = "Pages go to the recycle bin") { selected = s.id; dialog = "deleteSection" },
             ),
         )
     }
@@ -204,19 +204,19 @@ fun NotebookScreen(notebookId: Long, startSection: Long = 0) {
         ActionSheet(
             title = p.title.ifBlank { "Untitled page" }, subtitle = "Edited " + Time.ago(p.updatedAt), onDismiss = { pageSheet = null },
             quick = listOf(
-                SheetAction("Open", Icons.AutoMirrored.Filled.OpenInNew) { shell.go("page/${p.id}") },
-                SheetAction("Subpage", Icons.Default.SubdirectoryArrowRight) { newPage("blank", (p.level + 1).coerceAtMost(2), p) },
-                SheetAction("Duplicate", Icons.Default.ContentCopy) { scope.launch { runCatching { Brainstorm.duplicatePage(app, p) }.onFailure { shell.toast("Couldn't copy: ${it.message}") } } },
+                SheetAction("Open", Icons.AutoMirrored.Rounded.OpenInNew) { shell.go("page/${p.id}") },
+                SheetAction("Subpage", Icons.Rounded.SubdirectoryArrowRight) { newPage("blank", (p.level + 1).coerceAtMost(2), p) },
+                SheetAction("Duplicate", Icons.Rounded.ContentCopy) { scope.launch { runCatching { Brainstorm.duplicatePage(app, p) }.onFailure { shell.toast("Couldn't copy: ${it.message}") } } },
             ),
             actions = listOfNotNull(
-                if (p.level < 2) SheetAction("Make subpage", Icons.AutoMirrored.Filled.FormatIndentIncrease) { app.io { dao.updatePage(p.copy(level = p.level + 1)) } } else null,
-                if (p.level > 0) SheetAction("Promote", Icons.AutoMirrored.Filled.FormatIndentDecrease) { app.io { dao.updatePage(p.copy(level = p.level - 1)) } } else null,
-                if (idx > 0) SheetAction("Move up", Icons.Default.ArrowUpward) { scope.launch { Brainstorm.reorder(app, pages.toMutableList().apply { add(idx - 1, removeAt(idx)) }) } } else null,
-                if (idx in 0 until pages.lastIndex) SheetAction("Move down", Icons.Default.ArrowDownward) { scope.launch { Brainstorm.reorder(app, pages.toMutableList().apply { add(idx + 1, removeAt(idx)) }) } } else null,
-                SheetAction("Move to…", Icons.AutoMirrored.Filled.DriveFileMove) { pagePick = p; dialog = "movePage" },
-                SheetAction("Copy to…", Icons.Default.FileCopy) { pagePick = p; dialog = "copyPage" },
-                SheetAction(if (p.reminderAt != null) "Reminder · ${Time.dateTime(p.reminderAt)}" else "Remind me", Icons.Default.NotificationsActive) { pagePick = p; dialog = "pageReminder" },
-                SheetAction("Delete", Icons.Default.Delete, destructive = true) { scope.launch { Brainstorm.trashPage(app, p); shell.toast("Moved to recycle bin", "Undo") { app.io { Brainstorm.restorePage(app, p) } } } },
+                if (p.level < 2) SheetAction("Make subpage", Icons.AutoMirrored.Rounded.FormatIndentIncrease) { app.io { dao.updatePage(p.copy(level = p.level + 1)) } } else null,
+                if (p.level > 0) SheetAction("Promote", Icons.AutoMirrored.Rounded.FormatIndentDecrease) { app.io { dao.updatePage(p.copy(level = p.level - 1)) } } else null,
+                if (idx > 0) SheetAction("Move up", Icons.Rounded.ArrowUpward) { scope.launch { Brainstorm.reorder(app, pages.toMutableList().apply { add(idx - 1, removeAt(idx)) }) } } else null,
+                if (idx in 0 until pages.lastIndex) SheetAction("Move down", Icons.Rounded.ArrowDownward) { scope.launch { Brainstorm.reorder(app, pages.toMutableList().apply { add(idx + 1, removeAt(idx)) }) } } else null,
+                SheetAction("Move to…", Icons.AutoMirrored.Rounded.DriveFileMove) { pagePick = p; dialog = "movePage" },
+                SheetAction("Copy to…", Icons.Rounded.FileCopy) { pagePick = p; dialog = "copyPage" },
+                SheetAction(if (p.reminderAt != null) "Reminder · ${Time.dateTime(p.reminderAt)}" else "Remind me", Icons.Rounded.NotificationsActive) { pagePick = p; dialog = "pageReminder" },
+                SheetAction("Delete", Icons.Rounded.Delete, destructive = true) { scope.launch { Brainstorm.trashPage(app, p); shell.toast("Moved to recycle bin", "Undo") { app.io { Brainstorm.restorePage(app, p) } } } },
             ),
         )
     }
@@ -292,7 +292,7 @@ private fun SectionDialog(s: SectionEntity, groups: List<String>, onDismiss: () 
                 ColorPickerRow(color, { color = it }, Brainstorm.SectionColors)
                 OutlinedTextField(group, { group = it }, label = { Text("Section group (optional)") }, singleLine = true, modifier = Modifier.fillMaxWidth())
                 if (groups.isNotEmpty()) Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    groups.forEach { g -> AssistChip({ group = g }, { Text(g) }, leadingIcon = { Icon(Icons.Default.FolderOpen, null) }) }
+                    groups.forEach { g -> AssistChip({ group = g }, { Text(g) }, leadingIcon = { Icon(Icons.Rounded.FolderOpen, null) }) }
                     AssistChip({ group = "" }, { Text("No group") })
                 }
             }

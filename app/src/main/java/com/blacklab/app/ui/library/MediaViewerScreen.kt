@@ -16,8 +16,8 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.automirrored.rounded.ArrowBack
+import androidx.compose.material.icons.rounded.*
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -91,23 +91,23 @@ fun MediaViewerScreen(relPath: String) {
         }
         if (chrome) {
             Row(Modifier.fillMaxWidth().background(Color.Black.copy(alpha = 0.45f)).statusBarsPadding().padding(4.dp), verticalAlignment = Alignment.CenterVertically) {
-                IconButton(onClick = { shell.back() }) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back", tint = Color.White) }
+                IconButton(onClick = { shell.back() }) { Icon(Icons.AutoMirrored.Rounded.ArrowBack, "Back", tint = Color.White) }
                 Column(Modifier.weight(1f)) {
                     Text(current.name, color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.titleSmall)
                     Text("${Time.dateTime(current.lastModified())} · ${Files.formatSize(current.length())}", color = Color.White.copy(alpha = 0.7f), style = MaterialTheme.typography.labelSmall)
                 }
-                IconButton(onClick = { dialog = "info" }) { Icon(Icons.Default.Info, "Info", tint = Color.White) }
-                IconButton(onClick = { menu = current }) { Icon(Icons.Default.MoreVert, "More", tint = Color.White) }
+                IconButton(onClick = { dialog = "info" }) { Icon(Icons.Rounded.Info, "Info", tint = Color.White) }
+                IconButton(onClick = { menu = current }) { Icon(Icons.Rounded.MoreVert, "More", tint = Color.White) }
             }
             Row(Modifier.align(Alignment.BottomCenter).fillMaxWidth().background(Color.Black.copy(alpha = 0.45f)).navigationBarsPadding().padding(8.dp),
                 horizontalArrangement = androidx.compose.foundation.layout.Arrangement.SpaceEvenly) {
-                ViewerAction(Icons.Default.Share, "Share") { Files.share(ctx, listOf(current)) }
-                if (current.isImage()) ViewerAction(Icons.Default.Edit, "Edit") { shell.go("imgedit?path=" + android.net.Uri.encode(app.storage.relative(current)) + "&tab=crop") }
-                if (current.isVideo()) ViewerAction(Icons.Default.VideoSettings, "Edit") { shell.go("videoedit?path=" + android.net.Uri.encode(app.storage.relative(current))) }
-                if (current.isImage()) ViewerAction(Icons.Default.TextSnippet, "Text") {
+                ViewerAction(Icons.Rounded.Share, "Share") { Files.share(ctx, listOf(current)) }
+                if (current.isImage()) ViewerAction(Icons.Rounded.Edit, "Edit") { shell.go("imgedit?path=" + android.net.Uri.encode(app.storage.relative(current)) + "&tab=crop") }
+                if (current.isVideo()) ViewerAction(Icons.Rounded.VideoSettings, "Edit") { shell.go("videoedit?path=" + android.net.Uri.encode(app.storage.relative(current))) }
+                if (current.isImage()) ViewerAction(Icons.Rounded.TextSnippet, "Text") {
                     app.io { val t = Ocr.recognize(ctx, current); withContext(Dispatchers.Main) { ocrText = t } }
                 }
-                if (current.isImage()) ViewerAction(Icons.Default.NoteAdd, "To doc") {
+                if (current.isImage()) ViewerAction(Icons.Rounded.NoteAdd, "To doc") {
                     app.io {
                         val profile = app.settings.current.activeProfile
                         val data = EditorController.imageDataUri(current) ?: return@io
@@ -118,7 +118,7 @@ fun MediaViewerScreen(relPath: String) {
                         withContext(Dispatchers.Main) { shell.go("doc/$id") }
                     }
                 }
-                ViewerAction(Icons.Default.Delete, "Delete") { dialog = "delete" }
+                ViewerAction(Icons.Rounded.Delete, "Delete") { dialog = "delete" }
             }
         }
     }

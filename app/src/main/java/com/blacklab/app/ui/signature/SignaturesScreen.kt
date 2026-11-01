@@ -1,5 +1,6 @@
 package com.blacklab.app.ui.signature
 
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import android.content.Context
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -15,13 +16,13 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Description
-import androidx.compose.material.icons.filled.DocumentScanner
-import androidx.compose.material.icons.filled.Fingerprint
-import androidx.compose.material.icons.filled.Lock
-import androidx.compose.material.icons.filled.MoreVert
-import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.rounded.Add
+import androidx.compose.material.icons.rounded.Description
+import androidx.compose.material.icons.rounded.DocumentScanner
+import androidx.compose.material.icons.rounded.Fingerprint
+import androidx.compose.material.icons.rounded.Lock
+import androidx.compose.material.icons.rounded.MoreVert
+import androidx.compose.material.icons.rounded.Star
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -101,12 +102,13 @@ fun SignaturesScreen() {
         if (pdf != null) prepare("Preparing to sign…") { SignDocs.copyIn(app, pdf, "Scan " + java.time.LocalDateTime.now().format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HHmm"))) }
     }
 
-    Scaffold(topBar = { BlTopBar("Signatures", onBack = { shell.back() }, showMenu = false) }) { pad ->
+    val titleScroll = com.blacklab.app.ui.components.rememberCollapsingTitle()
+    Scaffold(Modifier.nestedScroll(titleScroll.nestedScrollConnection), topBar = { BlTopBar("Signatures", onBack = { shell.back() }, showMenu = false, scrollBehavior = titleScroll, large = true) }) { pad ->
         LazyColumn(Modifier.padding(pad).fillMaxSize().padding(horizontal = 16.dp)) {
             item {
                 BlCard(Modifier.fillMaxWidth().padding(top = 8.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Default.Lock, null, tint = MaterialTheme.colorScheme.primary)
+                        Icon(Icons.Rounded.Lock, null, tint = MaterialTheme.colorScheme.primary)
                         Spacer(Modifier.size(10.dp))
                         Text("Kept encrypted on this phone", style = MaterialTheme.typography.titleSmall)
                     }
@@ -115,7 +117,7 @@ fun SignaturesScreen() {
                 }
             }
             item {
-                LabeledSwitchRow("Confirm before signing", "Fingerprint or screen lock before a saved signature is placed", s.sigConfirm, icon = Icons.Default.Fingerprint) { v ->
+                LabeledSwitchRow("Confirm before signing", "Fingerprint or screen lock before a saved signature is placed", s.sigConfirm, icon = Icons.Rounded.Fingerprint) { v ->
                     app.settings.update { putBoolean(Keys.SIG_CONFIRM, v) }
                 }
             }
@@ -126,8 +128,8 @@ fun SignaturesScreen() {
                     Text("Pick a PDF, Word document, picture or text file, or scan a paper one. BlackLab turns it into a PDF, you place your signature, initials and the date, and it's saved to Documents › Signed.",
                         style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     Row(Modifier.padding(top = 10.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        FilledTonalButton(onClick = { pick.launch(SignDocs.MIME) }) { Icon(Icons.Default.Description, null, Modifier.size(18.dp)); Spacer(Modifier.size(6.dp)); Text("Choose a file") }
-                        OutlinedButton(onClick = scanner) { Icon(Icons.Default.DocumentScanner, null, Modifier.size(18.dp)); Spacer(Modifier.size(6.dp)); Text("Scan & sign") }
+                        FilledTonalButton(onClick = { pick.launch(SignDocs.MIME) }) { Icon(Icons.Rounded.Description, null, Modifier.size(18.dp)); Spacer(Modifier.size(6.dp)); Text("Choose a file") }
+                        OutlinedButton(onClick = scanner) { Icon(Icons.Rounded.DocumentScanner, null, Modifier.size(18.dp)); Spacer(Modifier.size(6.dp)); Text("Scan & sign") }
                     }
                     TextButton(onClick = { details = true }, modifier = Modifier.padding(top = 4.dp)) { Text("My details for forms") }
                     Text("PDF forms: open the PDF › ⋮ › Fill in form › Auto-fill my details, then Sign here on each signature box. " +
@@ -143,7 +145,7 @@ fun SignaturesScreen() {
                     BlCard(Modifier.fillMaxWidth()) {
                         Text(if (kind == Signatures.INITIALS) "No initials yet. Some forms ask you to initial each page." else "No signature yet. Draw it once and use it on any document.",
                             style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        TextButton(onClick = { capture = kind }) { Icon(Icons.Default.Add, null, Modifier.size(18.dp)); Spacer(Modifier.size(6.dp)); Text(if (kind == Signatures.INITIALS) "Add initials" else "Add signature") }
+                        TextButton(onClick = { capture = kind }) { Icon(Icons.Rounded.Add, null, Modifier.size(18.dp)); Spacer(Modifier.size(6.dp)); Text(if (kind == Signatures.INITIALS) "Add initials" else "Add signature") }
                     }
                 }
                 items(list, key = { it.id }) { sig ->
@@ -155,12 +157,12 @@ fun SignaturesScreen() {
                             Column(Modifier.weight(1f)) {
                                 Row(verticalAlignment = Alignment.CenterVertically) {
                                     Text(sig.label, style = MaterialTheme.typography.titleSmall)
-                                    if (sig.isDefault) { Spacer(Modifier.size(6.dp)); Icon(Icons.Default.Star, "Default", Modifier.size(16.dp), tint = MaterialTheme.colorScheme.primary) }
+                                    if (sig.isDefault) { Spacer(Modifier.size(6.dp)); Icon(Icons.Rounded.Star, "Default", Modifier.size(16.dp), tint = MaterialTheme.colorScheme.primary) }
                                 }
                                 Text((if (sig.isDefault) "Default · " else "") + "Added " + Time.relativeDay(Time.toDate(sig.created)),
                                     style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             }
-                            IconButton(onClick = { menu = true }) { Icon(Icons.Default.MoreVert, "More") }
+                            IconButton(onClick = { menu = true }) { Icon(Icons.Rounded.MoreVert, "More") }
                             DropdownMenu(menu, { menu = false }) {
                                 if (!sig.isDefault) DropdownMenuItem(text = { Text("Make default") }, onClick = { menu = false; app.io { Signatures.setDefault(ctx, sig.id) } })
                                 DropdownMenuItem(text = { Text("Rename") }, onClick = { menu = false; renaming = sig })

@@ -30,10 +30,10 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.automirrored.filled.ArrowForward
-import androidx.compose.material.icons.automirrored.filled.Undo
-import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.automirrored.rounded.ArrowBack
+import androidx.compose.material.icons.automirrored.rounded.ArrowForward
+import androidx.compose.material.icons.automirrored.rounded.Undo
+import androidx.compose.material.icons.rounded.*
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.FilterChip
@@ -72,9 +72,9 @@ import com.blacklab.app.files.Stamp
 import java.io.File
 
 private enum class PdfTool(val label: String, val icon: androidx.compose.ui.graphics.vector.ImageVector) {
-    PEN("Pen", Icons.Default.Edit), HIGHLIGHT("Highlight", Icons.Default.BorderColor), TEXT("Text", Icons.Default.TextFields),
-    SIGN("Sign", Icons.Default.Draw), WHITEOUT("White-out", Icons.Default.Rectangle), BOX("Box", Icons.Default.CropSquare),
-    CHECK("✓ / ✗", Icons.Default.CheckBox), ERASE("Erase", Icons.Default.AutoFixNormal),
+    PEN("Pen", Icons.Rounded.Edit), HIGHLIGHT("Highlight", Icons.Rounded.BorderColor), TEXT("Text", Icons.Rounded.TextFields),
+    SIGN("Sign", Icons.Rounded.Draw), WHITEOUT("White-out", Icons.Rounded.Rectangle), BOX("Box", Icons.Rounded.CropSquare),
+    CHECK("✓ / ✗", Icons.Rounded.CheckBox), ERASE("Erase", Icons.Rounded.AutoFixNormal),
 }
 
 private val Inks = listOf(0xFF111111, 0xFF1E4FD8, 0xFFD32F2F, 0xFF2E7D32, 0xFFF9A825, 0xFF6A1B9A, 0xFFFFFFFF).map { it.toInt() }
@@ -84,6 +84,7 @@ private val Inks = listOf(0xFF111111, 0xFF1E4FD8, 0xFFD32F2F, 0xFF2E7D32, 0xFFF9
 fun PdfAnnotator(d: PdfDoc, startPage: Int, startSign: Boolean = false, onCancel: () -> Unit, onSave: (List<Stamp>) -> Unit) {
     val ctx = LocalContext.current
     val density = LocalDensity.current
+    val view = androidx.compose.ui.platform.LocalView.current
     var page by remember { mutableIntStateOf(startPage.coerceIn(0, d.pageCount - 1)) }
     val stamps = remember { mutableStateListOf<Stamp>() }
     var tool by remember { mutableStateOf(if (startSign) PdfTool.SIGN else PdfTool.PEN) }
@@ -105,7 +106,7 @@ fun PdfAnnotator(d: PdfDoc, startPage: Int, startSign: Boolean = false, onCancel
 
     Scaffold(topBar = {
         com.blacklab.app.ui.components.BlTopBar("Mark up & sign", subtitle = "Page ${page + 1} of ${d.pageCount} · ${stamps.size} mark(s)", onBack = onCancel, actions = {
-            IconButton(enabled = stamps.isNotEmpty(), onClick = { stamps.removeAt(stamps.lastIndex) }) { Icon(Icons.AutoMirrored.Filled.Undo, "Undo") }
+            IconButton(enabled = stamps.isNotEmpty(), onClick = { stamps.removeAt(stamps.lastIndex) }) { Icon(Icons.AutoMirrored.Rounded.Undo, "Undo") }
             TextButton(enabled = stamps.isNotEmpty(), onClick = { onSave(stamps.toList()) }) { Text("Save", fontWeight = FontWeight.Bold) }
         })
     }) { pad ->
@@ -138,7 +139,7 @@ fun PdfAnnotator(d: PdfDoc, startPage: Int, startSign: Boolean = false, onCancel
                                         when {
                                             dateNext -> { stamps += Stamp.Text(page, at.x, at.y - 0.008f, today(), 0.016f, Inks[0]); dateNext = false }
                                             sig == null -> { signAt = at; newKind = com.blacklab.app.core.Signatures.SIGNATURE; signPad = true }
-                                            else -> com.blacklab.app.ui.signature.SignatureGate.require(ctx) { placeSignature(stamps, page, sig, at, dw / dh, if (initials) 0.11f else 0.32f) }
+                                            else -> com.blacklab.app.ui.signature.SignatureGate.require(ctx) { placeSignature(stamps, page, sig, at, dw / dh, if (initials) 0.11f else 0.32f); com.blacklab.app.ui.components.Haptics.confirm(view) }
                                         }
                                     }
                                     PdfTool.CHECK -> stamps += Stamp.Text(page, norm(o).x - 0.012f, norm(o).y - 0.018f, "X", 0.028f, ink, bold = true)
@@ -189,9 +190,9 @@ fun PdfAnnotator(d: PdfDoc, startPage: Int, startSign: Boolean = false, onCancel
             }
             // page switcher
             if (d.pageCount > 1) Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                IconButton(enabled = page > 0, onClick = { page-- }) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Previous page") }
+                IconButton(enabled = page > 0, onClick = { page-- }) { Icon(Icons.AutoMirrored.Rounded.ArrowBack, "Previous page") }
                 Text("Page ${page + 1} / ${d.pageCount}", Modifier.weight(1f), style = MaterialTheme.typography.labelLarge, textAlign = androidx.compose.ui.text.style.TextAlign.Center)
-                IconButton(enabled = page < d.pageCount - 1, onClick = { page++ }) { Icon(Icons.AutoMirrored.Filled.ArrowForward, "Next page") }
+                IconButton(enabled = page < d.pageCount - 1, onClick = { page++ }) { Icon(Icons.AutoMirrored.Rounded.ArrowForward, "Next page") }
             }
             // tools
             Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 8.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {

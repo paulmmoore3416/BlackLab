@@ -21,8 +21,8 @@ android {
         applicationId = "com.blacklab.app"
         minSdk = 35
         targetSdk = 36
-        versionCode = 10
-        versionName = "4.5.0"
+        versionCode = 11
+        versionName = "4.6.0"
         vectorDrawables { useSupportLibrary = true }
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -145,6 +145,7 @@ dependencies {
 
     // Home-screen widgets (Today, Checklist, Quick capture)
     implementation("androidx.glance:glance-appwidget:1.1.1")
+    implementation("androidx.glance:glance-material3:1.1.1") // widgets in your palette colors
 
     // QR codes for Brainstorm Live Share links
     implementation("com.google.zxing:core:3.5.3")
@@ -163,6 +164,8 @@ dependencies {
     implementation("com.google.mlkit:genai-prompt:1.0.0-beta2")
     implementation("com.google.android.gms:play-services-auth:21.5.1")
     implementation("androidx.work:work-runtime-ktx:2.10.5")
+    // Installs the bundled baseline profile so BlackLab's code is precompiled: faster start, smoother first scrolls
+    implementation("androidx.profileinstaller:profileinstaller:1.4.1")
 
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.json:json:20240303")

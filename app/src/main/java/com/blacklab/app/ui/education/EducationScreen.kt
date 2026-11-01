@@ -22,7 +22,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.rounded.*
 import androidx.compose.material3.Button
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.ExtendedFloatingActionButton
@@ -107,7 +107,7 @@ fun EducationScreen(initialTab: String?) {
                 6 -> "Deck" to "deck"
                 else -> "" to ""
             }
-            if (key.isNotEmpty()) ExtendedFloatingActionButton(onClick = { editor = key }, icon = { Icon(Icons.Default.Add, null) }, text = { Text(label) })
+            if (key.isNotEmpty()) ExtendedFloatingActionButton(onClick = { editor = key }, icon = { Icon(Icons.Rounded.Add, null) }, text = { Text(label) })
         },
     ) { pad ->
         Column(Modifier.padding(pad).fillMaxSize()) {
@@ -151,9 +151,9 @@ private fun Overview(data: EduData, goTab: (Int) -> Unit) {
     LazyColumn(contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 96.dp)) {
         item {
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                StatTile("GPA", gpa.gpa?.let { String.format(Locale.US, "%.2f", it) } ?: "—", Icons.Default.Grade, Amber, Modifier.weight(1f)) { goTab(3) }
-                StatTile("Due this week", "${dueSoon.size}", Icons.Default.Assignment, Cobalt, Modifier.weight(1f)) { goTab(2) }
-                StatTile("Study / week", Time.hoursLabel(weekMinutes), Icons.Default.Timer, Violet, Modifier.weight(1f)) { goTab(5) }
+                StatTile("GPA", gpa.gpa?.let { String.format(Locale.US, "%.2f", it) } ?: "—", Icons.Rounded.Grade, Amber, Modifier.weight(1f)) { goTab(3) }
+                StatTile("Due this week", "${dueSoon.size}", Icons.Rounded.Assignment, Cobalt, Modifier.weight(1f)) { goTab(2) }
+                StatTile("Study / week", Time.hoursLabel(weekMinutes), Icons.Rounded.Timer, Violet, Modifier.weight(1f)) { goTab(5) }
             }
         }
         item { SectionHeader("Today's classes") }
@@ -211,7 +211,7 @@ private fun Overview(data: EduData, goTab: (Int) -> Unit) {
             SectionHeader("Flashcards")
             BlCard(Modifier.fillMaxWidth(), onClick = { goTab(6) }) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Default.Style, null, tint = Violet)
+                    Icon(Icons.Rounded.Style, null, tint = Violet)
                     Spacer(Modifier.width(12.dp))
                     Text(if (due > 0) "$due cards due for review" else "All caught up", Modifier.weight(1f))
                     if (due > 0) {
@@ -222,7 +222,7 @@ private fun Overview(data: EduData, goTab: (Int) -> Unit) {
             }
         }
         if (data.courses.isEmpty()) item {
-            EmptyState(Icons.Default.School, "Set up your studies", "Add your college classes, certification prep and training courses. Track grades, GPA, deadlines, CEUs and study time in one place.")
+            EmptyState(Icons.Rounded.School, "Set up your studies", "Add your college classes, certification prep and training courses. Track grades, GPA, deadlines, CEUs and study time in one place.")
         }
     }
 }
@@ -241,9 +241,9 @@ private fun CoursesTab(data: EduData) {
             FilterChip(term == -1L, { term = -1L }, label = { Text("All") })
             data.terms.forEach { t -> FilterChip(term == t.id, { term = t.id }, label = { Text(t.name) }) }
             FilterChip(term == null, { term = null }, label = { Text("No term") })
-            FilterChip(false, { manageTerms = true }, label = { Text("Terms…") }, leadingIcon = { Icon(Icons.Default.Edit, null, Modifier.size(14.dp)) })
+            FilterChip(false, { manageTerms = true }, label = { Text("Terms…") }, leadingIcon = { Icon(Icons.Rounded.Edit, null, Modifier.size(14.dp)) })
         }
-        if (shown.isEmpty()) EmptyState(Icons.Default.MenuBook, "No courses", "Tap + Course to add a class, certification prep or training course.")
+        if (shown.isEmpty()) EmptyState(Icons.Rounded.MenuBook, "No courses", "Tap + Course to add a class, certification prep or training course.")
         LazyColumn(contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 96.dp)) {
             items(shown, key = { it.id }) { CourseCard(it, data) }
         }
@@ -318,7 +318,7 @@ private fun AssignmentsTab(data: EduData) {
                 FilterChip(filter == k, { filter = k }, label = { Text(l) })
             }
         }
-        if (shown.isEmpty()) EmptyState(Icons.Default.Assignment, "No assignments", if (data.courses.isEmpty()) "Add a course first." else "Tap + Assignment to track homework, exams, projects and modules.")
+        if (shown.isEmpty()) EmptyState(Icons.Rounded.Assignment, "No assignments", if (data.courses.isEmpty()) "Add a course first." else "Tap + Assignment to track homework, exams, projects and modules.")
         LazyColumn(contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 96.dp)) {
             var lastLabel = ""
             shown.forEach { a ->
@@ -383,7 +383,7 @@ private fun GradesTab(data: EduData) {
                         Text("Projected: ${data.projectedGpa()?.let { String.format(Locale.US, "%.2f", it) } ?: "—"}", style = MaterialTheme.typography.titleMedium)
                         Text("Credits: ${fmt(gpa.credits)} graded · ${fmt(college.filter { it.status == "COMPLETED" }.sumOf { it.credits })} earned of ${fmt(s.targetCredits)}", style = MaterialTheme.typography.bodySmall)
                         Text("Quality points: ${fmt(gpa.qualityPoints)}", style = MaterialTheme.typography.bodySmall)
-                        OutlinedButton(onClick = { whatIf = true }) { Icon(Icons.Default.Calculate, null); Spacer(Modifier.width(6.dp)); Text("What-if GPA") }
+                        OutlinedButton(onClick = { whatIf = true }) { Icon(Icons.Rounded.Calculate, null); Spacer(Modifier.width(6.dp)); Text("What-if GPA") }
                     }
                 }
             }
@@ -437,7 +437,7 @@ private fun GradeRow(c: CourseEntity, data: EduData) {
 private fun CertsTab(data: EduData) {
     LazyColumn(contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 96.dp)) {
         if (data.certs.isEmpty()) item {
-            EmptyState(Icons.Default.WorkspacePremium, "Track your credentials", "Add certifications you hold or are working toward — CFM, FMP, SFP, CEM, LEED, PMP, OSHA… BlackLab reminds you of exams and renewals and logs your CEUs.")
+            EmptyState(Icons.Rounded.WorkspacePremium, "Track your credentials", "Add certifications you hold or are working toward — CFM, FMP, SFP, CEM, LEED, PMP, OSHA… BlackLab reminds you of exams and renewals and logs your CEUs.")
         }
         items(data.certs, key = { it.id }) { CertCard(it, data) }
     }
@@ -454,7 +454,7 @@ fun CertCard(c: CertificationEntity, data: EduData, compact: Boolean = false) {
     Surface(onClick = { edit = true }, shape = RoundedCornerShape(18.dp), color = MaterialTheme.colorScheme.surfaceContainer, modifier = Modifier.fillMaxWidth().padding(vertical = 5.dp)) {
         Column(Modifier.padding(14.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(Icons.Default.WorkspacePremium, null, tint = statusColor)
+                Icon(Icons.Rounded.WorkspacePremium, null, tint = statusColor)
                 Spacer(Modifier.width(10.dp))
                 Column(Modifier.weight(1f)) {
                     Text(c.name, style = MaterialTheme.typography.titleSmall, maxLines = 2)
@@ -512,7 +512,7 @@ private fun StudyTab(data: EduData) {
                 Spacer(Modifier.height(10.dp))
                 ProgressRing(1f - remaining.toFloat() / total, 220.dp, 12.dp, phaseColor, Modifier.align(Alignment.CenterHorizontally)) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text(String.format(Locale.US, "%02d:%02d", remaining / 60_000, (remaining / 1000) % 60), fontSize = 52.sp, fontWeight = FontWeight.Light)
+                        Text(String.format(Locale.US, "%02d:%02d", remaining / 60_000, (remaining / 1000) % 60), style = com.blacklab.app.ui.theme.MonoDigits, fontSize = 52.sp, fontWeight = FontWeight.Light)
                         Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                             repeat(4) { i -> Box(Modifier.size(8.dp).clip(CircleShape).background(if (i < st.completedFocus % 4 || (st.completedFocus > 0 && st.completedFocus % 4 == 0 && st.phase == StudyTimer.Phase.LONG_BREAK)) phaseColor else MaterialTheme.colorScheme.surfaceContainerHighest)) }
                         }
@@ -525,7 +525,7 @@ private fun StudyTab(data: EduData) {
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
                     OutlinedButton(onClick = { timer.reset() }, modifier = Modifier.weight(1f), contentPadding = PaddingValues(horizontal = 8.dp)) { Text("Reset", maxLines = 1) }
                     Button(onClick = { if (st.running) timer.pause() else timer.start(s.activeProfile.name) }, modifier = Modifier.weight(1.4f)) {
-                        Icon(if (st.running) Icons.Default.Pause else Icons.Default.PlayArrow, null); Spacer(Modifier.width(4.dp)); Text(if (st.running) "Pause" else if (st.phase == StudyTimer.Phase.IDLE) "Start focus" else "Resume")
+                        Icon(if (st.running) Icons.Rounded.Pause else Icons.Rounded.PlayArrow, null); Spacer(Modifier.width(4.dp)); Text(if (st.running) "Pause" else if (st.phase == StudyTimer.Phase.IDLE) "Start focus" else "Resume")
                     }
                     OutlinedButton(onClick = { timer.skip() }, modifier = Modifier.weight(1f), enabled = st.phase != StudyTimer.Phase.IDLE, contentPadding = PaddingValues(horizontal = 8.dp)) { Text("Skip", maxLines = 1) }
                 }
@@ -535,9 +535,9 @@ private fun StudyTab(data: EduData) {
         }
         item {
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.padding(top = 10.dp)) {
-                StatTile("Today", Time.hoursLabel(data.studyMinutes(today)), Icons.Default.Today, Cobalt, Modifier.weight(1f))
-                StatTile("This week", "${Time.hoursLabel(week.sum())}", Icons.Default.DateRange, Violet, Modifier.weight(1f))
-                StatTile("Streak", "$streak d", Icons.Default.LocalFireDepartment, Amber, Modifier.weight(1f))
+                StatTile("Today", Time.hoursLabel(data.studyMinutes(today)), Icons.Rounded.Today, Cobalt, Modifier.weight(1f))
+                StatTile("This week", "${Time.hoursLabel(week.sum())}", Icons.Rounded.DateRange, Violet, Modifier.weight(1f))
+                StatTile("Streak", "$streak d", Icons.Rounded.LocalFireDepartment, Amber, Modifier.weight(1f))
             }
         }
         item {
@@ -563,14 +563,14 @@ private fun StudyTab(data: EduData) {
         if (data.sessions.isEmpty()) item { Text("Completed focus sessions are logged automatically.", color = MaterialTheme.colorScheme.onSurfaceVariant) }
         items(data.sessions.take(20), key = { "ss${it.id}" }) { ses ->
             Row(Modifier.fillMaxWidth().padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-                Icon(if (ses.kind == "FOCUS") Icons.Default.Timer else Icons.Default.EditNote, null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(18.dp))
+                Icon(if (ses.kind == "FOCUS") Icons.Rounded.Timer else Icons.Rounded.EditNote, null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(18.dp))
                 Spacer(Modifier.width(10.dp))
                 Column(Modifier.weight(1f)) {
                     Text(ses.courseId?.let { data.courseById[it] }?.let { "${it.code} ${it.title}".trim() } ?: "General study", maxLines = 1)
                     Text(Time.dateTime(ses.startAt) + if (ses.notes.isNotBlank()) " · ${ses.notes}" else "", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
                 }
                 Text(Time.hoursLabel(ses.minutes), style = MaterialTheme.typography.labelLarge)
-                IconButton(onClick = { app.io { app.db.education().deleteSession(ses) } }) { Icon(Icons.Default.Close, "Delete", Modifier.size(16.dp)) }
+                IconButton(onClick = { app.io { app.db.education().deleteSession(ses) } }) { Icon(Icons.Rounded.Close, "Delete", Modifier.size(16.dp)) }
             }
         }
     }
@@ -583,7 +583,7 @@ private fun DecksTab(data: EduData) {
     val shell = LocalShell.current
     LazyColumn(contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 96.dp)) {
         if (data.decks.isEmpty()) item {
-            EmptyState(Icons.Default.Style, "Learn it for good", "Create flashcard decks per course or exam. BlackLab schedules reviews with spaced repetition (SM-2) so you study what you're about to forget.")
+            EmptyState(Icons.Rounded.Style, "Learn it for good", "Create flashcard decks per course or exam. BlackLab schedules reviews with spaced repetition (SM-2) so you study what you're about to forget.")
         }
         items(data.decks, key = { it.id }) { d ->
             val cards = data.cards.count { it.deckId == d.id }
@@ -591,7 +591,7 @@ private fun DecksTab(data: EduData) {
             val course = d.courseId?.let { data.courseById[it] }
             Surface(onClick = { shell.go("deck/${d.id}") }, shape = RoundedCornerShape(18.dp), color = MaterialTheme.colorScheme.surfaceContainer, modifier = Modifier.fillMaxWidth().padding(vertical = 5.dp)) {
                 Row(Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Default.Style, null, tint = course?.let { Color(it.color) } ?: Violet)
+                    Icon(Icons.Rounded.Style, null, tint = course?.let { Color(it.color) } ?: Violet)
                     Spacer(Modifier.width(12.dp))
                     Column(Modifier.weight(1f)) {
                         Text(d.name, style = MaterialTheme.typography.titleSmall)

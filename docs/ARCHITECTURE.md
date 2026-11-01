@@ -149,6 +149,17 @@ device can't keep HDR with effects it retries with HDR→SDR tone-mapping.
   - drops deep-link routes that carry file paths;
   - accepts only the "brief me" assistant request.
 
+## Motion & feel
+
+- `ui/theme/Motion`: shared easings (`enter`, `exit`, `emphasized`, `settle`). With `Motion.reduced` (Settings › Reduce motion, or the system animator scale at 0) every duration is 0 and springs snap.
+- `ui/components/SharedMotion`: the NavHost sits in a `SharedTransitionLayout`. Each destination is declared with `screen()`, which provides its `AnimatedVisibilityScope`. `Modifier.sharedCard(key)` gives container transforms (`task-<id>`, `note-<id>`) between list rows and detail screens.
+- `ui/components/Feel`: `Haptics` maps tick, confirm, reject, toggle and long-press to `HapticFeedbackConstants`, gated by Settings › Haptic feedback. Shared components (`LabeledSwitchRow`, `ConfirmDialog`, `pressable`) apply it everywhere.
+- `ui/components/Skeleton`: shimmer placeholders (`SkeletonRows`, `SkeletonPage`), still when motion is reduced.
+- `core/FrameStats`: `Window.OnFrameMetricsAvailableListener` per route. A frame counts as late when (total − unknown delay) exceeds 1.5 × its deadline. Results are shown in Problem reports.
+- Typography is Inter (`res/font/inter.ttf`, variable, weights 300–700). Display styles and `MonoDigits` use tabular figures.
+- `src/main/baseline-prof.txt` covers app classes. `profileinstaller` installs it for apps not delivered through Play.
+- Splash: `android:windowSplashScreenAnimatedIcon` = `drawable/splash_icon` (an animated vector).
+
 ## Testing & CI
 
 - JVM tests (`app/src/test`) cover pure logic. On-device tests (`app/src/androidTest`) run against the debug build's real container and clean up after themselves.

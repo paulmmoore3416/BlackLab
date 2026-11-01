@@ -43,9 +43,9 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.automirrored.filled.ArrowForward
-import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.automirrored.rounded.ArrowBack
+import androidx.compose.material.icons.automirrored.rounded.ArrowForward
+import androidx.compose.material.icons.rounded.*
 import androidx.compose.material3.Button
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
@@ -151,7 +151,7 @@ fun CameraScreen(initialMode: String) {
     Box(Modifier.fillMaxSize().background(Color.Black)) {
         if (!camOk) {
             Column(Modifier.align(Alignment.Center).padding(32.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                Icon(Icons.Default.NoPhotography, null, tint = Color.White, modifier = Modifier.size(56.dp))
+                Icon(Icons.Rounded.NoPhotography, null, tint = Color.White, modifier = Modifier.size(56.dp))
                 Text("Camera permission is needed", color = Color.White, modifier = Modifier.padding(16.dp))
                 Button(onClick = { perms.launch(arrayOf(Manifest.permission.CAMERA, Manifest.permission.RECORD_AUDIO) + Geo.permissions) }) { Text("Allow camera") }
                 Spacer(Modifier.height(12.dp))
@@ -403,7 +403,7 @@ private fun CameraContent(initialMode: String, micOk: Boolean, locOk: Boolean, o
             Modifier.fillMaxWidth().statusBarsPadding().padding(horizontal = 8.dp, vertical = 4.dp).horizontalScroll(rememberScrollState()),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            CamIcon(Icons.Default.Close, "Close") { shell.back() }
+            CamIcon(Icons.Rounded.Close, "Close") { shell.back() }
             Spacer(Modifier.width(12.dp))
             if (st.recording) {
                 Row(Modifier.clip(RoundedCornerShape(50)).background(Color(0xCCD32F2F)).padding(horizontal = 12.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -414,31 +414,31 @@ private fun CameraContent(initialMode: String, micOk: Boolean, locOk: Boolean, o
                 Spacer(Modifier.width(12.dp))
             }
             if (cfg.mode == CamMode.VIDEO) {
-                CamIcon(if (torch) Icons.Default.FlashlightOn else Icons.Default.FlashlightOff, "Torch", active = torch) { torch = !torch; engine.setTorch(torch) }
+                CamIcon(if (torch) Icons.Rounded.FlashlightOn else Icons.Rounded.FlashlightOff, "Torch", active = torch) { torch = !torch; engine.setTorch(torch) }
             } else if (st.hasFlash && cfg.mode != CamMode.PANO) {
-                CamIcon(when (cfg.flash) { ImageCapture.FLASH_MODE_ON -> Icons.Default.FlashOn; ImageCapture.FLASH_MODE_AUTO -> Icons.Default.FlashAuto; else -> Icons.Default.FlashOff }, "Flash",
+                CamIcon(when (cfg.flash) { ImageCapture.FLASH_MODE_ON -> Icons.Rounded.FlashOn; ImageCapture.FLASH_MODE_AUTO -> Icons.Rounded.FlashAuto; else -> Icons.Rounded.FlashOff }, "Flash",
                     active = cfg.flash != ImageCapture.FLASH_MODE_OFF) {
                     val next = when (cfg.flash) { ImageCapture.FLASH_MODE_OFF -> ImageCapture.FLASH_MODE_AUTO; ImageCapture.FLASH_MODE_AUTO -> ImageCapture.FLASH_MODE_ON; else -> ImageCapture.FLASH_MODE_OFF }
                     cfg = cfg.copy(flash = next); engine.setFlash(next)
                 }
             }
-            if (cfg.mode != CamMode.VIDEO && cfg.mode != CamMode.PANO) CamIcon(Icons.Default.Timer, "Timer", label = if (timerSec > 0) "${timerSec}s" else null, active = timerSec > 0) {
+            if (cfg.mode != CamMode.VIDEO && cfg.mode != CamMode.PANO) CamIcon(Icons.Rounded.Timer, "Timer", label = if (timerSec > 0) "${timerSec}s" else null, active = timerSec > 0) {
                 timerSec = when (timerSec) { 0 -> 3; 3 -> 10; else -> 0 }
             }
-            if (cfg.mode == CamMode.PHOTO || cfg.mode == CamMode.PRO) CamIcon(Icons.Default.Exposure, "Exposure bracketing",
+            if (cfg.mode == CamMode.PHOTO || cfg.mode == CamMode.PRO) CamIcon(Icons.Rounded.Exposure, "Exposure bracketing",
                 label = when (bracket) { 1 -> "±1"; 2 -> "±2"; 3 -> "×5"; else -> null }, active = bracket > 0) {
                 bracket = (bracket + 1) % Brackets.size
                 shell.toast(when (bracket) { 1 -> "Bracketing: 3 shots at −1, 0, +1 EV"; 2 -> "Bracketing: 3 shots at −2, 0, +2 EV"; 3 -> "Bracketing: 5 shots from −2 to +2 EV"; else -> "Bracketing off" })
             }
-            if (filterApplies) CamIcon(Icons.Default.AutoAwesome, "Looks", active = !filter.isIdentity) { filterBar = !filterBar }
-            CamIcon(if (grid) Icons.Default.GridOn else Icons.Default.GridOff, "Grid & level", active = grid) { grid = !grid; app.settings.update { putBoolean(Keys.CAM_GRID, grid) } }
-            if (cfg.mode == CamMode.PHOTO) CamIcon(Icons.Default.AspectRatio, "Aspect", label = cfg.aspect) {
+            if (filterApplies) CamIcon(Icons.Rounded.AutoAwesome, "Looks", active = !filter.isIdentity) { filterBar = !filterBar }
+            CamIcon(if (grid) Icons.Rounded.GridOn else Icons.Rounded.GridOff, "Grid & level", active = grid) { grid = !grid; app.settings.update { putBoolean(Keys.CAM_GRID, grid) } }
+            if (cfg.mode == CamMode.PHOTO) CamIcon(Icons.Rounded.AspectRatio, "Aspect", label = cfg.aspect) {
                 val a = if (cfg.aspect == "4:3") "16:9" else "4:3"; cfg = cfg.copy(aspect = a); app.settings.update { putString(Keys.CAM_ASPECT, a) }
             }
-            if (s.camGeotag) CamIcon(if (locOk && location.latest != null) Icons.Default.LocationOn else Icons.Default.LocationOff, "Location", active = locOk && location.latest != null) {
+            if (s.camGeotag) CamIcon(if (locOk && location.latest != null) Icons.Rounded.LocationOn else Icons.Rounded.LocationOff, "Location", active = locOk && location.latest != null) {
                 shell.toast(location.latest?.let { "Tagging photos at ${it.label}" } ?: if (locOk) "Waiting for a location fix…" else "Location permission is off — photos won't be geotagged")
             }
-            CamIcon(Icons.Default.Tune, "Settings") { settingsSheet = true }
+            CamIcon(Icons.Rounded.Tune, "Settings") { settingsSheet = true }
         }
 
         // ---------------- bottom controls
@@ -446,7 +446,7 @@ private fun CameraContent(initialMode: String, micOk: Boolean, locOk: Boolean, o
             horizontalAlignment = Alignment.CenterHorizontally) {
             if (showExposure && st.exposureMax > st.exposureMin && cfg.mode != CamMode.PRO) {
                 Row(Modifier.fillMaxWidth().padding(horizontal = 32.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Default.Exposure, null, tint = Color.White, modifier = Modifier.size(18.dp))
+                    Icon(Icons.Rounded.Exposure, null, tint = Color.White, modifier = Modifier.size(18.dp))
                     Slider(
                         value = st.exposureIndex.toFloat(), onValueChange = { engine.setExposure(it.roundToInt()) },
                         valueRange = st.exposureMin.toFloat()..st.exposureMax.toFloat(), modifier = Modifier.weight(1f).padding(horizontal = 8.dp),
@@ -513,15 +513,15 @@ private fun CameraContent(initialMode: String, micOk: Boolean, locOk: Boolean, o
                     contentAlignment = Alignment.Center,
                 ) {
                     if ((video && st.recording) || (panoMode && pano.running)) Box(Modifier.size(26.dp).clip(RoundedCornerShape(6.dp)).background(Color.White))
-                    else if (panoMode) Icon(Icons.Default.Panorama, null, tint = Color.Black, modifier = Modifier.size(30.dp))
+                    else if (panoMode) Icon(Icons.Rounded.Panorama, null, tint = Color.Black, modifier = Modifier.size(30.dp))
                     if (busy) Box(Modifier.size(20.dp).clip(CircleShape).background(Color.Gray))
                 }
                 if (st.recording) {
-                    CamIcon(if (st.paused) Icons.Default.PlayArrow else Icons.Default.Pause, "Pause", big = true) { if (st.paused) engine.resumeRecording() else engine.pauseRecording() }
+                    CamIcon(if (st.paused) Icons.Rounded.PlayArrow else Icons.Rounded.Pause, "Pause", big = true) { if (st.paused) engine.resumeRecording() else engine.pauseRecording() }
                 } else if (panoMode) {
                     Spacer(Modifier.size(56.dp))
                 } else {
-                    CamIcon(Icons.Default.Cameraswitch, "Switch camera", big = true) { torch = false; cfg = cfg.copy(front = !cfg.front) }
+                    CamIcon(Icons.Rounded.Cameraswitch, "Switch camera", big = true) { torch = false; cfg = cfg.copy(front = !cfg.front) }
                 }
             }
         }
@@ -691,7 +691,7 @@ private fun PanoGuide(p: com.blacklab.app.imaging.PanoProgress, processing: Bool
         }
         if (p.running || !p.started) {
             val off by animateFloatAsState(p.drift.coerceIn(-1.5f, 1.5f) * 140f, tween(120), label = "drift")
-            Icon(if (p.direction < 0) Icons.AutoMirrored.Filled.ArrowBack else Icons.AutoMirrored.Filled.ArrowForward, null,
+            Icon(if (p.direction < 0) Icons.AutoMirrored.Rounded.ArrowBack else Icons.AutoMirrored.Rounded.ArrowForward, null,
                 tint = if (abs(p.drift) > 0.55f || p.tooFast) Color(0xFFFFD54F) else Color.White,
                 modifier = Modifier.align(Alignment.Center).offset(y = off.dp).size(44.dp).clip(CircleShape).background(Color.Black.copy(alpha = 0.35f)).padding(6.dp))
         }

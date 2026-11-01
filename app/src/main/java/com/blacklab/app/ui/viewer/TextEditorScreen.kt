@@ -26,9 +26,9 @@ import androidx.compose.foundation.text.input.setTextAndPlaceCursorAtEnd
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.Redo
-import androidx.compose.material.icons.automirrored.filled.Undo
-import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.automirrored.rounded.Redo
+import androidx.compose.material.icons.automirrored.rounded.Undo
+import androidx.compose.material.icons.rounded.*
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
@@ -188,37 +188,37 @@ fun TextEditorScreen(file: File) {
     Scaffold(topBar = {
         BlTopBar(file.name, subtitle = (if (dirty) "● Edited · " else "") + kind.label + " · " + Files.formatSize(file.length()), onBack = { if (dirty) dialog = "exit" else shell.back() }, actions = {
             if (!preview) {
-                IconButton(enabled = state.undoState.canUndo, onClick = { state.undoState.undo() }) { Icon(Icons.AutoMirrored.Filled.Undo, "Undo") }
-                IconButton(enabled = state.undoState.canRedo, onClick = { state.undoState.redo() }) { Icon(Icons.AutoMirrored.Filled.Redo, "Redo") }
+                IconButton(enabled = state.undoState.canUndo, onClick = { state.undoState.undo() }) { Icon(Icons.AutoMirrored.Rounded.Undo, "Undo") }
+                IconButton(enabled = state.undoState.canRedo, onClick = { state.undoState.redo() }) { Icon(Icons.AutoMirrored.Rounded.Redo, "Redo") }
             }
-            if (kind == FileKind.MARKDOWN || kind == FileKind.HTML) IconButton(onClick = { preview = !preview }) { Icon(if (preview) Icons.Default.Edit else Icons.Default.Visibility, if (preview) "Edit" else "Preview") }
-            IconButton(enabled = dirty, onClick = { write(file) }) { Icon(Icons.Default.Save, "Save") }
+            if (kind == FileKind.MARKDOWN || kind == FileKind.HTML) IconButton(onClick = { preview = !preview }) { Icon(if (preview) Icons.Rounded.Edit else Icons.Rounded.Visibility, if (preview) "Edit" else "Preview") }
+            IconButton(enabled = dirty, onClick = { write(file) }) { Icon(Icons.Rounded.Save, "Save") }
             FileMenu(file, buildList {
-                add(MenuItem("Find & replace", Icons.Default.FindReplace) { findOpen = true; preview = false })
-                add(MenuItem("Go to line", Icons.Default.FormatListNumbered) { dialog = "goto" })
-                add(MenuItem(if (wrap) "Turn off word wrap" else "Word wrap", Icons.Default.WrapText) { wrap = !wrap })
-                add(MenuItem(if (mono) "Proportional font" else "Monospace font", Icons.Default.FontDownload) { mono = !mono })
-                add(MenuItem("Text tools", Icons.Default.Build) { dialog = "tools" })
+                add(MenuItem("Find & replace", Icons.Rounded.FindReplace) { findOpen = true; preview = false })
+                add(MenuItem("Go to line", Icons.Rounded.FormatListNumbered) { dialog = "goto" })
+                add(MenuItem(if (wrap) "Turn off word wrap" else "Word wrap", Icons.Rounded.WrapText) { wrap = !wrap })
+                add(MenuItem(if (mono) "Proportional font" else "Monospace font", Icons.Rounded.FontDownload) { mono = !mono })
+                add(MenuItem("Text tools", Icons.Rounded.Build) { dialog = "tools" })
                 if (ext == "json") {
-                    add(MenuItem("Format JSON", Icons.Default.DataObject) { formatJson(current(), 2)?.let { replaceAll(it) } ?: shell.toast("That isn't valid JSON") })
-                    add(MenuItem("Minify JSON", Icons.Default.Compress) { formatJson(current(), 0)?.let { replaceAll(it) } ?: shell.toast("That isn't valid JSON") })
+                    add(MenuItem("Format JSON", Icons.Rounded.DataObject) { formatJson(current(), 2)?.let { replaceAll(it) } ?: shell.toast("That isn't valid JSON") })
+                    add(MenuItem("Minify JSON", Icons.Rounded.Compress) { formatJson(current(), 0)?.let { replaceAll(it) } ?: shell.toast("That isn't valid JSON") })
                 }
-                add(MenuItem("Save as…", Icons.Default.SaveAs) { dialog = "saveas" })
-                add(MenuItem("Convert to BlackLab document", Icons.Default.EditNote) {
+                add(MenuItem("Save as…", Icons.Rounded.SaveAs) { dialog = "saveas" })
+                add(MenuItem("Convert to BlackLab document", Icons.Rounded.EditNote) {
                     app.io {
                         val id = runCatching { FileOps.importAsDocument(app, file, if (kind == FileKind.MARKDOWN) Markdown.toHtml(current()) else if (kind == FileKind.HTML) Jsoup.parse(current()).body().html() else ContentStore.textToHtml(current())) }.getOrNull()
                         withContext(Dispatchers.Main) { if (id != null) shell.go("doc/$id") else shell.toast("Couldn't convert") }
                     }
                 })
-                add(MenuItem("Export as PDF", Icons.Default.PictureAsPdf) {
+                add(MenuItem("Export as PDF", Icons.Rounded.PictureAsPdf) {
                     val html = bodyHtml()
                     app.io {
                         val out = runCatching { DocExporter.export(html, file.nameWithoutExtension, PageSetup(), ExportFormat.PDF, app.storage.dir(app.settings.current.activeProfile, Folder.EXPORTS)) }.getOrNull()
                         withContext(Dispatchers.Main) { if (out != null) shell.toast("Saved ${out.name} to Exports", "Open") { openInApp(shell, app, out) } else shell.toast("Export failed") }
                     }
                 })
-                if (ext == "csv" || ext == "tsv") add(MenuItem("Open as spreadsheet", Icons.Default.TableChart) { shell.back(); shell.go("view?path=" + encodePath(app, file)) })
-                if (dirty) add(MenuItem("Revert changes", Icons.Default.Restore) { saved?.let { replaceAll(it) } })
+                if (ext == "csv" || ext == "tsv") add(MenuItem("Open as spreadsheet", Icons.Rounded.TableChart) { shell.back(); shell.go("view?path=" + encodePath(app, file)) })
+                if (dirty) add(MenuItem("Revert changes", Icons.Rounded.Restore) { saved?.let { replaceAll(it) } })
             })
         })
     }) { pad ->
@@ -265,8 +265,8 @@ fun TextEditorScreen(file: File) {
             Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
                 Text("Ln ${stats.first}, Col ${stats.second} · ${stats.third} lines · $words words · ${if (crlf) "CRLF" else "LF"} · UTF-8",
                     style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.weight(1f))
-                IconButton(onClick = { size = (size - 1).coerceAtLeast(9) }) { Icon(Icons.Default.TextDecrease, "Smaller") }
-                IconButton(onClick = { size = (size + 1).coerceAtMost(30) }) { Icon(Icons.Default.TextIncrease, "Larger") }
+                IconButton(onClick = { size = (size - 1).coerceAtLeast(9) }) { Icon(Icons.Rounded.TextDecrease, "Smaller") }
+                IconButton(onClick = { size = (size + 1).coerceAtMost(30) }) { Icon(Icons.Rounded.TextIncrease, "Larger") }
             }
         }
     }
@@ -368,10 +368,10 @@ fun FindBar(
         Row(verticalAlignment = Alignment.CenterVertically) {
             OutlinedTextField(term, { term = it }, Modifier.weight(1f), singleLine = true, placeholder = { Text("Find") },
                 supportingText = null, trailingIcon = { if (term.isNotEmpty()) Text(if (n == 0) "0" else "$n", style = MaterialTheme.typography.labelMedium) })
-            IconButton(onClick = { if (!onFind(term, opts, -1)) Unit }) { Icon(Icons.Default.KeyboardArrowUp, "Previous") }
-            IconButton(onClick = { onFind(term, opts, 1) }) { Icon(Icons.Default.KeyboardArrowDown, "Next") }
-            if (onReplace != null) IconButton(onClick = { showReplace = !showReplace }) { Icon(Icons.Default.FindReplace, "Replace") }
-            IconButton(onClick = onClose) { Icon(Icons.Default.Close, "Close") }
+            IconButton(onClick = { if (!onFind(term, opts, -1)) Unit }) { Icon(Icons.Rounded.KeyboardArrowUp, "Previous") }
+            IconButton(onClick = { onFind(term, opts, 1) }) { Icon(Icons.Rounded.KeyboardArrowDown, "Next") }
+            if (onReplace != null) IconButton(onClick = { showReplace = !showReplace }) { Icon(Icons.Rounded.FindReplace, "Replace") }
+            IconButton(onClick = onClose) { Icon(Icons.Rounded.Close, "Close") }
         }
         if (showReplace && onReplace != null) Row(verticalAlignment = Alignment.CenterVertically) {
             OutlinedTextField(rep, { rep = it }, Modifier.weight(1f), singleLine = true, placeholder = { Text("Replace with") })
@@ -410,7 +410,7 @@ private fun LargeTextViewer(file: File) {
     var hit by remember { mutableIntStateOf(-1) }
     Scaffold(topBar = {
         BlTopBar(file.name, subtitle = "Large file · read-only · ${Files.formatSize(file.length())}", onBack = { shell.back() }, actions = {
-            IconButton(onClick = { findOpen = !findOpen }) { Icon(Icons.Default.Search, "Find") }
+            IconButton(onClick = { findOpen = !findOpen }) { Icon(Icons.Rounded.Search, "Find") }
             FileMenu(file)
         })
     }) { pad ->

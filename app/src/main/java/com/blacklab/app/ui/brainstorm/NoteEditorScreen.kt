@@ -1,5 +1,6 @@
 package com.blacklab.app.ui.brainstorm
 
+import com.blacklab.app.ui.components.sharedCard
 import android.graphics.Bitmap
 import android.graphics.ImageDecoder
 import android.net.Uri
@@ -21,13 +22,13 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.border
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.automirrored.filled.FormatIndentDecrease
-import androidx.compose.material.icons.automirrored.filled.FormatIndentIncrease
-import androidx.compose.material.icons.automirrored.filled.Label
-import androidx.compose.material.icons.automirrored.filled.Send
-import androidx.compose.material.icons.automirrored.filled.*
-import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.automirrored.rounded.ArrowBack
+import androidx.compose.material.icons.automirrored.rounded.FormatIndentDecrease
+import androidx.compose.material.icons.automirrored.rounded.FormatIndentIncrease
+import androidx.compose.material.icons.automirrored.rounded.Label
+import androidx.compose.material.icons.automirrored.rounded.Send
+import androidx.compose.material.icons.automirrored.rounded.*
+import androidx.compose.material.icons.rounded.*
 import androidx.compose.material.icons.outlined.PushPin
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -176,19 +177,20 @@ fun NoteEditorScreen(noteId: Long, kind: String = "") {
     val attachments = n?.let { NoteOps.attachments(it) } ?: emptyList()
 
     Scaffold(
+        modifier = Modifier.sharedCard("note-$noteId"),
         containerColor = bg,
         topBar = {
             TopAppBar(
                 title = {},
-                navigationIcon = { IconButton(onClick = { leave() }) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back") } },
+                navigationIcon = { IconButton(onClick = { leave() }) { Icon(Icons.AutoMirrored.Rounded.ArrowBack, "Back") } },
                 actions = {
-                    IconButton(onClick = { update { it.copy(pinned = !it.pinned) } }) { Icon(if (n?.pinned == true) Icons.Filled.PushPin else Icons.Outlined.PushPin, if (n?.pinned == true) "Unpin" else "Pin") }
-                    IconButton(onClick = { dialog = "reminder" }) { Icon(if (n?.reminderAt != null || n?.placeLat != null) Icons.Default.NotificationsActive else Icons.Default.AddAlert, "Reminder") }
+                    IconButton(onClick = { update { it.copy(pinned = !it.pinned) } }) { Icon(if (n?.pinned == true) Icons.Rounded.PushPin else Icons.Outlined.PushPin, if (n?.pinned == true) "Unpin" else "Pin") }
+                    IconButton(onClick = { dialog = "reminder" }) { Icon(if (n?.reminderAt != null || n?.placeLat != null) Icons.Rounded.NotificationsActive else Icons.Rounded.AddAlert, "Reminder") }
                     IconButton(onClick = {
                         val archived = !(n?.archived ?: false)
                         update { it.copy(archived = archived, pinned = false) }
                         scope.launch { saveNow(); shell.toast(if (archived) "Note archived" else "Note unarchived"); if (archived) shell.back() }
-                    }) { Icon(if (n?.archived == true) Icons.Default.Unarchive else Icons.Default.Archive, "Archive") }
+                    }) { Icon(if (n?.archived == true) Icons.Rounded.Unarchive else Icons.Rounded.Archive, "Archive") }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = bg),
             )
@@ -197,44 +199,44 @@ fun NoteEditorScreen(noteId: Long, kind: String = "") {
             Surface(color = bg, tonalElevation = 0.dp) {
                 Row(Modifier.fillMaxWidth().navigationBarsPadding().imePadding().padding(horizontal = 4.dp), verticalAlignment = Alignment.CenterVertically) {
                     Box {
-                        IconButton(onClick = { addMenu = true }) { Icon(Icons.Default.AddBox, "Add") }
+                        IconButton(onClick = { addMenu = true }) { Icon(Icons.Rounded.AddBox, "Add") }
                         DropdownMenu(addMenu, { addMenu = false }) {
-                            DropdownMenuItem(text = { Text("Take photo") }, leadingIcon = { Icon(Icons.Default.PhotoCamera, null) }, onClick = { addMenu = false; takePhoto.launch(camUri) })
-                            DropdownMenuItem(text = { Text("Add image") }, leadingIcon = { Icon(Icons.Default.Image, null) }, onClick = { addMenu = false; pickImage.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) })
-                            DropdownMenuItem(text = { Text("Drawing") }, leadingIcon = { Icon(Icons.Default.Brush, null) }, onClick = { addMenu = false; dialog = "drawing" })
-                            DropdownMenuItem(text = { Text("Recording") }, leadingIcon = { Icon(Icons.Default.Mic, null) }, onClick = { addMenu = false; dialog = "voice" })
-                            DropdownMenuItem(text = { Text(if (n?.checklist == true) "Hide checkboxes" else "Checkboxes") }, leadingIcon = { Icon(Icons.Default.CheckBox, null) }, onClick = {
+                            DropdownMenuItem(text = { Text("Take photo") }, leadingIcon = { Icon(Icons.Rounded.PhotoCamera, null) }, onClick = { addMenu = false; takePhoto.launch(camUri) })
+                            DropdownMenuItem(text = { Text("Add image") }, leadingIcon = { Icon(Icons.Rounded.Image, null) }, onClick = { addMenu = false; pickImage.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) })
+                            DropdownMenuItem(text = { Text("Drawing") }, leadingIcon = { Icon(Icons.Rounded.Brush, null) }, onClick = { addMenu = false; dialog = "drawing" })
+                            DropdownMenuItem(text = { Text("Recording") }, leadingIcon = { Icon(Icons.Rounded.Mic, null) }, onClick = { addMenu = false; dialog = "voice" })
+                            DropdownMenuItem(text = { Text(if (n?.checklist == true) "Hide checkboxes" else "Checkboxes") }, leadingIcon = { Icon(Icons.Rounded.CheckBox, null) }, onClick = {
                                 addMenu = false
                                 if (n?.checklist == true) { body = items.joinToString("\n") { it.text }; items.clear(); update { it.copy(checklist = false) } }
                                 else { items.clear(); items.addAll(body.lines().filter { it.isNotBlank() }.map { NoteItem(it.trim()) }.ifEmpty { listOf(NoteItem("")) }); body = ""; update { it.copy(checklist = true) } }
                             })
                         }
                     }
-                    IconButton(onClick = { dialog = "palette" }) { Icon(Icons.Default.Palette, "Background options") }
+                    IconButton(onClick = { dialog = "palette" }) { Icon(Icons.Rounded.Palette, "Background options") }
                     Text(if (n != null && n.id != 0L) "Edited " + Time.time(n.updatedAt) else "", style = MaterialTheme.typography.labelSmall, color = onBg.copy(alpha = 0.7f),
                         modifier = Modifier.weight(1f), textAlign = androidx.compose.ui.text.style.TextAlign.Center)
                     Box {
-                        IconButton(onClick = { menu = true }) { Icon(Icons.Default.MoreVert, "More") }
+                        IconButton(onClick = { menu = true }) { Icon(Icons.Rounded.MoreVert, "More") }
                         DropdownMenu(menu, { menu = false }) {
-                            DropdownMenuItem(text = { Text("Delete") }, leadingIcon = { Icon(Icons.Default.Delete, null) }, onClick = {
+                            DropdownMenuItem(text = { Text("Delete") }, leadingIcon = { Icon(Icons.Rounded.Delete, null) }, onClick = {
                                 menu = false; scope.launch { saveNow(); note?.takeIf { it.id != 0L }?.let { NoteOps.trash(app, it) }; shell.toast("Note moved to trash"); shell.back() }
                             })
-                            DropdownMenuItem(text = { Text("Make a copy") }, leadingIcon = { Icon(Icons.Default.ContentCopy, null) }, onClick = {
+                            DropdownMenuItem(text = { Text("Make a copy") }, leadingIcon = { Icon(Icons.Rounded.ContentCopy, null) }, onClick = {
                                 menu = false; scope.launch { saveNow(); note?.takeIf { it.id != 0L }?.let { val id = NoteOps.copy(app, it); shell.toast("Copied"); shell.nav.navigate("note/$id") { popUpTo("note/{id}?kind={kind}") { inclusive = true } } } }
                             })
-                            DropdownMenuItem(text = { Text("Send") }, leadingIcon = { Icon(Icons.AutoMirrored.Filled.Send, null) }, onClick = {
+                            DropdownMenuItem(text = { Text("Send") }, leadingIcon = { Icon(Icons.AutoMirrored.Rounded.Send, null) }, onClick = {
                                 menu = false; current()?.let { c ->
                                     val imgs = NoteOps.attachments(c).filter { it.kind != "audio" }.map { app.storage.resolve(it.path) }.filter { it.exists() }
                                     if (imgs.isEmpty()) Files.shareText(ctx, NoteOps.plainText(c), c.title.ifBlank { null }) else Files.share(ctx, imgs, NoteOps.plainText(c).take(200))
                                 }
                             })
-                            DropdownMenuItem(text = { Text("Live Share") }, leadingIcon = { Icon(Icons.Default.Wifi, null) }, onClick = { menu = false; scope.launch { ensureId(); saveNow(); dialog = "live" } })
-                            DropdownMenuItem(text = { Text("Comments") }, leadingIcon = { Icon(Icons.AutoMirrored.Filled.Comment, null) }, onClick = { menu = false; scope.launch { ensureId(); dialog = "comments" } })
-                            DropdownMenuItem(text = { Text("Labels") }, leadingIcon = { Icon(Icons.AutoMirrored.Filled.Label, null) }, onClick = { menu = false; dialog = "labels" })
-                            DropdownMenuItem(text = { Text("Send to notebook") }, leadingIcon = { Icon(Icons.AutoMirrored.Filled.MenuBook, null) }, onClick = { menu = false; scope.launch { saveNow(); dialog = "toPage" } })
+                            DropdownMenuItem(text = { Text("Live Share") }, leadingIcon = { Icon(Icons.Rounded.Wifi, null) }, onClick = { menu = false; scope.launch { ensureId(); saveNow(); dialog = "live" } })
+                            DropdownMenuItem(text = { Text("Comments") }, leadingIcon = { Icon(Icons.AutoMirrored.Rounded.Comment, null) }, onClick = { menu = false; scope.launch { ensureId(); dialog = "comments" } })
+                            DropdownMenuItem(text = { Text("Labels") }, leadingIcon = { Icon(Icons.AutoMirrored.Rounded.Label, null) }, onClick = { menu = false; dialog = "labels" })
+                            DropdownMenuItem(text = { Text("Send to notebook") }, leadingIcon = { Icon(Icons.AutoMirrored.Rounded.MenuBook, null) }, onClick = { menu = false; scope.launch { saveNow(); dialog = "toPage" } })
                             if (n?.checklist == true) {
-                                DropdownMenuItem(text = { Text("Uncheck all items") }, leadingIcon = { Icon(Icons.Default.CheckBoxOutlineBlank, null) }, onClick = { menu = false; for (i in items.indices) items[i] = items[i].copy(done = false); edits++ })
-                                DropdownMenuItem(text = { Text("Delete checked items") }, leadingIcon = { Icon(Icons.Default.DeleteSweep, null) }, onClick = { menu = false; items.removeAll { it.done }; edits++ })
+                                DropdownMenuItem(text = { Text("Uncheck all items") }, leadingIcon = { Icon(Icons.Rounded.CheckBoxOutlineBlank, null) }, onClick = { menu = false; for (i in items.indices) items[i] = items[i].copy(done = false); edits++ })
+                                DropdownMenuItem(text = { Text("Delete checked items") }, leadingIcon = { Icon(Icons.Rounded.DeleteSweep, null) }, onClick = { menu = false; items.removeAll { it.done }; edits++ })
                             }
                         }
                     }
@@ -264,9 +266,9 @@ fun NoteEditorScreen(noteId: Long, kind: String = "") {
                         Surface(Modifier.fillMaxWidth().padding(vertical = 4.dp), shape = RoundedCornerShape(14.dp), color = onBg.copy(alpha = 0.06f)) {
                             Column(Modifier.padding(10.dp)) {
                                 Row(verticalAlignment = Alignment.CenterVertically) {
-                                    IconButton(onClick = { openInApp(shell, app, app.storage.resolve(a.path)) }) { Icon(Icons.Default.PlayCircle, "Play", Modifier.size(32.dp)) }
+                                    IconButton(onClick = { openInApp(shell, app, app.storage.resolve(a.path)) }) { Icon(Icons.Rounded.PlayCircle, "Play", Modifier.size(32.dp)) }
                                     Text("Recording · " + Time.duration(a.durationMs), style = MaterialTheme.typography.labelLarge, modifier = Modifier.weight(1f))
-                                    IconButton(onClick = { update { it.copy(attachments = NoteOps.attachmentsJson(NoteOps.attachments(it) - a)) }; app.storage.resolve(a.path).delete() }) { Icon(Icons.Default.Close, "Remove") }
+                                    IconButton(onClick = { update { it.copy(attachments = NoteOps.attachmentsJson(NoteOps.attachments(it) - a)) }; app.storage.resolve(a.path).delete() }) { Icon(Icons.Rounded.Close, "Remove") }
                                 }
                                 if (a.transcript.isNotBlank()) Text(a.transcript, style = MaterialTheme.typography.bodySmall, color = onBg.copy(alpha = 0.8f), modifier = Modifier.padding(start = 12.dp, bottom = 4.dp))
                             }
@@ -308,14 +310,14 @@ fun NoteEditorScreen(noteId: Long, kind: String = "") {
                     item(key = "addItem") {
                         Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).clickable { items.add(open.lastOrNull()?.index?.plus(1) ?: items.size, NoteItem("")); focusItem = open.lastOrNull()?.index?.plus(1) ?: (items.size - 1); edits++ }.padding(vertical = 10.dp, horizontal = 4.dp),
                             verticalAlignment = Alignment.CenterVertically) {
-                            Icon(Icons.Default.Add, null, tint = onBg.copy(alpha = 0.6f)); Spacer(Modifier.width(12.dp)); Text("List item", color = onBg.copy(alpha = 0.6f))
+                            Icon(Icons.Rounded.Add, null, tint = onBg.copy(alpha = 0.6f)); Spacer(Modifier.width(12.dp)); Text("List item", color = onBg.copy(alpha = 0.6f))
                         }
                     }
                     if (done.isNotEmpty()) {
                         item(key = "doneHeader") {
                             HorizontalDivider(color = onBg.copy(alpha = 0.15f))
                             Row(Modifier.fillMaxWidth().clickable { showChecked = !showChecked }.padding(vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
-                                Icon(if (showChecked) Icons.Default.ExpandLess else Icons.Default.ExpandMore, null, tint = onBg.copy(alpha = 0.7f))
+                                Icon(if (showChecked) Icons.Rounded.ExpandLess else Icons.Rounded.ExpandMore, null, tint = onBg.copy(alpha = 0.7f))
                                 Spacer(Modifier.width(8.dp))
                                 Text("${done.size} checked item${if (done.size > 1) "s" else ""}", color = onBg.copy(alpha = 0.7f), style = MaterialTheme.typography.labelLarge)
                             }
@@ -324,7 +326,7 @@ fun NoteEditorScreen(noteId: Long, kind: String = "") {
                             Row(Modifier.fillMaxWidth().padding(start = (item.indent * 24).dp), verticalAlignment = Alignment.CenterVertically) {
                                 Checkbox(true, { items[i] = item.copy(done = false); edits++ })
                                 Text(item.text, color = onBg.copy(alpha = 0.55f), textDecoration = TextDecoration.LineThrough, modifier = Modifier.weight(1f))
-                                IconButton(onClick = { items.removeAt(i); edits++ }) { Icon(Icons.Default.Close, "Delete", tint = onBg.copy(alpha = 0.5f)) }
+                                IconButton(onClick = { items.removeAt(i); edits++ }) { Icon(Icons.Rounded.Close, "Delete", tint = onBg.copy(alpha = 0.5f)) }
                             }
                         }
                     }
@@ -333,9 +335,9 @@ fun NoteEditorScreen(noteId: Long, kind: String = "") {
                     FlowRow(Modifier.padding(vertical = 12.dp), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                         n.reminderAt?.let { at ->
                             AssistChip({ dialog = "reminder" }, { Text(Time.relativeDay(Time.toDate(at)) + ", " + Time.time(at) + (Recurrence.parse(n.repeatRule)?.let { " · " + it.describe() } ?: ""),
-                                textDecoration = if (at < Time.now()) TextDecoration.LineThrough else null) }, leadingIcon = { Icon(Icons.Default.Alarm, null) })
+                                textDecoration = if (at < Time.now()) TextDecoration.LineThrough else null) }, leadingIcon = { Icon(Icons.Rounded.Alarm, null) })
                         }
-                        if (n.placeLat != null) AssistChip({ dialog = "reminder" }, { Text((if (n.placeOnLeave) "Leaving " else "") + n.placeName.ifBlank { "Place" }) }, leadingIcon = { Icon(Icons.Default.Place, null) })
+                        if (n.placeLat != null) AssistChip({ dialog = "reminder" }, { Text((if (n.placeOnLeave) "Leaving " else "") + n.placeName.ifBlank { "Place" }) }, leadingIcon = { Icon(Icons.Rounded.Place, null) })
                         NoteOps.labels(n).forEach { l -> AssistChip({ dialog = "labels" }, { Text(l) }) }
                     }
                 }
@@ -418,12 +420,12 @@ private fun ChecklistRow(it: NoteItem, onBg: Color, focus: Boolean, onFocused: (
             keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences),
             modifier = Modifier.weight(1f).focusRequester(fr).onFocusChanged { f -> if (f.isFocused) onFocused() }.padding(vertical = 8.dp))
         if (focus) {
-            IconButton(onClick = onUp, Modifier.size(34.dp)) { Icon(Icons.Default.KeyboardArrowUp, "Move up", tint = onBg.copy(alpha = 0.6f)) }
-            IconButton(onClick = onDown, Modifier.size(34.dp)) { Icon(Icons.Default.KeyboardArrowDown, "Move down", tint = onBg.copy(alpha = 0.6f)) }
+            IconButton(onClick = onUp, Modifier.size(34.dp)) { Icon(Icons.Rounded.KeyboardArrowUp, "Move up", tint = onBg.copy(alpha = 0.6f)) }
+            IconButton(onClick = onDown, Modifier.size(34.dp)) { Icon(Icons.Rounded.KeyboardArrowDown, "Move down", tint = onBg.copy(alpha = 0.6f)) }
             IconButton(onClick = { onIndent(if (it.indent == 0) 1 else -1) }, Modifier.size(34.dp)) {
-                Icon(if (it.indent == 0) Icons.AutoMirrored.Filled.FormatIndentIncrease else Icons.AutoMirrored.Filled.FormatIndentDecrease, "Indent", tint = onBg.copy(alpha = 0.6f))
+                Icon(if (it.indent == 0) Icons.AutoMirrored.Rounded.FormatIndentIncrease else Icons.AutoMirrored.Rounded.FormatIndentDecrease, "Indent", tint = onBg.copy(alpha = 0.6f))
             }
-            IconButton(onClick = onDelete, Modifier.size(34.dp)) { Icon(Icons.Default.Close, "Delete item", tint = onBg.copy(alpha = 0.6f)) }
+            IconButton(onClick = onDelete, Modifier.size(34.dp)) { Icon(Icons.Rounded.Close, "Delete item", tint = onBg.copy(alpha = 0.6f)) }
         }
     }
 }
@@ -440,7 +442,7 @@ fun PaletteSheet(color: Int, bg: String, dark: Boolean, onDismiss: () -> Unit, o
                     Box(Modifier.size(44.dp).clip(CircleShape).background(fill ?: MaterialTheme.colorScheme.surface)
                         .border(if (i == color) 3.dp else 1.dp, if (i == color) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline, CircleShape)
                         .clickable { onColor(i) }, contentAlignment = Alignment.Center) {
-                        if (i == 0) Icon(Icons.Default.FormatColorReset, c.name, Modifier.size(20.dp)) else if (i == color) Icon(Icons.Default.Check, null)
+                        if (i == 0) Icon(Icons.Rounded.FormatColorReset, c.name, Modifier.size(20.dp)) else if (i == color) Icon(Icons.Rounded.Check, null)
                     }
                 }
             }
@@ -450,7 +452,7 @@ fun PaletteSheet(color: Int, bg: String, dark: Boolean, onDismiss: () -> Unit, o
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         Box(Modifier.size(52.dp).clip(CircleShape).background(MaterialTheme.colorScheme.surfaceContainerHigh)
                             .border(if (id == bg) 3.dp else 1.dp, if (id == bg) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline, CircleShape)
-                            .clickable { onBg(id) }, contentAlignment = Alignment.Center) { if (emoji.isEmpty()) Icon(Icons.Default.HideImage, null) else Text(emoji, fontSize = 24.sp) }
+                            .clickable { onBg(id) }, contentAlignment = Alignment.Center) { if (emoji.isEmpty()) Icon(Icons.Rounded.HideImage, null) else Text(emoji, fontSize = 24.sp) }
                         Text(label, style = MaterialTheme.typography.labelSmall)
                     }
                 }
@@ -474,13 +476,13 @@ fun LabelsDialog(profile: Profile, selected: List<String>, onDismiss: () -> Unit
                 val name = q.trim()
                 if (name.isNotEmpty() && labels.none { it.name.equals(name, true) }) {
                     TextButton(onClick = { app.io { app.db.notes().insertLabel(NoteLabelEntity(profile = profile.name, name = name)) }; chosen += name; q = "" }) {
-                        Icon(Icons.Default.Add, null); Spacer(Modifier.width(6.dp)); Text("Create “$name”")
+                        Icon(Icons.Rounded.Add, null); Spacer(Modifier.width(6.dp)); Text("Create “$name”")
                     }
                 }
                 LazyColumn(Modifier.heightIn(max = 320.dp)) {
                     items(labels.filter { q.isBlank() || it.name.contains(q, true) }, key = { it.id }) { l ->
                         Row(Modifier.fillMaxWidth().clickable { if (l.name in chosen) chosen.remove(l.name) else chosen.add(l.name) }, verticalAlignment = Alignment.CenterVertically) {
-                            Icon(Icons.AutoMirrored.Filled.Label, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Icon(Icons.AutoMirrored.Rounded.Label, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
                             Spacer(Modifier.width(10.dp))
                             Text(l.name, Modifier.weight(1f))
                             Checkbox(l.name in chosen, { c -> if (c) chosen.add(l.name) else chosen.remove(l.name) })

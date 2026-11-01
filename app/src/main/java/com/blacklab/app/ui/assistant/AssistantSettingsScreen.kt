@@ -13,7 +13,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.rounded.*
 import androidx.compose.material3.Button
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
@@ -103,7 +103,7 @@ fun AssistantSettingsScreen() {
             item {
                 BlCard(Modifier.fillMaxWidth()) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Default.AutoAwesome, null, tint = MaterialTheme.colorScheme.primary)
+                        Icon(Icons.Rounded.AutoAwesome, null, tint = MaterialTheme.colorScheme.primary)
                         Spacer(Modifier.size(12.dp))
                         Column(Modifier.weight(1f)) {
                             Text("Gemini Nano", style = MaterialTheme.typography.titleSmall)
@@ -128,7 +128,7 @@ fun AssistantSettingsScreen() {
             item {
                 BlCard(Modifier.fillMaxWidth()) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Default.AccountCircle, null, tint = MaterialTheme.colorScheme.primary)
+                        Icon(Icons.Rounded.AccountCircle, null, tint = MaterialTheme.colorScheme.primary)
                         Spacer(Modifier.size(12.dp))
                         Column(Modifier.weight(1f)) {
                             Text(s.googleAccount.ifBlank { "Not connected" }, style = MaterialTheme.typography.titleSmall)
@@ -152,7 +152,7 @@ fun AssistantSettingsScreen() {
                     ).forEach { (k, label) ->
                         val set = keysSet[k] == true
                         Row(Modifier.fillMaxWidth().padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-                            Icon(if (set) Icons.Default.Key else Icons.Default.KeyOff, null, tint = if (set) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant)
+                            Icon(if (set) Icons.Rounded.Key else Icons.Rounded.KeyOff, null, tint = if (set) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant)
                             Spacer(Modifier.size(12.dp))
                             Column(Modifier.weight(1f)) {
                                 Text(label, style = MaterialTheme.typography.bodyMedium)
@@ -171,10 +171,10 @@ fun AssistantSettingsScreen() {
             item { SectionHeader("BlackLab Desktop") }
             item {
                 BlCard(Modifier.fillMaxWidth()) {
-                    LabeledSwitchRow("Desktop link", if (linkRunning) "Running" + (if (clients.isNotEmpty()) " · ${clients.size} desktop(s) seen" else "") else "Off", s.linkEnabled, icon = Icons.Default.Computer) { v ->
+                    LabeledSwitchRow("Desktop link", if (linkRunning) "Running" + (if (clients.isNotEmpty()) " · ${clients.size} desktop(s) seen" else "") else "Off", s.linkEnabled, icon = Icons.Rounded.Computer) { v ->
                         app.settings.update { putBoolean(Keys.LINK_ENABLED, v) }
                     }
-                    LabeledSwitchRow("Allow Wi-Fi", "Otherwise USB only (adb forward)", s.linkLan, enabled = s.linkEnabled, icon = Icons.Default.Wifi) { v ->
+                    LabeledSwitchRow("Allow Wi-Fi", "Otherwise USB only (adb forward)", s.linkLan, enabled = s.linkEnabled, icon = Icons.Rounded.Wifi) { v ->
                         app.settings.update { putBoolean(Keys.LINK_LAN, v) }
                     }
                     Text("Pairing code", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 8.dp, start = 8.dp))
@@ -195,7 +195,7 @@ fun AssistantSettingsScreen() {
             item {
                 BlCard(Modifier.fillMaxWidth()) {
                     LabeledSwitchRow("Sync through Google Drive", if (s.googleAccount.isBlank()) "Sign in with Google first" else "Hidden app folder in ${s.googleAccount}",
-                        s.cloudSync, enabled = s.googleAccount.isNotBlank(), icon = Icons.Default.CloudSync) { v ->
+                        s.cloudSync, enabled = s.googleAccount.isNotBlank(), icon = Icons.Rounded.CloudSync) { v ->
                         app.settings.update { putBoolean(Keys.CLOUD_SYNC, v) }; CloudSync.schedule(ctx)
                     }
                     Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(start = 8.dp)) {

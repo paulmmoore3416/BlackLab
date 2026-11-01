@@ -1,5 +1,6 @@
 package com.blacklab.app.ui.tasks
 
+import com.blacklab.app.ui.components.sharedCard
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -26,8 +27,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.Sort
-import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.automirrored.rounded.Sort
+import androidx.compose.material.icons.rounded.*
 import androidx.compose.material.icons.outlined.StarBorder
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DropdownMenu
@@ -52,6 +53,7 @@ import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -147,18 +149,18 @@ fun TasksScreen() {
                 },
                 subtitle = if (filter == "myday") Time.longDate(Time.today()) else "${open.size} open · ${done.size} done",
                 actions = {
-                    IconButton(onClick = { searching = !searching; if (!searching) search = "" }) { Icon(Icons.Default.Search, "Search") }
-                    IconButton(onClick = { planMyDay = true }) { Icon(Icons.Default.WbSunny, "Plan my day") }
+                    IconButton(onClick = { searching = !searching; if (!searching) search = "" }) { Icon(Icons.Rounded.Search, "Search") }
+                    IconButton(onClick = { planMyDay = true }) { Icon(Icons.Rounded.WbSunny, "Plan my day") }
                     var sortMenu by remember { mutableStateOf(false) }
                     Box {
-                        IconButton(onClick = { sortMenu = true }) { Icon(Icons.AutoMirrored.Filled.Sort, "Sort") }
+                        IconButton(onClick = { sortMenu = true }) { Icon(Icons.AutoMirrored.Rounded.Sort, "Sort") }
                         DropdownMenu(sortMenu, { sortMenu = false }) {
                             listOf("DUE" to "Due date", "PRIORITY" to "Priority", "IMPORTANT" to "Importance", "CREATED" to "Creation date", "ALPHA" to "Alphabetically").forEach { (k, l) ->
                                 DropdownMenuItem(text = { Text(l) }, onClick = { app.settings.update { putString(Keys.TASK_SORT, k) }; sortMenu = false },
-                                    trailingIcon = { if (settings.taskSort == k) Icon(Icons.Default.Check, null) })
+                                    trailingIcon = { if (settings.taskSort == k) Icon(Icons.Rounded.Check, null) })
                             }
                             HorizontalDivider()
-                            DropdownMenuItem(text = { Text("Clear completed") }, leadingIcon = { Icon(Icons.Default.DeleteSweep, null) }, onClick = { sortMenu = false; confirmClear = true })
+                            DropdownMenuItem(text = { Text("Clear completed") }, leadingIcon = { Icon(Icons.Rounded.DeleteSweep, null) }, onClick = { sortMenu = false; confirmClear = true })
                         }
                     }
                 },
@@ -169,7 +171,7 @@ fun TasksScreen() {
         Column(Modifier.padding(pad).fillMaxSize()) {
             if (searching) {
                 OutlinedTextField(search, { search = it }, placeholder = { Text("Search tasks, notes, #tags") }, singleLine = true,
-                    leadingIcon = { Icon(Icons.Default.Search, null) }, modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp))
+                    leadingIcon = { Icon(Icons.Rounded.Search, null) }, modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp))
             }
             // List selector
             Row(Modifier.horizontalScroll(rememberScrollState()).padding(horizontal = 12.dp, vertical = 6.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -184,17 +186,17 @@ fun TasksScreen() {
                 }
                 ListChip("✓ Completed", tasks.count { it.completed }, filter == "completed") { filter = "completed" }
                 FilterChip(false, { editList = TaskListEntity(profile = profile.name, name = "", color = Palette[lists.size % Palette.size]) },
-                    label = { Text("New list") }, leadingIcon = { Icon(Icons.Default.Add, null, Modifier.size(16.dp)) })
+                    label = { Text("New list") }, leadingIcon = { Icon(Icons.Rounded.Add, null, Modifier.size(16.dp)) })
             }
             if (filter.startsWith("list:")) {
                 val l = listById[filter.removePrefix("list:").toLongOrNull()]
                 if (l != null) TextButton(onClick = { editList = l }, modifier = Modifier.padding(start = 8.dp)) {
-                    Icon(Icons.Default.Edit, null, Modifier.size(16.dp)); Spacer(Modifier.width(6.dp)); Text("Edit list")
+                    Icon(Icons.Rounded.Edit, null, Modifier.size(16.dp)); Spacer(Modifier.width(6.dp)); Text("Edit list")
                 }
             }
             if (open.isEmpty() && done.isEmpty()) {
                 EmptyState(
-                    if (filter == "myday") Icons.Default.WbSunny else Icons.Default.TaskAlt,
+                    if (filter == "myday") Icons.Rounded.WbSunny else Icons.Rounded.TaskAlt,
                     if (filter == "myday") "Focus on your day" else "Nothing here",
                     if (filter == "myday") "Add tasks below, or tap ☀ to plan your day from suggestions." else "Add a task below. Try: “Walkthrough Bldg C Friday 8am !high #inspection”",
                     Modifier.padding(top = 32.dp),
@@ -217,7 +219,7 @@ fun TasksScreen() {
                     if (done.isNotEmpty() && filter != "completed") {
                         item(key = "done-header") {
                             Row(Modifier.fillMaxWidth().clickable { showCompleted = !showCompleted }.padding(horizontal = 20.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-                                Icon(if (showCompleted) Icons.Default.ExpandMore else Icons.Default.ChevronRight, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                                Icon(if (showCompleted) Icons.Rounded.ExpandMore else Icons.Rounded.ChevronRight, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
                                 Text("Completed (${done.size})", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             }
                         }
@@ -266,14 +268,17 @@ private fun ListChip(label: String, count: Int, selected: Boolean, color: Color?
 fun SwipeTask(t: TaskEntity, steps: List<SubtaskEntity>, list: TaskListEntity?, showList: Boolean) {
     val app = rememberApp()
     val shell = LocalShell.current
+    val haptics = com.blacklab.app.ui.components.rememberHaptics()
     val state = rememberSwipeToDismissBoxState(confirmValueChange = { v ->
         when (v) {
             SwipeToDismissBoxValue.StartToEnd -> {
+                if (!t.completed) haptics.confirm() else haptics.tick()
                 app.io { TaskOps.setCompleted(app, t, !t.completed) }
                 if (!t.completed) shell.toast("Completed “${t.title.take(30)}”", "Undo") { app.io { app.db.tasks().get(t.id)?.let { TaskOps.setCompleted(app, it, false) } } }
                 false
             }
             SwipeToDismissBoxValue.EndToStart -> {
+                haptics.reject()
                 app.io { TaskOps.delete(app, t) }
                 shell.toast("Task deleted", "Undo") { app.io { app.db.tasks().insert(t); steps.forEach { app.db.tasks().insertSubtask(it) } } }
                 true
@@ -286,9 +291,9 @@ fun SwipeTask(t: TaskEntity, steps: List<SubtaskEntity>, list: TaskListEntity?, 
         backgroundContent = {
             val dir = state.dismissDirection
             val (color, icon, align) = when (dir) {
-                SwipeToDismissBoxValue.StartToEnd -> Triple(LocalBlColors.current.success, Icons.Default.Check, Alignment.CenterStart)
-                SwipeToDismissBoxValue.EndToStart -> Triple(LocalBlColors.current.danger, Icons.Default.Delete, Alignment.CenterEnd)
-                else -> Triple(Color.Transparent, Icons.Default.Check, Alignment.Center)
+                SwipeToDismissBoxValue.StartToEnd -> Triple(LocalBlColors.current.success, Icons.Rounded.Check, Alignment.CenterStart)
+                SwipeToDismissBoxValue.EndToStart -> Triple(LocalBlColors.current.danger, Icons.Rounded.Delete, Alignment.CenterEnd)
+                else -> Triple(Color.Transparent, Icons.Rounded.Check, Alignment.Center)
             }
             Box(Modifier.fillMaxSize().padding(horizontal = 12.dp, vertical = 3.dp).clip(RoundedCornerShape(16.dp)).background(color.copy(alpha = 0.85f)).padding(horizontal = 20.dp), contentAlignment = align) {
                 Icon(icon, null, tint = Color.White)
@@ -304,27 +309,28 @@ fun TaskRow(t: TaskEntity, steps: List<SubtaskEntity>, list: TaskListEntity?, sh
     val today = Time.today().toEpochDay()
     val pc = PriorityColors[t.priority.coerceIn(0, 4)]
     var menu by remember { mutableStateOf(false) }
+    val rowHaptics = com.blacklab.app.ui.components.rememberHaptics()
     if (menu) com.blacklab.app.ui.components.ActionSheet(
         title = t.title, subtitle = listOfNotNull(t.dueDay?.let { "Due " + Time.relativeDay(java.time.LocalDate.ofEpochDay(it)) }, list?.name).joinToString(" · ").ifBlank { null },
         onDismiss = { menu = false },
         quick = listOf(
-            com.blacklab.app.ui.components.SheetAction(if (t.completed) "Reopen" else "Complete", Icons.Default.Check) { app.io { TaskOps.setCompleted(app, t, !t.completed) } },
-            com.blacklab.app.ui.components.SheetAction(if (t.important) "Unstar" else "Important", Icons.Default.Star) { app.io { TaskOps.save(app, t.copy(important = !t.important)) } },
-            com.blacklab.app.ui.components.SheetAction(if (t.myDayDay == today) "Off My Day" else "My Day", Icons.Default.WbSunny) { app.io { TaskOps.save(app, t.copy(myDayDay = if (t.myDayDay == today) null else today)) } },
-            com.blacklab.app.ui.components.SheetAction("Delete", Icons.Default.Delete, destructive = true) {
+            com.blacklab.app.ui.components.SheetAction(if (t.completed) "Reopen" else "Complete", Icons.Rounded.Check) { app.io { TaskOps.setCompleted(app, t, !t.completed) } },
+            com.blacklab.app.ui.components.SheetAction(if (t.important) "Unstar" else "Important", Icons.Rounded.Star) { app.io { TaskOps.save(app, t.copy(important = !t.important)) } },
+            com.blacklab.app.ui.components.SheetAction(if (t.myDayDay == today) "Off My Day" else "My Day", Icons.Rounded.WbSunny) { app.io { TaskOps.save(app, t.copy(myDayDay = if (t.myDayDay == today) null else today)) } },
+            com.blacklab.app.ui.components.SheetAction("Delete", Icons.Rounded.Delete, destructive = true) {
                 app.io { TaskOps.delete(app, t) }
                 shell.toast("Task deleted", "Undo") { app.io { app.db.tasks().insert(t); steps.forEach { app.db.tasks().insertSubtask(it) } } }
             },
         ),
         actions = listOf(
-            com.blacklab.app.ui.components.SheetAction("Open details", Icons.Default.OpenInFull) { shell.go("task/${t.id}") },
-            com.blacklab.app.ui.components.SheetAction("Due today", Icons.Default.Today) { app.io { TaskOps.save(app, t.copy(dueDay = today)) } },
-            com.blacklab.app.ui.components.SheetAction("Due tomorrow", Icons.Default.EventAvailable) { app.io { TaskOps.save(app, t.copy(dueDay = today + 1)) } },
-            com.blacklab.app.ui.components.SheetAction("Raise priority", Icons.Default.PriorityHigh, hint = "Now: " + listOf("none", "low", "medium", "high", "urgent")[t.priority.coerceIn(0, 4)]) {
+            com.blacklab.app.ui.components.SheetAction("Open details", Icons.Rounded.OpenInFull) { shell.go("task/${t.id}") },
+            com.blacklab.app.ui.components.SheetAction("Due today", Icons.Rounded.Today) { app.io { TaskOps.save(app, t.copy(dueDay = today)) } },
+            com.blacklab.app.ui.components.SheetAction("Due tomorrow", Icons.Rounded.EventAvailable) { app.io { TaskOps.save(app, t.copy(dueDay = today + 1)) } },
+            com.blacklab.app.ui.components.SheetAction("Raise priority", Icons.Rounded.PriorityHigh, hint = "Now: " + listOf("none", "low", "medium", "high", "urgent")[t.priority.coerceIn(0, 4)]) {
                 app.io { TaskOps.save(app, t.copy(priority = (t.priority + 1).coerceAtMost(4))) }
             },
-            com.blacklab.app.ui.components.SheetAction("Duplicate", Icons.Default.ContentCopy) { app.io { TaskOps.save(app, t.copy(id = 0, completed = false, createdAt = Time.now(), updatedAt = Time.now())) } },
-            com.blacklab.app.ui.components.SheetAction("Share", Icons.Default.Share) {
+            com.blacklab.app.ui.components.SheetAction("Duplicate", Icons.Rounded.ContentCopy) { app.io { TaskOps.save(app, t.copy(id = 0, completed = false, createdAt = Time.now(), updatedAt = Time.now())) } },
+            com.blacklab.app.ui.components.SheetAction("Share", Icons.Rounded.Share) {
                 com.blacklab.app.core.Files.shareText(shell.nav.context, buildString { append(t.title); if (t.notes.isNotBlank()) append("\n\n").append(t.notes); steps.forEach { append("\n• ").append(it.title) } }, t.title)
             },
         ),
@@ -332,21 +338,28 @@ fun TaskRow(t: TaskEntity, steps: List<SubtaskEntity>, list: TaskListEntity?, sh
     Surface(
         shape = RoundedCornerShape(18.dp),
         color = MaterialTheme.colorScheme.surfaceContainer,
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 3.dp).clip(RoundedCornerShape(18.dp))
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 3.dp).clip(RoundedCornerShape(18.dp)).sharedCard("task-${t.id}")
             .pressable(onClick = { shell.go("task/${t.id}") }, onLongClick = { menu = true }),
     ) {
         Row(Modifier.padding(start = 6.dp, end = 4.dp, top = 8.dp, bottom = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-            // completion circle tinted by priority
+            // completion circle tinted by priority; flips at once (the save follows), with a springy check
+            var shown by remember(t.id, t.completed) { mutableStateOf(t.completed) }
+            val fill by androidx.compose.animation.animateColorAsState(if (shown) LocalBlColors.current.accent else Color.Transparent, com.blacklab.app.ui.theme.Motion.enter(180), label = "fill")
+            val checkScale by androidx.compose.animation.core.animateFloatAsState(if (shown) 1f else 0f, com.blacklab.app.ui.theme.Motion.settle(), label = "check")
             Box(
-                Modifier.size(44.dp).clip(CircleShape).clickable { app.io { TaskOps.setCompleted(app, t, !t.completed) } },
+                Modifier.size(44.dp).clip(CircleShape).clickable {
+                    shown = !shown
+                    if (shown) rowHaptics.confirm() else rowHaptics.tick()
+                    app.io { TaskOps.setCompleted(app, t, !t.completed) }
+                },
                 contentAlignment = Alignment.Center,
             ) {
                 Box(
                     Modifier.size(22.dp).clip(CircleShape)
-                        .background(if (t.completed) LocalBlColors.current.accent else Color.Transparent)
-                        .border(2.dp, if (t.completed) LocalBlColors.current.accent else if (t.priority > 0) pc else MaterialTheme.colorScheme.outline, CircleShape),
+                        .background(fill)
+                        .border(2.dp, if (shown) LocalBlColors.current.accent else if (t.priority > 0) pc else MaterialTheme.colorScheme.outline, CircleShape),
                     contentAlignment = Alignment.Center,
-                ) { if (t.completed) Icon(Icons.Default.Check, null, tint = MaterialTheme.colorScheme.onPrimary, modifier = Modifier.size(14.dp)) }
+                ) { Icon(Icons.Rounded.Check, null, tint = MaterialTheme.colorScheme.onPrimary, modifier = Modifier.size(14.dp).graphicsLayer { scaleX = checkScale; scaleY = checkScale; alpha = checkScale }) }
             }
             Column(Modifier.weight(1f).padding(vertical = 2.dp)) {
                 Text(
@@ -375,7 +388,7 @@ fun TaskRow(t: TaskEntity, steps: List<SubtaskEntity>, list: TaskListEntity?, sh
             }
             if (t.priority >= 3 && !t.completed) Pill(PriorityLabels[t.priority], pc, Modifier.padding(end = 2.dp))
             IconButton(onClick = { app.io { TaskOps.save(app, t.copy(important = !t.important)) } }) {
-                if (t.important) Icon(Icons.Default.Star, "Important", tint = Amber) else Icon(Icons.Outlined.StarBorder, "Mark important", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                if (t.important) Icon(Icons.Rounded.Star, "Important", tint = Amber) else Icon(Icons.Outlined.StarBorder, "Mark important", tint = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
     }
@@ -434,7 +447,7 @@ private fun QuickAddBar(filter: String, lists: List<TaskListEntity>) {
                 OutlinedTextField(
                     value = text, onValueChange = { text = it },
                     placeholder = { Text("Add a task") },
-                    leadingIcon = { Icon(Icons.Default.Add, null) },
+                    leadingIcon = { Icon(Icons.Rounded.Add, null) },
                     singleLine = true,
                     shape = RoundedCornerShape(24.dp),
                     keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences, imeAction = ImeAction.Done),
@@ -443,7 +456,7 @@ private fun QuickAddBar(filter: String, lists: List<TaskListEntity>) {
                         focusedIndicatorColor = Color.Transparent, unfocusedIndicatorColor = Color.Transparent),
                     modifier = Modifier.weight(1f),
                 )
-                if (text.isNotBlank()) IconButton(onClick = { submit() }) { Icon(Icons.Default.ArrowUpward, "Add", tint = MaterialTheme.colorScheme.primary) }
+                if (text.isNotBlank()) IconButton(onClick = { submit() }) { Icon(Icons.Rounded.ArrowUpward, "Add", tint = MaterialTheme.colorScheme.primary) }
             }
         }
     }
@@ -479,7 +492,7 @@ private fun PlanMyDaySheet(open: List<TaskEntity>, onDismiss: () -> Unit) {
                                 t.dueDay?.let { Text(Time.relativeDay(LocalDate.ofEpochDay(it)), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
                             }
                             TextButton(onClick = { app.io { TaskOps.save(app, t.copy(dueDay = today + 1, myDayDay = null)) } }) { Text("Tomorrow") }
-                            IconButton(onClick = { app.io { TaskOps.save(app, t.copy(myDayDay = today)) } }) { Icon(Icons.Default.AddCircle, "Add to My Day", tint = MaterialTheme.colorScheme.primary) }
+                            IconButton(onClick = { app.io { TaskOps.save(app, t.copy(myDayDay = today)) } }) { Icon(Icons.Rounded.AddCircle, "Add to My Day", tint = MaterialTheme.colorScheme.primary) }
                         }
                     }
                 }

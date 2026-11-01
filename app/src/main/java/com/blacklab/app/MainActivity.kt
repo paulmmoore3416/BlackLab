@@ -79,11 +79,17 @@ class MainActivity : FragmentActivity() {
 
     override fun onResume() {
         super.onResume()
+        com.blacklab.app.core.FrameStats.attach(this)
         val app = app
         com.blacklab.app.link.LinkService.sync(this)
         if (app.settings.current.cloudSync && System.currentTimeMillis() - com.blacklab.app.link.CloudSync.lastSync.value > 120_000) {
             app.appScope.launch { com.blacklab.app.link.CloudSync.sync(app) }
         }
+    }
+
+    override fun onPause() {
+        com.blacklab.app.core.FrameStats.detach(this)
+        super.onPause()
     }
 
     override fun onNewIntent(intent: Intent) {

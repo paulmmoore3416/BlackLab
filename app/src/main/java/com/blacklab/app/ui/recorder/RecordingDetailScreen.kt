@@ -20,7 +20,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.rounded.*
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
@@ -109,13 +109,13 @@ fun RecordingDetailScreen(id: Long) {
     Scaffold(topBar = {
         BlTopBar(r?.title ?: "Recording", subtitle = r?.let { Time.dateTime(it.createdAt) }, onBack = { shell.back() }, actions = {
             if (r != null) {
-                IconButton(onClick = { dialog = "rename" }) { Icon(Icons.Default.DriveFileRenameOutline, "Rename") }
-                IconButton(onClick = { Files.share(ctx, listOf(app.storage.resolve(r.filePath)), r.title) }) { Icon(Icons.Default.Share, "Share") }
-                IconButton(onClick = { dialog = "delete" }) { Icon(Icons.Default.Delete, "Delete") }
+                IconButton(onClick = { dialog = "rename" }) { Icon(Icons.Rounded.DriveFileRenameOutline, "Rename") }
+                IconButton(onClick = { Files.share(ctx, listOf(app.storage.resolve(r.filePath)), r.title) }) { Icon(Icons.Rounded.Share, "Share") }
+                IconButton(onClick = { dialog = "delete" }) { Icon(Icons.Rounded.Delete, "Delete") }
             }
         })
     }) { pad ->
-        if (r == null) { Box(Modifier.padding(pad)) { EmptyState(Icons.Default.GraphicEq, "Recording not found", "It may have been deleted.") }; return@Scaffold }
+        if (r == null) { Box(Modifier.padding(pad)) { EmptyState(Icons.Rounded.GraphicEq, "Recording not found", "It may have been deleted.") }; return@Scaffold }
         val file = app.storage.resolve(r.filePath)
         val markers = r.markers.lines().mapNotNull { l -> l.split('|', limit = 2).takeIf { it.size == 2 }?.let { (it[0].toLongOrNull() ?: 0L) to it[1] } }
         Column(Modifier.padding(pad).fillMaxSize().imePadding().verticalScroll(rememberScrollState()).padding(horizontal = 16.dp)) {
@@ -124,18 +124,18 @@ fun RecordingDetailScreen(id: Long) {
                 Spacer(Modifier.height(10.dp))
                 Slider(value = if (duration > 0) position.toFloat() / duration else 0f, onValueChange = { player.seekTo((it * duration).toLong()) })
                 Row {
-                    Text(Time.duration(position), style = MaterialTheme.typography.labelMedium)
+                    Text(Time.duration(position), style = MaterialTheme.typography.labelMedium.merge(com.blacklab.app.ui.theme.MonoDigits))
                     Spacer(Modifier.weight(1f))
                     Text(Time.duration(duration.takeIf { it > 0 } ?: r.durationMs), style = MaterialTheme.typography.labelMedium)
                 }
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly, verticalAlignment = Alignment.CenterVertically) {
-                    IconButton(onClick = { player.seekTo((player.currentPosition - 10_000).coerceAtLeast(0)) }) { Icon(Icons.Default.Replay10, "Back 10s", Modifier.size(32.dp)) }
+                    IconButton(onClick = { player.seekTo((player.currentPosition - 10_000).coerceAtLeast(0)) }) { Icon(Icons.Rounded.Replay10, "Back 10s", Modifier.size(32.dp)) }
                     Box(Modifier.size(72.dp).clip(CircleShape).background(MaterialTheme.colorScheme.primary).clickable {
                         if (player.isPlaying) player.pause() else { if (player.playbackState == Player.STATE_ENDED) player.seekTo(0); player.play() }
                     }, contentAlignment = Alignment.Center) {
-                        Icon(if (playing) Icons.Default.Pause else Icons.Default.PlayArrow, "Play", tint = MaterialTheme.colorScheme.onPrimary, modifier = Modifier.size(40.dp))
+                        Icon(if (playing) Icons.Rounded.Pause else Icons.Rounded.PlayArrow, "Play", tint = MaterialTheme.colorScheme.onPrimary, modifier = Modifier.size(40.dp))
                     }
-                    IconButton(onClick = { player.seekTo(player.currentPosition + 30_000) }) { Icon(Icons.Default.Forward30, "Forward 30s", Modifier.size(32.dp)) }
+                    IconButton(onClick = { player.seekTo(player.currentPosition + 30_000) }) { Icon(Icons.Rounded.Forward30, "Forward 30s", Modifier.size(32.dp)) }
                 }
                 Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     listOf(0.5f, 0.75f, 1f, 1.25f, 1.5f, 1.75f, 2f, 2.5f, 3f).forEach { sp ->
@@ -151,7 +151,7 @@ fun RecordingDetailScreen(id: Long) {
             if (markers.isEmpty()) Text("Tap “Add marker” while recording or here during playback.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             markers.forEach { (ms, label) ->
                 Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).clickable { player.seekTo(ms); player.play() }.padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Default.Flag, null, tint = LocalBlColors.current.warning, modifier = Modifier.size(18.dp))
+                    Icon(Icons.Rounded.Flag, null, tint = LocalBlColors.current.warning, modifier = Modifier.size(18.dp))
                     Spacer(Modifier.width(10.dp))
                     Text(Time.duration(ms), fontWeight = FontWeight.Bold, modifier = Modifier.width(64.dp))
                     Text(label, Modifier.weight(1f))
@@ -181,7 +181,7 @@ fun RecordingDetailScreen(id: Long) {
                             shell.toast(err ?: if (text.isBlank()) "No speech recognized" else "Transcript added")
                         }
                     }
-                }) { Icon(Icons.Default.Subtitles, null); Spacer(Modifier.width(6.dp)); Text("Transcribe (beta)") }
+                }) { Icon(Icons.Rounded.Subtitles, null); Spacer(Modifier.width(6.dp)); Text("Transcribe (beta)") }
                 OutlinedButton(enabled = transcript.isNotBlank(), onClick = {
                     app.io {
                         val profile = Profile.from(r.profile)

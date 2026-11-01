@@ -41,9 +41,9 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.RotateLeft
-import androidx.compose.material.icons.automirrored.filled.RotateRight
-import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.automirrored.rounded.RotateLeft
+import androidx.compose.material.icons.automirrored.rounded.RotateRight
+import androidx.compose.material.icons.rounded.*
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
@@ -245,19 +245,19 @@ fun PdfViewerScreen(original: File, startSign: Boolean = false) {
 
     Scaffold(topBar = {
         BlTopBar(original.nameWithoutExtension, subtitle = d?.let { "Page ${currentPage + 1} of ${it.pageCount}" + if (wasLocked) " · 🔒 unlocked" else "" } ?: "PDF", onBack = { shell.back() }, actions = {
-            IconButton(onClick = { dialog = "search" }) { Icon(Icons.Default.Search, "Search") }
-            IconButton(onClick = { mode = if (mode == "grid") "read" else "grid" }) { Icon(if (mode == "grid") Icons.Default.ViewAgenda else Icons.Default.GridView, "Pages") }
-            IconButton(onClick = { annotatePage = currentPage; mode = "annotate" }) { Icon(Icons.Default.Draw, "Mark up & sign") }
+            IconButton(onClick = { dialog = "search" }) { Icon(Icons.Rounded.Search, "Search") }
+            IconButton(onClick = { mode = if (mode == "grid") "read" else "grid" }) { Icon(if (mode == "grid") Icons.Rounded.ViewAgenda else Icons.Rounded.GridView, "Pages") }
+            IconButton(onClick = { annotatePage = currentPage; mode = "annotate" }) { Icon(Icons.Rounded.Draw, "Mark up & sign") }
             FileMenu(original, buildList {
-                add(MenuItem("Organize pages", Icons.Default.Dashboard) { mode = "organize" })
-                add(MenuItem("Merge with other PDFs or photos", Icons.Default.MergeType) { mergePicker.launch(arrayOf("application/pdf", "image/*")) })
-                add(MenuItem("Split / extract pages", Icons.Default.CallSplit) { dialog = "split" })
-                add(MenuItem("Fill in form", Icons.Default.EditNote) { dialog = "form" })
-                add(MenuItem("Add watermark", Icons.Default.BrandingWatermark) { dialog = "watermark" })
-                add(MenuItem("Add page numbers", Icons.Default.FormatListNumbered) { dialog = "numbers" })
-                if (wasLocked) add(MenuItem("Remove password", Icons.Default.LockOpen) { runTool("Removing password", "_unlocked") { src, out -> src.copyTo(out, true) } })
-                else add(MenuItem("Protect with password", Icons.Default.Lock) { dialog = "protect" })
-                add(MenuItem("Save pages as pictures", Icons.Default.Image) {
+                add(MenuItem("Organize pages", Icons.Rounded.Dashboard) { mode = "organize" })
+                add(MenuItem("Merge with other PDFs or photos", Icons.Rounded.MergeType) { mergePicker.launch(arrayOf("application/pdf", "image/*")) })
+                add(MenuItem("Split / extract pages", Icons.Rounded.CallSplit) { dialog = "split" })
+                add(MenuItem("Fill in form", Icons.Rounded.EditNote) { dialog = "form" })
+                add(MenuItem("Add watermark", Icons.Rounded.BrandingWatermark) { dialog = "watermark" })
+                add(MenuItem("Add page numbers", Icons.Rounded.FormatListNumbered) { dialog = "numbers" })
+                if (wasLocked) add(MenuItem("Remove password", Icons.Rounded.LockOpen) { runTool("Removing password", "_unlocked") { src, out -> src.copyTo(out, true) } })
+                else add(MenuItem("Protect with password", Icons.Rounded.Lock) { dialog = "protect" })
+                add(MenuItem("Save pages as pictures", Icons.Rounded.Image) {
                     val src = viewFile ?: return@MenuItem
                     busy = "Rendering pages…"
                     scope.launch {
@@ -267,9 +267,9 @@ fun PdfViewerScreen(original: File, startSign: Boolean = false) {
                         r.onSuccess { shell.toast("Saved ${it.size} picture(s) to Photos › ${dir.name}") }.onFailure { shell.toast("Couldn't render pages") }
                     }
                 })
-                add(MenuItem("Reduce file size", Icons.Default.Compress) { dialog = "compress" })
-                add(MenuItem("Copy text / save as .txt", Icons.Default.TextSnippet) { dialog = "text" })
-                add(MenuItem("Convert to BlackLab document", Icons.Default.Description) {
+                add(MenuItem("Reduce file size", Icons.Rounded.Compress) { dialog = "compress" })
+                add(MenuItem("Copy text / save as .txt", Icons.Rounded.TextSnippet) { dialog = "text" })
+                add(MenuItem("Convert to BlackLab document", Icons.Rounded.Description) {
                     val t = texts ?: return@MenuItem
                     app.io {
                         val html = t.mapIndexed { i, p -> "<h3>Page ${i + 1}</h3>" + ContentStore.textToHtml(p.trim()) }.joinToString("")
@@ -277,13 +277,13 @@ fun PdfViewerScreen(original: File, startSign: Boolean = false) {
                         withContext(Dispatchers.Main) { if (id != null) shell.go("doc/$id") else shell.toast("Couldn't convert") }
                     }
                 })
-                add(MenuItem("Properties", Icons.Default.Tune) { dialog = "props" })
-                add(MenuItem(if (night) "Normal colors" else "Night mode", Icons.Default.DarkMode) { night = !night })
+                add(MenuItem("Properties", Icons.Rounded.Tune) { dialog = "props" })
+                add(MenuItem(if (night) "Normal colors" else "Night mode", Icons.Rounded.DarkMode) { night = !night })
             })
         })
     }) { pad ->
         Box(Modifier.padding(pad).fillMaxSize().background(MaterialTheme.colorScheme.surfaceContainerLowest)) {
-            if (d == null) { if (!askPassword) CircularProgressIndicator(Modifier.align(Alignment.Center)); return@Box }
+            if (d == null) { if (!askPassword) com.blacklab.app.ui.components.SkeletonPage(Modifier.padding(12.dp)); return@Box }
             if (mode == "grid") {
                 LazyVerticalGrid(GridCells.Adaptive(110.dp), contentPadding = PaddingValues(12.dp), horizontalArrangement = Arrangement.spacedBy(10.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     items(d.pageCount) { i ->
@@ -524,7 +524,7 @@ private fun PasswordDialog(name: String, onDismiss: () -> Unit, onOk: (String) -
     var pw by remember { mutableStateOf("") }
     AlertDialog(
         onDismissRequest = onDismiss,
-        icon = { Icon(Icons.Default.Lock, null) },
+        icon = { Icon(Icons.Rounded.Lock, null) },
         title = { Text("Password required") },
         text = {
             Column {
@@ -554,7 +554,7 @@ private fun PdfSearchDialog(texts: List<String>?, onDismiss: () -> Unit, onGo: (
         title = { Text("Search") },
         text = {
             Column {
-                OutlinedTextField(q, { q = it }, Modifier.fillMaxWidth(), singleLine = true, placeholder = { Text("Find in document") }, leadingIcon = { Icon(Icons.Default.Search, null) })
+                OutlinedTextField(q, { q = it }, Modifier.fillMaxWidth(), singleLine = true, placeholder = { Text("Find in document") }, leadingIcon = { Icon(Icons.Rounded.Search, null) })
                 if (texts == null) Text("Reading text…", Modifier.padding(top = 8.dp))
                 else if (q.length >= 2) Text("${hits.size} result(s)", style = MaterialTheme.typography.labelMedium, modifier = Modifier.padding(top = 8.dp))
                 LazyColumn(Modifier.height(320.dp)) {
@@ -593,7 +593,7 @@ private fun PdfFormDialog(file: File?, onDismiss: () -> Unit, onFill: (Map<Strin
         text = {
             Column(Modifier.verticalScroll(rememberScrollState())) {
                 when {
-                    fields == null -> CircularProgressIndicator()
+                    fields == null -> com.blacklab.app.ui.components.SkeletonRows(3)
                     fields!!.isEmpty() -> Text("This PDF has no fillable fields. Use Mark up & sign to type text anywhere on a page.")
                     else -> {
                         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -604,7 +604,7 @@ private fun PdfFormDialog(file: File?, onDismiss: () -> Unit, onFill: (Map<Strin
                                     if (v.isNotBlank()) { values[f.name] = v; n++ }
                                 }
                                 filledNote = if (n > 0) "Filled $n field(s) from your details. Check them before saving." else "Nothing to fill: add your details, or the field names weren't recognized."
-                            }) { Icon(Icons.Default.AutoAwesome, null, Modifier.size(18.dp)); Spacer(Modifier.width(6.dp)); Text("Auto-fill my details") }
+                            }) { Icon(Icons.Rounded.AutoAwesome, null, Modifier.size(18.dp)); Spacer(Modifier.width(6.dp)); Text("Auto-fill my details") }
                             TextButton(onClick = { editDetails = true }) { Text("My details") }
                         }
                         filledNote?.let { Text(it, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(bottom = 6.dp)) }
@@ -618,7 +618,7 @@ private fun PdfFormDialog(file: File?, onDismiss: () -> Unit, onFill: (Map<Strin
                                     }
                                     val img = images[f.name]
                                     if (img != null) androidx.compose.foundation.Image(img.asImageBitmap(), "Signature", Modifier.size(width = 110.dp, height = 40.dp).background(Color.White, RoundedCornerShape(8.dp)).clickable { signFor = f.name }.padding(4.dp))
-                                    else androidx.compose.material3.OutlinedButton(onClick = { signFor = f.name }) { Icon(Icons.Default.Draw, null, Modifier.size(18.dp)); Spacer(Modifier.width(6.dp)); Text("Sign here") }
+                                    else androidx.compose.material3.OutlinedButton(onClick = { signFor = f.name }) { Icon(Icons.Rounded.Draw, null, Modifier.size(18.dp)); Spacer(Modifier.width(6.dp)); Text("Sign here") }
                                 }
                                 f.type == "check" -> Row(verticalAlignment = Alignment.CenterVertically) { Checkbox(values[f.name] == "Yes", { values[f.name] = if (it) "Yes" else "Off" }); Text(label(f)) }
                                 f.type == "radio" || f.type == "choice" -> ChoiceField(label(f), f.options, values[f.name].orEmpty()) { values[f.name] = it }
@@ -626,7 +626,7 @@ private fun PdfFormDialog(file: File?, onDismiss: () -> Unit, onFill: (Map<Strin
                                     supportingText = slot?.let { sl -> { Text(sl.label, style = MaterialTheme.typography.labelSmall) } },
                                     trailingIcon = slot?.takeIf { values[f.name].isNullOrBlank() }?.let { sl -> {
                                         val v = com.blacklab.app.core.FormAutofill.valueFor(sl, profile)
-                                        if (v.isNotBlank()) IconButton(onClick = { values[f.name] = v }) { Icon(Icons.Default.AutoAwesome, "Fill with ${sl.label.lowercase()}") }
+                                        if (v.isNotBlank()) IconButton(onClick = { values[f.name] = v }) { Icon(Icons.Rounded.AutoAwesome, "Fill with ${sl.label.lowercase()}") }
                                     } })
                             }
                         }
@@ -704,13 +704,13 @@ private fun PdfOrganizer(d: PdfDoc, onCancel: () -> Unit, onSave: (List<PageRef>
     }, bottomBar = {
         Row(Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.surfaceContainer).padding(6.dp), horizontalArrangement = Arrangement.SpaceEvenly) {
             val any = selected.isNotEmpty()
-            OrgAction(Icons.AutoMirrored.Filled.RotateLeft, "Left", any) { selected.forEach { pages[it] = pages[it].copy(rotate = (pages[it].rotate + 270) % 360) } }
-            OrgAction(Icons.AutoMirrored.Filled.RotateRight, "Right", any) { selected.forEach { pages[it] = pages[it].copy(rotate = (pages[it].rotate + 90) % 360) } }
-            OrgAction(Icons.Default.ArrowBack, "Earlier", any) { move(-1) }
-            OrgAction(Icons.Default.ArrowForward, "Later", any) { move(1) }
-            OrgAction(Icons.Default.ContentCopy, "Duplicate", any) { selected.sortedDescending().forEach { pages.add(it + 1, pages[it]) }; selected = emptySet() }
-            OrgAction(Icons.Default.Delete, "Delete", any && selected.size < pages.size) { selected.sortedDescending().forEach { pages.removeAt(it) }; selected = emptySet() }
-            OrgAction(Icons.Default.Output, "Extract", any) { onSave(selected.sorted().map { pages[it] }, true) }
+            OrgAction(Icons.AutoMirrored.Rounded.RotateLeft, "Left", any) { selected.forEach { pages[it] = pages[it].copy(rotate = (pages[it].rotate + 270) % 360) } }
+            OrgAction(Icons.AutoMirrored.Rounded.RotateRight, "Right", any) { selected.forEach { pages[it] = pages[it].copy(rotate = (pages[it].rotate + 90) % 360) } }
+            OrgAction(Icons.Rounded.ArrowBack, "Earlier", any) { move(-1) }
+            OrgAction(Icons.Rounded.ArrowForward, "Later", any) { move(1) }
+            OrgAction(Icons.Rounded.ContentCopy, "Duplicate", any) { selected.sortedDescending().forEach { pages.add(it + 1, pages[it]) }; selected = emptySet() }
+            OrgAction(Icons.Rounded.Delete, "Delete", any && selected.size < pages.size) { selected.sortedDescending().forEach { pages.removeAt(it) }; selected = emptySet() }
+            OrgAction(Icons.Rounded.Output, "Extract", any) { onSave(selected.sorted().map { pages[it] }, true) }
         }
     }) { pad ->
         LazyVerticalGrid(GridCells.Adaptive(104.dp), Modifier.padding(pad), contentPadding = PaddingValues(12.dp), horizontalArrangement = Arrangement.spacedBy(10.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -722,7 +722,7 @@ private fun PdfOrganizer(d: PdfDoc, onCancel: () -> Unit, onSave: (List<PageRef>
                     Box(Modifier.size(92.dp), contentAlignment = Alignment.Center) {
                         val (w, h) = d.sizes[ref.index]
                         PageImage(d, ref.index, 220, false, Modifier.rotate(ref.rotate.toFloat()).aspectRatio(w.toFloat() / h).border(if (sel) 2.dp else 0.5.dp, if (sel) MaterialTheme.colorScheme.primary else Color.Gray))
-                        if (sel) Icon(Icons.Default.CheckCircle, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.align(Alignment.TopEnd).size(20.dp).clip(CircleShape).background(Color.White))
+                        if (sel) Icon(Icons.Rounded.CheckCircle, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.align(Alignment.TopEnd).size(20.dp).clip(CircleShape).background(Color.White))
                     }
                     Text("${pos + 1}" + if (ref.index != pos) " (p${ref.index + 1})" else "", style = MaterialTheme.typography.labelSmall)
                 }

@@ -1,5 +1,6 @@
 package com.blacklab.app.ui.settings
 
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import android.content.Intent
 import android.net.Uri
 import android.provider.Settings as AndroidSettings
@@ -15,11 +16,11 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Autorenew
-import androidx.compose.material.icons.filled.Cancel
-import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.automirrored.filled.OpenInNew
-import androidx.compose.material.icons.filled.SystemUpdate
+import androidx.compose.material.icons.rounded.Autorenew
+import androidx.compose.material.icons.rounded.Cancel
+import androidx.compose.material.icons.rounded.CheckCircle
+import androidx.compose.material.icons.automirrored.rounded.OpenInNew
+import androidx.compose.material.icons.rounded.SystemUpdate
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilledTonalButton
@@ -73,7 +74,8 @@ fun UpdatesScreen() {
     val signer = remember { Updater.installedSigner(ctx) }
     val colors = LocalBlColors.current
 
-    Scaffold(topBar = { BlTopBar("App updates", onBack = { shell.back() }) }) { pad ->
+    val titleScroll = com.blacklab.app.ui.components.rememberCollapsingTitle()
+    Scaffold(Modifier.nestedScroll(titleScroll.nestedScrollConnection), topBar = { BlTopBar("App updates", onBack = { shell.back() }, scrollBehavior = titleScroll, large = true) }) { pad ->
         Column(Modifier.padding(pad).fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 16.dp)) {
             BlCard(Modifier.fillMaxWidth().padding(top = 8.dp)) {
                 Text("BlackLab ${BuildConfig.VERSION_NAME}", style = MaterialTheme.typography.titleMedium)
@@ -86,24 +88,24 @@ fun UpdatesScreen() {
                 Spacer(Modifier.size(10.dp))
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     FilledTonalButton(onClick = { scope.launch { Updater.check(ctx) } }, enabled = state !is State.Checking && state !is State.Downloading && state !is State.Installing) {
-                        Icon(Icons.Default.Autorenew, null, Modifier.size(18.dp)); Spacer(Modifier.size(8.dp)); Text("Check now")
+                        Icon(Icons.Rounded.Autorenew, null, Modifier.size(18.dp)); Spacer(Modifier.size(8.dp)); Text("Check now")
                     }
                     if (state is State.Checking) { Spacer(Modifier.size(12.dp)); CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp) }
                 }
             }
 
             when (val st = state) {
-                is State.UpToDate -> StatusCard(Icons.Default.CheckCircle, colors.success, "You're up to date",
+                is State.UpToDate -> StatusCard(Icons.Rounded.CheckCircle, colors.success, "You're up to date",
                     "The latest release on GitHub is ${st.latest}.")
                 is State.Failed -> {
-                    StatusCard(Icons.Default.Cancel, colors.danger, "Update stopped", st.message)
+                    StatusCard(Icons.Rounded.Cancel, colors.danger, "Update stopped", st.message)
                     st.release?.let { ReleaseCard(it) }
                 }
                 is State.Available -> {
                     ReleaseCard(st.release)
                     Row(Modifier.padding(top = 10.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         Button(onClick = { scope.launch { Updater.download(ctx, st.release) } }) {
-                            Icon(Icons.Default.SystemUpdate, null, Modifier.size(18.dp)); Spacer(Modifier.size(8.dp))
+                            Icon(Icons.Rounded.SystemUpdate, null, Modifier.size(18.dp)); Spacer(Modifier.size(8.dp))
                             Text("Download & verify" + if (st.release.apkSize > 0) " (${Files.formatSize(st.release.apkSize)})" else "")
                         }
                         TextButton(onClick = { app.settings.update { putString(Keys.UPDATE_SKIP, st.release.version) }; Updater.state.value = State.Idle }) { Text("Skip this version") }
@@ -147,7 +149,7 @@ fun UpdatesScreen() {
             }
 
             SectionHeader("Settings")
-            LabeledSwitchRow("Check for updates weekly", "Asks GitHub once a week and notifies you. Nothing downloads without your OK.", s.updateAuto, icon = Icons.Default.Autorenew) { v ->
+            LabeledSwitchRow("Check for updates weekly", "Asks GitHub once a week and notifies you. Nothing downloads without your OK.", s.updateAuto, icon = Icons.Rounded.Autorenew) { v ->
                 app.settings.update { putBoolean(Keys.UPDATE_AUTO, v) }
             }
             if (s.updateSkip.isNotBlank()) TextButton(onClick = { app.settings.update { putString(Keys.UPDATE_SKIP, "") } }) { Text("Stop skipping version ${s.updateSkip}") }
@@ -184,7 +186,7 @@ private fun ReleaseCard(r: Updater.Release) {
                     style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
             if (Updater.isAllowedUrl(r.pageUrl)) androidx.compose.material3.IconButton(onClick = { ctx.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(r.pageUrl))) }) {
-                Icon(Icons.AutoMirrored.Filled.OpenInNew, "Open on GitHub")
+                Icon(Icons.AutoMirrored.Rounded.OpenInNew, "Open on GitHub")
             }
         }
         if (r.notes.isNotBlank()) Text(r.notes.take(4000), style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 8.dp))
@@ -195,7 +197,7 @@ private fun ReleaseCard(r: Updater.Release) {
 private fun Check(ok: Boolean, text: String) {
     val c = LocalBlColors.current
     Row(Modifier.padding(top = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-        Icon(if (ok) Icons.Default.CheckCircle else Icons.Default.Cancel, null, Modifier.size(16.dp), tint = if (ok) c.success else c.danger)
+        Icon(if (ok) Icons.Rounded.CheckCircle else Icons.Rounded.Cancel, null, Modifier.size(16.dp), tint = if (ok) c.success else c.danger)
         Spacer(Modifier.size(8.dp)); Text(text, style = MaterialTheme.typography.bodySmall)
     }
 }

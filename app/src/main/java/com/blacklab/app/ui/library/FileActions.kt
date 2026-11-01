@@ -7,7 +7,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.rounded.*
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -78,23 +78,23 @@ fun FileActionHost(file: File?, onDismiss: () -> Unit, onChanged: () -> Unit = {
                     contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
             }) else ({ Icon(iconFor(f), null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.fillMaxSize()) }),
             quick = buildList {
-                if (image) add(SheetAction("Edit", Icons.Default.Edit) { edit("crop") })
-                add(SheetAction("Share", Icons.Default.Share) { Files.share(ctx, listOf(f)) })
-                add(SheetAction("Details", Icons.Default.Info) { step = "info" })
-                add(SheetAction("Delete", Icons.Default.Delete, destructive = true) { step = "delete" })
+                if (image) add(SheetAction("Edit", Icons.Rounded.Edit) { edit("crop") })
+                add(SheetAction("Share", Icons.Rounded.Share) { Files.share(ctx, listOf(f)) })
+                add(SheetAction("Details", Icons.Rounded.Info) { step = "info" })
+                add(SheetAction("Delete", Icons.Rounded.Delete, destructive = true) { step = "delete" })
             },
             actions = buildList {
                 val kind = com.blacklab.app.files.FileKinds.of(f)
                 add(SheetAction(when (kind) { com.blacklab.app.files.FileKind.VIDEO, com.blacklab.app.files.FileKind.AUDIO -> "Play"; else -> "Open in BlackLab" },
-                    when (kind) { com.blacklab.app.files.FileKind.VIDEO, com.blacklab.app.files.FileKind.AUDIO -> Icons.Default.PlayArrow; else -> Icons.Default.OpenInFull },
+                    when (kind) { com.blacklab.app.files.FileKind.VIDEO, com.blacklab.app.files.FileKind.AUDIO -> Icons.Rounded.PlayArrow; else -> Icons.Rounded.OpenInFull },
                     hint = kind.label + if (kind.editable) " · view & edit" else " · view") { com.blacklab.app.ui.viewer.openInApp(shell, app, f) })
                 if (video) {
-                    add(SheetAction("Edit video", Icons.Default.VideoSettings, hint = "Trim, split, filters, titles, music, speed") { shell.go("videoedit?path=" + Uri.encode(rel)) })
-                    add(SheetAction("Extract audio", Icons.Default.AudioFile, hint = "Save the soundtrack as .m4a") { shell.go("audioedit?path=" + Uri.encode(rel)) })
+                    add(SheetAction("Edit video", Icons.Rounded.VideoSettings, hint = "Trim, split, filters, titles, music, speed") { shell.go("videoedit?path=" + Uri.encode(rel)) })
+                    add(SheetAction("Extract audio", Icons.Rounded.AudioFile, hint = "Save the soundtrack as .m4a") { shell.go("audioedit?path=" + Uri.encode(rel)) })
                 }
-                if (kind == com.blacklab.app.files.FileKind.AUDIO) add(SheetAction("Edit audio", Icons.Default.GraphicEq, hint = "Trim, fade, normalize, speed, effects") { shell.go("audioedit?path=" + Uri.encode(rel)) })
-                if (kind == com.blacklab.app.files.FileKind.SHEET || com.blacklab.app.files.FileKinds.isTextLike(kind)) add(SheetAction("Edit as text", Icons.Default.Code) { shell.go("view?path=" + Uri.encode(rel) + "&text=true") })
-                if (kind != com.blacklab.app.files.FileKind.ARCHIVE) add(SheetAction("Compress to ZIP", Icons.Default.FolderZip) {
+                if (kind == com.blacklab.app.files.FileKind.AUDIO) add(SheetAction("Edit audio", Icons.Rounded.GraphicEq, hint = "Trim, fade, normalize, speed, effects") { shell.go("audioedit?path=" + Uri.encode(rel)) })
+                if (kind == com.blacklab.app.files.FileKind.SHEET || com.blacklab.app.files.FileKinds.isTextLike(kind)) add(SheetAction("Edit as text", Icons.Rounded.Code) { shell.go("view?path=" + Uri.encode(rel) + "&text=true") })
+                if (kind != com.blacklab.app.files.FileKind.ARCHIVE) add(SheetAction("Compress to ZIP", Icons.Rounded.FolderZip) {
                     app.io {
                         val out = Files.unique(f.parentFile!!, f.nameWithoutExtension, "zip")
                         val ok = runCatching { com.blacklab.app.files.FileOps.zip(listOf(f), out); app.storage.scan(out) }.isSuccess
@@ -102,18 +102,18 @@ fun FileActionHost(file: File?, onDismiss: () -> Unit, onChanged: () -> Unit = {
                     }
                 })
                 if (image) {
-                    add(SheetAction("Crop & rotate", Icons.Default.Crop, hint = "Aspect ratios, straighten, flip") { edit("crop") })
-                    add(SheetAction("Adjust light & color", Icons.Default.Tune, hint = "Exposure, contrast, warmth, vignette") { edit("adjust") })
-                    add(SheetAction("Draw & mark up", Icons.Default.Brush, hint = "Pen, highlighter, arrows, boxes, circles") { edit("draw") })
-                    add(SheetAction("Add text", Icons.Default.TextFields, hint = "Fonts, colors, bold, italic, underline, cursive") { edit("text") })
-                    add(SheetAction("Looks & filters", Icons.Default.AutoAwesome, hint = "1970s, Noir, Cinematic and more") { edit("looks") })
-                    add(SheetAction("Add watermark", Icons.Default.BrandingWatermark) { edit("watermark") })
-                    add(SheetAction("Remove background", Icons.Default.ContentCut, hint = "On-device subject cut-out") { edit("cutout") })
-                    add(SheetAction("Extract text (OCR)", Icons.Default.TextSnippet) {
+                    add(SheetAction("Crop & rotate", Icons.Rounded.Crop, hint = "Aspect ratios, straighten, flip") { edit("crop") })
+                    add(SheetAction("Adjust light & color", Icons.Rounded.Tune, hint = "Exposure, contrast, warmth, vignette") { edit("adjust") })
+                    add(SheetAction("Draw & mark up", Icons.Rounded.Brush, hint = "Pen, highlighter, arrows, boxes, circles") { edit("draw") })
+                    add(SheetAction("Add text", Icons.Rounded.TextFields, hint = "Fonts, colors, bold, italic, underline, cursive") { edit("text") })
+                    add(SheetAction("Looks & filters", Icons.Rounded.AutoAwesome, hint = "1970s, Noir, Cinematic and more") { edit("looks") })
+                    add(SheetAction("Add watermark", Icons.Rounded.BrandingWatermark) { edit("watermark") })
+                    add(SheetAction("Remove background", Icons.Rounded.ContentCut, hint = "On-device subject cut-out") { edit("cutout") })
+                    add(SheetAction("Extract text (OCR)", Icons.Rounded.TextSnippet) {
                         app.io { val t = Ocr.recognize(ctx, f); withContext(Dispatchers.Main) { ocr = t; step = "ocr" } }
                         step = "wait"
                     })
-                    add(SheetAction("Make a photo report", Icons.Default.NoteAdd, hint = "New document with this picture") {
+                    add(SheetAction("Make a photo report", Icons.Rounded.NoteAdd, hint = "New document with this picture") {
                         app.io {
                             val profile = app.settings.current.activeProfile
                             val data = EditorController.imageDataUri(f) ?: return@io
@@ -126,11 +126,11 @@ fun FileActionHost(file: File?, onDismiss: () -> Unit, onChanged: () -> Unit = {
                         }
                     })
                 }
-                if (gps != null) add(SheetAction("Show on map", Icons.Default.Map, hint = String.format(Locale.US, "%.5f, %.5f", gps[0], gps[1])) { openMap(ctx, gps[0], gps[1], f.nameWithoutExtension) })
-                if (onSelect != null) add(SheetAction("Select", Icons.Default.CheckCircle, hint = "Pick several to share or delete") { onSelect(f) })
-                add(SheetAction("Rename", Icons.Default.DriveFileRenameOutline) { step = "rename" })
-                add(SheetAction("Open with…", Icons.Default.OpenInNew) { Files.open(ctx, f) })
-                add(SheetAction("Copy path", Icons.Default.ContentCopy, hint = "BlackLab/$rel") {
+                if (gps != null) add(SheetAction("Show on map", Icons.Rounded.Map, hint = String.format(Locale.US, "%.5f, %.5f", gps[0], gps[1])) { openMap(ctx, gps[0], gps[1], f.nameWithoutExtension) })
+                if (onSelect != null) add(SheetAction("Select", Icons.Rounded.CheckCircle, hint = "Pick several to share or delete") { onSelect(f) })
+                add(SheetAction("Rename", Icons.Rounded.DriveFileRenameOutline) { step = "rename" })
+                add(SheetAction("Open with…", Icons.Rounded.OpenInNew) { Files.open(ctx, f) })
+                add(SheetAction("Copy path", Icons.Rounded.ContentCopy, hint = "BlackLab/$rel") {
                     ctx.getSystemService(android.content.ClipboardManager::class.java)?.setPrimaryClip(android.content.ClipData.newPlainText("Path", f.absolutePath))
                     shell.toast("Path copied")
                 })

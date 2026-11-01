@@ -1,5 +1,6 @@
 package com.blacklab.app.ui.settings
 
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import android.os.Build
 import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.clickable
@@ -18,12 +19,12 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.BugReport
-import androidx.compose.material.icons.filled.ContentCopy
-import androidx.compose.material.icons.filled.DeleteSweep
-import androidx.compose.material.icons.filled.HourglassBottom
-import androidx.compose.material.icons.filled.Memory
-import androidx.compose.material.icons.filled.Share
+import androidx.compose.material.icons.rounded.BugReport
+import androidx.compose.material.icons.rounded.ContentCopy
+import androidx.compose.material.icons.rounded.DeleteSweep
+import androidx.compose.material.icons.rounded.HourglassBottom
+import androidx.compose.material.icons.rounded.Memory
+import androidx.compose.material.icons.rounded.Share
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -65,8 +66,9 @@ fun DiagnosticsScreen() {
     var confirmClear by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) { CrashLog.markSeen(ctx) }
 
-    Scaffold(topBar = {
-        BlTopBar("Problem reports", onBack = { shell.back() }, showMenu = false)
+    val titleScroll = com.blacklab.app.ui.components.rememberCollapsingTitle()
+    Scaffold(Modifier.nestedScroll(titleScroll.nestedScrollConnection), topBar = {
+        BlTopBar("Problem reports", onBack = { shell.back() }, showMenu = false, scrollBehavior = titleScroll, large = true)
     }) { pad ->
         LazyColumn(Modifier.padding(pad).fillMaxSize().padding(horizontal = 16.dp)) {
             item {
@@ -79,11 +81,31 @@ fun DiagnosticsScreen() {
                         style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 6.dp))
                     if (entries.isNotEmpty()) Row(Modifier.padding(top = 6.dp)) {
                         TextButton(onClick = { Files.share(ctx, listOf(CrashLog.exportAll(ctx)), "BlackLab problem reports") }) {
-                            Icon(Icons.Default.Share, null, Modifier.size(18.dp)); Spacer(Modifier.size(6.dp)); Text("Share all")
+                            Icon(Icons.Rounded.Share, null, Modifier.size(18.dp)); Spacer(Modifier.size(6.dp)); Text("Share all")
                         }
                         TextButton(onClick = { confirmClear = true }) {
-                            Icon(Icons.Default.DeleteSweep, null, Modifier.size(18.dp)); Spacer(Modifier.size(6.dp)); Text("Delete all")
+                            Icon(Icons.Rounded.DeleteSweep, null, Modifier.size(18.dp)); Spacer(Modifier.size(6.dp)); Text("Delete all")
                         }
+                    }
+                }
+            }
+            item {
+                // Smoothness meter (this session, in memory only)
+                var snap by remember { mutableStateOf(com.blacklab.app.core.FrameStats.snapshot()) }
+                var all by remember { mutableStateOf(com.blacklab.app.core.FrameStats.overall()) }
+                BlCard(Modifier.fillMaxWidth().padding(top = 10.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text("Smoothness this session", style = MaterialTheme.typography.titleSmall, modifier = Modifier.weight(1f))
+                        TextButton(onClick = { snap = com.blacklab.app.core.FrameStats.snapshot(); all = com.blacklab.app.core.FrameStats.overall() }) { Text("Refresh") }
+                    }
+                    if (all.frames < 30) Text("Use the app for a bit and come back.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    else {
+                        Text("%.1f%% of %,d frames on time".format(all.smoothPct, all.frames), style = MaterialTheme.typography.bodyMedium)
+                        snap.take(3).filter { it.smoothPct < 99.5 }.forEach { sc ->
+                            Text("${sc.route}: %.1f%% smooth (%,d frames)".format(sc.smoothPct, sc.frames), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                        Text("Counted on this phone only; a frame is late when it takes over 1.5× the screen's refresh time.", style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 4.dp))
                     }
                 }
             }
@@ -94,7 +116,7 @@ fun DiagnosticsScreen() {
                 val expanded = open == e.file.name
                 BlCard(Modifier.fillMaxWidth().padding(top = 10.dp).animateContentSize(), onClick = { open = if (expanded) null else e.file.name }) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(when (e.kind) { "ANR" -> Icons.Default.HourglassBottom; "Native crash" -> Icons.Default.Memory; else -> Icons.Default.BugReport }, null,
+                        Icon(when (e.kind) { "ANR" -> Icons.Rounded.HourglassBottom; "Native crash" -> Icons.Rounded.Memory; else -> Icons.Rounded.BugReport }, null,
                             tint = LocalBlColors.current.danger)
                         Spacer(Modifier.size(10.dp))
                         Column(Modifier.weight(1f)) {
@@ -102,8 +124,8 @@ fun DiagnosticsScreen() {
                             Text(e.title, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = if (expanded) 4 else 2)
                         }
                         if (expanded) {
-                            IconButton(onClick = { clipboard.setText(AnnotatedString(e.text())); shell.toast("Report copied") }) { Icon(Icons.Default.ContentCopy, "Copy") }
-                            IconButton(onClick = { Files.share(ctx, listOf(e.file), "BlackLab problem report") }) { Icon(Icons.Default.Share, "Share") }
+                            IconButton(onClick = { clipboard.setText(AnnotatedString(e.text())); shell.toast("Report copied") }) { Icon(Icons.Rounded.ContentCopy, "Copy") }
+                            IconButton(onClick = { Files.share(ctx, listOf(e.file), "BlackLab problem report") }) { Icon(Icons.Rounded.Share, "Share") }
                         }
                     }
                     if (expanded) {

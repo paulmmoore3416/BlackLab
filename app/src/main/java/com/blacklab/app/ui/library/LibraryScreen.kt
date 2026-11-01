@@ -30,8 +30,8 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.automirrored.rounded.ArrowBack
+import androidx.compose.material.icons.rounded.*
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
@@ -110,11 +110,11 @@ fun LibraryScreen(initialTab: String) {
 
     Scaffold(topBar = {
         BlTopBar("Library", subtitle = if (app.storage.isPublic) "Internal storage › BlackLab › ${app.settings.profileName(s.activeProfile)}" else "App storage", actions = {
-            IconButton(onClick = { shell.go("create") }) { Icon(Icons.Default.AddCircle, "Create & edit") }
-            IconButton(onClick = { shell.go("music") }) { Icon(Icons.Default.LibraryMusic, "Music") }
-            IconButton(onClick = { shell.go("camera") }) { Icon(Icons.Default.PhotoCamera, "Camera") }
-            IconButton(onClick = { scanner() }) { Icon(Icons.Default.DocumentScanner, "Scan") }
-            IconButton(onClick = { importer.launch(arrayOf("*/*")) }) { Icon(Icons.Default.Upload, "Import") }
+            IconButton(onClick = { shell.go("create") }) { Icon(Icons.Rounded.AddCircle, "Create & edit") }
+            IconButton(onClick = { shell.go("music") }) { Icon(Icons.Rounded.LibraryMusic, "Music") }
+            IconButton(onClick = { shell.go("camera") }) { Icon(Icons.Rounded.PhotoCamera, "Camera") }
+            IconButton(onClick = { scanner() }) { Icon(Icons.Rounded.DocumentScanner, "Scan") }
+            IconButton(onClick = { importer.launch(arrayOf("*/*")) }) { Icon(Icons.Rounded.Upload, "Import") }
         })
     }) { pad ->
         Column(Modifier.padding(pad).fillMaxSize()) {
@@ -161,15 +161,15 @@ private fun MediaGrid(dir: File, refresh: Int, onChanged: () -> Unit) {
     var confirmDelete by remember { mutableStateOf(false) }
     var menuFile by remember { mutableStateOf<File?>(null) }
     FileActionHost(menuFile, onDismiss = { menuFile = null }, onChanged = onChanged, onSelect = { selected = selected + it })
-    if (files.isEmpty()) { EmptyState(Icons.Default.PhotoLibrary, "Nothing here yet", "Capture with the BlackLab camera — everything is saved to ${dir.name}.") ; return }
+    if (files.isEmpty()) { EmptyState(Icons.Rounded.PhotoLibrary, "Nothing here yet", "Capture with the BlackLab camera — everything is saved to ${dir.name}.") ; return }
     Column {
         if (selected.isNotEmpty()) Row(Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.surfaceContainerHigh).padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-            IconButton(onClick = { selected = emptySet() }) { Icon(Icons.Default.Close, "Clear") }
+            IconButton(onClick = { selected = emptySet() }) { Icon(Icons.Rounded.Close, "Clear") }
             Text("${selected.size} selected", Modifier.weight(1f))
-            IconButton(onClick = { selected = if (selected.size == files.size) emptySet() else files.toSet() }) { Icon(Icons.Default.SelectAll, "Select all") }
-            IconButton(onClick = { Files.share(ctx, selected.toList()) }) { Icon(Icons.Default.Share, "Share") }
+            IconButton(onClick = { selected = if (selected.size == files.size) emptySet() else files.toSet() }) { Icon(Icons.Rounded.SelectAll, "Select all") }
+            IconButton(onClick = { Files.share(ctx, selected.toList()) }) { Icon(Icons.Rounded.Share, "Share") }
             SelectionMore(selected.toList(), onDone = { selected = emptySet(); onChanged() })
-            IconButton(onClick = { confirmDelete = true }) { Icon(Icons.Default.Delete, "Delete") }
+            IconButton(onClick = { confirmDelete = true }) { Icon(Icons.Rounded.Delete, "Delete") }
         }
         val grouped = files.groupBy { Time.monthYear(Time.toDate(it.lastModified())) }
         LazyVerticalGrid(GridCells.Adaptive(108.dp), contentPadding = PaddingValues(4.dp, 4.dp, 4.dp, 96.dp), horizontalArrangement = Arrangement.spacedBy(3.dp), verticalArrangement = Arrangement.spacedBy(3.dp)) {
@@ -187,8 +187,8 @@ private fun MediaGrid(dir: File, refresh: Int, onChanged: () -> Unit) {
                             model = ImageRequest.Builder(ctx).data(f).size(320).apply { if (f.isVideo()) decoderFactory(VideoFrameDecoder.Factory()) }.crossfade(true).build(),
                             contentDescription = f.name, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize(),
                         )
-                        if (f.isVideo()) Icon(Icons.Default.PlayCircle, null, tint = Color.White, modifier = Modifier.align(Alignment.Center).size(32.dp))
-                        if (sel) Icon(Icons.Default.CheckCircle, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.align(Alignment.TopEnd).padding(4.dp))
+                        if (f.isVideo()) Icon(Icons.Rounded.PlayCircle, null, tint = Color.White, modifier = Modifier.align(Alignment.Center).size(32.dp))
+                        if (sel) Icon(Icons.Rounded.CheckCircle, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.align(Alignment.TopEnd).padding(4.dp))
                     }
                 }
             }
@@ -221,7 +221,7 @@ private fun FileList(start: File, refresh: Int, browse: Boolean, onChanged: () -
         if (browse) item {
             BlCard(Modifier.fillMaxWidth().padding(vertical = 6.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    if (dir != start) IconButton(onClick = { dir.parentFile?.let { dir = it } }) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Up") }
+                    if (dir != start) IconButton(onClick = { dir.parentFile?.let { dir = it } }) { Icon(Icons.AutoMirrored.Rounded.ArrowBack, "Up") }
                     Column(Modifier.weight(1f)) {
                         Text(("BlackLab/" + dir.relativeTo(start).path).trimEnd('/'), style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
                         stats?.let { (bytes, count) -> Text("$count files · ${Files.formatSize(bytes)} · ${Files.formatSize(app.storage.freeBytes())} free on device", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
@@ -232,7 +232,7 @@ private fun FileList(start: File, refresh: Int, browse: Boolean, onChanged: () -
                 }
             }
         }
-        if (entries.isEmpty()) item { EmptyState(Icons.Default.FolderOpen, "Empty folder", "Files saved here will appear in this list.") }
+        if (entries.isEmpty()) item { EmptyState(Icons.Rounded.FolderOpen, "Empty folder", "Files saved here will appear in this list.") }
         items(entries, key = { it.path }) { f ->
             Row(
                 Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).pressable(onClick = {
@@ -253,26 +253,26 @@ private fun FileList(start: File, refresh: Int, browse: Boolean, onChanged: () -
                     Text(if (f.isDirectory) "${f.listFiles()?.size ?: 0} items" else "${Files.formatSize(f.length())} · ${Time.ago(f.lastModified())}",
                         style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
-                if (f.isFile) IconButton(onClick = { menu = f }) { Icon(Icons.Default.MoreVert, "More") }
+                if (f.isFile) IconButton(onClick = { menu = f }) { Icon(Icons.Rounded.MoreVert, "More") }
             }
         }
     }
 }
 
 fun iconFor(f: File) = when (com.blacklab.app.files.FileKinds.of(f)) {
-    com.blacklab.app.files.FileKind.FOLDER -> Icons.Default.Folder
-    com.blacklab.app.files.FileKind.IMAGE -> Icons.Default.Image
-    com.blacklab.app.files.FileKind.VIDEO -> Icons.Default.Movie
-    com.blacklab.app.files.FileKind.AUDIO -> Icons.Default.AudioFile
-    com.blacklab.app.files.FileKind.PDF -> Icons.Default.PictureAsPdf
-    com.blacklab.app.files.FileKind.WORD, com.blacklab.app.files.FileKind.RTF, com.blacklab.app.files.FileKind.ODT, com.blacklab.app.files.FileKind.TEXT -> Icons.Default.Description
-    com.blacklab.app.files.FileKind.MARKDOWN, com.blacklab.app.files.FileKind.CODE, com.blacklab.app.files.FileKind.HTML -> Icons.Default.Code
-    com.blacklab.app.files.FileKind.SHEET -> Icons.Default.TableChart
-    com.blacklab.app.files.FileKind.SLIDES -> Icons.Default.Slideshow
-    com.blacklab.app.files.FileKind.EPUB -> Icons.Default.MenuBook
-    com.blacklab.app.files.FileKind.ARCHIVE -> Icons.Default.FolderZip
-    com.blacklab.app.files.FileKind.CALENDAR -> Icons.Default.Event
-    else -> Icons.Default.InsertDriveFile
+    com.blacklab.app.files.FileKind.FOLDER -> Icons.Rounded.Folder
+    com.blacklab.app.files.FileKind.IMAGE -> Icons.Rounded.Image
+    com.blacklab.app.files.FileKind.VIDEO -> Icons.Rounded.Movie
+    com.blacklab.app.files.FileKind.AUDIO -> Icons.Rounded.AudioFile
+    com.blacklab.app.files.FileKind.PDF -> Icons.Rounded.PictureAsPdf
+    com.blacklab.app.files.FileKind.WORD, com.blacklab.app.files.FileKind.RTF, com.blacklab.app.files.FileKind.ODT, com.blacklab.app.files.FileKind.TEXT -> Icons.Rounded.Description
+    com.blacklab.app.files.FileKind.MARKDOWN, com.blacklab.app.files.FileKind.CODE, com.blacklab.app.files.FileKind.HTML -> Icons.Rounded.Code
+    com.blacklab.app.files.FileKind.SHEET -> Icons.Rounded.TableChart
+    com.blacklab.app.files.FileKind.SLIDES -> Icons.Rounded.Slideshow
+    com.blacklab.app.files.FileKind.EPUB -> Icons.Rounded.MenuBook
+    com.blacklab.app.files.FileKind.ARCHIVE -> Icons.Rounded.FolderZip
+    com.blacklab.app.files.FileKind.CALENDAR -> Icons.Rounded.Event
+    else -> Icons.Rounded.InsertDriveFile
 }
 
 /** Overflow for multi-selected photos/videos: one PDF, one video montage, or a ZIP. */
@@ -282,9 +282,9 @@ private fun SelectionMore(files: List<File>, onDone: () -> Unit) {
     val shell = LocalShell.current
     val ctx = LocalContext.current
     var open by remember { mutableStateOf(false) }
-    IconButton(onClick = { open = true }) { Icon(Icons.Default.MoreVert, "More") }
+    IconButton(onClick = { open = true }) { Icon(Icons.Rounded.MoreVert, "More") }
     DropdownMenu(open, { open = false }) {
-        if (files.all { it.isImage() }) DropdownMenuItem(text = { Text("Make a PDF") }, leadingIcon = { Icon(Icons.Default.PictureAsPdf, null) }, onClick = {
+        if (files.all { it.isImage() }) DropdownMenuItem(text = { Text("Make a PDF") }, leadingIcon = { Icon(Icons.Rounded.PictureAsPdf, null) }, onClick = {
             open = false
             app.io {
                 val out = runCatching {
@@ -296,12 +296,12 @@ private fun SelectionMore(files: List<File>, onDone: () -> Unit) {
                 withContext(Dispatchers.Main) { onDone(); if (out != null) com.blacklab.app.ui.viewer.openInApp(shell, app, out) else shell.toast("Couldn't build the PDF") }
             }
         })
-        DropdownMenuItem(text = { Text("Make a video") }, leadingIcon = { Icon(Icons.Default.Movie, null) }, onClick = {
+        DropdownMenuItem(text = { Text("Make a video") }, leadingIcon = { Icon(Icons.Rounded.Movie, null) }, onClick = {
             open = false
             val paths = files.sortedBy { it.lastModified() }.joinToString("|") { Uri.encode(app.storage.relative(it)) }
             onDone(); shell.go("videoedit?paths=" + Uri.encode(paths))
         })
-        DropdownMenuItem(text = { Text("Compress to ZIP") }, leadingIcon = { Icon(Icons.Default.FolderZip, null) }, onClick = {
+        DropdownMenuItem(text = { Text("Compress to ZIP") }, leadingIcon = { Icon(Icons.Rounded.FolderZip, null) }, onClick = {
             open = false
             app.io {
                 val out = Files.unique(app.storage.dir(app.settings.current.activeProfile, Folder.EXPORTS), "BlackLab ${files.size} items", "zip")
