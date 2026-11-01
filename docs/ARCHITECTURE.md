@@ -128,6 +128,27 @@ device can't keep HDR with effects it retries with HDR→SDR tone-mapping.
 - On start it imports `ApplicationExitInfo` records newer than the last import: ANR (with the thread dump), native crash, excessive resource use and start-up failure. The first run only sets the baseline.
 - Unseen and announced timestamps drive the Settings badge and a one-time "a report was saved" snackbar. Sharing goes through `FileProvider`.
 
+## Signatures & forms
+
+- `core/Signatures` stores signatures and initials as PNGs encrypted with AES-256-GCM under a Keystore key (`blacklab_signatures_v1`), in `filesDir/signatures` with a JSON index (one default per kind). The 4.1–4.3 unencrypted `signature.png` is migrated, overwritten and deleted on first use. `files/signatures/` is excluded from backup and device transfer.
+- `ui/signature`: `SignatureCaptureDialog` (raw pointer input, so strokes start on touch; quadratic smoothing; or typed in a script font) → trimmed transparent PNG. `SignatureGate` requires biometric/device credential (3-minute grace) when *Confirm before signing* is on. `SignatureChooserDialog` and `SignaturePickerRow` are shared by PDF markup, the document editor (data-URI `<img>`, exported to PDF/DOCX) and notebook pages (scaled picture asset).
+- *Sign a document* (`SignDocs.toPdf`): PDF is copied; images go through `PdfTools.imagesToPdf`; DOCX/RTF/Markdown/HTML/text go `DocImporter` → `DocExporter` (PDF). The result lands in `Documents/Signed` and opens with `view?…&sign=true`, which starts `PdfAnnotator` on the Sign tool.
+- **Forms.** `PdfTools.formFields` reports text, check, choice, radio and signature fields with tooltips. `core/FormAutofill` normalizes field names ("Applicant_LastName" → "applicant last name") and maps them to profile slots. `fillForm` draws values into appearance streams (`NeedAppearances` off, `refreshAppearances` before `flatten`) and draws images inside signature widgets.
+
+## Theme & live Home
+
+- `ui/theme/AccentPalette`: nine palettes with light and dark shades of accent, complementary secondary and tertiary (all ≥ 4.5:1). `ThemeChoice` comes from settings, one palette per account plus an optional secondary override. Light schemes get matching containers and faintly accent-tinted surfaces. Dark selections use an accent tint unless a secondary was picked.
+- `core/AutoTheme`: NOAA sunrise/sunset from the rounded last-known location, or custom hours. `rememberThemeMode` resolves AUTO/SCHEDULE to DARK/LIGHT, re-checked by `rememberNow()`.
+- `ui/components/LiveClock`:
+  - `rememberNow()` ticks on minute boundaries, on resume and on time, date or zone changes.
+  - `rememberDeviceCalendarVersion()` observes `CalendarContract` with debouncing.
+  - Home uses both to filter today's agenda live.
+- `core/ActivityFeed` builds "Since you last looked" from existing timestamps: task completedAt/createdAt/reminderAt, event createdAt, recordings, document updatedAt, notes and guest comments. The window runs from the last Home visit (stored per account), capped at 3 days.
+- `core/IncomingGuard` filters what other apps send to the exported `MainActivity`:
+  - refuses `file://` and `content://` links into BlackLab's private storage;
+  - drops deep-link routes that carry file paths;
+  - accepts only the "brief me" assistant request.
+
 ## Testing & CI
 
 - JVM tests (`app/src/test`) cover pure logic. On-device tests (`app/src/androidTest`) run against the debug build's real container and clean up after themselves.

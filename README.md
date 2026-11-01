@@ -156,6 +156,11 @@ Rich-text entries saved as dated files, mood tracking, tags & location, favorite
 - **Pomodoro focus timer** that survives app restarts, study-time analytics and weekly goals
 - **Flashcards** with SM-2 spaced repetition
 
+### 🎨 Look & feel
+- Nine color palettes per account (Mint, Cobalt, Violet, Coral, Rose, Forest, Amber, Ocean, Graphite), each with a complementary secondary color; pick your own secondary; live light/dark preview; all WCAG AA contrast
+- Dark, light, system, or **automatic** (sunset to sunrise, worked out on the phone, or your own hours)
+- **Live Home dashboard**: finished events drop off, *NOW* marks what's on, tasks done today are counted, your phone's calendar updates as it syncs, and **Since you last looked** lists what happened while you were away
+
 ### 🔐 Accounts, privacy & storage
 - Personal / Professional accounts with separate data and folders; default account at launch
 - Optional **biometric / device-credential lock** for the app and/or the Professional account
@@ -232,7 +237,7 @@ keyPassword=…
 scripts/secret-scan.sh                      # fails if a key, token or keystore is tracked
 ```
 
-CI runs the secret scan, unit tests, both builds and the on-device tests on an Android 15 emulator for every push and pull request. The on-device tests cover the database upgrade, pictures on pages and every export format, notebook import, voice recording, location reminders, the widgets, update verification and the crash log.
+CI runs the secret scan, unit tests, both builds and the on-device tests on an Android 15 emulator for every push and pull request. The on-device tests cover the database upgrade, pictures on pages and every export format, notebook import, voice recording, location reminders, the widgets, update verification, the crash log, the PDF tools, encrypted signatures and signing, and filling and signing a real PDF form.
 
 ### Publishing a release
 
@@ -266,7 +271,8 @@ app/src/main/java/com/blacklab/app/
 ├── brainstorm/  Notebook pages, section encryption, templates, notes, place reminders, Live Share
 ├── capture/     Write-only quick capture opened by the widgets
 ├── assistant/   Assistant router, Gemini Nano, voice, Google APIs, local index, keys
-├── core/        Profiles, settings + settings schema, storage, time & recurrence, backups, crash log
+├── core/        Profiles, settings + schema, storage, time & recurrence, backups, crash log,
+│                encrypted signatures, form auto-fill, activity feed, auto theme, intent guard
 ├── data/        Room entities/DAOs, calendar logic, task ops, grades, SRS
 ├── link/        Desktop link server, data snapshot, Google Drive cloud sync
 ├── docs/        HTML ⇄ blocks model, DOCX writer/reader, PDF writer, Markdown
@@ -279,7 +285,7 @@ app/src/main/java/com/blacklab/app/
 ├── widgets/     Today, Checklist and Quick capture home-screen widgets
 └── ui/          Compose screens (home, camera, recorder, library, documents,
                  editor, journal, tasks, schedule, education, settings, onboarding, assistant,
-                 brainstorm)
+                 brainstorm, signature, theme palettes)
 desktop/
 ├── web/         BlackLab Desktop UI (also published to GitHub Pages)
 └── companion/   Local companion: serves the UI, USB link, offline desktop assistant
@@ -290,6 +296,8 @@ desktop/
 BlackLab has no backend and collects no analytics of its own — documents, recordings, photos and your database stay on the device. The assistant only reaches Google or ElevenLabs when you use an online feature (and never in offline-only mode). Desktop cloud sync uses the hidden app-data folder in your own Google Drive. API keys are stored encrypted on the phone and in `~/.config/blacklab-desktop/secrets.json` (mode 600) on the computer — never in this repository.
 
 **Disclosure:** the document scanner, QR/barcode scanner and OCR run on-device through Google Play services (ML Kit). Those Google libraries add the `INTERNET` / `ACCESS_NETWORK_STATE` permissions and, per Google’s ML Kit terms, may send anonymous usage and performance metrics to Google. They do not upload your images or text.
+
+**Signatures & form details:** saved signatures are encrypted with a key held in the phone's Android Keystore, kept out of backups and sync, and placed only after a fingerprint check (by default). Contact details for forms stay on the phone. The automatic theme uses the last known location rounded to ~10 km, computed on the phone.
 
 **Updates & problem reports:** the update check is a single anonymous request to GitHub's public API, made only when you tap *Check now* or turn on the weekly check. Problem reports stay in the app's private storage (not in backups) until you share them.
 
