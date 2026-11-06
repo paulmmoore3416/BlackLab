@@ -1,5 +1,6 @@
 package com.blacklab.app.ui.tasks
 
+import com.blacklab.app.ui.theme.readable
 import com.blacklab.app.ui.components.sharedCard
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
@@ -388,7 +389,7 @@ fun TaskRow(t: TaskEntity, steps: List<SubtaskEntity>, list: TaskListEntity?, sh
             }
             if (t.priority >= 3 && !t.completed) Pill(PriorityLabels[t.priority], pc, Modifier.padding(end = 2.dp))
             IconButton(onClick = { app.io { TaskOps.save(app, t.copy(important = !t.important)) } }) {
-                if (t.important) Icon(Icons.Rounded.Star, "Important", tint = Amber) else Icon(Icons.Outlined.StarBorder, "Mark important", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                if (t.important) Icon(Icons.Rounded.Star, "Important", tint = Amber.readable()) else Icon(Icons.Outlined.StarBorder, "Mark important", tint = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
     }

@@ -1,5 +1,6 @@
 package com.blacklab.app.ui.tasks
 
+import com.blacklab.app.ui.theme.readable
 import com.blacklab.app.ui.components.sharedCard
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -130,7 +131,7 @@ fun TaskDetailScreen(id: Long) {
                 onBack = { leave() },
                 actions = {
                     if (t != null) IconButton(onClick = { task = t.copy(important = !t.important) }) {
-                        if (t.important) Icon(Icons.Rounded.Star, "Important", tint = Amber) else Icon(Icons.Outlined.StarBorder, "Important")
+                        if (t.important) Icon(Icons.Rounded.Star, "Important", tint = Amber.readable()) else Icon(Icons.Outlined.StarBorder, "Important")
                     }
                     IconButton(onClick = { dialog = "delete" }) { Icon(Icons.Rounded.Delete, "Delete") }
                 },

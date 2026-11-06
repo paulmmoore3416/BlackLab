@@ -1,5 +1,6 @@
 package com.blacklab.app.ui.bh
 
+import com.blacklab.app.ui.theme.readable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -146,7 +147,7 @@ private fun PlanDialog(g: Bh.GroupPlan, onDismiss: () -> Unit, onRun: () -> Unit
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) { Pill(g.category, Amber); Pill("${g.minutes} min", Cobalt) }
             started.value?.let { t ->
                 val m = (now - t) / 60_000; val left = g.minutes - m
-                Text("Running · $m min in · ${if (left >= 0) "$left min left" else "${-left} min over"}", fontWeight = FontWeight.SemiBold, color = if (left < 5) Amber else Mint)
+                Text("Running · $m min in · ${if (left >= 0) "$left min left" else "${-left} min over"}", fontWeight = FontWeight.SemiBold, color = (if (left < 5) Amber else Mint).readable())
             }
             block("Objective", g.objective); block("Opening", g.opener); block("Activity", g.activity)
             if (g.discussion.isNotEmpty()) { Text("Discussion", style = MaterialTheme.typography.labelLarge); g.discussion.forEach { Text("• $it", style = MaterialTheme.typography.bodyMedium) } }

@@ -2,6 +2,22 @@
 
 All notable changes to BlackLab are documented here. The project follows [Semantic Versioning](https://semver.org/).
 
+## [5.2.0] — 2026-11-05
+
+A sharper, more readable light mode, more ways to make it yours, and eight new color palettes.
+
+### Added
+- **Light mode styles** (Settings › Appearance › Colors): **Clean** (soft gray page, crisp white cards), **Pure white**, **Warm paper** (cream, easy on the eyes at night), **Cool mist** (blue-gray) and **Accent wash** (your main color tints the page). Each has a live mini preview.
+- **Stronger contrast**: WCAG AAA (7:1) text and accent colors with darker borders, in light and dark mode.
+- **Eight new palettes**: Aurora, Crimson, Midnight, Sage, Copper, Lime, Plum and Sky — 17 in all, each with a complementary secondary and a tertiary color tuned for light and dark.
+- Eight more colors for lists, calendars and other color pickers, and six more notebook section colors.
+
+### Changed
+- **Light-mode contrast**: accent colors used as text or icons (pills, badges, stat tiles, status labels, links) are darkened automatically wherever they'd fall below WCAG AA on the page. The main, secondary and tertiary colors are checked against each style's background too.
+- **Light-mode depth**: cards are brighter than the page, with a hairline border and a soft shadow, so they read as raised surfaces. Borders and dividers are darker (3:1 or better) and secondary text is deeper.
+- Dark-mode borders are a little more visible; the 988 button uses a deeper red so its white text meets AA.
+- The palette pickers wrap onto several rows, so every color is visible without scrolling.
+
 ## [5.1.0] — 2026-11-05
 
 A Behavioral Health workspace for working as a Mental Health Technician and Peer Support Specialist — encrypted on the phone, built with initials and aliases only.

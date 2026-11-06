@@ -1,5 +1,6 @@
 package com.blacklab.app.ui.bh
 
+import com.blacklab.app.ui.theme.readable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -289,7 +290,7 @@ private fun GoalDialog(g: Bh.Goal, isNew: Boolean, onDismiss: () -> Unit, onDele
                 OutlinedTextField(step, { step = it }, Modifier.weight(1f), placeholder = { Text("Add a small step") }, singleLine = true)
                 IconButton(enabled = step.isNotBlank(), onClick = { x = x.copy(steps = x.steps + Bh.Step(text = step.trim())); step = "" }) { Icon(Icons.Rounded.Add, "Add step") }
             }
-            if (!isNew) TextButton(onClick = { onDelete(); onDismiss() }) { Text("Delete goal", color = com.blacklab.app.ui.theme.Danger) }
+            if (!isNew) TextButton(onClick = { onDelete(); onDismiss() }) { Text("Delete goal", color = com.blacklab.app.ui.theme.Danger.readable()) }
         }
     }, confirmButton = { TextButton(enabled = x.text.isNotBlank(), onClick = { onSave(x.copy(steps = x.steps + listOfNotNull(step.takeIf { it.isNotBlank() }?.let { Bh.Step(text = it.trim()) }))); onDismiss() }) { Text("Save") } },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } })

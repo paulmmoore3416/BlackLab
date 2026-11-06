@@ -1,5 +1,6 @@
 package com.blacklab.app.ui.schedule
 
+import com.blacklab.app.ui.theme.readable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -138,7 +139,7 @@ fun EventEditorScreen(id: Long, start: Long?, allDayDefault: Boolean) {
             if (conflicts.isNotEmpty()) {
                 BlCard(Modifier.fillMaxWidth().padding(bottom = 8.dp), accent = Amber) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Rounded.Warning, null, tint = Amber)
+                        Icon(Icons.Rounded.Warning, null, tint = Amber.readable())
                         Spacer(Modifier.width(10.dp))
                         Column {
                             Text("Conflicts with ${conflicts.size} item(s)", style = MaterialTheme.typography.titleSmall)

@@ -49,7 +49,11 @@ object SettingsSchema {
 
     /** Mirrors ui/theme AccentPalette (kept here so settings don't depend on the UI layer). */
     private val PALETTES = arrayOf("MINT" to "Mint", "COBALT" to "Cobalt", "VIOLET" to "Violet", "CORAL" to "Coral", "ROSE" to "Rose",
-        "FOREST" to "Forest", "AMBER" to "Amber", "OCEAN" to "Ocean", "GRAPHITE" to "Graphite")
+        "FOREST" to "Forest", "AMBER" to "Amber", "OCEAN" to "Ocean", "GRAPHITE" to "Graphite", "AURORA" to "Aurora", "CRIMSON" to "Crimson",
+        "MIDNIGHT" to "Midnight", "SAGE" to "Sage", "COPPER" to "Copper", "LIME" to "Lime", "PLUM" to "Plum", "SKY" to "Sky")
+
+    /** Mirrors ui/theme LightStyle. */
+    private val LIGHT_STYLES = arrayOf("CLEAN" to "Clean", "PURE" to "Pure white", "WARM" to "Warm paper", "COOL" to "Cool mist", "WASH" to "Accent wash")
 
     private fun choice(key: String, label: String, help: String, default: String, vararg options: Pair<String, String>, advanced: Boolean = false) =
         Def(key, Store.STRING, label, help, "choice", options.toList(), default = default, advanced = advanced)
@@ -75,6 +79,8 @@ object SettingsSchema {
                 "DARK" to "Dark", "LIGHT" to "Light", "SYSTEM" to "System", "AUTO" to "Sunset to sunrise", "SCHEDULE" to "Custom hours"),
             time(Keys.THEME_DARK_FROM, "Dark from", "Custom hours: when the dark theme starts.", d.themeDarkFrom),
             time(Keys.THEME_DARK_TO, "Dark until", "Custom hours: when the light theme comes back.", d.themeDarkTo),
+            choice(Keys.LIGHT_STYLE, "Light mode style", "How the light theme's page and cards look.", d.lightStyle, *LIGHT_STYLES),
+            bool(Keys.HIGH_CONTRAST, "Stronger contrast", "Darker text and borders and deeper accents (WCAG AAA), in light and dark.", d.highContrast),
             bool(Keys.HAPTICS, "Haptic feedback", "Small vibrations when you complete, toggle, place or delete something.", d.haptics),
             bool(Keys.REDUCE_MOTION, "Reduce motion", "Shorter, simpler animations. Also follows the phone's \"Remove animations\" setting.", d.reduceMotion),
             bool(Keys.DYNAMIC_COLOR, "Material You colors", "Use wallpaper colors instead of the account accents.", d.dynamicColor),

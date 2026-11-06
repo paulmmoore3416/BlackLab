@@ -1,5 +1,6 @@
 package com.blacklab.app.ui.bh
 
+import com.blacklab.app.ui.theme.readable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -98,7 +99,7 @@ fun BhRoundsScreen() = BhGuarded {
                                 overdue.isNotEmpty() -> "${overdue.size} OVERDUE"
                                 next == null -> "Continuous observation only"
                                 else -> "Next check in " + mmss(next - now)
-                            }, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold, color = c)
+                            }, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold, color = c.readable())
                             Text(if (s.roundsOn) "Alerts ${if (s.prefs.roundAlerts) "on" else "off"} · overdue after ${s.prefs.graceMinutes} min grace" else "Turn on to start the timers and alerts",
                                 style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
@@ -135,7 +136,7 @@ fun BhRoundsScreen() = BhGuarded {
                         }
                         Column(horizontalAlignment = Alignment.End) {
                             Pill(p.obs, Cobalt)
-                            Text(label, style = MaterialTheme.typography.labelMedium, color = color, fontWeight = FontWeight.SemiBold)
+                            Text(label, style = MaterialTheme.typography.labelMedium, color = color.readable(), fontWeight = FontWeight.SemiBold)
                         }
                     }
                 }
@@ -227,7 +228,7 @@ private fun CheckDialog(p: Bh.Patient, last: Bh.Check?, s: Bh.State, onDismiss: 
     val history = s.checks.filter { it.patientId == p.id }.take(8)
     AlertDialog(onDismissRequest = onDismiss, title = { Text("${p.display} · ${p.obs}") }, text = {
         Column(Modifier.heightIn(max = 560.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            if (p.precautions.isNotEmpty()) Text(p.precautions.joinToString(" · "), style = MaterialTheme.typography.labelSmall, color = Amber)
+            if (p.precautions.isNotEmpty()) Text(p.precautions.joinToString(" · "), style = MaterialTheme.typography.labelSmall, color = Amber.readable())
             Text("Location", style = MaterialTheme.typography.labelLarge)
             ChipSelect(Library.CHECK_LOCATIONS, loc, { if (it.isNotEmpty()) loc = it }, single = true, collapseAfter = 8)
             Text("Behavior", style = MaterialTheme.typography.labelLarge)

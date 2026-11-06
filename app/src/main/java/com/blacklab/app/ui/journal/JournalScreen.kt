@@ -1,5 +1,6 @@
 package com.blacklab.app.ui.journal
 
+import com.blacklab.app.ui.theme.readable
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -300,7 +301,7 @@ private fun EntryCard(e: JournalEntity) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(e.title.ifBlank { "Untitled entry" }, style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
                     if (e.mood > 0) Text(Moods[e.mood].first, fontSize = 18.sp)
-                    if (e.favorite) Icon(Icons.Rounded.Star, null, tint = Amber, modifier = Modifier.size(16.dp))
+                    if (e.favorite) Icon(Icons.Rounded.Star, null, tint = Amber.readable(), modifier = Modifier.size(16.dp))
                 }
                 Text(e.preview.ifBlank { "…" }, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 3, overflow = TextOverflow.Ellipsis)
                 val tags = e.tags.split(',').map { it.trim() }.filter { it.isNotEmpty() }

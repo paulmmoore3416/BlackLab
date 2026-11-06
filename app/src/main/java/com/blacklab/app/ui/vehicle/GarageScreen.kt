@@ -1,5 +1,6 @@
 package com.blacklab.app.ui.vehicle
 
+import com.blacklab.app.ui.theme.readable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -308,7 +309,7 @@ private fun ItemDialog(item: Garage.ServiceItem, isCustom: Boolean, onDismiss: (
                 num("Months", sMonths, { sMonths = it }, modifier = Modifier.weight(1f))
             }
             OutlinedTextField(note, { note = it }, Modifier.fillMaxWidth(), label = { Text("Note") })
-            if (isCustom || item.name.isNotBlank()) TextButton(onClick = { onDelete(); onDismiss() }) { Text("Remove this item", color = Danger) }
+            if (isCustom || item.name.isNotBlank()) TextButton(onClick = { onDelete(); onDismiss() }) { Text("Remove this item", color = Danger.readable()) }
         }
     }, confirmButton = {
         TextButton(enabled = name.isNotBlank(), onClick = {

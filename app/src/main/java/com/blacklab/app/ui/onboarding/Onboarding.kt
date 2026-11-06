@@ -1,5 +1,6 @@
 package com.blacklab.app.ui.onboarding
 
+import com.blacklab.app.ui.theme.readable
 import android.Manifest
 import android.content.pm.PackageManager
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -141,7 +142,7 @@ fun OnboardingScreen() {
                         Spacer(Modifier.height(24.dp))
                         Header("Your two accounts", "Everything — files, tasks, calendars, courses — is kept separate per account.")
                         OutlinedTextField(personal, { personal = it }, label = { Text("Personal account name") }, singleLine = true, modifier = Modifier.fillMaxWidth(),
-                            leadingIcon = { Icon(Icons.Rounded.Person, null, tint = Mint) })
+                            leadingIcon = { Icon(Icons.Rounded.Person, null, tint = Mint.readable()) })
                         Spacer(Modifier.height(10.dp))
                         OutlinedTextField(professional, { professional = it }, label = { Text("Professional account name") }, singleLine = true, modifier = Modifier.fillMaxWidth(),
                             leadingIcon = { Icon(Icons.Rounded.Work, null, tint = com.blacklab.app.ui.theme.Cobalt) })

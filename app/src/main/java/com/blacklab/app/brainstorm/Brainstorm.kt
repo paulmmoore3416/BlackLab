@@ -77,7 +77,8 @@ object Brainstorm {
     @OptIn(ExperimentalCoroutinesApi::class)
     private val writer = Dispatchers.IO.limitedParallelism(1)
 
-    val SectionColors = listOf(0xFF7C5CFF, 0xFF4F8CFF, 0xFF2BD9A8, 0xFFFFB74D, 0xFFFF7A59, 0xFFEF5350, 0xFFAB47BC, 0xFF26C6DA, 0xFF9CCC65, 0xFF8D6E63).map { it.toInt() }
+    val SectionColors = listOf(0xFF7C5CFF, 0xFF4F8CFF, 0xFF2BD9A8, 0xFFFFB74D, 0xFFFF7A59, 0xFFEF5350, 0xFFAB47BC, 0xFF26C6DA, 0xFF9CCC65, 0xFF8D6E63,
+        0xFF3EE6C4, 0xFFE040FB, 0xFF536DFE, 0xFFE0955E, 0xFF7CC8FF, 0xFFB8F15A).map { it.toInt() }
 
     // ---------------------------------------------------------------- paths
     fun root(app: AppContainer, profile: Profile): File = app.storage.dir(profile, Folder.BRAINSTORM)

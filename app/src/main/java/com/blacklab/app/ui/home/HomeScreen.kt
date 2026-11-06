@@ -1,5 +1,6 @@
 package com.blacklab.app.ui.home
 
+import com.blacklab.app.ui.theme.readable
 import com.blacklab.app.ui.components.sharedCard
 import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.background
@@ -223,7 +224,7 @@ fun HomeScreen() {
                             app.speaker.speak(text)
                         }
                         shell.go("assistant")
-                    }) { Icon(Icons.Rounded.WbSunny, "Brief me", tint = Amber) }
+                    }) { Icon(Icons.Rounded.WbSunny, "Brief me", tint = Amber.readable()) }
                     androidx.compose.material3.FilledIconButton(onClick = { shell.go("assistant?listen=true") }) { Icon(Icons.Rounded.Mic, "Talk") }
                 }
             }
@@ -362,7 +363,7 @@ fun HomeScreen() {
                                     color = if (d < todayEpoch) LocalBlColors.current.danger else MaterialTheme.colorScheme.onSurfaceVariant)
                             }
                         }
-                        if (t.important) Icon(Icons.Rounded.Star, null, tint = Amber, modifier = Modifier.padding(end = 12.dp).size(18.dp))
+                        if (t.important) Icon(Icons.Rounded.Star, null, tint = Amber.readable(), modifier = Modifier.padding(end = 12.dp).size(18.dp))
                     }
                 }
             }
@@ -397,11 +398,11 @@ fun HomeScreen() {
                     }
                     certAlerts.take(2).forEach { c ->
                         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.clickable { shell.go("education?tab=Certifications") }.padding(vertical = 4.dp)) {
-                            Icon(Icons.Rounded.WorkspacePremium, null, tint = Amber, modifier = Modifier.size(20.dp))
+                            Icon(Icons.Rounded.WorkspacePremium, null, tint = Amber.readable(), modifier = Modifier.size(20.dp))
                             Spacer(Modifier.width(12.dp))
                             Text(c.name.substringBefore(" —"), Modifier.weight(1f), maxLines = 1)
                             Text(c.examAt?.takeIf { c.status != "EARNED" }?.let { "Exam ${Time.relativeDay(Time.toDate(it))}" } ?: "Renew in ${c.expiresDay!! - todayEpoch}d",
-                                style = MaterialTheme.typography.labelMedium, color = Amber)
+                                style = MaterialTheme.typography.labelMedium, color = Amber.readable())
                         }
                     }
                 }

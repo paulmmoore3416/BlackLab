@@ -21,6 +21,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Check
+import androidx.compose.material.icons.rounded.Contrast
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SegmentedButton
@@ -82,14 +83,14 @@ fun ColorChoices() {
         }
 
         Text("Main color", style = MaterialTheme.typography.labelLarge, modifier = Modifier.padding(top = 12.dp, bottom = 6.dp))
-        Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+        androidx.compose.foundation.layout.FlowRow(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             AccentPalette.entries.forEach { p ->
                 PaletteSwatch(p, dark, selected = p == palette) { app.settings.update { putString(accentKey, p.name) } }
             }
         }
 
         Text("Secondary color", style = MaterialTheme.typography.labelLarge, modifier = Modifier.padding(top = 12.dp, bottom = 6.dp))
-        Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
+        androidx.compose.foundation.layout.FlowRow(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.width(56.dp)) {
                 Dot(palette.secondary(dark), selected = secondaryKey == "AUTO", label = "Auto (complementary)") { app.settings.update { putString(secKey, "AUTO") } }
                 Text("Auto", style = MaterialTheme.typography.labelSmall, modifier = Modifier.padding(top = 3.dp))
@@ -102,8 +103,49 @@ fun ColorChoices() {
             }
         }
 
+        Text("Light mode style", style = MaterialTheme.typography.labelLarge, modifier = Modifier.padding(top = 14.dp, bottom = 6.dp))
+        Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            com.blacklab.app.ui.theme.LightStyle.entries.forEach { st ->
+                LightStyleSwatch(st, palette, selected = choice.lightStyle == st) { app.settings.update { putString(Keys.LIGHT_STYLE, st.name) } }
+            }
+        }
+        Text(choice.lightStyle.blurb + if (dark) " — shown when the light theme is on." else "", style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 4.dp))
+
+        com.blacklab.app.ui.components.LabeledSwitchRow("Stronger contrast", "Darker text and borders and deeper accents (WCAG AAA), in light and dark", s.highContrast,
+            icon = Icons.Rounded.Contrast) { v -> app.settings.update { putBoolean(Keys.HIGH_CONTRAST, v) } }
+
         Preview(choice, which, dark)
     }
+}
+
+/** A tiny page-and-card mock of a light style, with the main color as a button stripe. */
+@Composable
+private fun LightStyleSwatch(st: com.blacklab.app.ui.theme.LightStyle, palette: AccentPalette, selected: Boolean, onClick: () -> Unit) {
+    val page = palette.accent(false).copy(alpha = st.wash).compositeOverColor(Color(st.background))
+    Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.width(76.dp)) {
+        Box(
+            Modifier.size(width = 68.dp, height = 52.dp).clip(RoundedCornerShape(12.dp)).background(page)
+                .border(if (selected) 3.dp else 1.dp, if (selected) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.outline, RoundedCornerShape(12.dp))
+                .clickable(onClick = onClick)
+                .semantics { contentDescription = "${st.label} light style"; this.selected = selected }
+                .padding(8.dp),
+        ) {
+            Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(6.dp)).background(Color(st.card)).border(1.dp, Color(0xFFD3D7DE), RoundedCornerShape(6.dp)).padding(5.dp)) {
+                Box(Modifier.fillMaxWidth(0.8f).height(4.dp).clip(RoundedCornerShape(2.dp)).background(Color(st.ink)))
+                Spacer(Modifier.height(3.dp))
+                Box(Modifier.fillMaxWidth(0.55f).height(4.dp).clip(RoundedCornerShape(2.dp)).background(Color(st.inkSoft)))
+                Spacer(Modifier.height(4.dp))
+                Box(Modifier.fillMaxWidth().height(5.dp).clip(RoundedCornerShape(3.dp)).background(palette.accent(false)))
+            }
+        }
+        Text(st.label, style = MaterialTheme.typography.labelSmall, modifier = Modifier.padding(top = 3.dp), maxLines = 1)
+    }
+}
+
+private fun Color.compositeOverColor(bg: Color): Color {
+    val a = alpha
+    return Color(red * a + bg.red * (1 - a), green * a + bg.green * (1 - a), blue * a + bg.blue * (1 - a), 1f)
 }
 
 /** Main color as the circle, complementary secondary as the lower-right quarter. */
@@ -149,8 +191,8 @@ private fun Preview(choice: ThemeChoice, p: Profile, currentDark: Boolean) {
             val accent = pal.accent(dark); val ter = pal.tertiary(dark)
             // matches the theme: dark-mode selections use the main color unless a secondary was picked
             val sec = if (dark && !choice.secondaryChosen(p)) accent else choice.secondary(p, dark)
-            val bg = if (dark) Color(0xFF0E1014) else Color(0xFFF7F8FA)
-            val fg = if (dark) Color(0xFFE9EBEF) else Color(0xFF15171B)
+            val bg = if (dark) Color(0xFF0E1014) else pal.accent(false).copy(alpha = choice.lightStyle.wash).compositeOverColor(Color(choice.lightStyle.background))
+            val fg = if (dark) Color(0xFFE9EBEF) else Color(choice.lightStyle.ink)
             Surface(Modifier.weight(1f), shape = RoundedCornerShape(16.dp), color = bg, border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)) {
                 Column(Modifier.padding(10.dp)) {
                     Text(if (dark) "Dark" else "Light", style = MaterialTheme.typography.labelSmall, color = fg.copy(alpha = 0.7f))
@@ -171,7 +213,7 @@ private fun Preview(choice: ThemeChoice, p: Profile, currentDark: Boolean) {
             }
         }
     }
-    if (!currentDark) Text("Tip: the light theme also tints its backgrounds very slightly with your main color.",
+    if (!currentDark) Text("Accent colors used as text are darkened automatically wherever they'd be hard to read on the page.",
         style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 6.dp))
 }
 

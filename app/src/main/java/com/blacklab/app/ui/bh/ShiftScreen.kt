@@ -1,5 +1,6 @@
 package com.blacklab.app.ui.bh
 
+import com.blacklab.app.ui.theme.readable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -117,7 +118,7 @@ fun BhShiftScreen() = BhGuarded {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Column(Modifier.weight(1f)) {
                             Text(p.display, style = MaterialTheme.typography.titleSmall)
-                            if (p.precautions.isNotEmpty()) Text(p.precautions.joinToString(" · "), style = MaterialTheme.typography.labelSmall, color = Amber)
+                            if (p.precautions.isNotEmpty()) Text(p.precautions.joinToString(" · "), style = MaterialTheme.typography.labelSmall, color = Amber.readable())
                             Text(last?.let { "Last check ${Writer.clock(it.time)} · ${it.location} · ${it.behavior}" } ?: "No checks yet",
                                 style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
@@ -223,7 +224,7 @@ internal fun PatientDialog(p: Bh.Patient, isNew: Boolean, onDismiss: () -> Unit,
             Text("Precautions", style = MaterialTheme.typography.labelLarge)
             ChipSelect(Library.PRECAUTIONS, x.precautions, { x = x.copy(precautions = it) }, collapseAfter = 8)
             OutlinedTextField(x.notes, { x = x.copy(notes = it) }, Modifier.fillMaxWidth(), label = { Text("Brief note for handoff") }, placeholder = { Text("e.g. new admit, prefers low lights") })
-            if (!isNew) TextButton(onClick = onDischarge) { Text("Discharge / remove from census", color = Danger) }
+            if (!isNew) TextButton(onClick = onDischarge) { Text("Discharge / remove from census", color = Danger.readable()) }
         }
     }, confirmButton = {
         TextButton(enabled = x.room.isNotBlank() || x.label.isNotBlank(), onClick = { onSave(x.copy(room = x.room.trim(), label = x.label.trim())); onDismiss() }) { Text("Save") }

@@ -145,6 +145,10 @@ data class Settings(
     val accentProfessional: String = "COBALT",
     val secondaryPersonal: String = "AUTO",
     val secondaryProfessional: String = "AUTO",
+    /** ui/theme LightStyle name: how light mode's page and cards look. */
+    val lightStyle: String = "CLEAN",
+    /** AAA-level text and accent contrast with darker borders, in light and dark. */
+    val highContrast: Boolean = false,
     // signatures
     val sigConfirm: Boolean = true,
     // feel
@@ -274,6 +278,8 @@ object Keys {
     const val ACCENT_PROFESSIONAL = "accent_professional"
     const val SECONDARY_PERSONAL = "secondary_personal"
     const val SECONDARY_PROFESSIONAL = "secondary_professional"
+    const val LIGHT_STYLE = "light_style"
+    const val HIGH_CONTRAST = "high_contrast"
     const val SIG_CONFIRM = "sig_confirm"
     const val HAPTICS = "haptics"
     const val REDUCE_MOTION = "reduce_motion"
@@ -421,6 +427,8 @@ class SettingsRepository(context: Context) {
             accentProfessional = getString(Keys.ACCENT_PROFESSIONAL, d.accentProfessional) ?: d.accentProfessional,
             secondaryPersonal = getString(Keys.SECONDARY_PERSONAL, d.secondaryPersonal) ?: d.secondaryPersonal,
             secondaryProfessional = getString(Keys.SECONDARY_PROFESSIONAL, d.secondaryProfessional) ?: d.secondaryProfessional,
+            lightStyle = getString(Keys.LIGHT_STYLE, d.lightStyle) ?: d.lightStyle,
+            highContrast = getBoolean(Keys.HIGH_CONTRAST, d.highContrast),
             sigConfirm = getBoolean(Keys.SIG_CONFIRM, d.sigConfirm),
             haptics = getBoolean(Keys.HAPTICS, d.haptics),
             reduceMotion = getBoolean(Keys.REDUCE_MOTION, d.reduceMotion),

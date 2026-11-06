@@ -1,5 +1,6 @@
 package com.blacklab.app.ui.education
 
+import com.blacklab.app.ui.theme.readable
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
@@ -211,7 +212,7 @@ private fun Overview(data: EduData, goTab: (Int) -> Unit) {
             SectionHeader("Flashcards")
             BlCard(Modifier.fillMaxWidth(), onClick = { goTab(6) }) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Rounded.Style, null, tint = Violet)
+                    Icon(Icons.Rounded.Style, null, tint = Violet.readable())
                     Spacer(Modifier.width(12.dp))
                     Text(if (due > 0) "$due cards due for review" else "All caught up", Modifier.weight(1f))
                     if (due > 0) {

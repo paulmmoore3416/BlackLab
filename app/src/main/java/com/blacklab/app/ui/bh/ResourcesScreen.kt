@@ -1,5 +1,6 @@
 package com.blacklab.app.ui.bh
 
+import com.blacklab.app.ui.theme.readable
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
@@ -94,7 +95,7 @@ fun BhResourcesScreen() = BhGuarded {
                     item {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             OptionalDropdown("Category", Library.RESOURCE_CATEGORIES, category, { category = it }, Modifier.weight(1f))
-                            IconButton(onClick = { favOnly = !favOnly }) { Icon(if (favOnly) Icons.Rounded.Star else Icons.Rounded.StarBorder, "Favorites only", tint = if (favOnly) Amber else MaterialTheme.colorScheme.onSurfaceVariant) }
+                            IconButton(onClick = { favOnly = !favOnly }) { Icon(if (favOnly) Icons.Rounded.Star else Icons.Rounded.StarBorder, "Favorites only", tint = if (favOnly) Amber.readable() else MaterialTheme.colorScheme.onSurfaceVariant) }
                         }
                     }
                     items(shown, key = { it.id }) { r -> ResourceCard(r, r.id in s.favorites, onEdit = { edit = if (r.builtin) r.copy(id = Bh.id(), builtin = false) else r }, onDelete = { del = r }) }
@@ -142,16 +143,16 @@ private fun ResourceCard(r: Bh.Resource, fav: Boolean, onEdit: () -> Unit, onDel
                 Text(listOfNotNull(r.category, r.hours.ifBlank { null }, r.cost.ifBlank { null }).joinToString(" · "), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
             if (!r.builtin) Pill("Local", Violet)
-            IconButton(onClick = { BhStore.toggleFavorite(ctx, r.id) }) { Icon(if (fav) Icons.Rounded.Star else Icons.Rounded.StarBorder, "Favorite", tint = if (fav) Amber else MaterialTheme.colorScheme.onSurfaceVariant) }
+            IconButton(onClick = { BhStore.toggleFavorite(ctx, r.id) }) { Icon(if (fav) Icons.Rounded.Star else Icons.Rounded.StarBorder, "Favorite", tint = if (fav) Amber.readable() else MaterialTheme.colorScheme.onSurfaceVariant) }
         }
         listOfNotNull(r.phone.ifBlank { null }?.let { "☎ $it" }, r.text.ifBlank { null }?.let { "✉ $it" }, r.address.ifBlank { null }, r.eligibility.ifBlank { null }?.let { "Eligibility: $it" })
             .forEach { Text(it, style = MaterialTheme.typography.bodySmall) }
         if (r.notes.isNotBlank()) Text(r.notes, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         Row {
-            if (r.phone.isNotBlank()) IconButton(onClick = { dial(ctx, r.phone) }) { Icon(Icons.Rounded.Call, "Call", tint = Mint) }
-            Library.smsTarget(r.text)?.let { (num, body) -> IconButton(onClick = { sms(ctx, num, body) }) { Icon(Icons.Rounded.Sms, "Text", tint = Mint) } }
-            if (r.url.isNotBlank()) IconButton(onClick = { runCatching { ctx.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(r.url))) } }) { Icon(Icons.Rounded.Language, "Website", tint = Cobalt) }
-            if (r.address.isNotBlank()) IconButton(onClick = { runCatching { ctx.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("geo:0,0?q=" + Uri.encode(r.address)))) } }) { Icon(Icons.Rounded.Map, "Map", tint = Cobalt) }
+            if (r.phone.isNotBlank()) IconButton(onClick = { dial(ctx, r.phone) }) { Icon(Icons.Rounded.Call, "Call", tint = Mint.readable()) }
+            Library.smsTarget(r.text)?.let { (num, body) -> IconButton(onClick = { sms(ctx, num, body) }) { Icon(Icons.Rounded.Sms, "Text", tint = Mint.readable()) } }
+            if (r.url.isNotBlank()) IconButton(onClick = { runCatching { ctx.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(r.url))) } }) { Icon(Icons.Rounded.Language, "Website", tint = Cobalt.readable()) }
+            if (r.address.isNotBlank()) IconButton(onClick = { runCatching { ctx.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("geo:0,0?q=" + Uri.encode(r.address)))) } }) { Icon(Icons.Rounded.Map, "Map", tint = Cobalt.readable()) }
             IconButton(onClick = {
                 ctx.startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, shareText(r)), "Share resource"))
             }) { Icon(Icons.Rounded.Share, "Share") }

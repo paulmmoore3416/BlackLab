@@ -1,5 +1,6 @@
 package com.blacklab.app.ui.bh
 
+import com.blacklab.app.ui.theme.readable
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -70,12 +71,12 @@ fun BhCrisisScreen(startTab: String = "") = BhGuarded {
                     }
                     1 -> {
                         item { SectionHeader("Ground rules") }
-                        items(Library.DEESCALATION_TIPS) { t -> Row { Text("•  ", color = Mint); Text(t, style = MaterialTheme.typography.bodyMedium) } }
+                        items(Library.DEESCALATION_TIPS) { t -> Row { Text("•  ", color = Mint.readable()); Text(t, style = MaterialTheme.typography.bodyMedium) } }
                         item { SectionHeader("Phrases that help") }
                         Library.CRISIS_PHASES.forEachIndexed { i, ph ->
                             item(key = "say$i") {
                                 BlCard(Modifier.fillMaxWidth(), accent = phaseColors[i]) {
-                                    Text(ph.name, style = MaterialTheme.typography.titleSmall, color = phaseColors[i])
+                                    Text(ph.name, style = MaterialTheme.typography.titleSmall, color = phaseColors[i].readable())
                                     ph.say.forEach { Text(it, style = MaterialTheme.typography.bodyMedium, fontStyle = FontStyle.Italic, modifier = Modifier.padding(top = 4.dp)) }
                                 }
                             }
@@ -134,7 +135,7 @@ private fun PhaseCard(ph: Library.Phase, color: Color, initiallyOpen: Boolean) {
     var open by remember { mutableStateOf(initiallyOpen) }
     BlCard(Modifier.fillMaxWidth(), accent = color, onClick = { open = !open }) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(ph.name, Modifier.weight(1f), style = MaterialTheme.typography.titleMedium, color = color)
+            Text(ph.name, Modifier.weight(1f), style = MaterialTheme.typography.titleMedium, color = color.readable())
             Icon(if (open) Icons.Rounded.ExpandLess else Icons.Rounded.ExpandMore, null)
         }
         Text(ph.looks.joinToString(" · "), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -144,7 +145,7 @@ private fun PhaseCard(ph: Library.Phase, color: Color, initiallyOpen: Boolean) {
                 ph.respond.forEach { Text("✓  $it", style = MaterialTheme.typography.bodyMedium) }
                 Text("SAY", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 6.dp))
                 ph.say.forEach { Text(it, style = MaterialTheme.typography.bodyMedium, fontStyle = FontStyle.Italic) }
-                Text("AVOID", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = Danger, modifier = Modifier.padding(top = 6.dp))
+                Text("AVOID", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = Danger.readable(), modifier = Modifier.padding(top = 6.dp))
                 ph.avoid.forEach { Text("✗  $it", style = MaterialTheme.typography.bodyMedium) }
             }
         }

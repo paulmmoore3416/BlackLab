@@ -1,5 +1,6 @@
 package com.blacklab.app.ui.bh
 
+import com.blacklab.app.ui.theme.readable
 import android.content.Intent
 import android.net.Uri
 import androidx.compose.foundation.layout.Arrangement
@@ -123,7 +124,7 @@ fun BhHubScreen() = BhGuarded {
                                 overdue.isNotEmpty() -> "${overdue.size} overdue"
                                 next != null -> "Next check in ${((next - now) / 60_000).coerceAtLeast(0)} min"
                                 else -> "Rounds on"
-                            }, style = MaterialTheme.typography.titleMedium, color = if (overdue.isNotEmpty()) Danger else MaterialTheme.colorScheme.onSurface)
+                            }, style = MaterialTheme.typography.titleMedium, color = if (overdue.isNotEmpty()) Danger.readable() else MaterialTheme.colorScheme.onSurface)
                             Text("${s.census.size} on census · ${dueList.count { Rounds.continuous(it.patient.obs) }} continuous · ${s.checks.size} checks logged",
                                 style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
@@ -134,7 +135,7 @@ fun BhHubScreen() = BhGuarded {
             item {
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     Button(onClick = { ctx.startActivity(Intent(Intent.ACTION_DIAL, Uri.parse("tel:988"))) }, Modifier.weight(1f),
-                        colors = ButtonDefaults.buttonColors(containerColor = Danger)) { Icon(Icons.Rounded.Call, null, Modifier.size(18.dp)); Spacer(Modifier.size(6.dp)); Text("988") }
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFC62828), contentColor = Color.White)) { Icon(Icons.Rounded.Call, null, Modifier.size(18.dp)); Spacer(Modifier.size(6.dp)); Text("988") }
                     OutlinedButton(onClick = { shell.go("bh/crisis") }, Modifier.weight(1f)) { Text("De-escalate") }
                     OutlinedButton(onClick = { shell.go("bh/crisis?tab=ground") }, Modifier.weight(1f)) { Text("Grounding") }
                 }
@@ -172,7 +173,7 @@ fun BhHubScreen() = BhGuarded {
             item {
                 BlCard(Modifier.fillMaxWidth()) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Rounded.VerifiedUser, null, tint = Success)
+                        Icon(Icons.Rounded.VerifiedUser, null, tint = Success.readable())
                         Text("Privacy", Modifier.padding(start = 8.dp), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
                     }
                     Text("Everything here is encrypted with a key that never leaves this phone. It isn't backed up, synced to Desktop or Drive, searched by “Ask my files” or read aloud in the car. " +
@@ -225,7 +226,7 @@ private fun BhSettingsDialog(p: Bh.Prefs, onDismiss: () -> Unit) {
             DropdownField("Erase drafts about others after", listOf(1, 3, 7, 14, 30, 90, 0).map { it to if (it == 0) "Keep until I delete" else "$it day${if (it == 1) "" else "s"}" },
                 x.noteDays, { x = x.copy(noteDays = it) })
             LabeledSwitchRow("Hide from Home", "Don't show the rounds card on the Home dashboard", x.hideOnHome) { x = x.copy(hideOnHome = it) }
-            TextButton(onClick = { wipe = true }) { Text("Erase the whole workspace…", color = Danger) }
+            TextButton(onClick = { wipe = true }) { Text("Erase the whole workspace…", color = Danger.readable()) }
         }
     }, confirmButton = { TextButton(onClick = { BhStore.prefs(ctx) { x }; onDismiss() }) { Text("Save") } },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } })

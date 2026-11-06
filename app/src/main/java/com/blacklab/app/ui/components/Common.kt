@@ -1,5 +1,6 @@
 package com.blacklab.app.ui.components
 
+import com.blacklab.app.ui.theme.readable
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
@@ -210,18 +211,21 @@ fun BlCard(
     content: @Composable ColumnScope.() -> Unit,
 ) {
     val shape = RoundedCornerShape(22.dp)
+    val light = !com.blacklab.app.ui.theme.LocalBlColors.current.isDark
     val colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer)
-    val border = BorderStroke(1.dp, accent?.copy(alpha = 0.4f) ?: MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.7f))
+    // Light mode: brighter cards on a calmer page, a hairline border and a soft shadow so they read as raised
+    val border = BorderStroke(1.dp, accent?.copy(alpha = if (light) 0.55f else 0.4f) ?: MaterialTheme.colorScheme.outlineVariant.copy(alpha = if (light) 1f else 0.7f))
+    val elevation = CardDefaults.cardElevation(defaultElevation = if (light) 1.dp else 0.dp, pressedElevation = if (light) 2.dp else 0.dp)
     if (onClick != null) {
         // soft press feedback: the card sinks slightly while touched
         val interaction = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
         val pressed by interaction.collectIsPressedAsState()
         val scale by animateFloatAsState(if (pressed) 0.975f else 1f, androidx.compose.animation.core.spring(dampingRatio = 0.7f, stiffness = 500f), label = "press")
-        Card(onClick = onClick, modifier = modifier.graphicsLayer { scaleX = scale; scaleY = scale }, shape = shape, colors = colors, border = border, interactionSource = interaction) {
+        Card(onClick = onClick, modifier = modifier.graphicsLayer { scaleX = scale; scaleY = scale }, shape = shape, colors = colors, border = border, elevation = elevation, interactionSource = interaction) {
             Column(Modifier.padding(contentPadding), content = content)
         }
     } else {
-        Card(modifier = modifier, shape = shape, colors = colors, border = border) {
+        Card(modifier = modifier, shape = shape, colors = colors, border = border, elevation = elevation) {
             Column(Modifier.padding(contentPadding), content = content)
         }
     }
@@ -257,12 +261,13 @@ fun EmptyState(icon: ImageVector, title: String, body: String, modifier: Modifie
 
 @Composable
 fun Pill(text: String, color: Color = MaterialTheme.colorScheme.primary, modifier: Modifier = Modifier, icon: ImageVector? = null) {
+    val ink = color.readable()
     Row(
         modifier.clip(RoundedCornerShape(50)).background(color.copy(alpha = 0.16f)).padding(horizontal = 8.dp, vertical = 3.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        if (icon != null) { Icon(icon, null, tint = color, modifier = Modifier.size(12.dp)); Spacer(Modifier.width(4.dp)) }
-        Text(text, color = color, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.SemiBold, maxLines = 1)
+        if (icon != null) { Icon(icon, null, tint = ink, modifier = Modifier.size(12.dp)); Spacer(Modifier.width(4.dp)) }
+        Text(text, color = ink, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.SemiBold, maxLines = 1)
     }
 }
 
@@ -274,7 +279,7 @@ fun ColorDot(color: Color, size: Dp = 10.dp, modifier: Modifier = Modifier) {
 @Composable
 fun IconBadge(icon: ImageVector, color: Color, size: Dp = 40.dp, modifier: Modifier = Modifier) {
     Box(modifier.size(size).clip(RoundedCornerShape(size / 3.2f)).background(color.copy(alpha = 0.16f)), contentAlignment = Alignment.Center) {
-        Icon(icon, null, tint = color, modifier = Modifier.size(size * 0.52f))
+        Icon(icon, null, tint = color.readable(), modifier = Modifier.size(size * 0.52f))
     }
 }
 

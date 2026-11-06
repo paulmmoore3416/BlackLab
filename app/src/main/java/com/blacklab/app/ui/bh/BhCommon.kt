@@ -1,5 +1,6 @@
 package com.blacklab.app.ui.bh
 
+import com.blacklab.app.ui.theme.readable
 import android.content.ClipData
 import android.content.ClipDescription
 import android.content.ClipboardManager
@@ -347,6 +348,6 @@ fun RecordRow(r: Forms.Rec, s: Bh.State, onClick: () -> Unit) {
     BlCard(Modifier.fillMaxWidth(), onClick = onClick) {
         Text(listOfNotNull(spec?.title, who).joinToString(" — "), style = MaterialTheme.typography.titleSmall)
         Text(listOfNotNull(headline, Writer.when_(r.updated)).joinToString(" · "), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        if (r.kind == Specs.INCIDENT && r.on("restrictive")) Text("Restrictive intervention", style = MaterialTheme.typography.labelSmall, color = Danger)
+        if (r.kind == Specs.INCIDENT && r.on("restrictive")) Text("Restrictive intervention", style = MaterialTheme.typography.labelSmall, color = Danger.readable())
     }
 }

@@ -1,5 +1,6 @@
 package com.blacklab.app.ui.documents
 
+import com.blacklab.app.ui.theme.readable
 import android.content.Context
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -252,7 +253,7 @@ private fun DocCard(d: DocumentEntity, grid: Boolean, onClick: () -> Unit, onMen
             Row(verticalAlignment = Alignment.Top) {
                 Column(Modifier.weight(1f)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        if (d.pinned) Icon(Icons.Rounded.PushPin, null, tint = Amber, modifier = Modifier.size(14.dp).padding(end = 2.dp))
+                        if (d.pinned) Icon(Icons.Rounded.PushPin, null, tint = Amber.readable(), modifier = Modifier.size(14.dp).padding(end = 2.dp))
                         Text(d.title, style = MaterialTheme.typography.titleSmall, maxLines = 2, overflow = TextOverflow.Ellipsis, fontWeight = FontWeight.SemiBold)
                     }
                     Text("${Time.ago(d.updatedAt)} · ${d.wordCount} words", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
