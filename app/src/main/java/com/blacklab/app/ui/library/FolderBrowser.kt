@@ -110,6 +110,8 @@ fun FolderBrowser(root: File, tab: String, media: Boolean, canOrganize: Boolean,
     var sortMenu by remember { mutableStateOf(false) }
     var bump by remember { mutableStateOf(0) }
     val changed = { bump++; onChanged() }
+    var smartPlan by remember { mutableStateOf<Map<String, List<File>>?>(null) }
+    var smartBusy by remember { mutableStateOf<String?>(null) }
 
     val entries by produceState(emptyList<File>(), dir, refresh, bump, sort, query) {
         value = withContext(Dispatchers.IO) {
@@ -171,6 +173,24 @@ fun FolderBrowser(root: File, tab: String, media: Boolean, canOrganize: Boolean,
                 DropdownMenu(overflow, { overflow = false }) {
                     DropdownMenuItem(text = { Text("New folder") }, leadingIcon = { Icon(Icons.Rounded.CreateNewFolder, null) }, onClick = { overflow = false; newFolder = true })
                     DropdownMenuItem(text = { Text("Sort into month folders") }, leadingIcon = { Icon(Icons.Rounded.CalendarMonth, null) }, onClick = { overflow = false; confirmAuto = true })
+                    if (media && com.blacklab.app.assistant.Gemini.visionEnabled) DropdownMenuItem(text = { Text("Smart sort with Gemini") }, leadingIcon = { Icon(Icons.Rounded.AutoAwesome, null) }, onClick = {
+                        overflow = false
+                        val photos = files.filter { it.isImage() }.take(40)
+                        if (photos.isEmpty()) shell.toast("No loose photos here to sort") else {
+                            smartBusy = "Looking at ${photos.size} photo${if (photos.size == 1) "" else "s"}…"
+                            app.io {
+                                val existing = folders.map { it.name }.toMutableList()
+                                val plan = LinkedHashMap<String, MutableList<File>>()
+                                photos.forEachIndexed { i, f ->
+                                    withContext(Dispatchers.Main) { smartBusy = "Looking at photo ${i + 1} of ${photos.size}…" }
+                                    val name = com.blacklab.app.assistant.Gemini.suggestFolder(f, existing)?.let { LibraryOps.cleanName(it) }?.ifBlank { null } ?: return@forEachIndexed
+                                    plan.getOrPut(name) { mutableListOf() } += f
+                                    if (name !in existing) existing += name
+                                }
+                                withContext(Dispatchers.Main) { smartBusy = null; if (plan.isEmpty()) shell.toast("Gemini couldn't suggest folders right now") else smartPlan = plan }
+                            }
+                        }
+                    })
                     DropdownMenuItem(text = { Text("Select all") }, leadingIcon = { Icon(Icons.Rounded.SelectAll, null) }, onClick = { overflow = false; selected = entries.toSet() })
                 }
             }
@@ -247,6 +267,33 @@ fun FolderBrowser(root: File, tab: String, media: Boolean, canOrganize: Boolean,
     }
 
     // ---- dialogs
+    smartBusy?.let { msg ->
+        AlertDialog(onDismissRequest = {}, title = { Text("Smart sort") }, text = {
+            Row(verticalAlignment = Alignment.CenterVertically) { androidx.compose.material3.CircularProgressIndicator(Modifier.size(24.dp)); Spacer(Modifier.width(14.dp)); Text(msg) }
+        }, confirmButton = {})
+    }
+    smartPlan?.let { plan ->
+        AlertDialog(onDismissRequest = { smartPlan = null }, title = { Text("Sort into these folders?") }, text = {
+            Column(Modifier.heightIn(max = 420.dp).verticalScroll(rememberScrollState())) {
+                Text("Gemini looked at each photo (sent to Google, downscaled). Nothing moves until you confirm.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                plan.forEach { (folder, list) ->
+                    Row(Modifier.padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Rounded.Folder, null, tint = MaterialTheme.colorScheme.primary); Spacer(Modifier.width(10.dp))
+                        Text(folder, Modifier.weight(1f)); Text("${list.size}", style = MaterialTheme.typography.labelLarge)
+                    }
+                }
+            }
+        }, confirmButton = {
+            TextButton(onClick = {
+                smartPlan = null
+                app.io {
+                    var n = 0
+                    plan.forEach { (folder, list) -> n += LibraryOps.move(list, File(dir, folder)).count { it.from in list } }
+                    withContext(Dispatchers.Main) { changed(); shell.toast("Sorted $n photo${if (n == 1) "" else "s"} into ${plan.size} folder${if (plan.size == 1) "" else "s"}") }
+                }
+            }) { Text("Sort") }
+        }, dismissButton = { TextButton(onClick = { smartPlan = null }) { Text("Cancel") } })
+    }
     if (newFolder) TextInputDialog("New folder in ${dir.name}", label = "Folder name", confirmLabel = "Create", onDismiss = { newFolder = false }) { name ->
         app.io {
             val f = LibraryOps.newFolder(dir, name)

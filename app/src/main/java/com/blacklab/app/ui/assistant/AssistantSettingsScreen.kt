@@ -1,5 +1,10 @@
 package com.blacklab.app.ui.assistant
 
+import androidx.compose.foundation.layout.width
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
+import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.SegmentedButton
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.IntentSenderRequest
 import androidx.activity.result.contract.ActivityResultContracts
@@ -148,6 +153,90 @@ fun AssistantSettingsScreen() {
                 }
             }
 
+            item { SectionHeader("Cloud AI · Gemini") }
+            item {
+                BlCard(Modifier.fillMaxWidth()) {
+                    Text(if (com.blacklab.app.assistant.Gemini.configured) "Key stored on this phone · ${s.asstGeminiModel}" else "Add a free Gemini API key below (Google AI Studio)",
+                        style = MaterialTheme.typography.titleSmall)
+                    SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth().padding(top = 8.dp)) {
+                        listOf("OFF" to "Off", "FALLBACK" to "Fallback", "PREFER" to "Prefer").forEachIndexed { i, (k, l) ->
+                            SegmentedButton(s.asstCloudAi == k, { app.settings.update { putString(com.blacklab.app.core.Keys.ASST_CLOUD_AI, k) } },
+                                SegmentedButtonDefaults.itemShape(i, 3)) { Text(l) }
+                        }
+                    }
+                    Text(when (s.asstCloudAi) {
+                        "OFF" -> "Never used. Everything stays on the phone and your computer."
+                        "PREFER" -> "Used before Gemini Nano when the computer isn't linked — smartest answers, sent to Google."
+                        else -> "Only when neither your computer nor Gemini Nano can answer. Photo features (nameplates, Describe, Smart sort) ask Gemini directly."
+                    } + " The Behavioral Health workspace never uses it. On the free tier Google may use requests to improve its products.",
+                        style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 6.dp))
+                    TextButton(onClick = { runCatching { ctx.startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse("https://aistudio.google.com/apikey"))) } }) { Text("Get a free key") }
+                }
+            }
+
+            item { SectionHeader("Wake word · Picovoice") }
+            item {
+                val wake by com.blacklab.app.assistant.WakeWordService.status.collectAsState()
+                val ppn = androidx.activity.compose.rememberLauncherForActivityResult(androidx.activity.result.contract.ActivityResultContracts.OpenDocument()) { uri ->
+                    if (uri != null) scope.launch(kotlinx.coroutines.Dispatchers.IO) {
+                        val f = com.blacklab.app.assistant.WakeWordService.customFile(ctx); f.parentFile?.mkdirs()
+                        val ok = runCatching { ctx.contentResolver.openInputStream(uri)!!.use { i -> f.outputStream().use { i.copyTo(it) } } }.isSuccess
+                        if (ok) { app.settings.update { putString(com.blacklab.app.core.Keys.WAKE_KEYWORD, com.blacklab.app.assistant.WakeWordService.CUSTOM) }
+                            com.blacklab.app.assistant.WakeWordService.stop(ctx); if (s.wakeWord) com.blacklab.app.assistant.WakeWordService.start(ctx) }
+                        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) { shell.toast(if (ok) "Custom wake word imported" else "Couldn't read that file") }
+                    }
+                }
+                BlCard(Modifier.fillMaxWidth()) {
+                    com.blacklab.app.ui.components.LabeledSwitchRow("Listen for the wake word", when (wake.state) {
+                        com.blacklab.app.assistant.WakeWordService.State.OFF -> if (app.secrets.has(Secrets.PICOVOICE)) "Off" else "Add your free Picovoice AccessKey below first"
+                        com.blacklab.app.assistant.WakeWordService.State.ERROR -> wake.message
+                        com.blacklab.app.assistant.WakeWordService.State.PAUSED -> wake.message
+                        else -> "Listening for “${wake.word}” — no audio leaves the phone"
+                    }, s.wakeWord, enabled = app.secrets.has(Secrets.PICOVOICE)) { v ->
+                        app.settings.update { putBoolean(com.blacklab.app.core.Keys.WAKE_WORD, v) }
+                        if (v) com.blacklab.app.assistant.WakeWordService.start(ctx) else com.blacklab.app.assistant.WakeWordService.stop(ctx)
+                    }
+                    com.blacklab.app.ui.components.DropdownField("Wake word", com.blacklab.app.assistant.WakeWordService.BUILT_IN + (com.blacklab.app.assistant.WakeWordService.CUSTOM to "Custom (.ppn) — e.g. “Hey Todd”"),
+                        s.wakeKeyword, { k -> app.settings.update { putString(com.blacklab.app.core.Keys.WAKE_KEYWORD, k) }
+                            if (s.wakeWord) { com.blacklab.app.assistant.WakeWordService.stop(ctx); com.blacklab.app.assistant.WakeWordService.start(ctx) } })
+                    var sens by remember(s.wakeSensitivity) { mutableStateOf(s.wakeSensitivity.toFloat()) }
+                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 6.dp)) {
+                        Text("Sensitivity", Modifier.width(90.dp), style = MaterialTheme.typography.labelLarge)
+                        androidx.compose.material3.Slider(sens, { sens = it }, Modifier.weight(1f), valueRange = 10f..95f,
+                            onValueChangeFinished = { app.settings.update { putInt(com.blacklab.app.core.Keys.WAKE_SENSITIVITY, sens.toInt()) }
+                                if (s.wakeWord) { com.blacklab.app.assistant.WakeWordService.stop(ctx); com.blacklab.app.assistant.WakeWordService.start(ctx) } })
+                        Text("${sens.toInt()}%", style = MaterialTheme.typography.labelMedium)
+                    }
+                    Row {
+                        TextButton(onClick = { ppn.launch(arrayOf("*/*")) }) { Text("Import custom .ppn") }
+                        TextButton(onClick = { runCatching { ctx.startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse("https://console.picovoice.ai/"))) } }) { Text("Get a free key") }
+                    }
+                    Text("Say the word, wait for the chime, then ask. ${s.asstName} answers out loud and in a notification. To make “Hey ${s.asstName}”, train it free at console.picovoice.ai (platform: Android) and import the .ppn here. Steps aside while recording or dictating.",
+                        style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+
+            item { SectionHeader("Weather · OpenWeatherMap") }
+            item {
+                val w by com.blacklab.app.assistant.Weather.report.collectAsState()
+                val werr by com.blacklab.app.assistant.Weather.error.collectAsState()
+                var site by remember(s.weatherSite) { mutableStateOf(s.weatherSite) }
+                BlCard(Modifier.fillMaxWidth()) {
+                    Text(w?.let { com.blacklab.app.assistant.Weather.summary(it) } ?: (werr ?: if (app.secrets.has(Secrets.OPENWEATHER)) "Tap Refresh" else "Add a free OpenWeatherMap key below"),
+                        style = MaterialTheme.typography.bodyMedium)
+                    w?.let { r -> com.blacklab.app.assistant.Weather.alerts(r).forEach { a -> Text("⚠ ${a.title}", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.error) } }
+                    com.blacklab.app.ui.components.LabeledSwitchRow("Facility prep tasks", "Freeze, heat, storms, wind, heavy rain and snow become Professional tasks with checklists", s.weatherTasks) { v ->
+                        app.settings.update { putBoolean(com.blacklab.app.core.Keys.WEATHER_TASKS, v) }
+                    }
+                    androidx.compose.material3.OutlinedTextField(site, { site = it }, Modifier.fillMaxWidth(), label = { Text("Facility location (lat, lon)") }, placeholder = { Text("Blank = phone's location") }, singleLine = true,
+                        trailingIcon = { if (site != s.weatherSite) IconButton(onClick = { app.settings.update { putString(com.blacklab.app.core.Keys.WEATHER_SITE, site.trim()) }; scope.launch { com.blacklab.app.assistant.Weather.refresh(force = true) } }) { Icon(Icons.Rounded.Check, "Save") } })
+                    Row {
+                        TextButton(onClick = { scope.launch { com.blacklab.app.assistant.Weather.refresh(force = true) } }) { Text("Refresh") }
+                        TextButton(onClick = { runCatching { ctx.startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse("https://home.openweathermap.org/users/sign_up"))) } }) { Text("Get a free key") }
+                    }
+                }
+            }
+
             item { SectionHeader("Google account") }
             item {
                 BlCard(Modifier.fillMaxWidth()) {
@@ -173,6 +262,9 @@ fun AssistantSettingsScreen() {
                     listOf(
                         Secrets.ELEVENLABS to "ElevenLabs (assistant voice)",
                         Secrets.DEV_KNOWLEDGE to "Google Developer Knowledge (docs search)",
+                        Secrets.GEMINI to "Gemini API (cloud AI & photos) · free at aistudio.google.com",
+                        Secrets.PICOVOICE to "Picovoice AccessKey (wake word) · free at console.picovoice.ai",
+                        Secrets.OPENWEATHER to "OpenWeatherMap (weather & facility alerts) · free at openweathermap.org",
                     ).forEach { (k, label) ->
                         val set = keysSet[k] == true
                         Row(Modifier.fillMaxWidth().padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {

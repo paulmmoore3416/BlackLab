@@ -210,6 +210,10 @@ class Assistant(private val app: AppContainer) {
         // ---- the desktop: its local AI and its own assistant (files, apps, system status on the computer)
         desktop(t, l)?.let { return it }
 
+        // ---- weather & facility weather prep (OpenWeatherMap)
+        if (Regex("\\b(weather|forecast|temperature outside|how (hot|cold) is it|will it (freeze|rain|snow|storm)|freeze warning|weather alerts?)\\b").containsMatchIn(l) &&
+            !Regex("^(add|create|remind|schedule)").containsMatchIn(l)) return weather(l)
+
         // ---- tasks
         m("^(?:remind me(?: to)?|don't let me forget(?: to)?)\\s+(.+)$")?.let { return addTask(it.groupValues[1], remind = true) }
         m("^(?:add|create|new|make)(?: a| an)?(?: new)? (?:task|to-?do|todo|reminder)(?: to| for| called| named)?[:\\s]+(.+)$")?.let { return addTask(it.groupValues[1], remind = false) }
@@ -392,6 +396,7 @@ User: $text"""
 • Settings — “dark mode”, “switch to professional”, “set focus length to 45”
 • Summaries — “summarize this week as action items”, “recap my recent notes for my boss”, or pick items in Summarize
 • Knowledge — “what is retrieval-augmented generation?”, “explain GitHub Actions caching”, “let's talk about system design”
+• Weather — “what's the weather”, “will it freeze tonight?”, “weather alerts” (facility prep checklists)
 • Desktop — “on my computer open my downloads”, “ask my desktop how much disk space is left”, “desktop AI status”
 • Behavioral Health — “start rounds”, “when are rounds due?”, “start my shift”, “new peer note”, “SBAR handoff”, “crisis lines”, “grounding”
 • Garage — “log fuel 13.2 gallons $48 at 31,250 miles”, “I got an oil change at 31,000”, “what's due on the car?”
@@ -783,6 +788,24 @@ User: $text"""
             return Reply(a.text, source = a.engine)
         }
         return Reply(if (q.isBlank()) chosen.opener else "Let's get into it — ${chosen.title}.", route = route, source = chosen.title, speak = origin == Origin.CAR || q.isBlank())
+    }
+
+    // ------------------------------------------------------------------ weather
+
+    private suspend fun weather(l: String): Reply {
+        if (!app.secrets.has(Secrets.OPENWEATHER)) return Reply("Add a free OpenWeatherMap key in Assistant settings and I'll give you the forecast and facility weather alerts.", listOf(Link("Assistant settings", "assistant/settings")))
+        val r = Weather.refresh() ?: Weather.report.value ?: return Reply(Weather.error.value ?: "Couldn't get the weather right now.")
+        val alerts = Weather.alerts(r)
+        val focus = when {
+            Regex("freeze|frost|cold").containsMatchIn(l) -> alerts.filter { it.kind.contains("FREEZE") }
+            Regex("storm|thunder|rain|wind").containsMatchIn(l) -> alerts.filter { it.kind in setOf("STORM", "RAIN", "WIND") }
+            Regex("snow").containsMatchIn(l) -> alerts.filter { it.kind == "SNOW" }
+            Regex("hot|heat").containsMatchIn(l) -> alerts.filter { it.kind == "HEAT" }
+            else -> alerts
+        }
+        val text = Weather.summary(r) + if (focus.isEmpty()) (if (Regex("freeze|storm|snow|heat|alert|rain|wind").containsMatchIn(l)) " No ${if (Regex("freeze").containsMatchIn(l)) "freeze" else "weather"} risk in the next two days." else "")
+            else "\n\n" + focus.joinToString("\n\n") { a -> "⚠ ${a.title}. ${a.detail}\n" + a.checklist.joinToString("\n") { "• $it" } }
+        return Reply(text, listOf(Link("To-Do", "tasks")), source = "OpenWeatherMap")
     }
 
     // ------------------------------------------------------------------ desktop AI

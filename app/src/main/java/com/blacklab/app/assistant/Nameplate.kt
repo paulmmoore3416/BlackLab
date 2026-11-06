@@ -78,11 +78,25 @@ ${asset.raw.take(2000)}""", temperature = 0.1f, maxTokens = 220,
         return Asset(merged, asset.raw)
     }
 
+    /** Gemini reads the nameplate photo directly (better than OCR on worn, angled or reflective plates). */
+    private suspend fun fromPhoto(photo: File, asset: Asset): Asset {
+        val out = Gemini.vision("""This is a photo of an equipment nameplate / data plate. Read it and reply with one JSON object only, using these keys when present:
+manufacturer, model, serial, equipment_type, voltage, phase, amps, horsepower, refrigerant, capacity, manufacture_date. Use null for anything unreadable.""", photo, 0.1f, 400) ?: return asset
+        val json = runCatching { JSONObject(out.substring(out.indexOf('{'), out.lastIndexOf('}') + 1)) }.getOrNull() ?: return asset
+        val map = mapOf("manufacturer" to "Manufacturer", "model" to "Model", "serial" to "Serial", "equipment_type" to "Equipment type", "voltage" to "Voltage",
+            "phase" to "Phase", "amps" to "FLA", "horsepower" to "Horsepower", "refrigerant" to "Refrigerant", "capacity" to "Capacity", "manufacture_date" to "Mfg date")
+        val merged = LinkedHashMap<String, String>()
+        map.forEach { (k, label) -> json.optString(k).trim().takeIf { it.isNotBlank() && it != "null" }?.let { merged[label] = it } }
+        asset.fields.forEach { (k, v) -> merged.putIfAbsent(k, v) }
+        return Asset(merged, asset.raw)
+    }
+
     data class Outcome(val asset: Asset, val docId: Long, val taskId: Long)
 
     suspend fun process(context: Context, app: AppContainer, photo: File, note: String = ""): Outcome {
         val text = Ocr.recognize(context, photo)
         var asset = parse(text)
+        if (Gemini.visionEnabled) asset = fromPhoto(photo, asset)
         if (app.settings.current.asstUseNano) asset = refine(asset)
         val s = app.settings.current
         val e = ContentStore::escape

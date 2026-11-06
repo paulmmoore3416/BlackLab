@@ -113,6 +113,16 @@ data class Settings(
     val asstUseNano: Boolean = true,
     /** Use the desktop's local AI (Ollama via BlackLab Desktop) whenever the computer is reachable. */
     val asstDesktopAi: Boolean = true,
+    /** Gemini API (cloud): OFF, FALLBACK (only when the desktop and Gemini Nano can't) or PREFER (before Gemini Nano). */
+    val asstCloudAi: String = "FALLBACK",
+    val asstGeminiModel: String = "gemini-2.5-flash",
+    /** Picovoice wake word. */
+    val wakeWord: Boolean = false,
+    val wakeKeyword: String = "JARVIS",
+    val wakeSensitivity: Int = 60,
+    /** OpenWeatherMap: facility prep tasks from forecast alerts, and an optional fixed site "lat, lon". */
+    val weatherTasks: Boolean = true,
+    val weatherSite: String = "",
     val asstNanoTemp: Int = 30,
     val asstNanoTokens: Int = 320,
     val asstOfflineOnly: Boolean = false,
@@ -258,6 +268,13 @@ object Keys {
     const val ASST_CONFIRM = "asst_confirm"
     const val ASST_USE_NANO = "asst_use_nano"
     const val ASST_DESKTOP_AI = "asst_desktop_ai"
+    const val ASST_CLOUD_AI = "asst_cloud_ai"
+    const val ASST_GEMINI_MODEL = "asst_gemini_model"
+    const val WAKE_WORD = "wake_word"
+    const val WAKE_KEYWORD = "wake_keyword"
+    const val WAKE_SENSITIVITY = "wake_sensitivity"
+    const val WEATHER_TASKS = "weather_tasks"
+    const val WEATHER_SITE = "weather_site"
     const val ASST_NANO_TEMP = "asst_nano_temp"
     const val ASST_NANO_TOKENS = "asst_nano_tokens"
     const val ASST_OFFLINE_ONLY = "asst_offline_only"
@@ -411,6 +428,13 @@ class SettingsRepository(context: Context) {
             asstConfirm = getBoolean(Keys.ASST_CONFIRM, d.asstConfirm),
             asstUseNano = getBoolean(Keys.ASST_USE_NANO, d.asstUseNano),
             asstDesktopAi = getBoolean(Keys.ASST_DESKTOP_AI, d.asstDesktopAi),
+            asstCloudAi = getString(Keys.ASST_CLOUD_AI, d.asstCloudAi) ?: d.asstCloudAi,
+            asstGeminiModel = getString(Keys.ASST_GEMINI_MODEL, d.asstGeminiModel) ?: d.asstGeminiModel,
+            wakeWord = getBoolean(Keys.WAKE_WORD, d.wakeWord),
+            wakeKeyword = getString(Keys.WAKE_KEYWORD, d.wakeKeyword) ?: d.wakeKeyword,
+            wakeSensitivity = getInt(Keys.WAKE_SENSITIVITY, d.wakeSensitivity).coerceIn(10, 95),
+            weatherTasks = getBoolean(Keys.WEATHER_TASKS, d.weatherTasks),
+            weatherSite = getString(Keys.WEATHER_SITE, d.weatherSite) ?: "",
             asstNanoTemp = getInt(Keys.ASST_NANO_TEMP, d.asstNanoTemp),
             asstNanoTokens = getInt(Keys.ASST_NANO_TOKENS, d.asstNanoTokens),
             asstOfflineOnly = getBoolean(Keys.ASST_OFFLINE_ONLY, d.asstOfflineOnly),

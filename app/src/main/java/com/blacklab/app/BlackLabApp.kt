@@ -37,6 +37,8 @@ class BlackLabApp : Application() {
         }
         // The desktop's local AI, when the computer is reachable (USB or Wireless debugging via adb reverse)
         com.blacklab.app.assistant.DesktopAi.init(container)
+        com.blacklab.app.assistant.Gemini.init(container)
+        com.blacklab.app.assistant.Weather.init(container)
         container.link.watch()
         container.appScope.launch {
             runCatching { com.blacklab.app.brainstorm.PlaceReminders.sync(this@BlackLabApp) }

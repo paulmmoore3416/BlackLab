@@ -55,6 +55,11 @@ object Briefing {
 
         return buildString {
             append(Time.greeting()); name?.let { append(", $it") }; append(". It's ${Time.longDate(today)}.\n\n")
+            Weather.report.value?.let { w ->
+                append(Weather.summary(w)).append("\n")
+                Weather.alerts(w).take(3).forEach { al -> append("⚠ ${al.title} — ${al.checklist.first()}.\n") }
+                append("\n")
+            }
             if (items.isEmpty()) append(if (persona == "LAIDBACK") "Calendar's wide open today — nice.\n" else "No events on the calendar today.\n")
             else { append("On deck today (${items.size}):\n"); append(describe(items.take(8), today)); append("\n") }
             append("\n")

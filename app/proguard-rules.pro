@@ -8,3 +8,6 @@
 -dontwarn com.google.re2j.**
 # PdfBox-Android: optional JPEG 2000 codec isn't bundled
 -dontwarn com.gemalto.jp2.**
+
+# Picovoice Porcupine (wake word): JNI binds by class and method name
+-keep class ai.picovoice.** { *; }

@@ -36,6 +36,7 @@ object Snapshot {
             put("google", JSONObject().put("account", s.googleAccount))
             put("keys", JSONObject().apply { Secrets.all.forEach { put(it, app.secrets.has(it)) } })
             put("time", Time.now())
+            com.blacklab.app.assistant.Weather.report.value?.let { put("weather", com.blacklab.app.assistant.Weather.toJson(it)) }
         }
     }
 

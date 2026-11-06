@@ -504,14 +504,39 @@ def assistant(body):
     if phone:
         r = phone_call(phone, "/api/assistant", {"text": text})
         return {"text": r.get("text", ""), "source": "Phone · " + r.get("source", "")}
+    g = gemini_text("You are BlackLab, a helpful, concise desktop assistant. Answer in 1-4 sentences.\n\nUser: " + text)
+    if g:
+        return {"text": g, "source": "Gemini (cloud) — Ollama is offline"}
     return {"text": "I can do desktop basics (system status, find files, open folders/apps, notes, pull phone files). For anything else, start Ollama or link the phone.",
             "source": "Desktop · rules"}
+
+
+def gemini_text(prompt: str, temperature=0.3, max_tokens=400) -> str | None:
+    """Cloud fallback when Ollama is down: the Gemini API with the key in secrets.json ("gemini")."""
+    key = SECRETS.get("gemini")
+    if not key:
+        return None
+    model = CONFIG.get("gemini_model", "gemini-2.5-flash")
+    cfg = {"temperature": temperature, "maxOutputTokens": max_tokens}
+    if "2.5" in model and "flash" in model:
+        cfg["thinkingConfig"] = {"thinkingBudget": 0}
+    try:
+        r = http_json(f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent",
+                      {"contents": [{"role": "user", "parts": [{"text": prompt[:30000]}]}], "generationConfig": cfg},
+                      headers={"x-goog-api-key": key}, timeout=60)
+        parts = r.get("candidates", [{}])[0].get("content", {}).get("parts", [])
+        return "".join(p.get("text", "") for p in parts).strip() or None
+    except Exception:
+        return None
 
 
 def phone_generate(body):
     """Raw generation for the phone's AI features (assistant router, summaries, Talk, Ask my files)."""
     models = ollama_models()
     if not models:
+        text = gemini_text(str(body.get("prompt", "")), float(body.get("temperature", 0.3)), int(body.get("max_tokens", 320)))
+        if text:
+            return {"text": text, "model": "gemini (cloud)"}
         raise RuntimeError("Ollama isn't running")
     model = default_model(models)
     r = http_json(f"{OLLAMA}/api/generate", {

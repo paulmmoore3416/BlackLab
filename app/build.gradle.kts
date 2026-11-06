@@ -21,8 +21,8 @@ android {
         applicationId = "com.blacklab.app"
         minSdk = 35
         targetSdk = 36
-        versionCode = 16
-        versionName = "5.4.0"
+        versionCode = 17
+        versionName = "5.5.0"
         vectorDrawables { useSupportLibrary = true }
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -156,6 +156,8 @@ dependencies {
     implementation("androidx.exifinterface:exifinterface:1.4.1")
 
     implementation("com.google.android.gms:play-services-mlkit-document-scanner:16.0.0")
+    // Offline wake word ("Hey Todd" / built-ins) — needs a free Picovoice AccessKey entered in the app
+    implementation("ai.picovoice:porcupine-android:4.0.2")
     implementation("com.google.android.gms:play-services-code-scanner:16.1.0")
     implementation("com.google.android.gms:play-services-mlkit-text-recognition:19.0.1")
     implementation("com.google.android.gms:play-services-mlkit-subject-segmentation:16.0.0-beta1")

@@ -95,6 +95,7 @@ fun HomeScreen() {
     val greeting = remember(now.hour) { Time.greeting() }
     val rec by RecorderService.state.collectAsState()
     val bh = com.blacklab.app.ui.bh.bhState()
+    val weather by com.blacklab.app.assistant.Weather.report.collectAsState()
     val bhNow = com.blacklab.app.ui.bh.rememberTicker(30_000)
     val dict by DictationService.state.collectAsState()
     val ctx = androidx.compose.ui.platform.LocalContext.current
@@ -263,6 +264,24 @@ fun HomeScreen() {
                     Spacer(Modifier.width(10.dp))
                     Text(if (rec.status == RecState.Status.PAUSED) "Recording paused" else "Recording in progress", Modifier.weight(1f), fontWeight = FontWeight.SemiBold)
                     Text(Time.duration(rec.elapsedMs), fontWeight = FontWeight.Bold)
+                }
+            }
+        }
+        // Weather + facility prep (OpenWeatherMap)
+        weather?.let { w ->
+            item {
+                val alerts = remember(w) { com.blacklab.app.assistant.Weather.alerts(w) }
+                val c = if (alerts.isNotEmpty()) Color(0xFFFFB74D) else MaterialTheme.colorScheme.primary
+                Surface(onClick = { shell.go(if (alerts.isNotEmpty()) "tasks" else "assistant/settings") }, shape = RoundedCornerShape(16.dp), color = c.copy(alpha = 0.14f), modifier = Modifier.fillMaxWidth().padding(top = 12.dp)) {
+                    Row(Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Text("${w.now.tempF.toInt()}°", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+                        Spacer(Modifier.width(12.dp))
+                        Column(Modifier.weight(1f)) {
+                            Text(w.now.condition + (w.now.place.takeIf { it.isNotBlank() }?.let { " · $it" } ?: ""), fontWeight = FontWeight.SemiBold, maxLines = 1)
+                            Text(alerts.firstOrNull()?.let { "⚠ ${it.title}" } ?: "High ${w.highF.toInt()}° · low ${w.lowF.toInt()}°", style = MaterialTheme.typography.labelMedium,
+                                color = if (alerts.isNotEmpty()) com.blacklab.app.ui.theme.LocalBlColors.current.warning else MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    }
                 }
             }
         }

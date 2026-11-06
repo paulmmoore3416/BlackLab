@@ -2,6 +2,16 @@
 
 All notable changes to BlackLab are documented here. The project follows [Semantic Versioning](https://semver.org/).
 
+## [5.5.0] — 2026-11-05
+
+Three free-key integrations: Gemini cloud AI, a Picovoice wake word, and OpenWeatherMap facility weather.
+
+### Added
+- **Gemini API** (free key, Google AI Studio): a third AI tier after the desktop AI and Gemini Nano (Off / Fallback by default / Prefer). Photo understanding: nameplate photos read directly into work orders, **Describe with Gemini** in the photo menu, and **Smart sort with Gemini**, which proposes folders for photos before anything moves. The desktop companion falls back to Gemini when Ollama is down. Never used by the Behavioral Health workspace.
+- **Wake word** (free Picovoice AccessKey): hands-free on the phone. Say the word (Jarvis, Computer… or your own "Hey Todd" .ppn), wait for the chime and ask. The reply is spoken and also posted as a notification. It steps aside while you record or dictate.
+- **Weather** (free OpenWeatherMap key): in the briefing, Home, the assistant ("will it freeze tonight?") and the web dashboard. **Facility prep alerts** for freeze, hard freeze, heat, storms, wind, heavy rain and snow come with checklists, and can create Professional tasks (one per alert per day).
+- Settings › Assistant & desktop: key slots with "get a free key" links, plus Cloud AI, Wake word and Weather cards.
+
 ## [5.4.0] — 2026-11-05
 
 Organize your Library with folders, and put your computer's local AI behind the phone's assistant, all started with one command.

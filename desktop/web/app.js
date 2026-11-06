@@ -442,10 +442,11 @@ Views.dashboard = () => {
       <div class="muted">${fmtDate(now, { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}${i.device ? ` · ${esc(i.device)} · Android ${esc(i.android)}` : ''}</div></div>
       <div class="spacer"></div>${profileSwitch()}</div>
     ${needData()}
-    <div class="grid g4" style="margin-bottom:16px">
+    <div class="grid g4" style="margin-bottom:16px;grid-template-columns:repeat(auto-fit,minmax(200px,1fr))">
       <div class="tile"><span class="k">Open tasks</span><span class="v">${open.length}</span><span class="s">${overdue.length ? `<span style="color:var(--danger)">${overdue.length} overdue</span>` : 'none overdue'} · ${dueToday.length} today</span></div>
       <div class="tile"><span class="k">Today</span><span class="v">${evToday.length}</span><span class="s">${next ? 'Next: ' + esc(next.title) + ' ' + relDay(next.start).toLowerCase() + ' ' + fmtTime(next.start) : 'Nothing upcoming'}</span></div>
       <div class="tile"><span class="k">Phone</span><span class="v">${i.battery >= 0 ? i.battery + '%' : '—'}</span><span class="s">${i.storageFree ? bytes(i.storageFree) + ' free' : 'not connected'}${i.charging ? ' · charging' : ''}</span></div>
+      ${i.weather ? `<div class="tile"><span class="k">Weather${i.weather.place ? ' · ' + esc(i.weather.place) : ''}</span><span class="v">${Math.round(i.weather.temp)}°</span><span class="s">${esc(i.weather.condition)} · H ${Math.round(i.weather.high)}° L ${Math.round(i.weather.low)}°${(i.weather.alerts || []).length ? ` · <span style="color:var(--warn)">⚠ ${esc(i.weather.alerts[0].title)}</span>` : ''}</span></div>` : ''}
       <div class="tile"><span class="k">Assistant</span><span class="v" style="font-size:20px">${esc(i.assistant?.name || 'BlackLab')}</span><span class="s">${i.assistant?.nano === 'AVAILABLE' ? 'Gemini Nano ready' : 'Rules engine'} · voice ${i.assistant ? (i.assistant.elevenCharsUsed || 0) + '/' + (i.assistant.elevenBudget || 0) : '—'}</span></div>
     </div>
     ${whatsNew()}

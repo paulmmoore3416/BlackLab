@@ -31,7 +31,12 @@ class Secrets(context: Context) {
         const val DESKTOP_AI = "desktop_ai"
         const val DESKTOP_AI_URL = "desktop_ai_url"
 
-        val all = listOf(ELEVENLABS, DEV_KNOWLEDGE, GOOGLE_DRIVE, GMAIL, GOOGLE_KEEP)
+        /** Free keys: Google AI Studio (Gemini), Picovoice (wake word), OpenWeatherMap (weather & facility alerts). */
+        const val GEMINI = "gemini"
+        const val PICOVOICE = "picovoice"
+        const val OPENWEATHER = "openweather"
+
+        val all = listOf(ELEVENLABS, DEV_KNOWLEDGE, GOOGLE_DRIVE, GMAIL, GOOGLE_KEEP, GEMINI, PICOVOICE, OPENWEATHER)
         /** Keys that may arrive by provisioning file or the desktop link (not shown in the key list). */
         val provisionable = all + listOf(DESKTOP_AI, DESKTOP_AI_URL)
         private const val ALIAS = "blacklab_secrets_v1"

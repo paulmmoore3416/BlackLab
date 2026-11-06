@@ -225,6 +225,11 @@
             android:foregroundServiceType="microphone" />
 
         <service
+            android:name=".assistant.WakeWordService"
+            android:exported="false"
+            android:foregroundServiceType="microphone" />
+
+        <service
             android:name=".dictation.DictationService"
             android:exported="false"
             android:foregroundServiceType="microphone" />

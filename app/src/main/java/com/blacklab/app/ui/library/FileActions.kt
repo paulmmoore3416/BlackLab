@@ -109,6 +109,13 @@ fun FileActionHost(file: File?, onDismiss: () -> Unit, onChanged: () -> Unit = {
                     add(SheetAction("Looks & filters", Icons.Rounded.AutoAwesome, hint = "1970s, Noir, Cinematic and more") { edit("looks") })
                     add(SheetAction("Add watermark", Icons.Rounded.BrandingWatermark) { edit("watermark") })
                     add(SheetAction("Remove background", Icons.Rounded.ContentCut, hint = "On-device subject cut-out") { edit("cutout") })
+                    if (com.blacklab.app.assistant.Gemini.visionEnabled) add(SheetAction("Describe with Gemini", Icons.Rounded.AutoAwesome, hint = "What's in it, issues worth noting — sent to Google") {
+                        app.io {
+                            val t = com.blacklab.app.assistant.Gemini.vision("Describe this photo for a facility / maintenance log in 3-6 short lines: what and where it is, its condition, any visible problems or safety hazards, and a suggested next step. Plain text, no preamble.", f)
+                            withContext(Dispatchers.Main) { ocr = t ?: "Gemini couldn't describe this one."; step = "ocr" }
+                        }
+                        step = "wait"
+                    })
                     add(SheetAction("Extract text (OCR)", Icons.Rounded.TextSnippet) {
                         app.io { val t = Ocr.recognize(ctx, f); withContext(Dispatchers.Main) { ocr = t; step = "ocr" } }
                         step = "wait"
