@@ -98,12 +98,16 @@ internal fun kbStyle(id: String): Pair<ImageVector, Color> = when (id) {
     "conv-ai-builder" -> Icons.Rounded.Psychology to Violet
     "conv-ship-it" -> Icons.Rounded.RocketLaunch to Coral
     "conv-health" -> Icons.Rounded.FitnessCenter to Color(0xFF4CD787)
+    "peer-support" -> Icons.Rounded.Diversity3 to Violet
+    "mht-practice" -> Icons.Rounded.HealthAndSafety to Coral
+    "conv-peer-lab" -> Icons.Rounded.Diversity3 to Color(0xFFB39DDB)
     "conv-money-home" -> Icons.Rounded.Savings to Amber
     "conv-downtime" -> Icons.Rounded.SportsFootball to Color(0xFF5BC0EB)
     else -> Icons.AutoMirrored.Rounded.MenuBook to Mint
 }
 
 private val techIds = setOf("software-engineering", "software-development", "ai-engineering", "ai-development", "github")
+private val careIds = setOf("peer-support", "mht-practice")
 
 // ------------------------------------------------------------------ hub
 
@@ -136,10 +140,15 @@ fun KnowledgeScreen(startTab: String = "") {
                             style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                     val tech = convs.filter { c -> c.draws.any { it in techIds } }
+                    val care = convs.filter { c -> c.draws.any { it in careIds } }
                     item { SectionHeader("Tech talk") }
                     items(tech, key = { it.id }) { c -> ConversationCard(c, app.conversations) { shell.go("talk/${c.id}") } }
+                    if (care.isNotEmpty()) {
+                        item { SectionHeader("Behavioral health") }
+                        items(care, key = { it.id }) { c -> ConversationCard(c, app.conversations) { shell.go("talk/${c.id}") } }
+                    }
                     item { SectionHeader("Everyday") }
-                    items(convs - tech.toSet(), key = { it.id }) { c -> ConversationCard(c, app.conversations) { shell.go("talk/${c.id}") } }
+                    items(convs - tech.toSet() - care.toSet(), key = { it.id }) { c -> ConversationCard(c, app.conversations) { shell.go("talk/${c.id}") } }
                 } else {
                     item {
                         OutlinedTextField(query, { query = it }, Modifier.fillMaxWidth(), placeholder = { Text("Search every knowledge base") },

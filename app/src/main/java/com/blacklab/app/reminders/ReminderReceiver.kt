@@ -58,6 +58,7 @@ class BootReceiver : BroadcastReceiver() {
                 StudyTimer.get(context).rearm()
                 runCatching { com.blacklab.app.brainstorm.PlaceReminders.sync(context) }
                 runCatching { com.blacklab.app.widgets.Widgets.refreshNow(context) }
+                runCatching { com.blacklab.app.bh.Rounds.rearm(context) }
             } finally {
                 pending.finish()
             }

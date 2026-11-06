@@ -93,6 +93,8 @@ fun HomeScreen() {
     val today = now.toLocalDate()
     val greeting = remember(now.hour) { Time.greeting() }
     val rec by RecorderService.state.collectAsState()
+    val bh = com.blacklab.app.ui.bh.bhState()
+    val bhNow = com.blacklab.app.ui.bh.rememberTicker(30_000)
     val dict by DictationService.state.collectAsState()
     val ctx = androidx.compose.ui.platform.LocalContext.current
     // null until the first database read, so Home shows placeholders instead of a "no tasks" flash
@@ -260,6 +262,24 @@ fun HomeScreen() {
                     Spacer(Modifier.width(10.dp))
                     Text(if (rec.status == RecState.Status.PAUSED) "Recording paused" else "Recording in progress", Modifier.weight(1f), fontWeight = FontWeight.SemiBold)
                     Text(Time.duration(rec.elapsedMs), fontWeight = FontWeight.Bold)
+                }
+            }
+        }
+        // Behavioral Health: on shift / rounds due — counts only, never initials or rooms
+        if (!bh.prefs.hideOnHome && (bh.roundsOn || bh.activeShift != null)) item {
+            val over = com.blacklab.app.bh.Rounds.overdue(bh, bhNow).size
+            val next = com.blacklab.app.bh.Rounds.nextDue(bh, bhNow)
+            val c = if (over > 0) Color(0xFFEF5350) else Color(0xFF2BD9A8)
+            Surface(onClick = { shell.go(if (bh.roundsOn) "bh/rounds" else "bh/shift") }, shape = RoundedCornerShape(16.dp), color = c.copy(alpha = 0.16f), modifier = Modifier.fillMaxWidth().padding(top = 12.dp)) {
+                Row(Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Box(Modifier.size(10.dp).clip(CircleShape).background(c))
+                    Spacer(Modifier.width(10.dp))
+                    Text(when {
+                        bh.roundsOn && over > 0 -> "Rounds: $over overdue"
+                        bh.roundsOn && next != null -> if (next <= bhNow) "Rounds due now" else "Next check in ${(next - bhNow) / 60_000 + 1} min"
+                        else -> "On shift" + (bh.activeShift?.let { " · ${it.type}" } ?: "")
+                    }, Modifier.weight(1f), fontWeight = FontWeight.SemiBold)
+                    Text(if (bh.census.isNotEmpty()) "${bh.census.size} on census" else "Shift Hub", style = MaterialTheme.typography.labelLarge)
                 }
             }
         }

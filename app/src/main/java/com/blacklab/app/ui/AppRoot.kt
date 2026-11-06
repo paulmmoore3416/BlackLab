@@ -139,6 +139,7 @@ private val drawerDests = listOf(
     Dest("assistant", "Assistant", Icons.Rounded.AutoAwesome),
     Dest("knowledge", "Knowledge & Talk", Icons.Rounded.Psychology),
     Dest("summarize", "Summarize", Icons.Rounded.Summarize),
+    Dest("bh", "Behavioral Health", Icons.Rounded.Diversity3),
     Dest("garage", "Garage · Santa Fe", Icons.Rounded.DirectionsCar),
     Dest("camera", "Camera", Icons.Rounded.PhotoCamera),
     Dest("recorder", "Recorder", Icons.Rounded.Mic),
@@ -476,6 +477,22 @@ private fun NavGraph(nav: androidx.navigation.NavHostController) {
         }
         screen("summarize") { com.blacklab.app.ui.summarize.SummarizeScreen() }
         screen("garage") { com.blacklab.app.ui.vehicle.GarageScreen() }
+        // ---- Behavioral Health (MHT & Peer Support) — every screen is behind BhGuarded
+        screen("bh") { com.blacklab.app.ui.bh.BhHubScreen() }
+        screen("bh/shift") { com.blacklab.app.ui.bh.BhShiftScreen() }
+        screen("bh/rounds") { com.blacklab.app.ui.bh.BhRoundsScreen() }
+        screen("bh/crisis?tab={tab}", arguments = listOf(navArgument("tab") { defaultValue = "" })) { com.blacklab.app.ui.bh.BhCrisisScreen(it.arguments?.getString("tab") ?: "") }
+        screen("bh/peer") { com.blacklab.app.ui.bh.BhPeerScreen() }
+        screen("bh/participant/{id}") { com.blacklab.app.ui.bh.BhParticipantScreen(it.arguments?.getString("id") ?: "") }
+        screen("bh/groups") { com.blacklab.app.ui.bh.BhGroupsScreen() }
+        screen("bh/resources") { com.blacklab.app.ui.bh.BhResourcesScreen() }
+        screen("bh/eoc") { com.blacklab.app.ui.bh.BhEocScreen() }
+        screen("bh/eoc/{id}") { com.blacklab.app.ui.bh.BhEocRoundScreen(it.arguments?.getString("id") ?: "") }
+        screen("bh/wellness") { com.blacklab.app.ui.bh.BhWellnessScreen() }
+        screen("bh/records/{kind}") { com.blacklab.app.ui.bh.BhGuarded { com.blacklab.app.ui.bh.BhRecordsScreen(it.arguments?.getString("kind") ?: "") } }
+        screen("bh/form/{kind}?id={id}&ref={ref}", arguments = listOf(navArgument("id") { defaultValue = "" }, navArgument("ref") { defaultValue = "" })) {
+            com.blacklab.app.ui.bh.BhGuarded { com.blacklab.app.ui.bh.BhFormScreen(it.arguments?.getString("kind") ?: "", it.arguments?.getString("id") ?: "", it.arguments?.getString("ref") ?: "") }
+        }
     }
     }
     }

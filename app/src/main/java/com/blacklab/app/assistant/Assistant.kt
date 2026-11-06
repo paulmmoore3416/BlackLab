@@ -204,6 +204,9 @@ class Assistant(private val app: AppContainer) {
         // ---- Garage: the Santa Fe (fuel, service, odometer, what's due) — before tasks so "what's due on the car" lands here
         garage(t, l)?.let { return it }
 
+        // ---- Behavioral Health: rounds, shift, crisis lines, notes (counts only — never names or rooms)
+        behavioral(l)?.let { return it }
+
         // ---- tasks
         m("^(?:remind me(?: to)?|don't let me forget(?: to)?)\\s+(.+)$")?.let { return addTask(it.groupValues[1], remind = true) }
         m("^(?:add|create|new|make)(?: a| an)?(?: new)? (?:task|to-?do|todo|reminder)(?: to| for| called| named)?[:\\s]+(.+)$")?.let { return addTask(it.groupValues[1], remind = false) }
@@ -385,6 +388,7 @@ User: $text"""
 • Settings — “dark mode”, “switch to professional”, “set focus length to 45”
 • Summaries — “summarize this week as action items”, “recap my recent notes for my boss”, or pick items in Summarize
 • Knowledge — “what is retrieval-augmented generation?”, “explain GitHub Actions caching”, “let's talk about system design”
+• Behavioral Health — “start rounds”, “when are rounds due?”, “start my shift”, “new peer note”, “SBAR handoff”, “crisis lines”, “grounding”
 • Garage — “log fuel 13.2 gallons $48 at 31,250 miles”, “I got an oil change at 31,000”, “what's due on the car?”
 • Driving — “navigate to my next meeting”, “find a gas station”, “call 555-0100”
 • 🌐 Gmail — “check email”, “search email for invoice”, “draft email to x@y.com about … saying …”
@@ -774,6 +778,75 @@ User: $text"""
             return Reply(a.text, source = a.engine)
         }
         return Reply(if (q.isBlank()) chosen.opener else "Let's get into it — ${chosen.title}.", route = route, source = chosen.title, speak = origin == Origin.CAR || q.isBlank())
+    }
+
+    // ------------------------------------------------------------------ behavioral health
+
+    private fun behavioral(l: String): Reply? {
+        val ctx = app.context
+        val bh = com.blacklab.app.bh.BhStore
+        val link = listOf(Link("Behavioral Health", "bh"))
+        if (Regex("\\b(crisis (line|number|text)s?|suicide (hotline|line)|988)\\b").containsMatchIn(l)) {
+            val call = Regex("^(call|dial|ring)\\b").containsMatchIn(l)
+            return Reply("988 Suicide & Crisis Lifeline: call or text 988, any time. Crisis Text Line: text HOME to 741741. Veterans: dial 988 and press 1." +
+                if (call) " Dialing 988." else "", listOf(Link("Resources", "bh/resources")), dial = if (call) "988" else null)
+        }
+        if (Regex("\\b(rounds?|q ?15s?|observation checks?)\\b").containsMatchIn(l) && !Regex("safety|ligature|eoc|environment|golf|ammo|drinks").containsMatchIn(l)) {
+            val st = bh.load(ctx)
+            when {
+                Regex("^(start|begin|turn on|resume)\\b").containsMatchIn(l) -> {
+                    if (st.census.isEmpty()) return Reply("There's no one on the census yet — add people by initials or room in Observation Rounds.", route = "bh/rounds")
+                    bh.setRounds(ctx, true); return Reply(done("rounds are on for ${st.census.size} on the census. I'll alert you when checks are due."), link)
+                }
+                Regex("^(stop|end|pause|turn off)\\b").containsMatchIn(l) -> { bh.setRounds(ctx, false); return Reply(done("rounds alerts are off."), link) }
+                Regex("^(log|open|show|do)\\b").containsMatchIn(l) -> return Reply("Opening rounds.", route = "bh/rounds")
+                Regex("^(when|what|how|are|is|any|next|status|rounds? status|check)").containsMatchIn(l) && !Regex("^what (is|are) (a |an )?(q ?15|rounds|observation)").containsMatchIn(l) -> {
+                    val now = System.currentTimeMillis()
+                    if (!st.roundsOn) return Reply("Rounds are off. Say “start rounds” to turn on the timers.", link)
+                    val over = com.blacklab.app.bh.Rounds.overdue(st, now).size
+                    val next = com.blacklab.app.bh.Rounds.nextDue(st, now)
+                    return Reply((if (over > 0) "$over overdue. " else "") + (next?.let { if (it <= now) "Checks are due now. " else "Next check in ${(it - now) / 60_000 + 1} minutes. " } ?: "") +
+                        "${st.census.size} on the census.", link)
+                }
+                else -> Unit
+            }
+        }
+        if (Regex("^(start|begin|clock in to|starting) (my |a |the )?shift").containsMatchIn(l)) {
+            val st = bh.load(ctx)
+            if (st.activeShift != null) return Reply("You're already on shift since ${com.blacklab.app.bh.Writer.clock(st.activeShift!!.start)}.", route = "bh/shift")
+            val type = when (LocalTime.now().hour) { in 5..10 -> "Day"; in 11..17 -> "Evening"; else -> "Night" }
+            bh.upsertShift(ctx, com.blacklab.app.bh.Bh.Shift(type = type, role = if (st.prefs.role == "PSS") "Peer Support" else "MHT", unit = st.prefs.unit))
+            return Reply(done("$type shift started. Your checklist is ready."), route = "bh/shift")
+        }
+        if (Regex("^(end|finish|clock out of|ending) (my |the )?shift").containsMatchIn(l)) {
+            return Reply("Let's wrap up — the end-of-shift list and handoff are open.", route = "bh/shift")
+        }
+        // Anchored so "remind me to finish my peer note" still becomes a task and questions still reach the knowledge bases
+        val lead = "^(?:(?:new|write|start|open|create|do|begin|draft|make|log|record|add|show|go to)\\s+)?(?:(?:a|an|my|the)\\s+)?"
+        fun says(body: String) = Regex(lead + "(?:$body)$").containsMatchIn(l)
+        val form = when {
+            says("(?:peer|session|peer support|peer session) note") -> com.blacklab.app.bh.Specs.PEER_NOTE
+            says("(?:observation|shift observation|behavior) note") -> com.blacklab.app.bh.Specs.BEHAVIOR
+            says("sbar(?: handoff| report)?|(?:shift )?handoff|shift report") -> com.blacklab.app.bh.Specs.HANDOFF
+            says("(?:behavioral|patient|unit|aggression|restraint|seclusion) incident(?: report| draft)?|incident draft") -> com.blacklab.app.bh.Specs.INCIDENT
+            says("(?:post[- ]incident |staff |patient )?debrief") -> com.blacklab.app.bh.Specs.DEBRIEF
+            says("group (?:session )?note") -> com.blacklab.app.bh.Specs.GROUP_NOTE
+            says("(?:after[- ]shift |wellness )?check[- ]?in") -> com.blacklab.app.bh.Specs.CHECKIN
+            says("supervision(?: session| hours| log)?") -> com.blacklab.app.bh.Specs.SUPERVISION
+            says("(?:wellness|crisis|wrap) plan") -> com.blacklab.app.bh.Specs.SAFETY_PLAN
+            else -> null
+        }
+        if (form != null) return Reply("Opening a new ${com.blacklab.app.bh.Specs.spec(form)?.title?.lowercase()}.", route = "bh/form/$form")
+        val screen = when {
+            says("de-?escalation(?: guide| tips)?|crisis guide") -> "bh/crisis"
+            says("grounding(?: exercise)?|breathing exercise|box breathing|breathing coach") -> "bh/crisis?tab=ground"
+            says("(?:safety|ligature|ligature risk|eoc|environment of care) rounds?") -> "bh/eoc"
+            says("group (?:plans?|ideas|topics?|activities|library)|plan a group") -> "bh/groups"
+            says("(?:peer |recovery |community )?resources|referrals?") && Regex("peer|referral|community|recovery").containsMatchIn(l) -> "bh/resources"
+            says("behavioral health|mht|peer support|census|participants") -> "bh"
+            else -> null
+        }
+        return screen?.let { Reply("Opening it.", route = it) }
     }
 
     // ------------------------------------------------------------------ garage & driving

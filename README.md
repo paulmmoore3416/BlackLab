@@ -7,13 +7,13 @@
 **A private, all-in-one personal & professional workspace for Android.**
 Pro camera & photo editor · dictation · audio recorder · Word-class documents · journal · to-do · calendar · education & certification tracking — in one app, with every file saved to a real folder on your phone.
 
-[![Version](https://img.shields.io/badge/version-5.0.0-2BD9A8)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-5.1.0-2BD9A8)](CHANGELOG.md)
 [![Android](https://img.shields.io/badge/Android-15%2B-3DDC84?logo=android&logoColor=white)](#requirements)
 [![Kotlin](https://img.shields.io/badge/Kotlin-2.1-7F52FF?logo=kotlin&logoColor=white)](https://kotlinlang.org)
 [![Jetpack Compose](https://img.shields.io/badge/Jetpack%20Compose-Material%203-4285F4?logo=jetpackcompose&logoColor=white)](https://developer.android.com/compose)
 [![Android CI](https://github.com/paulmmoore3416/BlackLab/actions/workflows/android.yml/badge.svg)](https://github.com/paulmmoore3416/BlackLab/actions/workflows/android.yml)
 
-[Download APK](releases/BlackLab-v5.0.0.apk) · [Features](#features) · [Install](#install) · [Build from source](#build-from-source) · [Architecture](docs/ARCHITECTURE.md)
+[Download APK](releases/BlackLab-v5.1.0.apk) · [Features](#features) · [Install](#install) · [Build from source](#build-from-source) · [Architecture](docs/ARCHITECTURE.md)
 
 </div>
 
@@ -62,9 +62,21 @@ Optimized for the **Google Pixel 10 Pro XL** and newer (Android 15+).
 - Gemini Nano on-device (long items read in chunks), with an offline extractive engine as the fallback; save as a document or note, make tasks, read aloud
 
 ### 🧠 Knowledge & Talk
-- **Five expert knowledge bases**: Software Engineering, Software Development, AI Engineering, AI Development, GitHub & Git
-- **Seven conversations**: Architecture Roundtable, Code Craft & Review, AI Builder's Lab, Ship It: DevOps & GitHub — each drawing on all five bases — plus Health & Performance at 40; Money, Home & Family; Downtime & Interests
+- **Seven expert knowledge bases**: Software Engineering, Software Development, AI Engineering, AI Development, GitHub & Git, Peer Support Practice, MHT Practice & Unit Safety
+- **Eight conversations**: Architecture Roundtable, Code Craft & Review, AI Builder's Lab, Ship It: DevOps & GitHub — each drawing on the five tech bases — the Shift & Peer Practice Lab, plus Health & Performance at 40; Money, Home & Family; Downtime & Interests
 - Ask the assistant (“what is RAG?”) or talk it through by voice; everything is searched on the phone
+
+### 🧩 Behavioral Health — MHT & Peer Support
+An encrypted workspace for working on a behavioral health unit, using initials and aliases only:
+- **Shift Hub**: shift checklist, de-identified census, observation notes, SBAR handoff, hours worked
+- **Observation Rounds**: Q5–Q60, line of sight and 1:1 timers, bulk round logging, due and overdue alerts (counts only), round sheet
+- **Crisis & De-escalation**: phase-by-phase guide, what to say, grounding and a breathing coach, trauma-informed principles, incident and debrief drafts
+- **Peer Support**: participants, recovery goals and capital, DAP/SOAP/BIRP/GIRP/narrative session notes, wellness & crisis plans, referrals
+- **Group Facilitation**: 18 ready plans plus your own, a facilitation timer, group notes
+- **Resources & Referrals**: 26 national crisis and recovery resources plus your local ones, with call, text, map and share
+- **Safety Rounds**: ligature-risk / environment-of-care rounds by area, with findings sent to To-Do as work orders
+- **Wellness & Supervision**: after-shift check-ins, compassion-fatigue trends, supervision hours, self-care plan
+- Encrypted with a Keystore key, never backed up or synced; census, rounds and drafts are erased automatically. The facility's EHR stays the record of care.
 
 ### 🔧 Garage
 - 2023 Santa Fe profile, editable maintenance schedule (normal or severe service) with what's due next, fuel log with MPG and cost per mile, service history

@@ -2,6 +2,30 @@
 
 All notable changes to BlackLab are documented here. The project follows [Semantic Versioning](https://semver.org/).
 
+## [5.1.0] — 2026-11-05
+
+A Behavioral Health workspace for working as a Mental Health Technician and Peer Support Specialist — encrypted on the phone, built with initials and aliases only.
+
+### Added
+- **Behavioral Health** (drawer): a hub with eight tools, a 988 button and quick links to de-escalation and grounding. Every screen sits behind a fingerprint / screen-lock check (on by default).
+  1. **Shift Hub**: start and end a shift (type, role, unit), a 23-item start/during/end checklist, a de-identified census (room/bed + initials, observation level, 17 precautions), shift notes, per-person **shift observation notes** (affect, behavior, speech, groups, ADLs, meals, sleep, delegated vitals, precautions), an **SBAR handoff** that pulls in the census and each person's last check, and hours worked over 7 and 30 days.
+  2. **Observation Rounds**: Q5/Q10/Q15/Q30/Q60, line of sight and 1:1 levels per person with live countdowns, overdue after a chosen grace period, **Log a round** for everyone at once (location and behavior dropdowns, “set all”), per-person checks with history, on-time percentage, and a copyable **round sheet**. Exact alarms notify when checks are due and keep nudging while anyone is overdue. Notifications show counts only and are hidden on the lock screen.
+  3. **Crisis & De-escalation**: a five-phase guide (what it looks like, respond, say, avoid), ground rules and phrases, grounding techniques with a box-breathing coach, SAMHSA's trauma-informed principles, and **incident report** and **post-incident debrief** drafts (event type, location, antecedents, warning signs, interventions, restrictive-intervention details, injuries, notifications, objective narrative).
+  4. **Peer Support**: participants by alias (setting, readiness, recovery pathways, strengths, supports, wellness/crisis plan on file), **recovery goals** by life area with steps, target dates and status, a 14-area **recovery capital** check, and **session notes** written as DAP, SOAP, BIRP, GIRP or narrative from 29 fields (contact type, setting, domains, 25 topics, 21 peer interventions, purposeful self-disclosure, response, safety reporting, plan). Also **wellness & crisis plan** drafts and **referrals**.
+  5. **Group Facilitation**: 18 ready group plans in 12 categories (objective, opener, activity, discussion questions, closing, materials, adaptations), your own plans, a facilitation timer, and **group notes** with attendance and dynamics.
+  6. **Resources & Referrals**: 26 national crisis, recovery and community resources (988, Crisis Text Line, Veterans Crisis Line, SAMHSA Helpline, NAMI, 211, Trevor, DV and more) with call, text, web, map, share and favorites; your own local resources; referral tracking by status.
+  7. **Safety Rounds (EOC)**: ligature-risk and environment-of-care rounds across 11 area types and 77 checks (OK / Issue / N/A), risk level and mitigation, one-tap **work orders** into To-Do (Professional), recurring findings over 90 days, and a copyable round report.
+  8. **Wellness & Supervision**: after-shift check-ins with trends and a compassion-fatigue nudge, a supervision log with hours by type and toward your credential, a self-care plan, and peer/MHT credentials you can track in Education.
+- Every note has **Copy** (marked sensitive on the clipboard), **Share** and **Save as document**.
+- **Knowledge**: two new expert bases, **Peer Support Practice** (31 entries) and **MHT Practice & Unit Safety** (33 entries), plus a **Shift & Peer Practice Lab** conversation.
+- Assistant: “start rounds”, “when are rounds due?”, “start my shift”, “new peer note”, “SBAR handoff”, “crisis lines”, “call 988”, “grounding”, “safety rounds”.
+- Home shows an on-shift / rounds-due card (counts only; can be hidden).
+- Education suggests 12 behavioral-health credentials (CPSS/CPS, NCPS, CPRS, MHT, BLS/CPR, crisis prevention, Mental Health First Aid, QPR, WRAP facilitator…).
+
+### Privacy
+- The workspace is one file encrypted with AES-256-GCM under an Android Keystore key, in app-private storage. It's excluded from Android backup and device transfer and is never synced to Desktop or Drive, indexed by Ask my files, or read aloud in the car.
+- Census and rounds are erased after 8–72 hours (24 by default), and drafts about other people after 1–90 days (14 by default). You can erase everything from the workspace settings.
+
 ## [5.0.0] — 2026-11-01
 
 BlackLab comes to the car, summarizes anything you pick, and gains an expert knowledge library you can talk to.

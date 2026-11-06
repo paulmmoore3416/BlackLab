@@ -26,6 +26,7 @@ class BlackLabApp : Application() {
         com.blacklab.app.core.CrashLog.install(this)
         container = AppContainer(this)
         Notifications.createChannels(this)
+        com.blacklab.app.bh.Rounds.createChannel(this)
         container.storage.ensureStructure()
         container.requestReminderSync()
         container.appScope.launch { container.backups.autoBackupIfDue() }

@@ -12,9 +12,9 @@ class KnowledgeTest {
     private val index = Knowledge.Bm25(bases.flatMap { it.entries })
     private fun top(q: String, scope: Set<String>? = null) = index.search(q, 3, scope, emptyMap())
 
-    @Test fun shipsFiveDomainAndSevenConversationBases() {
-        assertEquals(5, bases.count { it.kind == Knowledge.Kind.DOMAIN })
-        assertEquals(7, bases.count { it.kind == Knowledge.Kind.CONVERSATION })
+    @Test fun shipsSevenDomainAndEightConversationBases() {
+        assertEquals(7, bases.count { it.kind == Knowledge.Kind.DOMAIN })
+        assertEquals(8, bases.count { it.kind == Knowledge.Kind.CONVERSATION })
         assertEquals(bases.size, bases.map { it.id }.toSet().size)
     }
 
@@ -37,8 +37,8 @@ class KnowledgeTest {
         }
     }
 
-    @Test fun techConversationsDrawOnEveryDomainBase() {
-        val domains = bases.filter { it.kind == Knowledge.Kind.DOMAIN }.map { it.id }.toSet()
+    @Test fun techConversationsDrawOnEveryTechBase() {
+        val domains = setOf("software-engineering", "software-development", "ai-engineering", "ai-development", "github")
         listOf("conv-architecture", "conv-code-craft", "conv-ai-builder", "conv-ship-it").forEach { id ->
             val c = bases.first { it.id == id }
             assertEquals("$id draws on all domain bases", domains, c.draws.toSet())
@@ -53,6 +53,13 @@ class KnowledgeTest {
         assertTrue(top("how do I smoke a brisket").first().entry.title.contains("brisket", true))
         assertTrue(top("prompt injection defense").first().entry.title.contains("injection", true))
         assertTrue(top("emergency fund size", setOf("conv-money-home")).first().entry.title.contains("Emergency", true))
+        // Behavioral health
+        assertTrue(top("how long can a restraint order last").first().entry.title.contains("Restraint", true))
+        assertTrue(top("purposeful self-disclosure sharing my story").any { it.entry.title.contains("lived experience", true) })
+        assertTrue(top("what is a ligature point").first().entry.title.contains("ligature", true))
+        assertTrue(top("signs of opioid overdose naloxone").first().entry.title.contains("overdose", true))
+        assertTrue(top("OARS open questions reflections").first().entry.title.contains("OARS", true))
+        assertTrue(top("participant asked for my personal number", setOf("conv-peer-lab")).first().entry.title.contains("personal number", true))
     }
 
     @Test fun parsesHeaderAndEntries() {

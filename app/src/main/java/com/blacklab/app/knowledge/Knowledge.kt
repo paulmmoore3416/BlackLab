@@ -5,8 +5,9 @@ import com.blacklab.app.assistant.LocalIndex
 import kotlin.math.ln
 
 /**
- * BlackLab's built-in expert knowledge: five domain knowledge bases (software engineering, software
- * development, AI engineering, AI development, GitHub) and seven conversation knowledge bases that
+ * BlackLab's built-in expert knowledge: seven domain knowledge bases (software engineering, software
+ * development, AI engineering, AI development, GitHub, peer support practice, MHT practice & unit safety)
+ * and eight conversation knowledge bases that
  * the assistant talks from. Everything ships inside the APK as Markdown under assets/knowledge and is
  * searched on the phone, so it works with no signal (in the car, on a plane, in a mechanical room).
  *
@@ -90,8 +91,8 @@ object Knowledge {
 
     /** Display order for the built-in bases; anything else sorts after them by title. */
     private val order = listOf(
-        "software-engineering", "software-development", "ai-engineering", "ai-development", "github",
-        "conv-architecture", "conv-code-craft", "conv-ai-builder", "conv-ship-it", "conv-health", "conv-money-home", "conv-downtime",
+        "software-engineering", "software-development", "ai-engineering", "ai-development", "github", "peer-support", "mht-practice",
+        "conv-architecture", "conv-code-craft", "conv-ai-builder", "conv-ship-it", "conv-peer-lab", "conv-health", "conv-money-home", "conv-downtime",
     )
 
     /** Parses one knowledge-base Markdown file. Public for unit tests. */

@@ -44,14 +44,14 @@ val AssignmentKinds = listOf("Homework", "Reading", "Quiz", "Exam", "Midterm", "
 val AssignmentStatuses = listOf("TODO" to "To do", "IN_PROGRESS" to "In progress", "SUBMITTED" to "Submitted", "GRADED" to "Graded")
 val CertStatuses = listOf("PLANNED" to "Planned", "STUDYING" to "Studying", "EXAM_SCHEDULED" to "Exam scheduled", "EARNED" to "Earned", "EXPIRED" to "Expired")
 
-/** Popular facility-management & safety credentials for quick entry. */
+/** Popular facility-management, safety and behavioral-health credentials for quick entry. */
 val SuggestedCerts = listOf(
     "CFM — Certified Facility Manager" to "IFMA", "FMP — Facility Management Professional" to "IFMA", "SFP — Sustainability Facility Professional" to "IFMA",
     "RPA — Real Property Administrator" to "BOMI", "FMA — Facilities Management Administrator" to "BOMI", "CHFM — Certified Healthcare Facility Manager" to "AHA",
     "CEM — Certified Energy Manager" to "AEE", "LEED Green Associate" to "USGBC", "LEED AP O+M" to "USGBC", "PMP — Project Management Professional" to "PMI",
     "OSHA 30-Hour General Industry" to "OSHA", "CSP — Certified Safety Professional" to "BCSP", "CPMM — Certified Plant Maintenance Manager" to "AFE",
     "CMRP — Certified Maintenance & Reliability Professional" to "SMRP", "EPA 608 Universal" to "EPA", "NFPA CFPS — Certified Fire Protection Specialist" to "NFPA",
-)
+) + com.blacklab.app.ui.bh.BH_CREDENTIALS
 
 data class EduData(
     val courses: List<CourseEntity>,
