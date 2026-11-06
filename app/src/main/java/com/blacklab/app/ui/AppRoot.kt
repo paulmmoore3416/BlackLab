@@ -231,7 +231,7 @@ private fun AppShell(activity: MainActivity) {
             drawerState = drawer,
             gesturesEnabled = drawer.isOpen || route == "home",
             drawerContent = {
-                ModalDrawerSheet(drawerContainerColor = MaterialTheme.colorScheme.surfaceContainerLow) {
+                ModalDrawerSheet(drawerContainerColor = com.blacklab.app.ui.theme.LocalGlass.current.let { g -> if (g.enabled) g.barFill(MaterialTheme.colorScheme.surface, 0.94f) else MaterialTheme.colorScheme.surfaceContainerLow }) {
 
                     Column(Modifier.verticalScroll(rememberScrollState()).padding(horizontal = 12.dp)) {
                         Row(Modifier.padding(start = 8.dp, top = 20.dp, bottom = 8.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -300,7 +300,7 @@ private fun AppShell(activity: MainActivity) {
                     val musicOn by com.blacklab.app.media.PlaybackService.running.collectAsState()
                     if (showBottom && musicOn) com.blacklab.app.ui.music.MiniPlayer(com.blacklab.app.ui.music.rememberPlayer(), bottomInset = false) { nav.navigate("nowplaying") { launchSingleTop = true } }
                     AnimatedVisibility(showBottom && barShown, enter = slideInVertically(Motion.enter()) { it } + fadeIn(Motion.enter()), exit = slideOutVertically(Motion.exit()) { it } + fadeOut(Motion.exit())) {
-                        NavigationBar(containerColor = MaterialTheme.colorScheme.surfaceContainerLow, tonalElevation = 0.dp) {
+                        NavigationBar(containerColor = com.blacklab.app.ui.theme.LocalGlass.current.let { g -> if (g.enabled) g.barFill(MaterialTheme.colorScheme.surface, 0.86f) else MaterialTheme.colorScheme.surfaceContainerLow }, tonalElevation = 0.dp) {
                             bottomDests.forEach { d ->
                                 NavigationBarItem(
                                     selected = route == d.route,

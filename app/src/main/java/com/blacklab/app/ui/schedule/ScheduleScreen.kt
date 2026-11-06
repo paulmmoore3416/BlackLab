@@ -381,7 +381,7 @@ private fun AgendaList(today: LocalDate, byDay: Map<LocalDate, List<CalItem>>, o
     LazyColumn(state = state, contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 96.dp)) {
         days.forEach { d ->
             stickyHeader(key = "h$d") {
-                Row(Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.background).padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                Row(Modifier.fillMaxWidth().background(com.blacklab.app.ui.theme.LocalBlColors.current.page).padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
                     Box(Modifier.size(40.dp).clip(CircleShape).background(if (d == today) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceContainerHigh), contentAlignment = Alignment.Center) {
                         Text("${d.dayOfMonth}", fontWeight = FontWeight.Bold, color = if (d == today) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface)
                     }

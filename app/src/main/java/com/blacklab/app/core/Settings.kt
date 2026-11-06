@@ -149,6 +149,12 @@ data class Settings(
     val lightStyle: String = "CLEAN",
     /** AAA-level text and accent contrast with darker borders, in light and dark. */
     val highContrast: Boolean = false,
+    /** GLASS (aurora backdrop + frosted cards) or SOLID. */
+    val visualStyle: String = "GLASS",
+    /** AURORA (moving), GRADIENT (still) or PLAIN. */
+    val backdrop: String = "AURORA",
+    /** 0–100: how strongly the palette shows in the backdrop. */
+    val backdropIntensity: Int = 60,
     // signatures
     val sigConfirm: Boolean = true,
     // feel
@@ -280,6 +286,9 @@ object Keys {
     const val SECONDARY_PROFESSIONAL = "secondary_professional"
     const val LIGHT_STYLE = "light_style"
     const val HIGH_CONTRAST = "high_contrast"
+    const val VISUAL_STYLE = "visual_style"
+    const val BACKDROP = "backdrop"
+    const val BACKDROP_INTENSITY = "backdrop_intensity"
     const val SIG_CONFIRM = "sig_confirm"
     const val HAPTICS = "haptics"
     const val REDUCE_MOTION = "reduce_motion"
@@ -429,6 +438,9 @@ class SettingsRepository(context: Context) {
             secondaryProfessional = getString(Keys.SECONDARY_PROFESSIONAL, d.secondaryProfessional) ?: d.secondaryProfessional,
             lightStyle = getString(Keys.LIGHT_STYLE, d.lightStyle) ?: d.lightStyle,
             highContrast = getBoolean(Keys.HIGH_CONTRAST, d.highContrast),
+            visualStyle = getString(Keys.VISUAL_STYLE, d.visualStyle) ?: d.visualStyle,
+            backdrop = getString(Keys.BACKDROP, d.backdrop) ?: d.backdrop,
+            backdropIntensity = getInt(Keys.BACKDROP_INTENSITY, d.backdropIntensity).coerceIn(0, 100),
             sigConfirm = getBoolean(Keys.SIG_CONFIRM, d.sigConfirm),
             haptics = getBoolean(Keys.HAPTICS, d.haptics),
             reduceMotion = getBoolean(Keys.REDUCE_MOTION, d.reduceMotion),

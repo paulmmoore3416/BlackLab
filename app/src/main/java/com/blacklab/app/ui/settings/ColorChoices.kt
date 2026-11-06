@@ -72,7 +72,7 @@ fun ColorChoices() {
     BlCard(Modifier.fillMaxWidth()) {
         Text("Colors", style = MaterialTheme.typography.titleSmall)
         Text(
-            if (s.dynamicColor) "Material You is on, so wallpaper colors are used. Turn it off to use these."
+            if (s.dynamicColor) "Material You is on, so wallpaper colors are used. Pick any palette below to switch back to it."
             else "Each palette pairs a main color with a complementary secondary color. Both are tuned for light and dark mode.",
             style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
@@ -85,19 +85,19 @@ fun ColorChoices() {
         Text("Main color", style = MaterialTheme.typography.labelLarge, modifier = Modifier.padding(top = 12.dp, bottom = 6.dp))
         androidx.compose.foundation.layout.FlowRow(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             AccentPalette.entries.forEach { p ->
-                PaletteSwatch(p, dark, selected = p == palette) { app.settings.update { putString(accentKey, p.name) } }
+                PaletteSwatch(p, dark, selected = p == palette && !s.dynamicColor) { app.settings.update { putString(accentKey, p.name); putBoolean(Keys.DYNAMIC_COLOR, false) } }
             }
         }
 
         Text("Secondary color", style = MaterialTheme.typography.labelLarge, modifier = Modifier.padding(top = 12.dp, bottom = 6.dp))
         androidx.compose.foundation.layout.FlowRow(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.width(56.dp)) {
-                Dot(palette.secondary(dark), selected = secondaryKey == "AUTO", label = "Auto (complementary)") { app.settings.update { putString(secKey, "AUTO") } }
+                Dot(palette.secondary(dark), selected = secondaryKey == "AUTO", label = "Auto (complementary)") { app.settings.update { putString(secKey, "AUTO"); putBoolean(Keys.DYNAMIC_COLOR, false) } }
                 Text("Auto", style = MaterialTheme.typography.labelSmall, modifier = Modifier.padding(top = 3.dp))
             }
             AccentPalette.entries.filter { it != palette }.forEach { p ->
                 Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.width(56.dp)) {
-                    Dot(p.accent(dark), selected = secondaryKey == p.name, label = p.label) { app.settings.update { putString(secKey, p.name) } }
+                    Dot(p.accent(dark), selected = secondaryKey == p.name, label = p.label) { app.settings.update { putString(secKey, p.name); putBoolean(Keys.DYNAMIC_COLOR, false) } }
                     Text(p.label, style = MaterialTheme.typography.labelSmall, modifier = Modifier.padding(top = 3.dp), maxLines = 1)
                 }
             }
@@ -111,6 +111,32 @@ fun ColorChoices() {
         }
         Text(choice.lightStyle.blurb + if (dark) " — shown when the light theme is on." else "", style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 4.dp))
+
+        Text("Visual style", style = MaterialTheme.typography.labelLarge, modifier = Modifier.padding(top = 14.dp, bottom = 6.dp))
+        SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
+            listOf("GLASS" to "Glass", "SOLID" to "Solid").forEachIndexed { i, (k, l) ->
+                SegmentedButton(s.visualStyle == k, { app.settings.update { putString(Keys.VISUAL_STYLE, k) } }, SegmentedButtonDefaults.itemShape(i, 2)) { Text(l) }
+            }
+        }
+        if (s.visualStyle != "SOLID") {
+            Text("Backdrop", style = MaterialTheme.typography.labelLarge, modifier = Modifier.padding(top = 10.dp, bottom = 4.dp))
+            androidx.compose.foundation.layout.FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                listOf("AURORA" to "Aurora · moving", "GRADIENT" to "Gradient · still", "PLAIN" to "Plain").forEach { (k, l) ->
+                    androidx.compose.material3.FilterChip(s.backdrop == k, { app.settings.update { putString(Keys.BACKDROP, k) } }, label = { Text(l) })
+                }
+            }
+            if (s.backdrop != "PLAIN") {
+                var level by remember(s.backdropIntensity) { mutableStateOf(s.backdropIntensity.toFloat()) }
+                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 6.dp)) {
+                    Text("Intensity", style = MaterialTheme.typography.labelLarge, modifier = Modifier.width(80.dp))
+                    androidx.compose.material3.Slider(level, { level = it }, Modifier.weight(1f), valueRange = 0f..100f, steps = 19,
+                        onValueChangeFinished = { app.settings.update { putInt(Keys.BACKDROP_INTENSITY, level.toInt()) } })
+                    Text("${level.toInt()}%", style = MaterialTheme.typography.labelMedium, modifier = Modifier.width(44.dp))
+                }
+            }
+            Text(if (com.blacklab.app.ui.theme.Motion.reduced) "Reduce motion is on, so the aurora holds still." else "Glass cards glow where you touch them; numbers count up as they appear.",
+                style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
 
         com.blacklab.app.ui.components.LabeledSwitchRow("Stronger contrast", "Darker text and borders and deeper accents (WCAG AAA), in light and dark", s.highContrast,
             icon = Icons.Rounded.Contrast) { v -> app.settings.update { putBoolean(Keys.HIGH_CONTRAST, v) } }

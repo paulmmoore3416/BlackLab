@@ -208,3 +208,77 @@ textarea { resize: vertical; min-height: 70px; }
   .msg { max-width: 92%; }
   .sync-state { display: none; }
 }
+
+/* =====================================================================================
+   Glass design layer (5.3): the aurora canvas sits behind everything; panels are frosted.
+   Colors come from fx.js, which reads the palette and light style synced from the phone.
+   ===================================================================================== */
+#aurora { position: fixed; inset: 0; z-index: -1; pointer-events: none; }
+:root { --glass: var(--surface); --glass-bar: var(--bg-2); --glass-line: var(--line); --glass-hi: transparent; --glass-shadow: none; --accent-2: var(--pro); --accent-3: var(--accent); }
+html { background: var(--bg); }
+:root[data-style="glass"] body { background: transparent; }
+:root[data-style="glass"] .sidebar { background: var(--glass-bar); border-right: 1px solid var(--glass-line); -webkit-backdrop-filter: blur(24px) saturate(1.5); backdrop-filter: blur(24px) saturate(1.5); }
+:root[data-style="glass"] .topbar { background: var(--glass-bar); border-bottom: 1px solid var(--glass-line); -webkit-backdrop-filter: blur(20px) saturate(1.5); backdrop-filter: blur(20px) saturate(1.5); }
+:root[data-style="glass"] .card, :root[data-style="glass"] .tile, :root[data-style="glass"] .notice, :root[data-style="glass"] .palette-box {
+  background: var(--glass); border: 1px solid var(--glass-line);
+  -webkit-backdrop-filter: blur(18px) saturate(1.4); backdrop-filter: blur(18px) saturate(1.4);
+  box-shadow: var(--glass-shadow), inset 0 1px 0 var(--glass-hi);
+}
+.card, .tile { position: relative; overflow: hidden; transition: transform .25s cubic-bezier(.2,0,0,1), box-shadow .25s; }
+.card > *, .tile > * { position: relative; z-index: 1; }
+/* light that follows the pointer across a card */
+.card::before, .tile::before {
+  content: ""; position: absolute; inset: 0; z-index: 0; pointer-events: none; opacity: 0; transition: opacity .3s;
+  background: radial-gradient(460px circle at var(--mx, -999px) var(--my, -999px), color-mix(in srgb, var(--accent) 16%, transparent), transparent 60%);
+}
+.card:hover::before, .tile:hover::before { opacity: 1; }
+.tile:hover { transform: translateY(-2px); }
+.tile .v { background: linear-gradient(120deg, var(--text), color-mix(in srgb, var(--accent) 70%, var(--text))); -webkit-background-clip: text; background-clip: text; color: transparent; }
+nav a.active { background: linear-gradient(90deg, var(--accent-soft), color-mix(in srgb, var(--accent-2) 10%, transparent)); color: var(--accent); box-shadow: inset 2px 0 0 var(--accent); }
+button:not(.ghost):not(.danger):not(.icon-btn) { box-shadow: 0 6px 18px color-mix(in srgb, var(--accent) 28%, transparent); }
+.brand-name { background: linear-gradient(90deg, var(--text), var(--accent)); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.view-inner { animation: bl-rise .42s cubic-bezier(.05,.7,.1,1); }
+@keyframes bl-rise { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .view-inner { animation: none; } .tile:hover { transform: none; } }
+
+/* ---------- appearance */
+.swatches { display: flex; flex-wrap: wrap; gap: 12px; }
+.swatch { width: 74px; display: flex; flex-direction: column; align-items: center; gap: 6px; cursor: pointer; background: none; border: 0; color: var(--text); padding: 0; box-shadow: none !important; font-weight: 520; font-size: 12px; }
+.swatch .dot { width: 52px; height: 52px; border-radius: 50%; border: 2px solid var(--glass-line); transition: transform .2s; box-shadow: 0 6px 18px rgba(0,0,0,.18); }
+.swatch:hover .dot { transform: scale(1.08); }
+.swatch.sel .dot { border: 3px solid var(--text); }
+.style-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; }
+.style-card { position: relative; border-radius: 16px; padding: 12px; border: 1px solid var(--glass-line); cursor: pointer; text-align: left; background: none; color: var(--text); box-shadow: none !important; display: block; font-weight: 400; }
+.style-card.sel { outline: 3px solid var(--accent); outline-offset: 2px; }
+.style-card .page { border-radius: 12px; padding: 10px; height: 74px; }
+.style-card .mini { border-radius: 8px; padding: 8px; display: flex; flex-direction: column; gap: 5px; border: 1px solid rgba(0,0,0,.08); }
+.style-card .bar { height: 5px; border-radius: 3px; }
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 999px; overflow: hidden; }
+.seg button { border-radius: 0; background: transparent; color: var(--text); box-shadow: none !important; border: 0; padding: 7px 16px; }
+.seg button.on { background: var(--accent-soft); color: var(--accent); }
+.preview { border-radius: 18px; padding: 16px; min-height: 150px; position: relative; overflow: hidden; }
+
+/* ---------- behavioral health reference */
+.tabs { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 16px; }
+.tabs a { padding: 7px 14px; border-radius: 999px; border: 1px solid var(--line); color: var(--text); font-weight: 560; }
+.tabs a.on { background: var(--accent-soft); color: var(--accent); border-color: transparent; }
+.phase { border-left: 4px solid var(--c, var(--accent)); }
+.phase h3 { color: var(--c, var(--accent)); margin-bottom: 6px; }
+.say { font-style: italic; }
+.kv { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.check-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.check-table th, .check-table td { border-bottom: 1px solid var(--line); padding: 7px 6px; text-align: left; vertical-align: top; }
+.check-table td.box { width: 46px; text-align: center; }
+.check-table td.box span { display: inline-block; width: 16px; height: 16px; border: 1.5px solid var(--muted); border-radius: 4px; }
+.breath { width: 140px; height: 140px; border-radius: 50%; margin: 10px auto; background: radial-gradient(circle, color-mix(in srgb, var(--accent) 55%, transparent), color-mix(in srgb, var(--accent-3) 20%, transparent)); animation: bl-breath 16s ease-in-out infinite; }
+@keyframes bl-breath { 0% { transform: scale(.62); } 25% { transform: scale(1); } 50% { transform: scale(1); } 75% { transform: scale(.62); } 100% { transform: scale(.62); } }
+@media (prefers-reduced-motion: reduce) { .breath { animation: none; } }
+.print-only { display: none; }
+@media print {
+  #aurora, .sidebar, .topbar, .tabs, .no-print, .toast { display: none !important; }
+  .shell { display: block; } .main, .view { height: auto; overflow: visible; padding: 0; }
+  body, html { background: #fff !important; color: #000 !important; }
+  .card, .tile { background: #fff !important; border: 1px solid #ccc !important; box-shadow: none !important; backdrop-filter: none !important; break-inside: avoid; }
+  .print-only { display: block; }
+  .card::before, .tile::before { display: none; }
+}

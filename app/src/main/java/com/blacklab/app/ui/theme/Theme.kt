@@ -102,8 +102,14 @@ data class ThemeChoice(
     val personalSecondary: String = "AUTO",
     val professionalSecondary: String = "AUTO",
     val lightStyle: LightStyle = LightStyle.CLEAN,
-    /** Stronger contrast: AAA (7:1) text and accents, darker borders, in both light and dark. */
+    /** Stronger contrast: AAA (7:1) text and accents, darker borders, in light and dark. */
     val highContrast: Boolean = false,
+    /** GLASS (aurora backdrop + frosted cards) or SOLID (classic). */
+    val visualStyle: String = "GLASS",
+    /** AURORA, GRADIENT or PLAIN. */
+    val backdrop: String = "AURORA",
+    /** 0–100. */
+    val intensity: Int = 60,
 ) {
     fun palette(p: Profile) = if (p == Profile.PERSONAL) personal else professional
     fun secondaryChosen(p: Profile) = (if (p == Profile.PERSONAL) personalSecondary else professionalSecondary) != "AUTO"
@@ -117,6 +123,7 @@ data class ThemeChoice(
         fun from(s: com.blacklab.app.core.Settings) = ThemeChoice(
             AccentPalette.of(s.accentPersonal, AccentPalette.MINT), AccentPalette.of(s.accentProfessional, AccentPalette.COBALT),
             s.secondaryPersonal, s.secondaryProfessional, LightStyle.of(s.lightStyle), s.highContrast,
+            s.visualStyle, s.backdrop, s.backdropIntensity,
         )
     }
 }
@@ -151,7 +158,11 @@ fun colorSchemeFor(choice: ThemeChoice, profile: Profile, dark: Boolean): ColorS
 @Composable
 fun profileAccent(p: Profile): Color = LocalThemeChoice.current.palette(p).accent(LocalBlColors.current.isDark)
 
-data class BlColors(val accent: Color, val accentSoft: Color, val warning: Color, val danger: Color, val success: Color, val isDark: Boolean, val highContrast: Boolean = false)
+data class BlColors(
+    val accent: Color, val accentSoft: Color, val warning: Color, val danger: Color, val success: Color, val isDark: Boolean, val highContrast: Boolean = false,
+    /** The solid page color — for things that must hide what scrolls beneath them (sticky headers) even when the page itself is see-through. */
+    val page: Color = Color(0xFF0E1014),
+)
 
 val LocalBlColors = staticCompositionLocalOf { BlColors(Mint, Mint.copy(alpha = 0.15f), Amber, Danger, Success, true) }
 
@@ -340,31 +351,57 @@ fun BlackLabTheme(themeMode: String, dynamic: Boolean, profile: Profile, choice:
     val secondary = choice.secondary(profile, dark)
     val tertiary = palette.tertiary(dark)
     val ctx = LocalContext.current
-    val scheme = when {
+    val solid = when {
         dynamic && dark -> dynamicDarkColorScheme(ctx)
         dynamic -> dynamicLightColorScheme(ctx)
         dark -> dark(accent, secondary, tertiary, choice.secondaryChosen(profile), choice.highContrast)
         else -> light(accent, secondary, tertiary, choice.lightStyle, choice.highContrast)
     }
+    // Every color change — palette, secondary, light style, light/dark, contrast — blends over ~half a second
+    val scheme = animateScheme(solid)
+    val glass = GlassStyle(enabled = choice.visualStyle != "SOLID", backdrop = choice.backdrop, intensity = choice.intensity / 100f, dark = dark)
     val target = if (choice.highContrast) Contrast.AAA else Contrast.AA
     val bl = BlColors(
         accent = scheme.primary,
         accentSoft = scheme.primary.copy(alpha = 0.14f),
-        warning = (if (dark) Amber else Color(0xFFB45309)).ensureContrast(scheme.surface, target),
-        danger = (if (dark) Danger else Color(0xFFC62828)).ensureContrast(scheme.surface, target),
-        success = (if (dark) Success else Color(0xFF2E7D32)).ensureContrast(scheme.surface, target),
+        warning = (if (dark) Amber else Color(0xFFB45309)).ensureContrast(solid.surface, target),
+        danger = (if (dark) Danger else Color(0xFFC62828)).ensureContrast(solid.surface, target),
+        success = (if (dark) Success else Color(0xFF2E7D32)).ensureContrast(solid.surface, target),
         isDark = dark,
         highContrast = choice.highContrast,
+        page = scheme.background,
     )
-    androidx.compose.runtime.CompositionLocalProvider(LocalBlColors provides bl, LocalThemeChoice provides choice) {
-        MaterialTheme(colorScheme = scheme, typography = BlTypography, shapes = BlShapes) {
-            // Root surface so every screen inherits the correct background and on-background text color
-            androidx.compose.material3.Surface(
-                modifier = androidx.compose.ui.Modifier.fillMaxSize(),
-                color = scheme.background,
-                contentColor = scheme.onBackground,
-                content = content,
-            )
+    // With glass on, screens are see-through and the aurora shows behind them
+    val drawn = if (glass.enabled) scheme.copy(background = Color.Transparent) else scheme
+    androidx.compose.runtime.CompositionLocalProvider(LocalBlColors provides bl, LocalThemeChoice provides choice, LocalGlass provides glass) {
+        MaterialTheme(colorScheme = drawn, typography = BlTypography, shapes = BlShapes) {
+            androidx.compose.foundation.layout.Box(androidx.compose.ui.Modifier.fillMaxSize()) {
+                if (glass.enabled) Backdrop(scheme.background, scheme.primary, scheme.secondary, scheme.tertiary, glass)
+                // Root surface so every screen inherits the correct on-background text color
+                androidx.compose.material3.Surface(
+                    modifier = androidx.compose.ui.Modifier.fillMaxSize(),
+                    color = if (glass.enabled) Color.Transparent else scheme.background,
+                    contentColor = scheme.onBackground,
+                    content = content,
+                )
+            }
         }
     }
+}
+
+/** Animates every color of a scheme toward [target], so theme changes blend instead of snapping. */
+@Composable
+private fun animateScheme(target: ColorScheme): ColorScheme {
+    val spec = Motion.enter<Color>(520)
+    @Composable fun a(c: Color) = androidx.compose.animation.animateColorAsState(c, spec, label = "scheme").value
+    return target.copy(
+        primary = a(target.primary), onPrimary = a(target.onPrimary), primaryContainer = a(target.primaryContainer), onPrimaryContainer = a(target.onPrimaryContainer),
+        secondary = a(target.secondary), onSecondary = a(target.onSecondary), secondaryContainer = a(target.secondaryContainer), onSecondaryContainer = a(target.onSecondaryContainer),
+        tertiary = a(target.tertiary), onTertiary = a(target.onTertiary), tertiaryContainer = a(target.tertiaryContainer), onTertiaryContainer = a(target.onTertiaryContainer),
+        background = a(target.background), onBackground = a(target.onBackground), surface = a(target.surface), onSurface = a(target.onSurface),
+        surfaceVariant = a(target.surfaceVariant), onSurfaceVariant = a(target.onSurfaceVariant),
+        surfaceContainerLowest = a(target.surfaceContainerLowest), surfaceContainerLow = a(target.surfaceContainerLow), surfaceContainer = a(target.surfaceContainer),
+        surfaceContainerHigh = a(target.surfaceContainerHigh), surfaceContainerHighest = a(target.surfaceContainerHighest),
+        outline = a(target.outline), outlineVariant = a(target.outlineVariant), inversePrimary = a(target.inversePrimary), surfaceTint = a(target.surfaceTint),
+    )
 }

@@ -7,13 +7,13 @@
 **A private, all-in-one personal & professional workspace for Android.**
 Pro camera & photo editor · dictation · audio recorder · Word-class documents · journal · to-do · calendar · education & certification tracking — in one app, with every file saved to a real folder on your phone.
 
-[![Version](https://img.shields.io/badge/version-5.2.0-2BD9A8)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-5.3.0-2BD9A8)](CHANGELOG.md)
 [![Android](https://img.shields.io/badge/Android-15%2B-3DDC84?logo=android&logoColor=white)](#requirements)
 [![Kotlin](https://img.shields.io/badge/Kotlin-2.1-7F52FF?logo=kotlin&logoColor=white)](https://kotlinlang.org)
 [![Jetpack Compose](https://img.shields.io/badge/Jetpack%20Compose-Material%203-4285F4?logo=jetpackcompose&logoColor=white)](https://developer.android.com/compose)
 [![Android CI](https://github.com/paulmmoore3416/BlackLab/actions/workflows/android.yml/badge.svg)](https://github.com/paulmmoore3416/BlackLab/actions/workflows/android.yml)
 
-[Download APK](releases/BlackLab-v5.2.0.apk) · [Features](#features) · [Install](#install) · [Build from source](#build-from-source) · [Architecture](docs/ARCHITECTURE.md)
+[Download APK](releases/BlackLab-v5.3.0.apk) · [Features](#features) · [Install](#install) · [Build from source](#build-from-source) · [Architecture](docs/ARCHITECTURE.md)
 
 </div>
 
@@ -83,6 +83,7 @@ An encrypted workspace for working on a behavioral health unit, using initials a
 
 ### 🖥️ BlackLab Desktop
 - Dashboard, assistant and **detailed settings for every section**, synced live with the phone over USB or Wi-Fi, or through your Google Drive's hidden app folder
+- Same glass look, palettes and light styles as the phone; an **Appearance** page that sets them on the phone; a printable **Behavioral Health** reference (crisis lines, de-escalation, group library, safety-round sheets)
 - Run it locally (`desktop/install.sh`) or open **https://paulmmoore3416.github.io/BlackLab/** and sign in with Google
 - Local companion with an offline desktop assistant (Ollama) for desktop tasks
 
@@ -191,6 +192,7 @@ Rich-text entries saved as dated files, mood tracking, tags & location, favorite
 
 ### 🎨 Look & feel
 - Seventeen color palettes per account (Mint, Cobalt, Violet, Coral, Rose, Forest, Amber, Ocean, Graphite, Aurora, Crimson, Midnight, Sage, Copper, Lime, Plum, Sky), each with a complementary secondary color; pick your own secondary; live light/dark preview; all WCAG AA contrast
+- **Glass** design: an aurora backdrop in your palette colors behind frosted cards and bars (moving, still or plain; adjustable intensity) — or the classic Solid look; color changes blend smoothly and cards glow where you touch
 - Five light-mode styles (Clean, Pure white, Warm paper, Cool mist, Accent wash) and a **Stronger contrast** (WCAG AAA) option; accent text and icons are darkened automatically wherever they'd be hard to read
 - Dark, light, system, or **automatic** (sunset to sunrise, worked out on the phone, or your own hours)
 - Smooth by design: task and note cards grow into their screens, haptic feedback, instant task ticks, loading placeholders instead of spinners, large titles that collapse, a bottom bar that hides while you scroll, an animated launch screen, and a **Reduce motion** option

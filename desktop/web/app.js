@@ -384,7 +384,9 @@ const NAV = [
   { id: 'journal', label: 'Journal', ico: '✎' },
   { id: 'media', label: 'Recordings', ico: '◉' },
   { id: 'files', label: 'Phone files', ico: '▤' },
+  { id: 'bh', label: 'Behavioral Health', ico: '✚' },
   { sep: true },
+  { id: 'appearance', label: 'Appearance', ico: '◐' },
   { id: 'settings', label: 'Settings', ico: '⚙' },
   { id: 'desktop', label: 'Desktop tools', ico: '⌂' },
   { id: 'connect', label: 'Connect', ico: '⇄' },
@@ -446,6 +448,7 @@ Views.dashboard = () => {
       <div class="tile"><span class="k">Phone</span><span class="v">${i.battery >= 0 ? i.battery + '%' : '—'}</span><span class="s">${i.storageFree ? bytes(i.storageFree) + ' free' : 'not connected'}${i.charging ? ' · charging' : ''}</span></div>
       <div class="tile"><span class="k">Assistant</span><span class="v" style="font-size:20px">${esc(i.assistant?.name || 'BlackLab')}</span><span class="s">${i.assistant?.nano === 'AVAILABLE' ? 'Gemini Nano ready' : 'Rules engine'} · voice ${i.assistant ? (i.assistant.elevenCharsUsed || 0) + '/' + (i.assistant.elevenBudget || 0) : '—'}</span></div>
     </div>
+    ${whatsNew()}
     <div class="grid g3">
       <div class="card span2"><h2>Today<span class="spacer"></span><a href="#/calendar" class="small">Schedule →</a></h2>
         ${evToday.length ? `<ul class="list">${evToday.map((e) => `<li><span class="bar" style="background:${argb(e.color)}"></span><span class="meta" style="width:74px">${e.allDay ? 'All day' : fmtTime(e.start)}</span><span class="t">${esc(e.title)}${e.location ? ` <span class="muted">· ${esc(e.location)}</span>` : ''}</span><span class="chip">${esc(e.calendar || '')}</span></li>`).join('')}</ul>` : '<div class="empty">Nothing on the calendar today.</div>'}
@@ -467,9 +470,20 @@ Views.dashboard = () => {
 };
 Views.dashboard.bind = () => {
   bindProfile(); bindTaskChecks();
+  const nd = $('#newDismiss'); if (nd) nd.onclick = () => { S.ui.seenNew = window.BL_DATA?.version || ''; saveUi(); render(); };
   $$('[data-q]').forEach((c) => c.onclick = () => { go('assistant'); ask(c.dataset.q); });
   $('#quickAskBtn').onclick = () => { const v = $('#quickAsk').value; if (v.trim()) { go('assistant'); ask(v); } };
 };
+
+function whatsNew() {
+  if (S.ui.seenNew === (window.BL_DATA?.version || '')) return '';
+  return `<div class="card" style="margin-bottom:16px"><h2>New in BlackLab ${esc(window.BL_DATA?.version || '')}<span class="spacer"></span><button class="ghost small" id="newDismiss">Got it</button></h2>
+    <div class="grid g3">
+      <div><h3>Glass, aurora & 17 palettes</h3><div class="muted small">Frosted glass over a moving backdrop in your palette colors, five light-mode styles, Stronger contrast, and eight new palettes — on the phone and here. <a href="#/appearance">Appearance →</a></div></div>
+      <div><h3>Behavioral Health</h3><div class="muted small">MHT & Peer Support tools on the phone: shift hub, observation rounds, peer notes, groups, safety rounds. Reference library here. <a href="#/bh">Open →</a></div></div>
+      <div><h3>Readable everywhere</h3><div class="muted small">Accent text is checked against WCAG AA (AAA with Stronger contrast) on every background, and color changes blend smoothly.</div></div>
+    </div></div>`;
+}
 
 function taskList(list, empty) {
   if (!list.length) return `<div class="empty">${empty}</div>`;
@@ -879,15 +893,154 @@ Views.connect.bind = () => {
   };
 };
 
+
+// ---------------- appearance (writes the phone's color settings; the phone applies them on sync)
+const APP_KEYS = ['theme_mode', 'dynamic_color', 'accent_personal', 'accent_professional', 'secondary_personal', 'secondary_professional', 'light_style', 'high_contrast', 'visual_style', 'backdrop', 'backdrop_intensity', 'reduce_motion'];
+Views.appearance = () => {
+  const V = S.values; const P = window.BL_DATA?.palettes || []; const L = window.BL_DATA?.lightStyles || [];
+  const acct = S.ui.appAcct || (V.active_profile === 'PROFESSIONAL' ? 'professional' : 'personal');
+  const cur = V['accent_' + acct] || (acct === 'professional' ? 'COBALT' : 'MINT');
+  const sec = V['secondary_' + acct] || 'AUTO';
+  const dark = document.documentElement.getAttribute('data-theme') !== 'light';
+  const conic = (p) => { const c = dark ? p.dark : p.light; return `conic-gradient(from 200deg, ${c[0]} 0 62%, ${c[1]} 62% 87%, ${c[2]} 87% 100%)`; };
+  const seg = (key, opts) => `<div class="seg">${opts.map(([v, l]) => `<button data-set="${key}" data-val="${esc(v)}" class="${String(V[key] ?? '') === String(v) ? 'on' : ''}">${esc(l)}</button>`).join('')}</div>`;
+  return `<div class="view-inner">
+    <div class="hero"><div><h1>Appearance</h1><div class="muted">Changes here go to your phone — instantly over the phone link, or through Google Drive on its next sync. This page previews them right away.</div></div></div>
+    ${S.snap || S.schema ? '' : '<div class="notice">Connect your phone or sign in with Google so changes reach the phone. Until then they’re saved here and pushed when it connects.</div>'}
+    <div class="grid g2">
+      <div class="card"><h2>Theme</h2>
+        <div class="stack">
+          ${seg('theme_mode', [['DARK', 'Dark'], ['LIGHT', 'Light'], ['SYSTEM', 'System'], ['AUTO', 'Sunset to sunrise']])}
+          <div class="row wrap"><span class="muted small" style="width:110px">Visual style</span>${seg('visual_style', [['GLASS', 'Glass'], ['SOLID', 'Solid']])}</div>
+          <div class="row wrap"><span class="muted small" style="width:110px">Backdrop</span>${seg('backdrop', [['AURORA', 'Aurora · moving'], ['GRADIENT', 'Gradient · still'], ['PLAIN', 'Plain']])}</div>
+          <div class="row"><span class="muted small" style="width:110px">Intensity</span><input type="range" id="apInt" min="0" max="100" step="5" value="${V.backdrop_intensity ?? 60}" style="flex:1"><span class="mono" id="apIntV">${V.backdrop_intensity ?? 60}%</span></div>
+          <label class="row"><label class="switch"><input type="checkbox" id="apHc" ${V.high_contrast ? 'checked' : ''}><span></span></label> Stronger contrast <span class="muted small">— WCAG AAA text and deeper accents</span></label>
+          <label class="row"><label class="switch"><input type="checkbox" id="apRm" ${V.reduce_motion ? 'checked' : ''}><span></span></label> Reduce motion <span class="muted small">— the aurora holds still</span></label>
+          <label class="row"><label class="switch"><input type="checkbox" id="apDyn" ${V.dynamic_color ? 'checked' : ''}><span></span></label> Material You <span class="muted small">— wallpaper colors on the phone instead of a palette</span></label>
+        </div>
+      </div>
+      <div class="card"><h2>Preview</h2>
+        <div class="preview" style="background:linear-gradient(135deg, color-mix(in srgb, var(--accent) 22%, var(--bg)), color-mix(in srgb, var(--accent-2) 16%, var(--bg)) 60%, color-mix(in srgb, var(--accent-3) 18%, var(--bg)))">
+          <div class="tile" style="position:relative;max-width:260px"><span class="k">Open tasks</span><span class="v">12</span><span class="s">3 today · <span style="color:var(--accent)">link text</span></span></div>
+          <div class="row" style="position:relative;margin-top:12px"><button>Primary</button><span class="chip accent">Selected</span><span class="chip" style="color:var(--accent-2)">Secondary</span></div>
+        </div>
+      </div>
+    </div>
+    <div class="card" style="margin-top:16px"><h2>Palette<span class="spacer"></span>
+        <div class="seg"><button data-acct="personal" class="${acct === 'personal' ? 'on' : ''}">${esc(D.profileName('PERSONAL'))}</button><button data-acct="professional" class="${acct === 'professional' ? 'on' : ''}">${esc(D.profileName('PROFESSIONAL'))}</button></div></h2>
+      <div class="muted small" style="margin-bottom:10px">Main color with its complementary secondary and a tertiary, tuned for light and dark.</div>
+      <div class="swatches">${P.map((p) => `<button class="swatch ${p.id === cur && !V.dynamic_color ? 'sel' : ''}" data-pal="${p.id}" title="${esc(p.label)}"><span class="dot" style="background:${conic(p)}"></span>${esc(p.label)}</button>`).join('')}</div>
+      <h3 style="margin:18px 0 10px">Secondary color</h3>
+      <div class="swatches"><button class="swatch ${sec === 'AUTO' ? 'sel' : ''}" data-sec="AUTO"><span class="dot" style="background:${(P.find((p) => p.id === cur) || P[0])?.[dark ? 'dark' : 'light'][1]}"></span>Auto</button>
+        ${P.filter((p) => p.id !== cur).map((p) => `<button class="swatch ${sec === p.id ? 'sel' : ''}" data-sec="${p.id}"><span class="dot" style="background:${dark ? p.dark[0] : p.light[0]}"></span>${esc(p.label)}</button>`).join('')}</div>
+    </div>
+    <div class="card" style="margin-top:16px"><h2>Light mode style</h2>
+      <div class="style-cards">${L.map((st) => `<button class="style-card ${String(V.light_style || 'CLEAN') === st.id ? 'sel' : ''}" data-style="${st.id}">
+        <div class="page" style="background:${st.background}"><div class="mini" style="background:${st.card}"><span class="bar" style="background:${st.ink};width:80%"></span><span class="bar" style="background:${st.inkSoft};width:55%"></span><span class="bar" style="background:var(--accent)"></span></div></div>
+        <div style="margin-top:8px;font-weight:650">${esc(st.label)}</div><div class="muted small">${esc(st.blurb)}</div></button>`).join('')}</div>
+    </div>
+  </div>`;
+};
+Views.appearance.bind = () => {
+  const acct = S.ui.appAcct || (S.values.active_profile === 'PROFESSIONAL' ? 'professional' : 'personal');
+  $$('[data-set]').forEach((b) => b.onclick = () => setMany({ [b.dataset.set]: b.dataset.val }, 'Appearance'));
+  $$('[data-acct]').forEach((b) => b.onclick = () => { S.ui.appAcct = b.dataset.acct; saveUi(); render(); });
+  $$('[data-pal]').forEach((b) => b.onclick = () => setMany({ ['accent_' + acct]: b.dataset.pal, dynamic_color: false }, 'Palette'));
+  $$('[data-sec]').forEach((b) => b.onclick = () => setMany({ ['secondary_' + acct]: b.dataset.sec, dynamic_color: false }, 'Secondary color'));
+  $$('[data-style]').forEach((b) => b.onclick = () => setMany({ light_style: b.dataset.style }, 'Light style'));
+  const r = $('#apInt'); r.oninput = () => { $('#apIntV').textContent = r.value + '%'; S.values.backdrop_intensity = Number(r.value); window.BLFX?.apply(S.values, S.ui); };
+  r.onchange = () => setMany({ backdrop_intensity: Number(r.value) }, 'Backdrop');
+  $('#apHc').onchange = (e) => setMany({ high_contrast: e.target.checked }, 'Contrast');
+  $('#apRm').onchange = (e) => setMany({ reduce_motion: e.target.checked }, 'Motion');
+  $('#apDyn').onchange = (e) => setMany({ dynamic_color: e.target.checked }, 'Material You');
+};
+
+// ---------------- behavioral health reference (public reference content only — the workspace never leaves the phone)
+const BH_TABS = [['resources', 'Crisis & resources'], ['deescalation', 'De-escalation'], ['grounding', 'Grounding'], ['groups', 'Group library'], ['safety', 'Safety rounds'], ['shift', 'Shift checklist'], ['privacy', 'Privacy']];
+Views.bh = () => {
+  const B = window.BL_DATA?.bh; if (!B) return '<div class="view-inner"><div class="notice">Reference data didn’t load.</div></div>';
+  const tab = BH_TABS.some(([k]) => k === S.sub) ? S.sub : 'resources';
+  const tabs = `<div class="tabs">${BH_TABS.map(([k, l]) => `<a href="#/bh/${k}" class="${tab === k ? 'on' : ''}">${l}</a>`).join('')}</div>`;
+  const phaseColor = ['var(--warn)', '#FF7A59', 'var(--danger)', 'var(--pro)', 'var(--accent)'];
+  let body = '';
+  if (tab === 'resources') {
+    const q = (S.ui.bhQ || '').toLowerCase(); const cat = S.ui.bhCat || '';
+    const list = B.resources.filter((r) => (!cat || r.category === cat) && (!q || (r.name + ' ' + r.notes + ' ' + r.category).toLowerCase().includes(q)));
+    body = `<div class="row wrap no-print" style="margin-bottom:12px"><input id="bhQ" placeholder="Search resources" value="${esc(S.ui.bhQ || '')}" style="flex:1;min-width:200px">
+        <select id="bhCat"><option value="">All categories</option>${B.resourceCategories.map((c) => `<option ${c === cat ? 'selected' : ''}>${esc(c)}</option>`).join('')}</select>
+        <button class="ghost small" onclick="window.print()">Print</button></div>
+      <div class="grid g3">${list.map((r) => `<div class="card" style="${r.category === 'Crisis' ? 'border-color:color-mix(in srgb,var(--danger) 45%,var(--glass-line))' : ''}"><h3>${esc(r.name)}</h3>
+        <div class="muted small" style="margin:2px 0 8px">${esc(r.category)} · ${esc(r.hours)}</div>
+        ${r.phone ? `<div>☎ <a href="tel:${esc(r.phone.replace(/[^\d+]/g, ''))}">${esc(r.phone)}</a></div>` : ''}${r.text ? `<div>✉ ${esc(r.text)}</div>` : ''}
+        ${r.url ? `<div><a href="${esc(r.url)}" target="_blank" rel="noopener noreferrer">${esc(r.url.replace(/^https?:\/\//, ''))}</a></div>` : ''}
+        ${r.notes ? `<div class="muted small" style="margin-top:6px">${esc(r.notes)}</div>` : ''}</div>`).join('')}</div>
+      <div class="muted small" style="margin-top:12px">National numbers change occasionally — confirm before relying on one. Your local resources live in the app on your phone.</div>`;
+  } else if (tab === 'deescalation') {
+    body = `<div class="stack">${B.phases.map((p, i) => `<div class="card phase" style="--c:${phaseColor[i]}"><h3>${esc(p.name)}</h3><div class="muted small" style="margin-bottom:10px">${p.looks.map(esc).join(' · ')}</div>
+        <div class="kv"><div><b>Respond</b><ul>${p.respond.map((x) => `<li>${esc(x)}</li>`).join('')}</ul></div><div><b>Say</b><ul>${p.say.map((x) => `<li class="say">${esc(x)}</li>`).join('')}</ul><b style="color:var(--danger)">Avoid</b><ul>${p.avoid.map((x) => `<li>${esc(x)}</li>`).join('')}</ul></div></div></div>`).join('')}
+      <div class="card"><h2>Ground rules</h2><ul>${B.tips.map((t) => `<li>${esc(t)}</li>`).join('')}</ul></div>
+      <div class="card"><h2>Trauma-informed principles (SAMHSA)</h2><div class="grid g3">${B.traumaInformed.map((t) => `<div><h3>${esc(t.name)}</h3><div class="muted small">${esc(t.how)}</div></div>`).join('')}</div></div>
+      <div class="muted small">General reference — follow your facility's policies, your crisis-prevention training and the nurse in charge.</div></div>`;
+  } else if (tab === 'grounding') {
+    body = `<div class="grid g2"><div class="card" style="text-align:center"><h2>Box breathing</h2><div class="breath"></div><div class="muted" id="breathTxt">In 4 · hold 4 · out 4 · hold 4</div></div>
+      <div class="card"><h2>Techniques</h2><ul class="list">${B.grounding.map((g) => `<li><span class="t"><b>${esc(g.name)}</b><br><span class="muted small">${esc(g.how)}</span></span></li>`).join('')}</ul></div></div>`;
+  } else if (tab === 'groups') {
+    const cat = S.ui.bhGCat || ''; const list = B.groups.filter((g) => !cat || g.category === cat); const open = Number(S.ui.bhOpen ?? -1);
+    body = `<div class="row wrap no-print" style="margin-bottom:12px"><select id="bhGCat"><option value="">All ${B.groups.length} plans</option>${B.groupCategories.map((c) => `<option ${c === cat ? 'selected' : ''}>${esc(c)}</option>`).join('')}</select><span class="spacer"></span><button class="ghost small" onclick="window.print()">Print</button></div>
+      <div class="stack">${list.map((g) => { const i = B.groups.indexOf(g); const on = open === i; return `<div class="card"><h2 style="cursor:pointer" data-open="${i}">${esc(g.title)}<span class="spacer"></span><span class="chip accent">${esc(g.category)}</span><span class="chip">${g.minutes} min</span></h2>
+        <div class="muted">${esc(g.objective)}</div>
+        ${on ? `<div class="kv" style="margin-top:12px"><div><b>Opening</b><p>${esc(g.opener)}</p><b>Activity</b><p>${esc(g.activity)}</p><b>Closing</b><p>${esc(g.closing)}</p></div>
+          <div><b>Discussion</b><ul>${g.discussion.map((d) => `<li>${esc(d)}</li>`).join('')}</ul>${g.materials ? `<b>Materials</b><p>${esc(g.materials)}</p>` : ''}${g.adaptations ? `<b>Adaptations</b><p>${esc(g.adaptations)}</p>` : ''}</div></div>` : ''}</div>`; }).join('')}</div>`;
+  } else if (tab === 'safety') {
+    const area = S.ui.bhArea || B.eoc[0].area; const a = B.eoc.find((x) => x.area === area) || B.eoc[0];
+    const groups = [...new Set(a.items.map((i) => i.group))];
+    body = `<div class="row wrap no-print" style="margin-bottom:12px"><select id="bhArea">${B.eoc.map((x) => `<option ${x.area === a.area ? 'selected' : ''}>${esc(x.area)}</option>`).join('')}</select>
+        <span class="muted small">${B.eoc.reduce((n, x) => n + x.items.length, 0)} checks across ${B.eoc.length} area types</span><span class="spacer"></span><button class="ghost small" onclick="window.print()">Print blank round sheet</button></div>
+      <div class="card"><h2>${esc(a.area)} — ligature risk & environment of care</h2>
+        <div class="print-only">Unit ________________ Room / location ________________ Date ________ Inspector ________________</div>
+        <table class="check-table"><thead><tr><th>Check</th><th>OK</th><th>Issue</th><th>N/A</th><th style="width:34%">Notes</th></tr></thead><tbody>
+        ${groups.map((gr) => `<tr><th colspan="5" class="muted small">${esc(gr.toUpperCase())}</th></tr>${a.items.filter((i) => i.group === gr).map((i) => `<tr><td>${esc(i.text)}</td><td class="box"><span></span></td><td class="box"><span></span></td><td class="box"><span></span></td><td></td></tr>`).join('')}`).join('')}
+        </tbody></table>
+        <div class="kv" style="margin-top:12px"><div><b>Risk level</b><div class="muted small">${B.riskLevels.map(esc).join(' · ')}</div></div><div><b>Mitigation</b><div class="muted small">${B.mitigations.map(esc).join(' · ')}</div></div></div>
+      </div><div class="muted small" style="margin-top:10px">Run the round in the app to log findings and send work orders to To-Do. Record official findings in your facility's system.</div>`;
+  } else if (tab === 'shift') {
+    const phases = [...new Set(B.checklist.map((c) => c.phase))];
+    body = `<div class="row no-print" style="margin-bottom:12px"><span class="spacer"></span><button class="ghost small" onclick="window.print()">Print</button></div><div class="grid g3">${phases.map((ph) => `<div class="card"><h2>${esc(ph)} of shift</h2><table class="check-table"><tbody>${B.checklist.filter((c) => c.phase === ph).map((c) => `<tr><td class="box"><span></span></td><td>${esc(c.text)}</td></tr>`).join('')}</tbody></table></div>`).join('')}</div>
+      <div class="card" style="margin-top:16px"><h2>Precautions</h2><div class="row wrap">${B.precautions.map((p) => `<span class="chip">${esc(p)}</span>`).join('')}</div></div>`;
+  } else {
+    body = `<div class="card"><h2>Why your workspace isn't here</h2>
+      <p>The Behavioral Health workspace on your phone — census, observation rounds, peer notes, participants, incident drafts and check-ins — is encrypted with a key that never leaves the phone. It is never backed up, never synced to Google Drive or BlackLab Desktop, never searched by “Ask my files” and never read aloud in the car.</p>
+      <p>That's deliberate: it keeps information about the people you support off shared and cloud systems. This page shows only public reference content generated from the same library the app uses, so it's always current with your phone's version (${esc(window.BL_DATA?.version || '')}).</p>
+      <p class="muted small">Your facility's EHR is always the record of care. Follow its policy on personal devices.</p></div>`;
+  }
+  return `<div class="view-inner"><div class="hero"><div><h1>Behavioral Health</h1><div class="muted">MHT & Peer Support reference — crisis lines, de-escalation, groups and safety rounds. Printable.</div></div>
+    <div class="spacer"></div><a class="chip btn" href="tel:988" style="color:var(--danger)">☎ 988</a></div>${tabs}${body}</div>`;
+};
+Views.bh.bind = () => {
+  const q = $('#bhQ'); if (q) q.oninput = () => { S.ui.bhQ = q.value; saveUi(); clearTimeout(q._t); q._t = setTimeout(() => { render(); const n = $('#bhQ'); n.focus(); n.setSelectionRange(n.value.length, n.value.length); }, 250); };
+  const c = $('#bhCat'); if (c) c.onchange = () => { S.ui.bhCat = c.value; saveUi(); render(); };
+  const g = $('#bhGCat'); if (g) g.onchange = () => { S.ui.bhGCat = g.value; saveUi(); render(); };
+  const a = $('#bhArea'); if (a) a.onchange = () => { S.ui.bhArea = a.value; saveUi(); render(); };
+  $$('[data-open]').forEach((h) => h.onclick = () => { S.ui.bhOpen = Number(S.ui.bhOpen) === Number(h.dataset.open) ? -1 : Number(h.dataset.open); saveUi(); render(); });
+  const bt = $('#breathTxt');
+  if (bt && !(S.values.reduce_motion || matchMedia('(prefers-reduced-motion: reduce)').matches)) {
+    const steps = ['Breathe in…', 'Hold…', 'Breathe out…', 'Hold…']; let i = 0; bt.textContent = steps[0];
+    const timer = setInterval(() => { if (!document.body.contains(bt)) return clearInterval(timer); i = (i + 1) % 4; bt.textContent = steps[i]; }, 4000);
+  }
+};
+
 // ------------------------------------------------------------------ rendering
+let lastView = '';
 function render(soft) {
   readHash(); renderNav(); renderSyncState();
+  window.BLFX?.apply(S.values, S.ui);
   const v = Views[S.view] || Views.dashboard;
   $('#crumb').textContent = NAV.find((n) => n.id === S.view)?.label || 'Dashboard';
   if (soft && S.view === 'assistant') { renderChatLog(); return; }
   if (soft && document.activeElement && $('#view').contains(document.activeElement) && /INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName) && S.view !== 'settings') return;
   $('#view').innerHTML = v();
   v.bind?.();
+  if (S.view + S.sub !== lastView) { lastView = S.view + S.sub; window.BLFX?.countUp($('#view')); }
   $('#sidebar').classList.remove('open');
 }
 
@@ -904,7 +1057,8 @@ function renderGsi() {
 
 function setTheme(t) {
   S.ui.theme = t; saveUi();
-  if (t === 'auto') document.documentElement.removeAttribute('data-theme'); else document.documentElement.setAttribute('data-theme', t);
+  if (window.BLFX) window.BLFX.apply(S.values, S.ui);
+  else if (t === 'auto') document.documentElement.removeAttribute('data-theme'); else document.documentElement.setAttribute('data-theme', t);
 }
 
 // ------------------------------------------------------------------ command palette
@@ -972,6 +1126,7 @@ async function boot() {
   $('#paletteBtn').onclick = openPalette;
   $('#refreshBtn').onclick = refresh;
   $('#themeBtn').onclick = () => setTheme((document.documentElement.getAttribute('data-theme') || (matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark')) === 'light' ? 'dark' : 'light');
+  if (window.BLFX) window.BLFX.reapply = () => window.BLFX.apply(S.values, S.ui);
   $('#menuBtn').onclick = () => $('#sidebar').classList.toggle('open');
   renderGsi(); setMode('offline'); render();
   if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js').catch(() => {});

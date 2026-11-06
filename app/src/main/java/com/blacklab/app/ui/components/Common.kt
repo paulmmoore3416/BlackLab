@@ -1,5 +1,7 @@
 package com.blacklab.app.ui.components
 
+import androidx.compose.ui.geometry.isSpecified
+import androidx.compose.ui.draw.drawBehind
 import com.blacklab.app.ui.theme.readable
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.BorderStroke
@@ -158,7 +160,7 @@ fun BlTopBar(
             scrollBehavior = scrollBehavior,
             colors = TopAppBarDefaults.largeTopAppBarColors(
                 containerColor = MaterialTheme.colorScheme.background,
-                scrolledContainerColor = MaterialTheme.colorScheme.surfaceContainer,
+                scrolledContainerColor = barColor(),
             ),
         )
         return
@@ -180,9 +182,16 @@ fun BlTopBar(
         scrollBehavior = scrollBehavior,
         colors = TopAppBarDefaults.topAppBarColors(
             containerColor = MaterialTheme.colorScheme.background,
-            scrolledContainerColor = MaterialTheme.colorScheme.surfaceContainer,
+            scrolledContainerColor = barColor(),
         ),
     )
+}
+
+/** Bar color: frosted over the glass backdrop, solid otherwise. */
+@Composable
+fun barColor(): Color {
+    val glass = com.blacklab.app.ui.theme.LocalGlass.current
+    return if (glass.enabled) glass.barFill(MaterialTheme.colorScheme.surface) else MaterialTheme.colorScheme.surfaceContainer
 }
 
 /** Scroll behavior for a large title that collapses as you scroll; use with BlTopBar(large = true) and Modifier.nestedScroll. */
@@ -211,23 +220,50 @@ fun BlCard(
     content: @Composable ColumnScope.() -> Unit,
 ) {
     val shape = RoundedCornerShape(22.dp)
+    val glass = com.blacklab.app.ui.theme.LocalGlass.current
     val light = !com.blacklab.app.ui.theme.LocalBlColors.current.isDark
-    val colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer)
-    // Light mode: brighter cards on a calmer page, a hairline border and a soft shadow so they read as raised
-    val border = BorderStroke(1.dp, accent?.copy(alpha = if (light) 0.55f else 0.4f) ?: MaterialTheme.colorScheme.outlineVariant.copy(alpha = if (light) 1f else 0.7f))
-    val elevation = CardDefaults.cardElevation(defaultElevation = if (light) 1.dp else 0.dp, pressedElevation = if (light) 2.dp else 0.dp)
-    if (onClick != null) {
-        // soft press feedback: the card sinks slightly while touched
-        val interaction = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
-        val pressed by interaction.collectIsPressedAsState()
-        val scale by animateFloatAsState(if (pressed) 0.975f else 1f, androidx.compose.animation.core.spring(dampingRatio = 0.7f, stiffness = 500f), label = "press")
-        Card(onClick = onClick, modifier = modifier.graphicsLayer { scaleX = scale; scaleY = scale }, shape = shape, colors = colors, border = border, elevation = elevation, interactionSource = interaction) {
-            Column(Modifier.padding(contentPadding), content = content)
-        }
+    val interaction = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
+    val pressed by interaction.collectIsPressedAsState()
+    // Press glow: a soft light that blooms from where your finger touched (glass) or a gentle sink (solid)
+    var touch by remember { androidx.compose.runtime.mutableStateOf(androidx.compose.ui.geometry.Offset.Unspecified) }
+    androidx.compose.runtime.LaunchedEffect(interaction) {
+        interaction.interactions.collect { if (it is androidx.compose.foundation.interaction.PressInteraction.Press) touch = it.pressPosition }
+    }
+    val glow by animateFloatAsState(if (pressed) 1f else 0f, androidx.compose.animation.core.tween(if (pressed) 120 else 520), label = "glow")
+    val scale by animateFloatAsState(if (pressed) 0.975f else 1f, androidx.compose.animation.core.spring(dampingRatio = 0.7f, stiffness = 500f), label = "press")
+    val glowColor = (accent ?: MaterialTheme.colorScheme.primary)
+    val colors: androidx.compose.material3.CardColors
+    val border: BorderStroke
+    val elevation: androidx.compose.material3.CardElevation
+    if (glass.enabled) {
+        colors = CardDefaults.cardColors(containerColor = glass.cardFill(accent))
+        border = BorderStroke(1.dp, glass.edge(accent))
+        elevation = CardDefaults.cardElevation(0.dp, 0.dp, 0.dp, 0.dp, 0.dp, 0.dp)
     } else {
-        Card(modifier = modifier, shape = shape, colors = colors, border = border, elevation = elevation) {
-            Column(Modifier.padding(contentPadding), content = content)
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer)
+        // Light mode: brighter cards on a calmer page, a hairline border and a soft shadow so they read as raised
+        border = BorderStroke(1.dp, accent?.copy(alpha = if (light) 0.55f else 0.4f) ?: MaterialTheme.colorScheme.outlineVariant.copy(alpha = if (light) 1f else 0.7f))
+        elevation = CardDefaults.cardElevation(defaultElevation = if (light) 1.dp else 0.dp, pressedElevation = if (light) 2.dp else 0.dp)
+    }
+    // Sheen and press glow are painted behind the frosted fill as rounded shapes, so they cover the whole card
+    val radius = with(androidx.compose.ui.platform.LocalDensity.current) { 22.dp.toPx() }
+    val glass2 = glass.enabled
+    val surfaceFx = Modifier.drawBehind {
+        if (!glass2) return@drawBehind
+        val corner = androidx.compose.ui.geometry.CornerRadius(radius, radius)
+        drawRoundRect(androidx.compose.ui.graphics.Brush.verticalGradient(
+            listOf(Color.White.copy(alpha = if (light) 0.55f else 0.10f), Color.White.copy(alpha = 0f)), endY = size.height * 0.6f), cornerRadius = corner)
+        if (glow > 0.01f) {
+            val c = if (touch.isSpecified) touch else center
+            drawRoundRect(androidx.compose.ui.graphics.Brush.radialGradient(
+                listOf(glowColor.copy(alpha = (if (light) 0.55f else 0.30f) * glow), glowColor.copy(alpha = 0f)), c, size.maxDimension * 0.8f), cornerRadius = corner)
         }
+    }
+    val inner: @Composable ColumnScope.() -> Unit = { Column(Modifier.padding(contentPadding), content = content) }
+    if (onClick != null) {
+        Card(onClick = onClick, modifier = modifier.graphicsLayer { scaleX = scale; scaleY = scale }.then(surfaceFx), shape = shape, colors = colors, border = border, elevation = elevation, interactionSource = interaction, content = inner)
+    } else {
+        Card(modifier = modifier.then(surfaceFx), shape = shape, colors = colors, border = border, elevation = elevation, content = inner)
     }
 }
 
@@ -305,7 +341,7 @@ fun StatTile(label: String, value: String, icon: ImageVector, color: Color, modi
     BlCard(modifier, onClick = onClick, contentPadding = PaddingValues(12.dp)) {
         IconBadge(icon, color, 32.dp)
         Spacer(Modifier.height(8.dp))
-        Text(value, style = MaterialTheme.typography.titleLarge, maxLines = 1)
+        CountUpText(value, MaterialTheme.typography.titleLarge)
         Text(label, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
     }
 }
@@ -513,3 +549,25 @@ fun MiniBars(values: List<Float>, labels: List<String>, color: Color, modifier: 
 }
 
 fun Modifier.screenPadding(): Modifier = this.padding(horizontal = 16.dp)
+
+/**
+ * Text whose leading number counts up to its value when it first appears and glides when it
+ * changes ("12", "3.5 h", "$48", "85%"). Anything that isn't a number shows as is.
+ */
+@Composable
+fun CountUpText(value: String, style: androidx.compose.ui.text.TextStyle, modifier: Modifier = Modifier, color: Color = Color.Unspecified) {
+    val m = remember(value) { Regex("^([^\\d-]*)(-?[\\d,]*\\.?\\d+)(.*)$").find(value) }
+    if (m == null) { Text(value, modifier, color = color, style = style, maxLines = 1); return }
+    val (pre, num, post) = m.destructured
+    val target = num.replace(",", "").toDoubleOrNull()
+    if (target == null) { Text(value, modifier, color = color, style = style, maxLines = 1); return }
+    val decimals = num.substringAfter('.', "").length
+    val anim = remember { androidx.compose.animation.core.Animatable(0f) }
+    androidx.compose.runtime.LaunchedEffect(target) {
+        anim.animateTo(target.toFloat(), if (com.blacklab.app.ui.theme.Motion.reduced) androidx.compose.animation.core.snap() else androidx.compose.animation.core.tween(700, easing = com.blacklab.app.ui.theme.Motion.ease))
+    }
+    val shown = if (decimals > 0) "%.${decimals}f".format(anim.value) else "%,d".format(anim.value.roundToLong()).let { if (num.contains(',')) it else it.replace(",", "") }
+    Text(pre + shown + post, modifier, color = color, style = style.merge(com.blacklab.app.ui.theme.MonoDigits), maxLines = 1)
+}
+
+private fun Float.roundToLong(): Long = kotlin.math.round(this.toDouble()).toLong()

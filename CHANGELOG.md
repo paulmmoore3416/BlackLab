@@ -2,6 +2,24 @@
 
 All notable changes to BlackLab are documented here. The project follows [Semantic Versioning](https://semver.org/).
 
+## [5.3.0] — 2026-11-05
+
+A glass design language on the phone and the web, colors you can actually see change, and a BlackLab Desktop web app that matches the phone.
+
+### Fixed
+- **Color choices had almost no visible effect.** Palettes only reached a few buttons and toggles, so choosing one looked like nothing happened. They now drive the whole look: the backdrop, glass tint, bars, selections and highlights.
+- Choosing a palette while Material You was on was silently ignored. Picking any palette or secondary color now switches Material You off.
+
+### Added
+- **Glass visual style** (default): an **aurora backdrop** built from your palette's main, secondary and tertiary colors drifting slowly behind every screen, with **frosted glass cards**, top bars, navigation bar and drawer. Choose **Glass** or **Solid**, a **moving, still or plain** backdrop, and its **intensity** (Settings › Appearance › Colors).
+- **Fluid motion**: every color change (palette, secondary, light style, light/dark, contrast) blends over half a second; glass cards glow from where you touch them; stat numbers count up. Reduce motion stills it all.
+- **BlackLab Desktop (web)**, https://paulmmoore3416.github.io/BlackLab/:
+  - Restyled to match the phone: the same 17 palettes and 5 light styles read from your synced settings, the same WCAG contrast rules, a live aurora canvas, real backdrop-blur glass, a pointer-following glow and count-up figures.
+  - **Appearance** page: theme, glass, backdrop, intensity, contrast, motion, palette and secondary per account, and light style, with a live preview. Changes go to the phone over the live link or through Google Drive.
+  - **Behavioral Health** reference: crisis lines and national resources, the de-escalation guide, grounding with a breathing pacer, the 18-plan group library, printable blank **safety-round sheets** for all 11 area types, and the shift checklist. The encrypted phone workspace is never synced; the page explains why.
+  - "New in this version" card on the dashboard.
+- desktop/web/data.js is generated from the app's own palettes and library by a unit test that fails if the web copy drifts.
+
 ## [5.2.0] — 2026-11-05
 
 A sharper, more readable light mode, more ways to make it yours, and eight new color palettes.
