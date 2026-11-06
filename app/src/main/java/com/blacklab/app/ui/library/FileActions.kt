@@ -55,7 +55,7 @@ fun openMap(ctx: android.content.Context, lat: Double, lon: Double, label: Strin
  * applies to the file type, and hosts the follow-up dialogs (rename, delete, details, OCR).
  */
 @Composable
-fun FileActionHost(file: File?, onDismiss: () -> Unit, onChanged: () -> Unit = {}, onSelect: ((File) -> Unit)? = null, onDeleted: (() -> Unit)? = null) {
+fun FileActionHost(file: File?, onDismiss: () -> Unit, onChanged: () -> Unit = {}, onSelect: ((File) -> Unit)? = null, onDeleted: (() -> Unit)? = null, onMove: ((File) -> Unit)? = null) {
     val f = file ?: return
     val app = rememberApp()
     val shell = LocalShell.current
@@ -129,6 +129,7 @@ fun FileActionHost(file: File?, onDismiss: () -> Unit, onChanged: () -> Unit = {
                 if (gps != null) add(SheetAction("Show on map", Icons.Rounded.Map, hint = String.format(Locale.US, "%.5f, %.5f", gps[0], gps[1])) { openMap(ctx, gps[0], gps[1], f.nameWithoutExtension) })
                 if (onSelect != null) add(SheetAction("Select", Icons.Rounded.CheckCircle, hint = "Pick several to share or delete") { onSelect(f) })
                 add(SheetAction("Rename", Icons.Rounded.DriveFileRenameOutline) { step = "rename" })
+                if (onMove != null) add(SheetAction("Move to folder", Icons.Rounded.DriveFileMove, hint = "Or copy — pick or create a folder") { onDismiss(); onMove(f) })
                 add(SheetAction("Open with…", Icons.Rounded.OpenInNew) { Files.open(ctx, f) })
                 add(SheetAction("Copy path", Icons.Rounded.ContentCopy, hint = "BlackLab/$rel") {
                     ctx.getSystemService(android.content.ClipboardManager::class.java)?.setPrimaryClip(android.content.ClipData.newPlainText("Path", f.absolutePath))

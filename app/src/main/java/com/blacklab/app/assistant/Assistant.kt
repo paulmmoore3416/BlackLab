@@ -207,6 +207,9 @@ class Assistant(private val app: AppContainer) {
         // ---- Behavioral Health: rounds, shift, crisis lines, notes (counts only — never names or rooms)
         behavioral(l)?.let { return it }
 
+        // ---- the desktop: its local AI and its own assistant (files, apps, system status on the computer)
+        desktop(t, l)?.let { return it }
+
         // ---- tasks
         m("^(?:remind me(?: to)?|don't let me forget(?: to)?)\\s+(.+)$")?.let { return addTask(it.groupValues[1], remind = true) }
         m("^(?:add|create|new|make)(?: a| an)?(?: new)? (?:task|to-?do|todo|reminder)(?: to| for| called| named)?[:\\s]+(.+)$")?.let { return addTask(it.groupValues[1], remind = false) }
@@ -317,7 +320,7 @@ class Assistant(private val app: AppContainer) {
         knowledgeAnswer(t)?.let { return it }
 
         // ---- fall through to Gemini Nano
-        if (allowNano && s.asstUseNano) nano(t, origin)?.let { return it }
+        if (allowNano && (s.asstUseNano || DesktopAi.usable)) nano(t, origin)?.let { return it }
         val hits = run { index.ensure(); index.search(t, 3, profile.name) }
         if (hits.isNotEmpty() && hits.first().score > 2.5) return filesReply(t, hits, extractive = true)
         return Reply(
@@ -354,7 +357,8 @@ nameplate | start focus | search my files for <words> | action items from my las
 android docs <question> | switch to personal/professional | open <screen> | log <n> CEUs for <certification> |
 summarize <today/tomorrow/this week/my recent notes/my open tasks/my journal> as <kind of summary> | let's talk about <topic> |
 log fuel <gallons> gallons <dollars> dollars at <miles> miles | log <service> at <miles> miles | what's due on the car |
-navigate to my next meeting | find a gas station | navigate to <place>.
+navigate to my next meeting | find a gas station | navigate to <place> |
+desktop <request for the user's computer: open a folder or app, find files on the computer, system status, disk space, save a desktop note>.
 
 If the user's message is a request one of these commands can do, reply with exactly one line: COMMAND: <the command>
 Otherwise answer the user directly in 1-4 sentences, starting with: ANSWER:
@@ -365,10 +369,10 @@ User: $text"""
         val cmd = Regex("COMMAND:\\s*(.+)", RegexOption.IGNORE_CASE).find(out)?.groupValues?.get(1)?.lineSequence()?.first()?.trim()
         if (!cmd.isNullOrBlank()) {
             val r = route(cmd, origin, allowNano = false)
-            return r.copy(source = "Gemini Nano → ${r.source}")
+            return r.copy(source = "${Nano.engineShort} → ${r.source}")
         }
         val answer = out.substringAfter("ANSWER:", out).trim().removePrefix("ANSWER").trim()
-        return if (answer.isBlank()) null else Reply(answer, source = "Gemini Nano · on-device")
+        return if (answer.isBlank()) null else Reply(answer, source = Nano.engine)
     }
 
     // ------------------------------------------------------------------ actions
@@ -388,6 +392,7 @@ User: $text"""
 • Settings — “dark mode”, “switch to professional”, “set focus length to 45”
 • Summaries — “summarize this week as action items”, “recap my recent notes for my boss”, or pick items in Summarize
 • Knowledge — “what is retrieval-augmented generation?”, “explain GitHub Actions caching”, “let's talk about system design”
+• Desktop — “on my computer open my downloads”, “ask my desktop how much disk space is left”, “desktop AI status”
 • Behavioral Health — “start rounds”, “when are rounds due?”, “start my shift”, “new peer note”, “SBAR handoff”, “crisis lines”, “grounding”
 • Garage — “log fuel 13.2 gallons $48 at 31,250 miles”, “I got an oil change at 31,000”, “what's due on the car?”
 • Driving — “navigate to my next meeting”, “find a gas station”, “call 555-0100”
@@ -543,7 +548,7 @@ User: $text"""
             append(if (r.actions.isEmpty()) "\n\nNo action items jumped out." else "\n\nAction items → ${r.taskIds.size} task(s):\n" + r.actions.take(8).joinToString("\n") { "• $it" })
         }
         return Reply(text, listOf(Link("Minutes", "doc/${r.docId}"), Link("Source", src.route), Link("To-Do", "tasks")),
-            source = if (Nano.ready && s.asstUseNano) "Gemini Nano · on-device" else "On-device extractor")
+            source = if (Nano.ready && s.asstUseNano) Nano.engine else "On-device extractor")
     }
 
     private suspend fun keep(text: String, origin: Origin): Reply {
@@ -753,7 +758,7 @@ User: $text"""
         if (s.asstUseNano && Nano.ready) {
             val notes = hits.mapIndexed { i, h -> "[${i + 1}] ${h.entry.title}: ${com.blacklab.app.knowledge.Text.bestSentences(h.entry.body, question, 6).joinToString(" ").take(800)}" }.joinToString("\n")
             val out = Nano.generate("Answer the question in 2-5 plain sentences using these expert notes (cite [n] when used). If they don't cover it, say what you know and that it's general knowledge.\n\n$notes\n\nQuestion: $question", 0.25f, s.asstNanoTokens)
-            if (!out.isNullOrBlank()) return Reply(out, links, source = "Knowledge · ${base?.title ?: ""} · Gemini Nano")
+            if (!out.isNullOrBlank()) return Reply(out, links, source = "Knowledge · ${base?.title ?: ""} · ${Nano.engineShort}")
         }
         val text = com.blacklab.app.knowledge.Text.bestSentences(top.entry.body, question, 4).joinToString(" ")
         return Reply(text + "\n\n— ${base?.title ?: "Knowledge"} › ${top.entry.title}", links, source = "Knowledge · offline")
@@ -778,6 +783,28 @@ User: $text"""
             return Reply(a.text, source = a.engine)
         }
         return Reply(if (q.isBlank()) chosen.opener else "Let's get into it — ${chosen.title}.", route = route, source = chosen.title, speak = origin == Origin.CAR || q.isBlank())
+    }
+
+    // ------------------------------------------------------------------ desktop AI
+
+    private suspend fun desktop(t: String, l: String): Reply? {
+        val aiWord = "(desktop|computer|pc|laptop)(?:'?s)? (?:ai|brain|model|llm|assistant)"
+        if (Regex("^(?:what'?s|whats|how'?s|hows|check|show)?\\s*(?:the |my )?$aiWord(?: status| connection)?\\??$").containsMatchIn(l) ||
+            Regex("\\b$aiWord\\b.*\\b(status|working|connected|online|up|running|reachable|there|linked)\\b").containsMatchIn(l) ||
+            Regex("^(?:is|are) (?:the |my )?(desktop|computer|pc)(?:'?s)? (?:ai )?(connected|online|reachable|linked|up)").containsMatchIn(l) ||
+            Regex("^(desktop|computer) (status|connection)$").containsMatchIn(l)) {
+            val st = DesktopAi.probe()
+            return Reply(when (st.state) {
+                DesktopAi.State.ONLINE -> "Your computer's AI is connected — ${st.model.ifBlank { "local model" }}, ${st.latencyMs} ms away. I'll use it for anything that needs real thinking."
+                DesktopAi.State.NOT_PAIRED -> "Not paired yet. On the computer, run ./daddyshome with the phone plugged in, then open BlackLab once."
+                DesktopAi.State.OFF -> "Desktop AI is turned off in Assistant settings."
+                else -> "I can't reach the computer right now. " + st.note.ifBlank { "Plug in the phone (or turn on Wireless debugging) and run ./daddyshome." }
+            }, listOf(Link("Assistant settings", "assistant/settings")), source = "Desktop AI")
+        }
+        val m = Regex("^(?:on (?:my |the )?(?:desktop|computer|pc|laptop)[,:]?\\s+|(?:desktop|computer)[:,]\\s*|desktop\\s+|(?:ask|tell|have) (?:my |the )?(?:desktop|computer|pc)(?: to)?\\s+)(.+)$", RegexOption.IGNORE_CASE).find(t) ?: return null
+        val req = m.groupValues[1].trim()
+        val r = DesktopAi.ask(req) ?: return Reply("I can't reach the computer right now. Plug in the phone (or use Wireless debugging) and run ./daddyshome on the computer.", source = "Desktop AI")
+        return Reply(r.text.ifBlank { "Done." }, source = r.source.ifBlank { "Desktop" })
     }
 
     // ------------------------------------------------------------------ behavioral health
@@ -912,7 +939,7 @@ User: $text"""
                 "Answer the question using only these excerpts from the user's own files. Cite sources like [1]. If the answer isn't there, say so.\n\n$context\n\nQuestion: $question",
                 0.2f, s.asstNanoTokens,
             )
-            if (!answer.isNullOrBlank()) return Reply(answer, links, source = "Ask my files · Gemini Nano")
+            if (!answer.isNullOrBlank()) return Reply(answer, links, source = "Ask my files · ${Nano.engineShort}")
         }
         val text = "Here's what I found in your files:\n" + hits.take(3).joinToString("\n\n") { h ->
             val words = LocalIndex.tokens(question).toSet()

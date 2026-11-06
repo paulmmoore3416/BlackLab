@@ -2,6 +2,27 @@
 
 All notable changes to BlackLab are documented here. The project follows [Semantic Versioning](https://semver.org/).
 
+## [5.4.0] — 2026-11-05
+
+Organize your Library with folders, and put your computer's local AI behind the phone's assistant, all started with one command.
+
+### Added
+- **Library folders & sorting** for Photos, Videos, Scans, Audio, Exports and Imports:
+  - **New folder**, open folders through breadcrumbs, and folder tiles with a cover photo and item count
+  - **Move or copy** any selection, or a single item from its long-press menu, into any folder (with "new folder" in the picker); rename and delete folders
+  - **Sort** (newest, oldest, name, size, type), **group** photos and videos by month, day or type or not at all, switch between **grid and list**, and **search** inside a folder; each tab remembers its choices
+  - **Sort into month folders** files everything in a folder into folders like "2026-11 November"
+  - Moving recordings carries their transcripts and keeps the Recorder pointing at the right files. Dictation and All files stay browse-only, because other screens track those by location.
+- **Desktop AI**: while the computer running BlackLab Desktop is reachable (USB or Wireless debugging), the assistant, Summarize, Talk, Ask my files, meeting actions and Brainstorm's smart tools use its Ollama model. Otherwise they use Gemini Nano, then the offline rules. Source labels show which engine answered.
+  - "On my computer …" or "ask my desktop …" hands a request to the desktop assistant (files, apps, system status), and "desktop AI status" checks the link
+  - **Settings › Assistant & desktop › Desktop AI**: status, model, latency, Test, and an on/off switch
+- **`./daddyshome`** (repo root and `~/daddyshome`): starts Ollama; loads and pins the selected desktop model at the companion's context size; restarts the companion; links every phone both ways (`adb forward` 8765, `adb reverse` 8770); pairs the phone with a shared key; prints a status board. Also `--status`, `--open`, `--repair` and `--stop`. See [docs/DESKTOP_AI.md](docs/DESKTOP_AI.md).
+- Companion 1.1.0: key-protected `/phone/status`, `/phone/generate` and `/phone/ask`; automatic `adb reverse` for every linked phone; one context size and keep-alive setting for every request.
+
+### Security
+- The companion still listens on 127.0.0.1 only. Phone requests travel inside the adb tunnel and need the shared key, our Host header and no browser Origin.
+- The app allows plain HTTP only to its own loopback address. The shared key lives in the Keystore-encrypted store and is pushed once by `./daddyshome`.
+
 ## [5.3.0] — 2026-11-05
 
 A glass design language on the phone and the web, colors you can actually see change, and a BlackLab Desktop web app that matches the phone.

@@ -124,6 +124,30 @@ fun AssistantSettingsScreen() {
                 }
             }
 
+            item { SectionHeader("Desktop AI") }
+            item {
+                val dst by com.blacklab.app.assistant.DesktopAi.status.collectAsState()
+                BlCard(Modifier.fillMaxWidth(), accent = if (dst.state == com.blacklab.app.assistant.DesktopAi.State.ONLINE) MaterialTheme.colorScheme.primary else null) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Rounded.Computer, null, tint = MaterialTheme.colorScheme.primary)
+                        Spacer(Modifier.size(12.dp))
+                        Column(Modifier.weight(1f)) {
+                            Text(if (dst.state == com.blacklab.app.assistant.DesktopAi.State.ONLINE) "Connected · ${dst.model}" else dst.state.label, style = MaterialTheme.typography.titleSmall)
+                            Text(when (dst.state) {
+                                com.blacklab.app.assistant.DesktopAi.State.ONLINE -> "${dst.latencyMs} ms · ${dst.models.size} models on the computer" + (dst.host.takeIf { it.isNotBlank() }?.let { " · $it" } ?: "")
+                                else -> dst.note.ifBlank { "Uses Ollama on the computer through BlackLab Desktop over USB or Wireless debugging" }
+                            }, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                        OutlinedButton(onClick = { scope.launch { com.blacklab.app.assistant.DesktopAi.probe() } }) { Text("Test") }
+                    }
+                    com.blacklab.app.ui.components.LabeledSwitchRow("Use the desktop AI when it's reachable", "Assistant, summaries, Talk, Ask my files and Brainstorm tools use it first, then Gemini Nano", s.asstDesktopAi) { v ->
+                        app.settings.update { putBoolean(com.blacklab.app.core.Keys.ASST_DESKTOP_AI, v) }; scope.launch { com.blacklab.app.assistant.DesktopAi.probe() }
+                    }
+                    Text("Set up: plug the phone into the computer (or pair Wireless debugging), run ./daddyshome there, then open BlackLab once. Requests stay inside the USB / adb link and carry a key only this phone has.",
+                        style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 4.dp))
+                }
+            }
+
             item { SectionHeader("Google account") }
             item {
                 BlCard(Modifier.fillMaxWidth()) {

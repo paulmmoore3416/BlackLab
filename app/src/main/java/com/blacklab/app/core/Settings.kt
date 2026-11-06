@@ -111,6 +111,8 @@ data class Settings(
     val asstAutoListen: Boolean = false,
     val asstConfirm: Boolean = true,
     val asstUseNano: Boolean = true,
+    /** Use the desktop's local AI (Ollama via BlackLab Desktop) whenever the computer is reachable. */
+    val asstDesktopAi: Boolean = true,
     val asstNanoTemp: Int = 30,
     val asstNanoTokens: Int = 320,
     val asstOfflineOnly: Boolean = false,
@@ -255,6 +257,7 @@ object Keys {
     const val ASST_AUTO_LISTEN = "asst_auto_listen"
     const val ASST_CONFIRM = "asst_confirm"
     const val ASST_USE_NANO = "asst_use_nano"
+    const val ASST_DESKTOP_AI = "asst_desktop_ai"
     const val ASST_NANO_TEMP = "asst_nano_temp"
     const val ASST_NANO_TOKENS = "asst_nano_tokens"
     const val ASST_OFFLINE_ONLY = "asst_offline_only"
@@ -407,6 +410,7 @@ class SettingsRepository(context: Context) {
             asstAutoListen = getBoolean(Keys.ASST_AUTO_LISTEN, d.asstAutoListen),
             asstConfirm = getBoolean(Keys.ASST_CONFIRM, d.asstConfirm),
             asstUseNano = getBoolean(Keys.ASST_USE_NANO, d.asstUseNano),
+            asstDesktopAi = getBoolean(Keys.ASST_DESKTOP_AI, d.asstDesktopAi),
             asstNanoTemp = getInt(Keys.ASST_NANO_TEMP, d.asstNanoTemp),
             asstNanoTokens = getInt(Keys.ASST_NANO_TOKENS, d.asstNanoTokens),
             asstOfflineOnly = getBoolean(Keys.ASST_OFFLINE_ONLY, d.asstOfflineOnly),

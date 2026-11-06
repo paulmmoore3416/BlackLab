@@ -27,8 +27,13 @@ class Secrets(context: Context) {
         const val GMAIL = "gmail"
         const val GOOGLE_KEEP = "google_keep"
         const val LINK_TOKEN = "link_token"
+        /** Shared key for the desktop's local AI (provisioned by ./daddyshome) and where to reach it. */
+        const val DESKTOP_AI = "desktop_ai"
+        const val DESKTOP_AI_URL = "desktop_ai_url"
 
         val all = listOf(ELEVENLABS, DEV_KNOWLEDGE, GOOGLE_DRIVE, GMAIL, GOOGLE_KEEP)
+        /** Keys that may arrive by provisioning file or the desktop link (not shown in the key list). */
+        val provisionable = all + listOf(DESKTOP_AI, DESKTOP_AI_URL)
         private const val ALIAS = "blacklab_secrets_v1"
     }
 
@@ -88,7 +93,7 @@ class Secrets(context: Context) {
         val count = runCatching {
             val json = JSONObject(f.readText())
             var n = 0
-            json.keys().forEach { k -> if (k in all) { put(k, json.optString(k)); n++ } }
+            json.keys().forEach { k -> if (k in provisionable) { put(k, json.optString(k)); n++ } }
             n
         }.getOrDefault(0)
         f.delete()

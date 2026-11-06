@@ -79,7 +79,7 @@ object Summarizer {
                 val out = runCatching { nano(req, sources, onProgress) }.getOrNull()
                 if (!out.isNullOrBlank()) {
                     val actions = if (req.style == Style.ACTIONS) bullets(out) else emptyList()
-                    return Result(title, out.trim(), "Gemini Nano · on-device", req.style, actions, sources.size)
+                    return Result(title, out.trim(), com.blacklab.app.assistant.Nano.engine, req.style, actions, sources.size)
                 }
             }
         }

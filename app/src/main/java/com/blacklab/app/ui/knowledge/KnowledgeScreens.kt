@@ -369,7 +369,7 @@ fun TalkScreen(id: String, initial: String = "") {
     LaunchedEffect(turns.size, busy) { if (turns.isNotEmpty()) listState.animateScrollToItem(turns.size - 1 + if (busy) 1 else 0) }
 
     Scaffold(topBar = {
-        BlTopBar(base.title, subtitle = if (Nano.ready && s.asstUseNano) "Gemini Nano · grounded in notes" else "Offline notes", onBack = { shell.back() }) {
+        BlTopBar(base.title, subtitle = if (Nano.ready && s.asstUseNano) "${Nano.engineShort} · grounded in notes" else "Offline notes", onBack = { shell.back() }) {
             IconButton(onClick = { if (speaking) app.speaker.stop() else speak = !speak }) {
                 Icon(if (speaking) Icons.Rounded.StopCircle else if (speak) Icons.AutoMirrored.Rounded.VolumeUp else Icons.AutoMirrored.Rounded.VolumeOff, "Voice")
             }

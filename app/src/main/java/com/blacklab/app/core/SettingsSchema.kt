@@ -105,6 +105,7 @@ object SettingsSchema {
             text(Keys.ASST_NAME, "Assistant name", "What the assistant calls itself.", d.asstName),
             choice(Keys.ASST_PERSONA, "Personality", "How replies are worded.", d.asstPersona, "LAIDBACK" to "Laid-back & funny", "PROFESSIONAL" to "Professional", "CONCISE" to "Just the facts"),
             bool(Keys.ASST_USE_NANO, "On-device AI (Gemini Nano)", "Use the Pixel's built-in Gemini Nano for open questions. Runs fully offline.", d.asstUseNano),
+            bool(Keys.ASST_DESKTOP_AI, "Use the desktop AI", "When the computer running BlackLab Desktop is reachable (USB or Wireless debugging), the assistant, summaries and Talk use its local model; otherwise Gemini Nano.", d.asstDesktopAi),
             pct(Keys.ASST_NANO_TEMP, "Creativity", "Gemini Nano temperature. Lower is more predictable.", d.asstNanoTemp, advanced = true),
             int(Keys.ASST_NANO_TOKENS, "Max reply length", "Upper bound on Gemini Nano output tokens.", d.asstNanoTokens, 64, 1024, 32, "tokens", advanced = true),
             bool(Keys.ASST_OFFLINE_ONLY, "Offline only", "Never use the network: no ElevenLabs, Gmail, Drive or docs search.", d.asstOfflineOnly),

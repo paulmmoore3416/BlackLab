@@ -522,7 +522,7 @@ object Brainstorm {
         if (text.isBlank()) return "There's nothing on this page to summarize yet." to "BlackLab"
         if (app.settings.current.asstUseNano && Nano.ready) {
             Nano.generate("Summarize these notes in 3 to 5 short bullet points. Use '- ' bullets, no intro.\n\nNotes:\n${text.take(3500)}", 0.2f, 300)
-                ?.takeIf { it.isNotBlank() }?.let { return it to "Gemini Nano · on-device" }
+                ?.takeIf { it.isNotBlank() }?.let { return it to com.blacklab.app.assistant.Nano.engine }
         }
         val sentences = text.split(Regex("(?<=[.!?])\\s+|\\n+")).map { it.trim() }.filter { it.split(' ').size >= 4 }
         val picks = sentences.take(1) + sentences.drop(1).sortedByDescending { it.length }.take(3)
@@ -533,7 +533,7 @@ object Brainstorm {
         if (app.settings.current.asstUseNano && Nano.ready) {
             val out = Nano.generate("Brainstorm 6 distinct, practical ideas about: \"$topic\". ${if (context.isNotBlank()) "Context: ${context.take(800)}. " else ""}Reply with one idea per line, each under 8 words, no numbering.", 0.8f, 200)
             val list = out?.lines()?.map { it.trim().trimStart('-', '*', '•', ' ', '1', '2', '3', '4', '5', '6', '7', '8', '9', '0', '.', ')').trim() }?.filter { it.length in 3..80 }?.distinct()?.take(8)
-            if (!list.isNullOrEmpty()) return list to "Gemini Nano · on-device"
+            if (!list.isNullOrEmpty()) return list to com.blacklab.app.assistant.Nano.engine
         }
         return PageTemplates.prompts(topic) to "Idea starters (5W1H + SCAMPER)"
     }

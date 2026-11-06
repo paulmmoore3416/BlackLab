@@ -85,6 +85,8 @@ class MainActivity : FragmentActivity() {
         com.blacklab.app.core.FrameStats.attach(this)
         val app = app
         com.blacklab.app.link.LinkService.sync(this)
+        // Keys pushed by ./daddyshome while the app was already running: import them now and re-check the desktop
+        app.appScope.launch { if (app.secrets.importProvisioning(app.storage.root) > 0) com.blacklab.app.assistant.DesktopAi.probe() }
         if (app.settings.current.cloudSync && System.currentTimeMillis() - com.blacklab.app.link.CloudSync.lastSync.value > 120_000) {
             app.appScope.launch { com.blacklab.app.link.CloudSync.sync(app) }
         }

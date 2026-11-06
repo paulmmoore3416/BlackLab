@@ -102,7 +102,7 @@ User: $question
 You:"""
                 val out = Nano.generate(prompt, (s.asstNanoTemp / 100f).coerceAtLeast(0.35f), maxOf(s.asstNanoTokens, 360))
                     ?.removePrefix("You:")?.trim()
-                if (!out.isNullOrBlank()) return Answer(out, hits.map { it.entry }, followUps, "Gemini Nano · ${base.title}")
+                if (!out.isNullOrBlank()) return Answer(out, hits.map { it.entry }, followUps, "${com.blacklab.app.assistant.Nano.engineShort} · ${base.title}")
             }
         }
         return offline(base, question, retrievalQuery, hits, followUps)

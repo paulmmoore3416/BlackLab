@@ -47,3 +47,6 @@ systemctl --user enable --now blacklab-desktop.service
 update-desktop-database "${HOME}/.local/share/applications" >/dev/null 2>&1 || true
 echo "BlackLab Desktop installed. Open it from your app launcher or run ${HERE}/blacklab-desktop.sh"
 echo "Private keys: ${CONF}/secrets.json"
+
+# ./daddyshome from your home folder too: wakes the local AI and links the phone both ways
+ln -sf "$(cd "$(dirname "$0")/.." && pwd)/daddyshome" "$HOME/daddyshome" && echo "Linked ~/daddyshome"

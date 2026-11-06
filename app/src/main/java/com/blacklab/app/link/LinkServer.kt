@@ -277,7 +277,7 @@ class LinkServer(private val app: AppContainer, private val port: Int, private v
             }
             r.method == "POST" && r.path == "/api/secrets" -> {
                 val set = ArrayList<String>()
-                body.keys().forEach { k -> if (k in Secrets.all) { app.secrets.put(k, body.optString(k)); set += k } }
+                body.keys().forEach { k -> if (k in Secrets.provisionable) { app.secrets.put(k, body.optString(k)); set += k } }
                 200 to JSONObject().put("set", JSONArray(set)).toString()
             }
             r.method == "POST" && r.path == "/api/backup" -> 200 to JSONObject().put("file", app.backups.backupNow().name).toString()

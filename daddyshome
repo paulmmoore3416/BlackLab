@@ -1,0 +1,193 @@
+#!/usr/bin/env bash
+# ./daddyshome — wake up the BlackLab desktop brain and link the phone to it.
+#
+#   1. Starts Ollama (if it isn't running) and loads the desktop assistant's model — the one
+#      selected in BlackLab Desktop (~/.config/blacklab-desktop/config.json "model") — and pins it
+#      in memory so every answer is instant.
+#   2. Starts the BlackLab Desktop companion (restarting it so it runs the latest code).
+#   3. Links every connected phone — USB or Wireless debugging — both ways:
+#        desktop → phone  adb forward tcp:8765  (dashboard, settings, files)
+#        phone → desktop  adb reverse tcp:8770  (the phone's assistant uses this computer's AI)
+#   4. Pairs the phone the first time (a shared key, pushed into BlackLab's encrypted key store).
+#   5. Checks everything end to end and prints a status board.
+#
+# Usage:  ./daddyshome [model]        e.g. ./daddyshome qwen2.5:14b  (also makes it the default)
+#         ./daddyshome --status       just the status board
+#         ./daddyshome --open         …and open the BlackLab Desktop window
+#         ./daddyshome --repair       re-send the phone's key (after reinstalling the app)
+#         ./daddyshome --stop         unload the model and unlink the phone
+set -uo pipefail
+
+HERE="$(cd "$(dirname "$(readlink -f "$0")")" && pwd)"
+CFG_DIR="$HOME/.config/blacklab-desktop"
+CFG="$CFG_DIR/config.json"
+SECRETS="$CFG_DIR/secrets.json"
+PORT="${BLACKLAB_DESKTOP_PORT:-8770}"
+PHONE_PORT=8765
+OLLAMA_URL="http://127.0.0.1:11434"
+COMP="http://127.0.0.1:${PORT}"
+PKG="com.blacklab.app"
+
+if [ -t 1 ]; then B=$'\e[1m'; G=$'\e[32m'; Y=$'\e[33m'; R=$'\e[31m'; D=$'\e[2m'; N=$'\e[0m'; else B=; G=; Y=; R=; D=; N=; fi
+ok()   { printf "  ${G}✔${N} %s\n" "$*"; }
+warn() { printf "  ${Y}!${N} %s\n" "$*"; }
+bad()  { printf "  ${R}✘${N} %s\n" "$*"; }
+step() { printf "\n${B}%s${N}\n" "$*"; }
+
+ADB="$(command -v adb || true)"; [ -z "$ADB" ] && [ -x "$HOME/Android/Sdk/platform-tools/adb" ] && ADB="$HOME/Android/Sdk/platform-tools/adb"
+
+json_get() { python3 -c "import json,sys
+try: d=json.load(open('$1'))
+except Exception: d={}
+v=d.get('$2','')
+print(v if not isinstance(v,(dict,list)) else json.dumps(v))" 2>/dev/null; }
+
+json_set() { mkdir -p "$CFG_DIR"; python3 - "$CFG" "$1" "$2" <<'PY'
+import json, sys
+path, key, val = sys.argv[1], sys.argv[2], sys.argv[3]
+try: d = json.load(open(path))
+except Exception: d = {}
+try: d[key] = json.loads(val)
+except Exception: d[key] = val
+open(path, "w").write(json.dumps(d, indent=2))
+PY
+}
+
+ollama_up() { curl -fsS -m 2 "$OLLAMA_URL/api/version" >/dev/null 2>&1; }
+companion_up() { curl -fsS -m 2 -H 'X-BlackLab: 1' "$COMP/local/status" >/dev/null 2>&1; }
+phones() { [ -n "$ADB" ] && "$ADB" devices | awk 'NR>1 && $2=="device" && $1 !~ /^emulator-/ {print $1}'; }
+
+model_selected() { local m; m="$(json_get "$CFG" model)"; echo "${m:-qwen3:8b}"; }
+
+PS_PY='
+import json, sys
+out = []
+for m in json.load(sys.stdin).get("models", []):
+    exp = m.get("expires_at", "")
+    until = "always" if exp[:4].isdigit() and int(exp[:4]) > 2100 else exp[:16].replace("T", " ")
+    out.append("%s · %d MB on GPU · context %s · loaded %s" % (m["name"], (m.get("size_vram") or 0) // 1048576, m.get("context_length", "?"), until))
+print("; ".join(out))
+'
+
+status_board() {
+  step "Status"
+  if ollama_up; then
+    local v loaded; v="$(curl -fsS -m 2 "$OLLAMA_URL/api/version" | python3 -c 'import json,sys;print(json.load(sys.stdin).get("version",""))')"
+    ok "Ollama $v running"
+    loaded="$(curl -fsS -m 3 "$OLLAMA_URL/api/ps" | python3 -c "$PS_PY" 2>/dev/null)"
+    [ -n "$loaded" ] && ok "Loaded: $loaded" || warn "No model loaded right now"
+  else bad "Ollama is not running"; fi
+  ollama_up && ok "Desktop assistant model: $(model_selected) (keep-alive $(json_get "$CFG" keep_alive || echo 30m))"
+  if companion_up; then ok "BlackLab Desktop companion on $COMP"; else bad "BlackLab Desktop companion is not running"; fi
+  local p any=0
+  for p in $(phones); do
+    any=1
+    local model; model="$("$ADB" -s "$p" shell getprop ro.product.model 2>/dev/null | tr -d '\r')"
+    local how="USB"; [[ "$p" == *:* || "$p" == *_adb-tls-* ]] && how="Wi-Fi (Wireless debugging)"
+    if "$ADB" -s "$p" reverse --list 2>/dev/null | grep -q "tcp:$PORT"; then ok "Phone ${model:-$p} linked over $how (phone → desktop AI ready)"; else warn "Phone ${model:-$p} on $how but not linked"; fi
+  done
+  [ $any = 0 ] && warn "No phone connected — plug it in (USB debugging) or pair Wireless debugging: adb pair <ip:port>, then adb connect <ip:port>"
+  local tok; tok="$(json_get "$SECRETS" phone_ai_token)"
+  if [ -n "$tok" ] && companion_up; then
+    if curl -fsS -m 3 -H "Authorization: Bearer $tok" "$COMP/phone/status" >/dev/null 2>&1; then ok "Phone AI endpoint answers with the shared key"; else warn "Phone AI endpoint didn't answer"; fi
+    local seen; seen="$(curl -fsS -m 2 -H 'X-BlackLab: 1' "$COMP/local/status" | python3 -c 'import json,sys;p=json.load(sys.stdin).get("phone_ai",{});print("yes "+p.get("phone","") if p.get("paired_recently") else "no")' 2>/dev/null)"
+    if [[ "$seen" == yes* ]]; then ok "The phone's assistant has checked in (${seen#yes })"; else warn "The phone hasn't checked in yet — open BlackLab on the phone (it re-checks every 20 s)"; fi
+  fi
+}
+
+case "${1:-}" in
+  --status) status_board; exit 0 ;;
+  --stop)
+    step "Standing down"
+    m="$(model_selected)"
+    ollama_up && curl -fsS -m 30 "$OLLAMA_URL/api/generate" -d "{\"model\":\"$m\",\"keep_alive\":0}" >/dev/null 2>&1 && ok "Unloaded $m"
+    json_set keep_alive '"30m"'
+    for p in $(phones); do "$ADB" -s "$p" reverse --remove "tcp:$PORT" >/dev/null 2>&1 && ok "Unlinked $p"; done
+    exit 0 ;;
+  -h|--help) sed -n '2,20p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+esac
+
+OPEN=0; REPAIR=0; WANT=""
+for a in "$@"; do case "$a" in --open) OPEN=1 ;; --repair) REPAIR=1 ;; -*) ;; *) WANT="$a" ;; esac; done
+
+printf "${B}Daddy's home.${N} ${D}Waking up the BlackLab desktop brain…${N}\n"
+
+# ---------------------------------------------------------------- 1. Ollama
+step "1 · Local AI (Ollama)"
+if ! command -v ollama >/dev/null 2>&1; then bad "Ollama isn't installed — https://ollama.com/download"; exit 1; fi
+if ollama_up; then ok "Ollama already running"
+else
+  if systemctl list-unit-files ollama.service >/dev/null 2>&1 && systemctl cat ollama.service >/dev/null 2>&1; then
+    systemctl start ollama.service 2>/dev/null || sudo -n systemctl start ollama.service 2>/dev/null || true
+  fi
+  if ! ollama_up; then
+    mkdir -p "$HOME/.cache/blacklab-desktop"
+    nohup ollama serve >>"$HOME/.cache/blacklab-desktop/ollama.log" 2>&1 &
+  fi
+  for _ in $(seq 1 60); do ollama_up && break; sleep 0.5; done
+  if ollama_up; then ok "Ollama started"; else bad "Ollama didn't start — try: sudo systemctl start ollama"; exit 1; fi
+fi
+
+# ---------------------------------------------------------------- 2. the model
+step "2 · Desktop assistant model"
+if [ -n "$WANT" ]; then json_set model "\"$WANT\""; ok "Default desktop model set to $WANT"; fi
+MODEL="$(model_selected)"
+if ! ollama list 2>/dev/null | awk 'NR>1{print $1}' | grep -qx "$MODEL"; then
+  warn "$MODEL isn't downloaded — pulling it (one time)…"
+  ollama pull "$MODEL" || { bad "Couldn't pull $MODEL"; exit 1; }
+fi
+json_set keep_alive -1   # keep it loaded: the companion passes this on every request
+printf "  ${D}loading %s into memory…${N}\r" "$MODEL"
+t0=$(date +%s)
+CTX="$(json_get "$CFG" num_ctx)"; CTX="${CTX:-8192}"   # must match the companion's, or Ollama reloads the model on the first request
+if curl -fsS -m 300 "$OLLAMA_URL/api/generate" -d "{\"model\":\"$MODEL\",\"prompt\":\"\",\"keep_alive\":-1,\"options\":{\"num_ctx\":$CTX}}" >/dev/null 2>&1; then
+  ok "$MODEL loaded and pinned in memory ($(( $(date +%s) - t0 )) s)"
+else bad "Couldn't load $MODEL"; fi
+
+# ---------------------------------------------------------------- 3. companion
+step "3 · BlackLab Desktop companion"
+if systemctl --user cat blacklab-desktop.service >/dev/null 2>&1; then
+  systemctl --user restart blacklab-desktop.service
+else
+  pkill -f "desktop/companion/blacklab_desktop.py" 2>/dev/null || true
+  mkdir -p "$HOME/.cache/blacklab-desktop"
+  nohup python3 "$HERE/desktop/companion/blacklab_desktop.py" >>"$HOME/.cache/blacklab-desktop/companion.log" 2>&1 &
+fi
+for _ in $(seq 1 50); do companion_up && break; sleep 0.2; done
+if companion_up; then ok "Companion running on $COMP"; else bad "Companion didn't start — see ~/.cache/blacklab-desktop/companion.log"; exit 1; fi
+
+# ---------------------------------------------------------------- 4. phone link + pairing
+step "4 · Phone link"
+TOKEN="$(json_get "$SECRETS" phone_ai_token)"
+if [ -z "$ADB" ]; then warn "adb not found (Android platform-tools) — the phone can't be linked"
+else
+  "$ADB" start-server >/dev/null 2>&1
+  PHONES="$(phones)"
+  if [ -z "$PHONES" ]; then
+    warn "No phone connected. Plug it in with USB debugging, or pair Wireless debugging (Developer options):"
+    printf "      ${D}adb pair <ip:pairing-port>   then   adb connect <ip:port>   then run ./daddyshome again${N}\n"
+  fi
+  for p in $PHONES; do
+    "$ADB" -s "$p" forward "tcp:$PHONE_PORT" "tcp:$PHONE_PORT" >/dev/null 2>&1
+    "$ADB" -s "$p" reverse "tcp:$PORT" "tcp:$PORT" >/dev/null 2>&1 && ok "Linked $p both ways (desktop ⇄ phone)" || warn "Couldn't link $p"
+    if ! "$ADB" -s "$p" shell pm path "$PKG" >/dev/null 2>&1; then warn "BlackLab isn't installed on $p"; continue; fi
+    # First time (or --repair): hand the phone the shared key. BlackLab imports it into its encrypted
+    # key store and deletes the file the next time it opens or comes to the front.
+    SEEN="$(curl -fsS -m 2 -H 'X-BlackLab: 1' "$COMP/local/status" | python3 -c 'import json,sys;print(json.load(sys.stdin).get("phone_ai",{}).get("paired_recently",False))' 2>/dev/null)"
+    if [ "$REPAIR" = 1 ] || { [ "$SEEN" != "True" ] && [ ! -f "$CFG_DIR/.paired-$p" ]; }; then
+      TMP="$(mktemp)"; chmod 600 "$TMP"
+      printf '{"desktop_ai":"%s","desktop_ai_url":"http://127.0.0.1:%s"}' "$TOKEN" "$PORT" > "$TMP"
+      "$ADB" -s "$p" shell mkdir -p /sdcard/BlackLab/.provision >/dev/null 2>&1
+      if "$ADB" -s "$p" push "$TMP" /sdcard/BlackLab/.provision/keys.json >/dev/null 2>&1; then
+        touch "$CFG_DIR/.paired-$p"; ok "Sent the pairing key to $p — open BlackLab on the phone once to finish"
+      else warn "Couldn't send the pairing key to $p"; fi
+      shred -u "$TMP" 2>/dev/null || rm -f "$TMP"
+    fi
+  done
+fi
+
+status_board
+printf "\n${B}Ready.${N} Ask the phone anything — it uses ${B}%s${N} on this computer while linked, and Gemini Nano when it isn't.\n" "$MODEL"
+printf "${D}Desktop UI: %s  ·  ./daddyshome --status  ·  ./daddyshome --stop${N}\n" "$COMP/"
+[ "$OPEN" = 1 ] && exec "$HERE/desktop/blacklab-desktop.sh"
+exit 0

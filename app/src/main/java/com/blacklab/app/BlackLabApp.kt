@@ -35,6 +35,8 @@ class BlackLabApp : Application() {
             if (imported > 0) android.util.Log.i("BlackLab", "Imported $imported provisioned key(s)")
             com.blacklab.app.assistant.Nano.refresh()
         }
+        // The desktop's local AI, when the computer is reachable (USB or Wireless debugging via adb reverse)
+        com.blacklab.app.assistant.DesktopAi.init(container)
         container.link.watch()
         container.appScope.launch {
             runCatching { com.blacklab.app.brainstorm.PlaceReminders.sync(this@BlackLabApp) }

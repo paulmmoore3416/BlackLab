@@ -121,142 +121,41 @@ fun LibraryScreen(initialTab: String) {
             ScrollableTabRow(selectedTabIndex = tab, edgePadding = 12.dp, containerColor = MaterialTheme.colorScheme.background, divider = {}) {
                 Tabs.forEachIndexed { i, (_, l) -> Tab(selected = tab == i, onClick = { tab = i }, text = { Text(l) }) }
             }
-            when (Tabs[tab].first) {
-                "PHOTOS" -> MediaGrid(app.storage.dir(s.activeProfile, Folder.PHOTOS), refresh) { refresh++ }
-                "VIDEOS" -> MediaGrid(app.storage.dir(s.activeProfile, Folder.VIDEOS), refresh) { refresh++ }
-                "RECORDINGS" -> {
-                    Column(Modifier.padding(16.dp)) {
-                        Text("Audio recordings live in the Recorder, with playback, markers and transcripts.", color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        TextButton(onClick = { shell.go("recorder") }) { Text("Open Recorder") }
+            val prof = s.activeProfile
+            val tabKey = Tabs[tab].first
+            when (tabKey) {
+                "PHOTOS" -> FolderBrowser(app.storage.dir(prof, Folder.PHOTOS), "photos", media = true, canOrganize = true, refresh = refresh, onChanged = { refresh++ },
+                    emptyHint = "Capture with the BlackLab camera — everything is saved to Photos. Make folders from ⋮ › New folder.")
+                "VIDEOS" -> FolderBrowser(app.storage.dir(prof, Folder.VIDEOS), "videos", media = true, canOrganize = true, refresh = refresh, onChanged = { refresh++ },
+                    emptyHint = "Videos you record in BlackLab are saved here.")
+                "SCANS" -> FolderBrowser(app.storage.dir(prof, Folder.SCANS), "scans", media = false, canOrganize = true, refresh = refresh, onChanged = { refresh++ },
+                    emptyHint = "Scan a document with the scan button above — PDFs land here.")
+                "RECORDINGS" -> Column {
+                    Row(Modifier.padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Text("Playback, markers and transcripts live in the Recorder.", Modifier.weight(1f), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        TextButton(onClick = { shell.go("recorder") }) { Text("Recorder") }
                     }
-                    FileList(app.storage.dir(s.activeProfile, Folder.RECORDINGS), refresh, browse = false) { refresh++ }
+                    FolderBrowser(app.storage.dir(prof, Folder.RECORDINGS), "recordings", media = false, canOrganize = true, refresh = refresh, onChanged = { refresh++ },
+                        emptyHint = "Recordings and their transcripts are saved here.")
                 }
-                "DICTATION" -> {
-                    Column(Modifier.padding(16.dp)) {
-                        Text("Dictation sessions — each in its own dated folder with audio, transcript and location.", color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        TextButton(onClick = { shell.go("dictation") }) { Text("Open Dictation") }
+                "DICTATION" -> Column {
+                    Row(Modifier.padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Text("Each session has its own dated folder with audio, transcript and location.", Modifier.weight(1f), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        TextButton(onClick = { shell.go("dictation") }) { Text("Dictation") }
                     }
-                    FileList(app.storage.dir(s.activeProfile, Folder.DICTATION), refresh, browse = false) { refresh++ }
+                    FolderBrowser(app.storage.dir(prof, Folder.DICTATION), "dictation", media = false, canOrganize = false, refresh = refresh, onChanged = { refresh++ },
+                        emptyHint = "Dictation sessions appear here.")
                 }
-                "SCANS" -> FileList(app.storage.dir(s.activeProfile, Folder.SCANS), refresh, browse = false) { refresh++ }
-                "EXPORTS" -> FileList(app.storage.dir(s.activeProfile, Folder.EXPORTS), refresh, browse = false) { refresh++ }
-                "IMPORTS" -> FileList(app.storage.dir(s.activeProfile, Folder.IMPORTS), refresh, browse = false) { refresh++ }
-                else -> FileList(app.storage.root, refresh, browse = true) { refresh++ }
+                "EXPORTS" -> FolderBrowser(app.storage.dir(prof, Folder.EXPORTS), "exports", media = false, canOrganize = true, refresh = refresh, onChanged = { refresh++ },
+                    emptyHint = "Exports (DOCX, PDF, ZIP, ICS…) are saved here.")
+                "IMPORTS" -> FolderBrowser(app.storage.dir(prof, Folder.IMPORTS), "imports", media = false, canOrganize = true, refresh = refresh, onChanged = { refresh++ },
+                    emptyHint = "Files you import or share into BlackLab are saved here.")
+                else -> FolderBrowser(app.storage.root, "browse", media = false, canOrganize = false, refresh = refresh, onChanged = { refresh++ },
+                    emptyHint = "The BlackLab folder is empty.")
             }
         }
     }
     scanResult?.let { r -> ScanDoneDialog(r) { scanResult = null } }
-}
-
-@Composable
-private fun MediaGrid(dir: File, refresh: Int, onChanged: () -> Unit) {
-    val haptics = androidx.compose.ui.platform.LocalHapticFeedback.current
-    val app = rememberApp()
-    val shell = LocalShell.current
-    val ctx = LocalContext.current
-    val files by produceState(emptyList<File>(), dir, refresh) {
-        value = withContext(Dispatchers.IO) { dir.listFiles()?.filter { it.isFile && (it.isImage() || it.isVideo()) }?.sortedByDescending { it.lastModified() } ?: emptyList() }
-    }
-    var selected by remember { mutableStateOf(setOf<File>()) }
-    var confirmDelete by remember { mutableStateOf(false) }
-    var menuFile by remember { mutableStateOf<File?>(null) }
-    FileActionHost(menuFile, onDismiss = { menuFile = null }, onChanged = onChanged, onSelect = { selected = selected + it })
-    if (files.isEmpty()) { EmptyState(Icons.Rounded.PhotoLibrary, "Nothing here yet", "Capture with the BlackLab camera — everything is saved to ${dir.name}.") ; return }
-    Column {
-        if (selected.isNotEmpty()) Row(Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.surfaceContainerHigh).padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-            IconButton(onClick = { selected = emptySet() }) { Icon(Icons.Rounded.Close, "Clear") }
-            Text("${selected.size} selected", Modifier.weight(1f))
-            IconButton(onClick = { selected = if (selected.size == files.size) emptySet() else files.toSet() }) { Icon(Icons.Rounded.SelectAll, "Select all") }
-            IconButton(onClick = { Files.share(ctx, selected.toList()) }) { Icon(Icons.Rounded.Share, "Share") }
-            SelectionMore(selected.toList(), onDone = { selected = emptySet(); onChanged() })
-            IconButton(onClick = { confirmDelete = true }) { Icon(Icons.Rounded.Delete, "Delete") }
-        }
-        val grouped = files.groupBy { Time.monthYear(Time.toDate(it.lastModified())) }
-        LazyVerticalGrid(GridCells.Adaptive(108.dp), contentPadding = PaddingValues(4.dp, 4.dp, 4.dp, 96.dp), horizontalArrangement = Arrangement.spacedBy(3.dp), verticalArrangement = Arrangement.spacedBy(3.dp)) {
-            grouped.forEach { (month, list) ->
-                item(key = "h$month", span = { GridItemSpan(maxLineSpan) }) { Text(month, style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(8.dp)) }
-                items(list, key = { it.path }) { f ->
-                    val sel = f in selected
-                    Box(Modifier.aspectRatio(1f).clip(RoundedCornerShape(6.dp)).background(MaterialTheme.colorScheme.surfaceContainerHigh)
-                        .combinedClickable(
-                            onClick = { if (selected.isNotEmpty()) selected = if (sel) selected - f else selected + f else shell.go("media?path=" + Uri.encode(app.storage.relative(f))) },
-                            onLongClick = { haptics.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress); if (selected.isNotEmpty()) selected = if (sel) selected - f else selected + f else menuFile = f },
-                        )
-                        .then(if (sel) Modifier.border(3.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(6.dp)) else Modifier)) {
-                        AsyncImage(
-                            model = ImageRequest.Builder(ctx).data(f).size(320).apply { if (f.isVideo()) decoderFactory(VideoFrameDecoder.Factory()) }.crossfade(true).build(),
-                            contentDescription = f.name, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize(),
-                        )
-                        if (f.isVideo()) Icon(Icons.Rounded.PlayCircle, null, tint = Color.White, modifier = Modifier.align(Alignment.Center).size(32.dp))
-                        if (sel) Icon(Icons.Rounded.CheckCircle, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.align(Alignment.TopEnd).padding(4.dp))
-                    }
-                }
-            }
-        }
-    }
-    if (confirmDelete) ConfirmDialog("Delete ${selected.size} item(s)?", "Files will be permanently removed from BlackLab.", onDismiss = { confirmDelete = false }) {
-        val list = selected.toList(); selected = emptySet()
-        app.io { list.forEach { it.delete(); app.storage.scan(it) }; withContext(Dispatchers.Main) { onChanged() } }
-    }
-}
-
-@Composable
-private fun FileList(start: File, refresh: Int, browse: Boolean, onChanged: () -> Unit) {
-    val app = rememberApp()
-    val shell = LocalShell.current
-    val ctx = LocalContext.current
-    var dir by remember(start) { mutableStateOf(start) }
-    val entries by produceState(emptyList<File>(), dir, refresh) {
-        value = withContext(Dispatchers.IO) {
-            dir.listFiles()?.filter { !it.name.startsWith(".") }?.sortedWith(compareBy<File>({ !it.isDirectory }, { -it.lastModified() })) ?: emptyList()
-        }
-    }
-    val stats by produceState<Pair<Long, Int>?>(null, dir, refresh) {
-        value = if (browse) withContext(Dispatchers.IO) { dir.walkTopDown().filter { it.isFile }.let { seq -> seq.sumOf { it.length() } to seq.count() } } else null
-    }
-    var menu by remember { mutableStateOf<File?>(null) }
-
-    FileActionHost(menu, onDismiss = { menu = null }, onChanged = onChanged)
-    LazyColumn(contentPadding = PaddingValues(start = 12.dp, end = 12.dp, bottom = 96.dp)) {
-        if (browse) item {
-            BlCard(Modifier.fillMaxWidth().padding(vertical = 6.dp)) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    if (dir != start) IconButton(onClick = { dir.parentFile?.let { dir = it } }) { Icon(Icons.AutoMirrored.Rounded.ArrowBack, "Up") }
-                    Column(Modifier.weight(1f)) {
-                        Text(("BlackLab/" + dir.relativeTo(start).path).trimEnd('/'), style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                        stats?.let { (bytes, count) -> Text("$count files · ${Files.formatSize(bytes)} · ${Files.formatSize(app.storage.freeBytes())} free on device", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
-                    }
-                }
-                if (dir == start) Row(Modifier.horizontalScroll(rememberScrollState()).padding(top = 6.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Text("Folder location: ${start.absolutePath}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
-            }
-        }
-        if (entries.isEmpty()) item { EmptyState(Icons.Rounded.FolderOpen, "Empty folder", "Files saved here will appear in this list.") }
-        items(entries, key = { it.path }) { f ->
-            Row(
-                Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).pressable(onClick = {
-                    when {
-                        f.isDirectory -> dir = f
-                        else -> com.blacklab.app.ui.viewer.openInApp(shell, app, f)
-                    }
-                }, onLongClick = { if (f.isFile) menu = f else dir = f }).padding(horizontal = 8.dp, vertical = 10.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                if (f.isImage()) AsyncImage(f, null, contentScale = ContentScale.Crop, modifier = Modifier.size(40.dp).clip(RoundedCornerShape(8.dp)))
-                else Box(Modifier.size(40.dp).clip(RoundedCornerShape(10.dp)).background(MaterialTheme.colorScheme.surfaceContainerHigh), contentAlignment = Alignment.Center) {
-                    Icon(iconFor(f), null, tint = MaterialTheme.colorScheme.primary)
-                }
-                Spacer(Modifier.width(12.dp))
-                Column(Modifier.weight(1f)) {
-                    Text(f.name, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    Text(if (f.isDirectory) "${f.listFiles()?.size ?: 0} items" else "${Files.formatSize(f.length())} · ${Time.ago(f.lastModified())}",
-                        style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
-                if (f.isFile) IconButton(onClick = { menu = f }) { Icon(Icons.Rounded.MoreVert, "More") }
-            }
-        }
-    }
 }
 
 fun iconFor(f: File) = when (com.blacklab.app.files.FileKinds.of(f)) {
@@ -277,7 +176,7 @@ fun iconFor(f: File) = when (com.blacklab.app.files.FileKinds.of(f)) {
 
 /** Overflow for multi-selected photos/videos: one PDF, one video montage, or a ZIP. */
 @Composable
-private fun SelectionMore(files: List<File>, onDone: () -> Unit) {
+internal fun SelectionMore(files: List<File>, onDone: () -> Unit) {
     val app = rememberApp()
     val shell = LocalShell.current
     val ctx = LocalContext.current

@@ -15,6 +15,8 @@ from __future__ import annotations
 
 import datetime as dt
 import hashlib
+import hmac
+import secrets as pysecrets
 import json
 import os
 import re
@@ -29,7 +31,7 @@ import urllib.request
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
-VERSION = "1.0.0"
+VERSION = "1.1.0"
 HOST, PORT = "127.0.0.1", int(os.environ.get("BLACKLAB_DESKTOP_PORT", "8770"))
 HOME = Path.home()
 WEB_DIR = Path(__file__).resolve().parent.parent / "web"
@@ -57,6 +59,33 @@ def load_json(path: Path, default):
 
 SECRETS = load_json(CONFIG_DIR / "secrets.json", {})
 CONFIG = load_json(CONFIG_DIR / "config.json", {})
+
+
+def ensure_phone_token() -> str:
+    """The shared key the phone uses for /phone/* (provisioned onto the phone by ./daddyshome)."""
+    tok = SECRETS.get("phone_ai_token")
+    if not tok:
+        tok = pysecrets.token_urlsafe(32)
+        SECRETS["phone_ai_token"] = tok
+        CONFIG_DIR.mkdir(parents=True, exist_ok=True)
+        p = CONFIG_DIR / "secrets.json"
+        p.write_text(json.dumps(SECRETS, indent=2))
+        os.chmod(p, 0o600)
+    return tok
+
+
+def keep_alive():
+    """How long Ollama keeps the model loaded after each request. ./daddyshome sets -1 (always loaded)."""
+    v = CONFIG.get("keep_alive", "30m")
+    return int(v) if isinstance(v, (int, float)) or (isinstance(v, str) and v.lstrip("-").isdigit()) else v
+
+
+def num_ctx() -> int:
+    """One context size everywhere — Ollama reloads the whole model when it changes."""
+    return int(CONFIG.get("num_ctx", 8192))
+
+
+PHONE = {"last_seen": 0, "model": ""}  # the phone's last authenticated contact
 
 
 # ---------------------------------------------------------------- helpers
@@ -110,7 +139,22 @@ def adb_forward(port: int = 8765):
     r = subprocess.run([adb, "-s", serial, "forward", f"tcp:{port}", f"tcp:{port}"], capture_output=True, text=True, timeout=8)
     if r.returncode != 0:
         return False, r.stderr.strip() or "adb forward failed"
+    adb_reverse_all()
     return True, f"USB link ready: 127.0.0.1:{port} → {devs[0]['model'] or serial}"
+
+
+def adb_reverse_all():
+    """Lets every connected phone (USB or Wireless debugging) reach this companion at its own 127.0.0.1:PORT."""
+    adb = adb_path()
+    if not adb:
+        return []
+    done = []
+    for d in adb_devices()["devices"]:
+        if d["state"] == "device" and not d["emulator"]:
+            r = subprocess.run([adb, "-s", d["serial"], "reverse", f"tcp:{PORT}", f"tcp:{PORT}"], capture_output=True, text=True, timeout=8)
+            if r.returncode == 0:
+                done.append(d["model"] or d["serial"])
+    return done
 
 
 def ollama_models():
@@ -417,8 +461,8 @@ def ollama_chat(text, model, phone):
     msgs = [{"role": "system", "content": system}, {"role": "user", "content": text}]
     used = []
     for _ in range(4):
-        r = http_json(f"{OLLAMA}/api/chat", {"model": model, "messages": msgs, "tools": TOOLS, "stream": False, "think": False,
-                                            "options": {"temperature": 0.3, "num_ctx": 8192}}, timeout=180)
+        r = http_json(f"{OLLAMA}/api/chat", {"model": model, "messages": msgs, "tools": TOOLS, "stream": False, "think": False, "keep_alive": keep_alive(),
+                                            "options": {"temperature": 0.3, "num_ctx": num_ctx()}}, timeout=180)
         msg = r.get("message", {})
         calls = msg.get("tool_calls") or []
         if not calls:
@@ -462,6 +506,26 @@ def assistant(body):
         return {"text": r.get("text", ""), "source": "Phone · " + r.get("source", "")}
     return {"text": "I can do desktop basics (system status, find files, open folders/apps, notes, pull phone files). For anything else, start Ollama or link the phone.",
             "source": "Desktop · rules"}
+
+
+def phone_generate(body):
+    """Raw generation for the phone's AI features (assistant router, summaries, Talk, Ask my files)."""
+    models = ollama_models()
+    if not models:
+        raise RuntimeError("Ollama isn't running")
+    model = default_model(models)
+    r = http_json(f"{OLLAMA}/api/generate", {
+        "model": model, "prompt": str(body.get("prompt", ""))[:24000], "stream": False, "think": False, "keep_alive": keep_alive(),
+        "options": {"temperature": float(body.get("temperature", 0.3)), "num_predict": int(body.get("max_tokens", 320)), "num_ctx": num_ctx()},
+    }, timeout=170)
+    text = re.sub(r"<think>.*?</think>", "", r.get("response", ""), flags=re.S).strip()
+    return {"text": text, "model": model}
+
+
+def phone_ask(body):
+    """The phone hands the desktop assistant a request for the computer. Phone tools are off here so it can't loop back."""
+    r = assistant({"text": body.get("text", ""), "target": "desktop", "phone": None})
+    return {"text": r.get("text", ""), "source": "Desktop · " + r.get("source", "")}
 
 
 def tts(text: str) -> bytes | None:
@@ -533,6 +597,18 @@ class Handler(SimpleHTTPRequestHandler):
             return False
         return True
 
+    def phone_guard(self) -> bool:
+        """/phone/* is for the BlackLab app only: our Host, no browser Origin, and the shared key."""
+        auth = self.headers.get("Authorization") or ""
+        tok = SECRETS.get("phone_ai_token") or ""
+        if not self.host_ok() or self.headers.get("Origin") or not tok or not hmac.compare_digest(auth, "Bearer " + tok):
+            self.reply(401, {"error": "unauthorized"})
+            return False
+        if self.headers.get("X-BlackLab-Phone"):  # the app identifies itself; health checks from this computer don't count
+            PHONE["last_seen"] = time.time()
+            PHONE["model"] = self.headers.get("X-BlackLab-Phone", "")[:60]
+        return True
+
     def do_OPTIONS(self):
         self.send_response(204)
         self.cors()
@@ -541,17 +617,32 @@ class Handler(SimpleHTTPRequestHandler):
     def do_GET(self):
         if not self.host_ok():
             return self.reply(403, {"error": "forbidden"})
+        if self.path == "/phone/status":
+            if not self.phone_guard():
+                return
+            models = ollama_models()
+            return self.reply(200, {"ok": True, "ollama": bool(models), "model": default_model(models), "models": models, "version": VERSION,
+                                    "host": os.uname().nodename, "keep_alive": str(CONFIG.get("keep_alive", "30m"))})
         if self.path.startswith("/local/"):
             if not self.guard():
                 return
             if self.path == "/local/status":
                 models = ollama_models()
                 return self.reply(200, {"companion": True, "version": VERSION, "adb": adb_devices(), "ollama": models, "model": default_model(models),
+                                        "phone_ai": {"paired_recently": time.time() - PHONE["last_seen"] < 600, "last_seen": PHONE["last_seen"], "phone": PHONE["model"]},
                                         "eleven": bool(SECRETS.get("elevenlabs")), "devdocs": bool(SECRETS.get("developer_knowledge")), "out": str(OUT_DIR)})
             return self.reply(404, {"error": "unknown"})
         return super().do_GET()
 
     def do_POST(self):
+        if self.path in ("/phone/generate", "/phone/ask"):
+            if not self.phone_guard():
+                return
+            try:
+                body = json.loads(self.rfile.read(min(int(self.headers.get("Content-Length") or 0), 200_000)) or b"{}")
+                return self.reply(200, phone_generate(body) if self.path == "/phone/generate" else phone_ask(body))
+            except Exception as e:
+                return self.reply(503, {"error": str(e)})
         if not self.path.startswith("/local/"):
             return self.reply(404, {"error": "unknown"})
         if not self.guard():
@@ -585,7 +676,7 @@ def keep_usb_link():
     while True:
         try:
             if any(d["state"] == "device" and not d["emulator"] for d in adb_devices()["devices"]):
-                adb_forward(8765)
+                adb_forward(8765)  # desktop → phone link, and adb reverse so the phone can reach this companion's AI
         except Exception:
             pass
         time.sleep(15)
@@ -593,6 +684,7 @@ def keep_usb_link():
 
 def main():
     OUT_DIR.mkdir(exist_ok=True)
+    ensure_phone_token()
     threading.Thread(target=keep_usb_link, daemon=True).start()
     srv = ThreadingHTTPServer((HOST, PORT), Handler)
     print(f"BlackLab Desktop companion {VERSION} on http://{HOST}:{PORT}  (web: {WEB_DIR})", flush=True)

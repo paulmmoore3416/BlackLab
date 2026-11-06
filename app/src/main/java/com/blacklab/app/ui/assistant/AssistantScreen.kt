@@ -212,7 +212,7 @@ fun AssistantScreen(startListening: Boolean = false) {
     Scaffold(
         topBar = {
             BlTopBar(s.asstName, subtitle = listOf(
-                if (nano == Nano.Status.AVAILABLE) "Gemini Nano" else "Rules engine",
+                if (Nano.ready) Nano.engineShort else "Rules engine",
                 if (online && !s.asstOfflineOnly) "online" else "offline",
                 if (speaking) "speaking…" else null,
             ).filterNotNull().joinToString(" · "), onBack = { shell.back() }) {

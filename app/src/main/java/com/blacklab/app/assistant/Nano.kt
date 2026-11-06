@@ -66,10 +66,20 @@ object Nano {
         }
     }
 
-    val ready: Boolean get() = _status.value == Status.AVAILABLE
+    /** True when some model can answer: the desktop's local AI when reachable, else Gemini Nano on the phone. */
+    val ready: Boolean get() = _status.value == Status.AVAILABLE || DesktopAi.usable
+    val onDevice: Boolean get() = _status.value == Status.AVAILABLE
 
-    /** Single-turn generation. Returns null when Nano isn't available or times out. */
+    /** Which engine answers right now, for "source" labels. */
+    val engine: String get() = if (DesktopAi.usable) "Desktop AI · ${DesktopAi.status.value.model.ifBlank { "local model" }}" else "Gemini Nano · on-device"
+    val engineShort: String get() = if (DesktopAi.usable) "Desktop AI" else "Gemini Nano"
+
+    /**
+     * Single-turn generation: the desktop model when it's reachable (bigger, faster on a GPU), then
+     * Gemini Nano on the phone. Returns null when neither is available or both time out.
+     */
     suspend fun generate(prompt: String, temperature: Float = 0.3f, maxTokens: Int = 320, timeoutMs: Long = 25_000): String? {
+        if (DesktopAi.usable) DesktopAi.generate(prompt, temperature, maxTokens)?.let { return it }
         if (_status.value != Status.AVAILABLE && refresh() != Status.AVAILABLE) return null
         return lock.withLock {
             withTimeoutOrNull(timeoutMs) {

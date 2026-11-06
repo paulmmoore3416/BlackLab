@@ -7,13 +7,13 @@
 **A private, all-in-one personal & professional workspace for Android.**
 Pro camera & photo editor · dictation · audio recorder · Word-class documents · journal · to-do · calendar · education & certification tracking — in one app, with every file saved to a real folder on your phone.
 
-[![Version](https://img.shields.io/badge/version-5.3.0-2BD9A8)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-5.4.0-2BD9A8)](CHANGELOG.md)
 [![Android](https://img.shields.io/badge/Android-15%2B-3DDC84?logo=android&logoColor=white)](#requirements)
 [![Kotlin](https://img.shields.io/badge/Kotlin-2.1-7F52FF?logo=kotlin&logoColor=white)](https://kotlinlang.org)
 [![Jetpack Compose](https://img.shields.io/badge/Jetpack%20Compose-Material%203-4285F4?logo=jetpackcompose&logoColor=white)](https://developer.android.com/compose)
 [![Android CI](https://github.com/paulmmoore3416/BlackLab/actions/workflows/android.yml/badge.svg)](https://github.com/paulmmoore3416/BlackLab/actions/workflows/android.yml)
 
-[Download APK](releases/BlackLab-v5.3.0.apk) · [Features](#features) · [Install](#install) · [Build from source](#build-from-source) · [Architecture](docs/ARCHITECTURE.md)
+[Download APK](releases/BlackLab-v5.4.0.apk) · [Features](#features) · [Install](#install) · [Build from source](#build-from-source) · [Architecture](docs/ARCHITECTURE.md)
 
 </div>
 
@@ -82,6 +82,7 @@ An encrypted workspace for working on a behavioral health unit, using initials a
 - 2023 Santa Fe profile, editable maintenance schedule (normal or severe service) with what's due next, fuel log with MPG and cost per mile, service history
 
 ### 🖥️ BlackLab Desktop
+- **`./daddyshome`** wakes the desktop brain: starts Ollama, loads and pins your desktop assistant model, starts the companion and links the phone both ways. The phone's assistant then **thinks with your computer's local AI** whenever it's linked (USB or Wireless debugging) and falls back to Gemini Nano when it isn't. See [docs/DESKTOP_AI.md](docs/DESKTOP_AI.md)
 - Dashboard, assistant and **detailed settings for every section**, synced live with the phone over USB or Wi-Fi, or through your Google Drive's hidden app folder
 - Same glass look, palettes and light styles as the phone; an **Appearance** page that sets them on the phone; a printable **Behavioral Health** reference (crisis lines, de-escalation, group library, safety-round sheets)
 - Run it locally (`desktop/install.sh`) or open **https://paulmmoore3416.github.io/BlackLab/** and sign in with Google
@@ -105,6 +106,7 @@ An encrypted workspace for working on a behavioral health unit, using initials a
 - Every session in its own dated folder (`Dictation/Dictation_YYYY-MM-DD_HH-MM-SS/`) with audio, transcript `.txt` and GPS + address
 
 ### 📂 Open, view & edit any file
+- **Library folders**: make folders inside Photos, Videos, Scans, Audio, Exports and Imports; move or copy selections; sort by date, name, size or type; group by month, day or type; grid or list; search; and **Sort into month folders** in one tap
 - **PDF** — continuous scroll, zoom, thumbnails, search, night mode; mark up & **sign**, organize/rotate/delete pages, **merge**, **split**, **fill forms**, watermark, page numbers, **password protect**, compress, pages → pictures
 - **Office & e-books** — Word, RTF, ODT, PowerPoint and EPUB readers (themes, chapters) with “Edit in Documents” and export
 - **Spreadsheets** — CSV/TSV/XLSX editor with multiple sheets, formulas, sort, filter, column stats; saves Excel or CSV
