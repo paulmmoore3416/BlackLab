@@ -43,6 +43,28 @@ always works.
   Everything else stays HTTPS.
 - The Behavioral Health workspace never uses this path.
 
+## Task logs
+
+Every job the desktop AI does is written down in **`~/Desktop/BlackLab AI Task Logs/`**, whether the
+phone's assistant sent it ("on my computer …", "ask my desktop …") or you asked in BlackLab Desktop.
+
+- One Markdown file per task in a month folder (`2026-11/2026-11-06_14-03-22_find-my-resume.md`):
+  when it ran and how long it took, where it came from, which engine answered, the request, every
+  step and tool with its arguments and result, the reply, and any error.
+- A **Files** table lists everything the task created, edited, downloaded, read or opened, so you can
+  always see what the AI touched. Pulling files from the phone lists each downloaded file.
+- `task-index.csv` has one row per task (open it in a spreadsheet to scan or filter).
+- The folder and files are readable only by your user (700/600), because logs can quote file contents.
+- Say "open task logs" to the desktop assistant to open the folder. `./daddyshome --status` shows where
+  they are.
+- `~/.config/blacklab-desktop/config.json`: `"task_log_dir"` moves the folder, `"task_logs": false`
+  turns logging off.
+
+Raw text generation for the phone's own features (summaries, Talk, Ask my files) is not a desktop task
+and isn't logged. Developers adding a desktop tool: decorate it with `@logged_tool("name")` and call
+`task_file("created" | "edited" | "downloaded" | "deleted" | "read" | "opened", path)` for every file it
+touches.
+
 ## Wi-Fi
 
 Pair the phone with Android's **Wireless debugging** (Developer options):

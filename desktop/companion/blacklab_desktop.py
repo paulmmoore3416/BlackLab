@@ -6,14 +6,19 @@ A small local server (Python standard library only) that
   * links to the phone over USB (`adb forward`) and relays to the phone's link API,
   * runs an offline desktop assistant: deterministic rules for common desktop tasks plus a local
     Ollama model with tool calling for everything else (no cloud needed),
-  * speaks with ElevenLabs and searches Google developer docs when keys are configured.
+  * speaks with ElevenLabs and searches Google developer docs when keys are configured,
+  * writes a task log for every job the desktop AI does (~/Desktop/BlackLab AI Task Logs): the
+    request, each step and tool, and every file it creates, edits, downloads, reads or opens.
 
 Listens on 127.0.0.1 only. Secrets live in ~/.config/blacklab-desktop/secrets.json (chmod 600),
 never in the repository.
 """
 from __future__ import annotations
 
+import contextlib
+import csv
 import datetime as dt
+import functools
 import hashlib
 import hmac
 import secrets as pysecrets
@@ -31,7 +36,7 @@ import urllib.request
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
-VERSION = "1.1.0"
+VERSION = "1.2.0"
 HOST, PORT = "127.0.0.1", int(os.environ.get("BLACKLAB_DESKTOP_PORT", "8770"))
 HOME = Path.home()
 WEB_DIR = Path(__file__).resolve().parent.parent / "web"
@@ -59,6 +64,8 @@ def load_json(path: Path, default):
 
 SECRETS = load_json(CONFIG_DIR / "secrets.json", {})
 CONFIG = load_json(CONFIG_DIR / "config.json", {})
+# Every desktop-AI task is logged here (config.json: "task_log_dir" to move it, "task_logs": false to stop)
+TASK_LOG_DIR = Path(os.path.expanduser(CONFIG.get("task_log_dir", "~/Desktop/BlackLab AI Task Logs")))
 
 
 def ensure_phone_token() -> str:
@@ -181,8 +188,169 @@ def safe_home_path(p: str) -> Path | None:
     return path if str(path).startswith(str(HOME)) else None
 
 
+# ---------------------------------------------------------------- task logs
+#
+# One Markdown file per task in TASK_LOG_DIR/<YYYY-MM>/, plus a task-index.csv for a quick overview.
+# A task is one request to the desktop AI (from the phone or the desktop UI). Tools record their
+# steps through @logged_tool, and anything that touches a file calls task_file(action, path):
+# "created", "edited", "downloaded", "deleted", "read", "opened". New tools must do the same.
+
+_TASK = threading.local()
+_INDEX_LOCK = threading.Lock()
+LOG_EXCERPT = 2000  # characters of each tool result kept in the log
+
+
+def _short(v, n=LOG_EXCERPT) -> str:
+    s = v if isinstance(v, str) else json.dumps(v, ensure_ascii=False, default=str)
+    return s if len(s) <= n else s[:n] + f"… ({len(s) - n:,} more characters)"
+
+
+def _home_rel(path) -> str:
+    try:
+        return "~/" + str(Path(path).resolve().relative_to(HOME))
+    except (ValueError, OSError):
+        return str(path)
+
+
+class TaskLog:
+    def __init__(self, request: str, origin: str):
+        self.request, self.origin = request.strip(), origin
+        self.started = dt.datetime.now()
+        self.steps: list[dict] = []
+        self.files: list[tuple[str, str]] = []
+        self.reply, self.source, self.error = "", "", None
+
+    def step(self, kind: str, title: str, detail="", seconds: float | None = None):
+        self.steps.append({"at": dt.datetime.now(), "kind": kind, "title": title, "detail": _short(detail) if detail else "", "seconds": seconds})
+
+    def file(self, action: str, path):
+        entry = (action, _home_rel(path) if not str(path).startswith("http") else str(path))
+        if entry not in self.files:
+            self.files.append(entry)
+
+    def status(self) -> str:
+        if self.error:
+            return "Failed"
+        return "Unfinished" if self.reply.startswith("I went in circles") else "Done"
+
+    def markdown(self, ended: dt.datetime) -> str:
+        secs = (ended - self.started).total_seconds()
+        title = " ".join(self.request.split())[:80] or "(empty request)"
+        out = [f"# Desktop AI task: {title}", "",
+               "| | |", "|---|---|",
+               f"| When | {self.started:%Y-%m-%d %H:%M:%S} → {ended:%H:%M:%S} ({secs:.1f} s) |",
+               f"| From | {self.origin} |",
+               f"| Answered by | {self.source or '—'} |",
+               f"| Status | {self.status()} |",
+               f"| Files touched | {len(self.files)} |", "",
+               "## Request", "", *("> " + line for line in (self.request or "(empty)").splitlines()), "",
+               "## Steps", ""]
+        if not self.steps:
+            out.append("_No tools were used._")
+        for i, st in enumerate(self.steps, 1):
+            took = f" · {st['seconds']:.1f} s" if st["seconds"] is not None else ""
+            out.append(f"{i}. **{st['title']}** ({st['kind']}) · {st['at']:%H:%M:%S}{took}")
+            if st["detail"]:
+                out += ["", "    ```", *("    " + line for line in st["detail"].splitlines()), "    ```", ""]
+        out += ["", "## Files", ""]
+        if self.files:
+            out += ["| Action | Path |", "|---|---|", *(f"| {a} | `{p}` |" for a, p in self.files[:500])]
+            if len(self.files) > 500:
+                out += ["", f"_…and {len(self.files) - 500:,} more._"]
+        else:
+            out.append("_No files were created, edited, downloaded, read or opened._")
+        out += ["", "## Reply", "", self.reply or "_(no reply)_"]
+        if self.error:
+            out += ["", "## Error", "", "```", self.error, "```"]
+        out += ["", f"_BlackLab Desktop companion {VERSION}_", ""]
+        return "\n".join(out)
+
+    def save(self) -> Path:
+        ended = dt.datetime.now()
+        folder = TASK_LOG_DIR / f"{self.started:%Y-%m}"
+        folder.mkdir(parents=True, exist_ok=True)
+        for d in (TASK_LOG_DIR, folder):
+            os.chmod(d, 0o700)  # logs can quote file contents: keep them to this user
+        slug = re.sub(r"[^a-z0-9]+", "-", self.request.lower()).strip("-")[:48] or "task"
+        path = folder / f"{self.started:%Y-%m-%d_%H-%M-%S}_{slug}.md"
+        n = 2
+        while path.exists():
+            path = folder / f"{self.started:%Y-%m-%d_%H-%M-%S}_{slug}-{n}.md"
+            n += 1
+        fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+        with os.fdopen(fd, "w") as f:
+            f.write(self.markdown(ended))
+        index = TASK_LOG_DIR / "task-index.csv"
+        with _INDEX_LOCK:
+            new = not index.exists()
+            with open(index, "a", newline="") as f:
+                w = csv.writer(f)
+                if new:
+                    w.writerow(["started", "seconds", "from", "request", "answered_by", "status", "tools", "files", "log"])
+                w.writerow([f"{self.started:%Y-%m-%d %H:%M:%S}", f"{(ended - self.started).total_seconds():.1f}", self.origin,
+                            " ".join(self.request.split())[:200], self.source, self.status(),
+                            ", ".join(st["title"] for st in self.steps if st["kind"] == "tool"),
+                            "; ".join(f"{a} {p}" for a, p in self.files[:20]) + (f"; +{len(self.files) - 20} more" if len(self.files) > 20 else ""), str(path.relative_to(TASK_LOG_DIR))])
+            os.chmod(index, 0o600)
+        return path
+
+
+@contextlib.contextmanager
+def task_log(request: str, origin: str):
+    """Logs everything done inside the block as one task. Nested calls join the outer task."""
+    if getattr(_TASK, "log", None) is not None or CONFIG.get("task_logs", True) is False or not (request or "").strip():
+        yield getattr(_TASK, "log", None)
+        return
+    log = TaskLog(request, origin)
+    _TASK.log = log
+    try:
+        yield log
+    except Exception as e:
+        log.error = f"{type(e).__name__}: {e}"
+        raise
+    finally:
+        _TASK.log = None
+        try:
+            log.save()
+        except Exception as e:  # a full disk or a bad folder must never break the assistant
+            print(f"task log not written: {e}", file=sys.stderr, flush=True)
+
+
+def current_task() -> TaskLog | None:
+    return getattr(_TASK, "log", None)
+
+
+def task_step(kind: str, title: str, detail="", seconds: float | None = None):
+    if (log := current_task()) is not None:
+        log.step(kind, title, detail, seconds)
+
+
+def task_file(action: str, path):
+    if (log := current_task()) is not None:
+        log.file(action, path)
+
+
+def logged_tool(name: str):
+    """Records a tool's arguments, result and duration in the current task log."""
+    def deco(fn):
+        @functools.wraps(fn)
+        def wrapper(*a, **kw):
+            args = a[0] if a else None
+            t0 = time.time()
+            try:
+                out = fn(*a, **kw)
+            except Exception as e:
+                task_step("tool", name, f"args: {_short(args, 400)}\nfailed: {e}", time.time() - t0)
+                raise
+            task_step("tool", name, f"args: {_short(args, 400)}\nresult: {_short(out)}" if args else f"result: {_short(out)}", time.time() - t0)
+            return out
+        return wrapper
+    return deco
+
+
 # ---------------------------------------------------------------- desktop tools
 
+@logged_tool("system_status")
 def tool_system_status(_=None):
     du = shutil.disk_usage(HOME)
     mem = {}
@@ -209,6 +377,7 @@ def tool_system_status(_=None):
             f"Ollama: {len(ollama_models())} model(s).")
 
 
+@logged_tool("disk_hogs")
 def tool_disk_hogs(_=None):
     try:
         out = subprocess.run(["du", "-xsh", "--max-depth=1", str(HOME)], capture_output=True, text=True, timeout=40).stdout
@@ -227,6 +396,7 @@ def tool_disk_hogs(_=None):
 SKIP_DIRS = {".cache", "node_modules", ".git", ".gradle", ".local", "Android", ".npm", ".cargo", ".rustup", "snap", ".var", ".ollama", ".mozilla"}
 
 
+@logged_tool("find_files")
 def tool_find_files(args):
     q = (args.get("query") if isinstance(args, dict) else str(args)).lower().strip()
     if not q:
@@ -253,8 +423,12 @@ def tool_find_files(args):
 
 FOLDERS = {"downloads": "Downloads", "documents": "Documents", "desktop": "Desktop", "pictures": "Pictures", "music": "Music",
            "videos": "Videos", "home": "", "blacklab": "Desktop/BlackLab", "blacklab-desktop": "BlackLab-Desktop", "notes": "BlackLab-Desktop/Notes"}
+if str(TASK_LOG_DIR).startswith(str(HOME) + "/"):
+    for _k in ("task logs", "task log", "ai logs", "ai task logs"):
+        FOLDERS[_k] = str(TASK_LOG_DIR.relative_to(HOME))
 
 
+@logged_tool("open_path")
 def tool_open_path(args):
     p = args.get("path") if isinstance(args, dict) else str(args)
     key = p.lower().strip().strip("~/").replace(" folder", "")
@@ -262,17 +436,21 @@ def tool_open_path(args):
     if not target or not target.exists():
         return f"Couldn't find {p} in your home folder."
     xdg_open(str(target))
+    task_file("opened", target)
     return f"Opened {target.relative_to(HOME) if target != HOME else '~'}."
 
 
+@logged_tool("open_url")
 def tool_open_url(args):
     url = args.get("url") if isinstance(args, dict) else str(args)
     if not re.match(r"^https?://", url or ""):
         url = "https://" + url
     xdg_open(url)
+    task_file("opened link", url)
     return f"Opened {url}."
 
 
+@logged_tool("launch_app")
 def tool_launch_app(args):
     name = (args.get("name") if isinstance(args, dict) else str(args)).lower().strip()
     dirs = [HOME / ".local/share/applications", Path("/usr/share/applications"), Path("/var/lib/flatpak/exports/share/applications"),
@@ -301,6 +479,7 @@ def tool_launch_app(args):
     return f"Launching {best.stem}."
 
 
+@logged_tool("desktop_note")
 def tool_desktop_note(args):
     text = args.get("text") if isinstance(args, dict) else str(args)
     title = (args.get("title") if isinstance(args, dict) else "") or " ".join(text.split()[:6])
@@ -308,19 +487,24 @@ def tool_desktop_note(args):
     folder.mkdir(parents=True, exist_ok=True)
     slug = re.sub(r"[^a-z0-9]+", "-", title.lower()).strip("-")[:50] or "note"
     path = folder / f"{dt.date.today():%Y-%m-%d}-{slug}.md"
+    existed = path.exists()
     path.write_text(f"# {title}\n\n{text}\n\n_{dt.datetime.now():%Y-%m-%d %H:%M} · BlackLab Desktop_\n")
+    task_file("edited" if existed else "created", path)
     return f"Saved note to ~/{path.relative_to(HOME)}."
 
 
+@logged_tool("read_file")
 def tool_read_file(args):
     p = safe_home_path(args.get("path") if isinstance(args, dict) else str(args))
     if not p or not p.is_file():
         return "File not found in your home folder."
     if p.stat().st_size > 400_000:
         return "That file is too big to read here."
+    task_file("read", p)
     return p.read_text(errors="ignore")[:6000]
 
 
+@logged_tool("dev_docs")
 def tool_dev_docs(args):
     q = args.get("query") if isinstance(args, dict) else str(args)
     key = SECRETS.get("developer_knowledge")
@@ -348,12 +532,14 @@ def phone_call(phone, path, body=None, timeout=60):
                      method="POST" if body is not None else "GET")
 
 
+@logged_tool("phone_command")
 def tool_phone(args, phone):
     text = args.get("command") if isinstance(args, dict) else str(args)
     r = phone_call(phone, "/api/assistant", {"text": text})
     return r.get("text", "")
 
 
+@logged_tool("pull_from_phone")
 def pull(kind: str, phone) -> str:
     roots = {"backups": ["Backups"], "documents": ["Personal/Documents", "Professional/Documents"],
              "photos": ["Personal/Photos", "Professional/Photos"], "scans": ["Personal/Scans", "Professional/Scans"],
@@ -381,6 +567,7 @@ def pull(kind: str, phone) -> str:
             req = urllib.request.Request(url, headers={"Authorization": "Bearer " + phone.get("token", "")})
             with urllib.request.urlopen(req, timeout=120) as r, open(dest, "wb") as out:
                 shutil.copyfileobj(r, out)
+            task_file("downloaded", dest)
             got += 1
             total += f["size"]
 
@@ -406,7 +593,7 @@ def desktop_rules(text: str, phone):
     m = re.match(r"^(?:find|search for|look for|locate) (?:files? )?(?:named |called |like )?(.+?)(?: on (?:my )?(?:computer|desktop|pc))?$", low)
     if m and not PHONE_WORDS.search(low):
         return tool_find_files({"query": m.group(1)}), "Desktop · rules"
-    m = re.match(r"^open (?:my |the )?(downloads|documents|desktop|pictures|music|videos|home|blacklab-desktop|notes)(?: folder)?$", low)
+    m = re.match(r"^open (?:my |the )?(downloads|documents|desktop|pictures|music|videos|home|blacklab-desktop|notes|task logs?|ai (?:task )?logs)(?: folder)?$", low)
     if m:
         return tool_open_path({"path": m.group(1)}), "Desktop · rules"
     m = re.match(r"^(?:open|go to|browse to) (https?://\S+|[\w-]+\.(?:com|org|net|io|dev|edu|gov)\S*)$", low)
@@ -443,6 +630,9 @@ TOOLS = [
 ]
 
 
+TOOL_NAMES = {t["function"]["name"] for t in TOOLS}
+
+
 def run_tool(name, args, phone):
     fns = {"system_status": tool_system_status, "find_files": tool_find_files, "read_file": tool_read_file, "open_path": tool_open_path,
            "open_url": tool_open_url, "launch_app": tool_launch_app, "desktop_note": tool_desktop_note, "dev_docs": tool_dev_docs}
@@ -460,6 +650,7 @@ def ollama_chat(text, model, phone):
               "(tasks, calendar, notes, journal, recordings, email, Drive). Keep replies short. Today is " + dt.datetime.now().strftime("%A, %B %d %Y, %I:%M %p") + ".")
     msgs = [{"role": "system", "content": system}, {"role": "user", "content": text}]
     used = []
+    task_step("model", f"Asked {model}", f"system prompt + request; tools offered: {', '.join(t['function']['name'] for t in TOOLS)}")
     for _ in range(4):
         r = http_json(f"{OLLAMA}/api/chat", {"model": model, "messages": msgs, "tools": TOOLS, "stream": False, "think": False, "keep_alive": keep_alive(),
                                             "options": {"temperature": 0.3, "num_ctx": num_ctx()}}, timeout=180)
@@ -478,11 +669,23 @@ def ollama_chat(text, model, phone):
                 except Exception:
                     args = {}
             used.append(name)
+            if name not in TOOL_NAMES:
+                task_step("model", f"{model} asked for an unknown tool: {name}", args)
             msgs.append({"role": "tool", "content": str(run_tool(name, args, phone))[:4000], "tool_name": name})
     return "I went in circles on that one — try rephrasing?", f"Desktop AI · {model}"
 
 
 def assistant(body):
+    """Every request is one task in the task log, whichever path answers it."""
+    origin = body.get("origin") or "BlackLab Desktop (this computer)"
+    with task_log(body.get("text") or "", origin) as log:
+        out = _assistant(body)
+        if log is not None:
+            log.reply, log.source = out.get("text", ""), out.get("source", "")
+        return out
+
+
+def _assistant(body):
     text = (body.get("text") or "").strip()
     target = body.get("target", "auto")
     phone = body.get("phone")
@@ -491,9 +694,11 @@ def assistant(body):
     if target != "phone":
         r = desktop_rules(text, phone)
         if r:
+            task_step("rules", "Handled by the desktop rules (no AI needed)")
             return {"text": r[0], "source": r[1]}
     looks_phone = bool(PHONE_WORDS.search(text))
     if phone and (target == "phone" or (target == "auto" and looks_phone)):
+        task_step("relay", "Sent to the phone's assistant")
         r = phone_call(phone, "/api/assistant", {"text": text})
         return {"text": r.get("text", ""), "source": "Phone · " + r.get("source", ""), "links": r.get("links", [])}
     models = ollama_models()
@@ -502,8 +707,10 @@ def assistant(body):
         text_out, source = ollama_chat(text, model, phone)
         return {"text": text_out, "source": source}
     if phone:
+        task_step("relay", "Ollama is offline: sent to the phone's assistant")
         r = phone_call(phone, "/api/assistant", {"text": text})
         return {"text": r.get("text", ""), "source": "Phone · " + r.get("source", "")}
+    task_step("model", "Ollama is offline: asked Gemini (cloud)")
     g = gemini_text("You are BlackLab, a helpful, concise desktop assistant. Answer in 1-4 sentences.\n\nUser: " + text)
     if g:
         return {"text": g, "source": "Gemini (cloud) — Ollama is offline"}
@@ -549,7 +756,8 @@ def phone_generate(body):
 
 def phone_ask(body):
     """The phone hands the desktop assistant a request for the computer. Phone tools are off here so it can't loop back."""
-    r = assistant({"text": body.get("text", ""), "target": "desktop", "phone": None})
+    who = PHONE.get("model") or "phone"
+    r = assistant({"text": body.get("text", ""), "target": "desktop", "phone": None, "origin": f"Phone assistant ({who})"})
     return {"text": r.get("text", ""), "source": "Desktop · " + r.get("source", "")}
 
 
@@ -655,7 +863,8 @@ class Handler(SimpleHTTPRequestHandler):
                 models = ollama_models()
                 return self.reply(200, {"companion": True, "version": VERSION, "adb": adb_devices(), "ollama": models, "model": default_model(models),
                                         "phone_ai": {"paired_recently": time.time() - PHONE["last_seen"] < 600, "last_seen": PHONE["last_seen"], "phone": PHONE["model"]},
-                                        "eleven": bool(SECRETS.get("elevenlabs")), "devdocs": bool(SECRETS.get("developer_knowledge")), "out": str(OUT_DIR)})
+                                        "eleven": bool(SECRETS.get("elevenlabs")), "devdocs": bool(SECRETS.get("developer_knowledge")), "out": str(OUT_DIR),
+                                        "task_logs": str(TASK_LOG_DIR) if CONFIG.get("task_logs", True) is not False else None})
             return self.reply(404, {"error": "unknown"})
         return super().do_GET()
 
@@ -686,7 +895,11 @@ class Handler(SimpleHTTPRequestHandler):
                 data = tts(body.get("text", ""))
                 return self.reply(200, raw=data, ctype="audio/mpeg") if data else self.reply(204, raw=b"", ctype="audio/mpeg")
             if self.path == "/local/pull":
-                return self.reply(200, {"message": pull(body.get("kind", ""), body.get("phone"))})
+                with task_log(f"pull {body.get('kind', '')} from the phone", "BlackLab Desktop (this computer)") as log:
+                    msg = pull(body.get("kind", ""), body.get("phone"))
+                    if log is not None:
+                        log.reply, log.source = msg, "Desktop · phone files"
+                return self.reply(200, {"message": msg})
             if self.path == "/local/open":
                 return self.reply(200, {"message": tool_open_path({"path": body.get("path", "~")})})
             return self.reply(404, {"error": "unknown"})

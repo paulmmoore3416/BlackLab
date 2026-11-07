@@ -78,7 +78,11 @@ status_board() {
     [ -n "$loaded" ] && ok "Loaded: $loaded" || warn "No model loaded right now"
   else bad "Ollama is not running"; fi
   ollama_up && ok "Desktop assistant model: $(model_selected) (keep-alive $(json_get "$CFG" keep_alive || echo 30m))"
-  if companion_up; then ok "BlackLab Desktop companion on $COMP"; else bad "BlackLab Desktop companion is not running"; fi
+  if companion_up; then
+    ok "BlackLab Desktop companion on $COMP"
+    local logs; logs="$(curl -fsS -m 2 -H 'X-BlackLab: 1' "$COMP/local/status" | python3 -c 'import json,sys;print(json.load(sys.stdin).get("task_logs") or "")' 2>/dev/null)"
+    if [ -n "$logs" ]; then ok "Desktop AI task logs: ${logs/#$HOME/\~}"; else warn "Desktop AI task logs are off (config.json \"task_logs\")"; fi
+  else bad "BlackLab Desktop companion is not running"; fi
   local p any=0
   for p in $(phones); do
     any=1

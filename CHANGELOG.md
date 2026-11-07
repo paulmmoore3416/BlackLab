@@ -2,6 +2,11 @@
 
 All notable changes to BlackLab are documented here. The project follows [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Added
+- **Desktop AI task logs** (companion 1.2.0): every task the desktop AI runs, from the phone or BlackLab Desktop, is logged in `~/Desktop/BlackLab AI Task Logs/`: one Markdown file per task with the request, each step and tool, the reply, and every file it created, edited, downloaded, read or opened, plus a `task-index.csv`. Private to your user; "open task logs" opens the folder; `./daddyshome --status` shows it. See [docs/DESKTOP_AI.md](docs/DESKTOP_AI.md#task-logs).
+
 ## [5.5.0] — 2026-11-05
 
 Three free-key integrations: Gemini cloud AI, a Picovoice wake word, and OpenWeatherMap facility weather.
