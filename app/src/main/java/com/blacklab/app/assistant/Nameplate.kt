@@ -131,6 +131,8 @@ manufacturer, model, serial, equipment_type, voltage, phase, amps, horsepower, r
             notes = asset.fields.entries.joinToString("\n") { "${it.key}: ${it.value}" }, tags = "workorder", attachmentPath = app.storage.relative(photo),
             dueDay = Time.today().toEpochDay(), priority = 2,
         ))
+        DesktopJobs.enqueue(app, "equipment", photo, asset.label, JSONObject()
+            .put("fields", JSONObject(asset.fields as Map<*, *>)).put("note", note).put("wo", woNumber).put("task_id", taskId))
         return Outcome(asset, docId, taskId)
     }
 }

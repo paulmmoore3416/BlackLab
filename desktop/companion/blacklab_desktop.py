@@ -44,7 +44,10 @@ from collections import deque
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
-VERSION = "1.3.0"
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import agents  # noqa: E402  (background jobs, recordings, equipment, briefs)
+
+VERSION = "1.4.0"
 HOST, PORT = "127.0.0.1", int(os.environ.get("BLACKLAB_DESKTOP_PORT", "8770"))
 HOME = Path.home()
 WEB_DIR = Path(__file__).resolve().parent.parent / "web"
@@ -444,6 +447,11 @@ def archive_chat(request: str, reply: str, origin: str, source: str, when: dt.da
         request, reply = redact(request), redact(reply)
         _append_private(day, head + f"## {when:%H:%M:%S} · {origin}\n\n**You**\n\n{quote(request)}\n\n"
                                     f"**BlackLab** · {source or '—'}\n\n{quote(reply)}\n\n---\n\n")
+        try:
+            if agents.C and agents.ISSUE_RE.search(request):  # "RTU-4 is tripping again" becomes part of its history
+                agents.link_mentions(request, "chat", "Chat", when.timestamp())
+        except Exception:
+            pass
         _append_private(CHAT_DIR / "chat-history.jsonl", json.dumps(
             {"at": when.isoformat(timespec="seconds"), "from": origin, "you": request.strip(), "blacklab": reply, "by": source, "tools": tools},
             ensure_ascii=False) + "\n")
@@ -617,6 +625,7 @@ def memory_keeper():
 # ~/.cache/blacklab-desktop/doc-index.json, refreshed incrementally on every search. Nothing leaves the computer.
 
 DOC_INDEX = CACHE_DIR / "doc-index.json"
+DOC_ROOTS: list[Path] = []  # extra folders to index (agents.py adds Equipment/Cards)
 DOC_EXT = {".md", ".txt", ".csv", ".html", ".htm", ".json", ".log", ".pdf", ".tsv", ".xml"}
 _DOC_LOCK = threading.Lock()
 
@@ -665,7 +674,7 @@ def update_doc_index() -> dict:
         if idx.get("model") != embed_model():
             idx = {"model": embed_model(), "files": {}}
         seen, changed = set(), False
-        for root in dict.fromkeys((DOCS_DIR, DOWNLOADS_DIR)):
+        for root in dict.fromkeys((DOCS_DIR, DOWNLOADS_DIR, *DOC_ROOTS)):
             if not root.is_dir():
                 continue
             for f in root.rglob("*"):
@@ -719,6 +728,12 @@ def doc_search(query: str, k=4) -> list[tuple[float, str, str]]:
     for path in files:
         task_file("read", path)
     return best
+
+
+@logged_tool("equipment")
+def tool_equipment(args):
+    q = (args.get("query") if isinstance(args, dict) else str(args or "")) or ""
+    return agents.equipment_lookup(q) if agents.C else "The equipment registry isn't loaded."
 
 
 @logged_tool("search_documents")
@@ -1031,6 +1046,16 @@ def desktop_rules(text: str, phone):
     m = re.match(r"^(?:search|ask|check) (?:my |the )?(?:ai |blacklab )?(?:documents|docs|downloads)\b(?: for| about)?[:,\s]+(.+)$", t, re.I | re.S)
     if m:
         return answer_from_docs(m.group(1).strip())
+    m = re.match(r"^(?:(?:what'?s|show(?: me)?|give me) )?(?:the )?(?:history|record|info|details|nameplate) (?:on|for|of) (.+?)\??$|^(?:show |list )?(?:my |all |the )?equipment(?: list)?(?: for| matching)?\s*(.*?)\??$", low)
+    if m and (m.group(1) or m.group(2) is not None):
+        q = (m.group(1) or m.group(2) or "all").strip()
+        if m.group(2) is not None or agents.EQUIP_DB.exists():
+            r = tool_equipment({"query": q})
+            if m.group(2) is not None or not r.startswith("No equipment matches"):
+                return r, "Desktop · equipment"
+    m = re.match(r"^which (?:units|equipment|machines)\b(.*?)\??$", low)
+    if m:
+        return tool_equipment({"query": m.group(1)}), "Desktop · equipment"
     m = re.match(r"^(?:show|search|check) (?:my |the )?chat history(?: for| about)?\s*(.*)$", low)
     if m:
         return tool_recall_chats({"query": m.group(1)}), "Desktop · chat history"
@@ -1070,6 +1095,8 @@ TOOLS = [
                                       "parameters": {"type": "object", "properties": {"query": {"type": "string", "description": "Key words, plus 'today' or 'yesterday' to limit the day"}}, "required": ["query"]}}},
     {"type": "function", "function": {"name": "search_documents", "description": "Search inside the user's own documents and downloads (notes, reports, PDFs, phone files) for a topic.",
                                       "parameters": {"type": "object", "properties": {"query": {"type": "string"}}, "required": ["query"]}}},
+    {"type": "function", "function": {"name": "equipment", "description": "Look up the user's equipment registry: a unit's nameplate data and history (work orders, meetings, photos, repeat issues), or list units matching words like a type, make, location or refrigerant.",
+                                      "parameters": {"type": "object", "properties": {"query": {"type": "string", "description": "A tag like RTU-4, a serial, or words like 'R-22' or 'chiller'; 'all' lists everything"}}, "required": ["query"]}}},
     {"type": "function", "function": {"name": "dev_docs", "description": "Search Google's official Android/Firebase/Cloud developer documentation (needs internet).", "parameters": {"type": "object", "properties": {"query": {"type": "string"}}, "required": ["query"]}}},
 ]
 
@@ -1098,7 +1125,7 @@ def tool_guard(name: str, request: str) -> str | None:
 def run_tool(name, args, phone):
     fns = {"system_status": tool_system_status, "find_files": tool_find_files, "read_file": tool_read_file, "open_path": tool_open_path,
            "open_url": tool_open_url, "launch_app": tool_launch_app, "desktop_note": tool_desktop_note, "dev_docs": tool_dev_docs,
-           "recall_chats": tool_recall_chats, "search_documents": tool_search_documents}
+           "recall_chats": tool_recall_chats, "search_documents": tool_search_documents, "equipment": tool_equipment}
     try:
         if name == "phone_command":
             return tool_phone(args, phone)
@@ -1107,7 +1134,7 @@ def run_tool(name, args, phone):
         return f"{name} failed: {e}"
 
 
-def ollama_chat(text, model, phone, history=(), use_memory=True):
+def ollama_chat(text, model, phone, history=(), use_memory=True, rounds=4):
     tools = [t for t in TOOLS if phone or t["function"]["name"] != "phone_command"]
     system = ("You are BlackLab, the user's laid-back, funny but sharp personal assistant, running offline on their Linux desktop. "
               "The user is a Director of Facility Operations who is also a student. "
@@ -1124,7 +1151,7 @@ def ollama_chat(text, model, phone, history=(), use_memory=True):
     msgs.append({"role": "user", "content": text})
     used = []
     task_step("model", f"Asked {model}", f"system prompt + {len(history or ())} earlier turn(s) + request; tools offered: {', '.join(t['function']['name'] for t in tools)}")
-    for _ in range(4):
+    for _ in range(rounds):
         r = http_json(f"{OLLAMA}/api/chat", {"model": model, "messages": msgs, "tools": tools, "stream": False, "think": False, "keep_alive": keep_alive(),
                                             "options": {"temperature": 0.3, "num_ctx": num_ctx()}}, timeout=180)
         msg = r.get("message", {})
@@ -1192,7 +1219,8 @@ def _assistant(body):
     models = ollama_models()
     if models:
         model = body.get("model") if body.get("model") in models else default_model(models)
-        text_out, source = ollama_chat(text, model, phone, body.get("history") or (), use_memory=not body.get("private"))
+        text_out, source = ollama_chat(text, model, phone, body.get("history") or (), use_memory=not body.get("private"),
+                                       rounds=min(int(body.get("rounds") or 4), 10))
         return {"text": text_out, "source": source}
     if phone:
         task_step("relay", "Ollama is offline: sent to the phone's assistant")
@@ -1339,6 +1367,18 @@ class Handler(SimpleHTTPRequestHandler):
     def do_GET(self):
         if not self.host_ok():
             return self.reply(403, {"error": "forbidden"})
+        route = urllib.parse.urlsplit(self.path).path
+        if route == "/phone/jobs":
+            if not self.phone_guard():
+                return
+            return self.reply(200, {"jobs": agents.pending_for_phone(), "whisper": agents.whisper_ready()})
+        if route in ("/local/jobs", "/local/equipment"):
+            if not self.guard():
+                return
+            if route == "/local/jobs":
+                jobs = sorted(agents.JOBS.values(), key=lambda j: j["created"], reverse=True)[:60]
+                return self.reply(200, {"jobs": [agents.public(j) for j in jobs], "whisper": agents.whisper_ready()})
+            return self.reply(200, {"text": agents.equipment_lookup("all")})
         if self.path == "/phone/status":
             if not self.phone_guard():
                 return
@@ -1355,11 +1395,38 @@ class Handler(SimpleHTTPRequestHandler):
                                         "eleven": bool(SECRETS.get("elevenlabs")), "devdocs": bool(SECRETS.get("developer_knowledge")), "out": str(DOWNLOADS_DIR),
                                         "folders": {"ai": str(AI_DIR), "downloads": str(DOWNLOADS_DIR), "documents": str(DOCS_DIR),
                                                     "chat_history": str(CHAT_DIR) if CONFIG.get("chat_history", True) is not False else None},
-                                        "task_logs": str(TASK_LOG_DIR) if CONFIG.get("task_logs", True) is not False else None})
+                                        "task_logs": str(TASK_LOG_DIR) if CONFIG.get("task_logs", True) is not False else None,
+                                        "agents": agents.status()})
             return self.reply(404, {"error": "unknown"})
         return super().do_GET()
 
     def do_POST(self):
+        route = urllib.parse.urlsplit(self.path).path
+        if route in ("/phone/upload", "/phone/jobs", "/phone/jobs/ack", "/phone/context"):
+            if not self.phone_guard():
+                return
+            try:
+                length = int(self.headers.get("Content-Length") or 0)
+                if route == "/phone/upload":
+                    name = urllib.parse.parse_qs(urllib.parse.urlsplit(self.path).query).get("name", ["upload"])[0]
+                    return self.reply(200, {"upload": agents.save_upload(name, length, self.rfile)})
+                if length > 4_000_000:
+                    return self.reply(413, {"error": "too large"})
+                body = json.loads(self.rfile.read(length) or b"{}")
+                if route == "/phone/jobs":
+                    who = PHONE.get("model") or "phone"
+                    j = agents.submit(body.get("kind", ""), body.get("title", ""), body.get("params") or {}, body.get("upload"),
+                                      origin=f"Phone ({who})", private=bool(body.get("private")))
+                    return self.reply(200, agents.public(j))
+                if route == "/phone/jobs/ack":
+                    agents.ack([str(i) for i in body.get("ids", [])][:200])
+                    return self.reply(200, {"ok": True})
+                agents.save_context(body)
+                return self.reply(200, {"ok": True})
+            except ValueError as e:
+                return self.reply(400, {"error": str(e)})
+            except Exception as e:
+                return self.reply(500, {"error": str(e)})
         if self.path in ("/phone/generate", "/phone/ask"):
             if not self.phone_guard():
                 return
@@ -1391,6 +1458,17 @@ class Handler(SimpleHTTPRequestHandler):
                     if log is not None:
                         log.reply, log.source = msg, "Desktop · phone files"
                 return self.reply(200, {"message": msg})
+            if self.path == "/local/jobs":
+                upload = None
+                if body.get("path"):
+                    f = safe_home_path(body["path"])
+                    if not f or not f.is_file():
+                        return self.reply(400, {"error": "file not found in your home folder"})
+                    upload = "local-" + hashlib.sha1(str(f).encode()).hexdigest()[:12]
+                    agents.UPLOADS[upload] = str(f)
+                j = agents.submit(body.get("kind", ""), body.get("title", "") or (Path(body["path"]).name if body.get("path") else ""),
+                                  body.get("params") or {}, upload, private=bool(body.get("private")))
+                return self.reply(200, agents.public(j))
             if self.path == "/local/open":
                 return self.reply(200, {"message": tool_open_path({"path": body.get("path", "~")})})
             return self.reply(404, {"error": "unknown"})
@@ -1430,6 +1508,7 @@ def main():
     ensure_phone_token()
     threading.Thread(target=keep_usb_link, daemon=True).start()
     threading.Thread(target=memory_keeper, daemon=True).start()
+    agents.setup(sys.modules[__name__])
     srv = ThreadingHTTPServer((HOST, PORT), Handler)
     print(f"BlackLab Desktop companion {VERSION} on http://{HOST}:{PORT}  (web: {WEB_DIR})", flush=True)
     try:

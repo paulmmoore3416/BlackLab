@@ -148,6 +148,14 @@ fun AssistantSettingsScreen() {
                     com.blacklab.app.ui.components.LabeledSwitchRow("Use the desktop AI when it's reachable", "Assistant, summaries, Talk, Ask my files and Brainstorm tools use it first, then Gemini Nano", s.asstDesktopAi) { v ->
                         app.settings.update { putBoolean(com.blacklab.app.core.Keys.ASST_DESKTOP_AI, v) }; scope.launch { com.blacklab.app.assistant.DesktopAi.probe() }
                     }
+                    com.blacklab.app.ui.components.LabeledSwitchRow("Hand off work to the computer", "Recordings → meeting notes and tasks, nameplates → equipment registry, morning brief and Friday summary", s.asstDesktopJobs) { v ->
+                        app.settings.update { putBoolean(com.blacklab.app.core.Keys.ASST_DESKTOP_JOBS, v) }
+                    }
+                    val jobs by com.blacklab.app.assistant.DesktopJobs.jobs.collectAsState()
+                    val waiting by com.blacklab.app.assistant.DesktopJobs.outbox.collectAsState()
+                    if (jobs.isNotEmpty() || waiting > 0) Text(
+                        (jobs.joinToString("\n") { "• ${it.title}: ${it.progress}" } + if (waiting > 0) "\n• $waiting waiting to send" else "").trim(),
+                        style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(top = 4.dp))
                     Text("Set up: plug the phone into the computer (or pair Wireless debugging), run ./daddyshome there, then open BlackLab once. Requests stay inside the USB / adb link and carry a key only this phone has.",
                         style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 4.dp))
                 }

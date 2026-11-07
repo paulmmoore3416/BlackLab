@@ -16,6 +16,7 @@ object Notifications {
     const val CH_RECORDING = "recording"
     const val CH_STUDY = "study"
     const val CH_LINK = "link"
+    const val CH_DESKTOP = "desktop_jobs"
 
     fun createChannels(context: Context) {
         val nm = context.getSystemService(NotificationManager::class.java)
@@ -34,6 +35,9 @@ object Notifications {
                 },
                 NotificationChannel(CH_LINK, "Desktop link & sync", NotificationManager.IMPORTANCE_MIN).apply {
                     description = "Shown while BlackLab Desktop can connect"
+                },
+                NotificationChannel(CH_DESKTOP, "Computer results", NotificationManager.IMPORTANCE_DEFAULT).apply {
+                    description = "Meeting notes, equipment records and other work your computer finished"
                 },
                 NotificationChannel(CH_STUDY, "Study timer", NotificationManager.IMPORTANCE_HIGH).apply {
                     description = "Focus session and break alerts"
@@ -108,6 +112,26 @@ object Notifications {
             .setAutoCancel(true)
             .setColor(0xFF2BD9A8.toInt())
             .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setContentIntent(openAppIntent(context, route, id))
+            .build()
+        try {
+            nm.notify(id, n)
+        } catch (_: SecurityException) {
+        }
+    }
+
+    /** A notification with expandable text (desktop results, briefs). */
+    fun big(context: Context, id: Int, channel: String, title: String, text: String, route: String?) {
+        val nm = NotificationManagerCompat.from(context)
+        if (!nm.areNotificationsEnabled()) return
+        val n = NotificationCompat.Builder(context, channel)
+            .setSmallIcon(R.drawable.ic_notification)
+            .setContentTitle(title)
+            .setContentText(text.lineSequence().firstOrNull { it.isNotBlank() }.orEmpty())
+            .setStyle(NotificationCompat.BigTextStyle().bigText(text))
+            .setAutoCancel(true)
+            .setColor(0xFF2BD9A8.toInt())
+            .setSubText("From your computer")
             .setContentIntent(openAppIntent(context, route, id))
             .build()
         try {

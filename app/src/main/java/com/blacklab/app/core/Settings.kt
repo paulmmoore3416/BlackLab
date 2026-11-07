@@ -113,6 +113,7 @@ data class Settings(
     val asstUseNano: Boolean = true,
     /** Use the desktop's local AI (Ollama via BlackLab Desktop) whenever the computer is reachable. */
     val asstDesktopAi: Boolean = true,
+    val asstDesktopJobs: Boolean = true,
     /** Gemini API (cloud): OFF, FALLBACK (only when the desktop and Gemini Nano can't) or PREFER (before Gemini Nano). */
     val asstCloudAi: String = "FALLBACK",
     val asstGeminiModel: String = "gemini-2.5-flash",
@@ -268,6 +269,7 @@ object Keys {
     const val ASST_CONFIRM = "asst_confirm"
     const val ASST_USE_NANO = "asst_use_nano"
     const val ASST_DESKTOP_AI = "asst_desktop_ai"
+    const val ASST_DESKTOP_JOBS = "asst_desktop_jobs"
     const val ASST_CLOUD_AI = "asst_cloud_ai"
     const val ASST_GEMINI_MODEL = "asst_gemini_model"
     const val WAKE_WORD = "wake_word"
@@ -428,6 +430,7 @@ class SettingsRepository(context: Context) {
             asstConfirm = getBoolean(Keys.ASST_CONFIRM, d.asstConfirm),
             asstUseNano = getBoolean(Keys.ASST_USE_NANO, d.asstUseNano),
             asstDesktopAi = getBoolean(Keys.ASST_DESKTOP_AI, d.asstDesktopAi),
+            asstDesktopJobs = getBoolean(Keys.ASST_DESKTOP_JOBS, d.asstDesktopJobs),
             asstCloudAi = getString(Keys.ASST_CLOUD_AI, d.asstCloudAi) ?: d.asstCloudAi,
             asstGeminiModel = getString(Keys.ASST_GEMINI_MODEL, d.asstGeminiModel) ?: d.asstGeminiModel,
             wakeWord = getBoolean(Keys.WAKE_WORD, d.wakeWord),

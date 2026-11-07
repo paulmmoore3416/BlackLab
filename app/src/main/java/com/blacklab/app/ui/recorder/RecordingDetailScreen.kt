@@ -197,6 +197,13 @@ fun RecordingDetailScreen(id: Long) {
                     }
                 }) { Text("Save as document") }
             }
+            val desk by com.blacklab.app.assistant.DesktopAi.status.collectAsState()
+            if (desk.state == com.blacklab.app.assistant.DesktopAi.State.ONLINE && app.settings.current.asstDesktopJobs) {
+                OutlinedButton(onClick = {
+                    com.blacklab.app.assistant.DesktopJobs.enqueue(app, "transcribe", file, r.title, org.json.JSONObject().put("recording_id", r.id))
+                    shell.toast("Sent to your computer. Meeting notes and tasks come back when it's done.")
+                }, modifier = Modifier.padding(top = 6.dp)) { Icon(Icons.Rounded.Computer, null); Spacer(Modifier.width(6.dp)); Text("Transcribe on computer (Whisper)") }
+            }
             transcribing?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(top = 6.dp)) }
             OutlinedTextField(transcript, { transcript = it }, placeholder = { Text("No transcript yet") }, minLines = 4, modifier = Modifier.fillMaxWidth().padding(top = 8.dp))
             SectionHeader("Notes")

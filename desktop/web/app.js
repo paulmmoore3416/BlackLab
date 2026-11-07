@@ -825,9 +825,32 @@ Views.desktop = () => {
       <div class="card"><h2>Ask the desktop</h2><div class="stack">
         ${['System status', 'What is using my disk space?', 'Find files named budget', 'Open my Downloads folder', 'Make a desktop note: call the roofer Monday', 'Search my documents for roof inspection', 'Remember that Trane is our chiller vendor', 'Show chat history for chiller', 'Android docs: CameraX extensions'].map((q) => `<span class="chip btn" data-q="${esc(q)}">${esc(q)}</span>`).join('')}
         <div class="small muted">These run on this computer through the companion. With Ollama they work fully offline.</div></div></div>
+    </div>
+    <div class="grid g2" style="margin-top:16px">
+      <div class="card"><h2>Background jobs</h2><div class="stack">
+        <div id="jobs" class="small muted">Loading…</div>
+        <button class="ghost" data-act="job-brief">Write the morning brief now</button>
+        <button class="ghost" data-act="job-weekly">Write the weekly summary now</button>
+        <div class="small muted">Recordings and nameplate photos from the phone run here too. Results go back to the phone as notifications and land in Desktop › BlackLab AI › Documents.</div></div></div>
+      <div class="card"><h2>Equipment</h2><div class="stack">
+        <pre id="equipment" class="small" style="white-space:pre-wrap;margin:0">Loading…</pre>
+        <div class="small muted">Built from nameplate photos on the phone. Ask “history on RTU-4” or “which units use R-22?”.</div></div></div>
     </div></div>`;
 };
+async function loadJobs() {
+  const el = $('#jobs'); if (!el) return;
+  try {
+    const r = await Companion.req('/local/jobs');
+    const label = { queued: 'Waiting', running: 'Working', done: 'Done', failed: 'Failed' };
+    el.innerHTML = r.jobs.length ? r.jobs.slice(0, 8).map((j) => `<div>• <b>${esc(j.title)}</b> · ${esc(j.kind)} · ${esc(j.status === 'running' ? j.progress : label[j.status] || j.status)}${j.error ? ' · ' + esc(j.error) : ''}</div>`).join('')
+      : 'No jobs yet.' + (r.whisper ? '' : ' Transcription needs ./daddyshome --install-whisper.');
+    const eq = await Companion.req('/local/equipment'); const pre = $('#equipment'); if (pre) pre.textContent = eq.text;
+    if (r.jobs.some((j) => j.status === 'running' || j.status === 'queued')) setTimeout(loadJobs, 4000);
+  } catch (e) { el.textContent = e.message; }
+}
+
 Views.desktop.bind = () => {
+  if (Companion.ok) loadJobs();
   const re = $('#recheck'); if (re) re.onclick = async () => { await Companion.detect(); render(); toast(Companion.ok ? 'Companion found' : 'Still not running'); };
   $$('[data-q]').forEach((c) => c.onclick = () => { S.ui.target = 'desktop'; saveUi(); go('assistant'); ask(c.dataset.q); });
   $$('[data-act]').forEach((b) => b.onclick = async () => {
@@ -839,6 +862,10 @@ Views.desktop.bind = () => {
         const r = await Companion.req('/local/pull', { kind: a.slice(5), phone: { url: Phone.url, token: Phone.token } }); toast(r.message, 5000);
       } else if (a === 'backup') { if (S.mode !== 'phone') throw new Error('Needs a live phone link'); const r = await Phone.req('/api/backup', { body: {} }); toast('Backed up: ' + r.file); }
       else if (a === 'open-folder') await Companion.req('/local/open', { path: 'blacklab ai' });
+      else if (a === 'job-brief' || a === 'job-weekly') {
+        await Companion.req('/local/jobs', { kind: a.slice(4), title: a === 'job-brief' ? 'Morning brief' : 'Weekly summary' });
+        toast('Started. It takes about a minute.'); loadJobs();
+      }
     } catch (e) { toast(e.message); }
     b.disabled = false;
   });

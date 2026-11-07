@@ -173,6 +173,7 @@ class RecorderService : Service() {
                             transcript = transcript.toString(), format = e.config.summary(),
                         )
                     )
+                    savedId?.let { com.blacklab.app.assistant.DesktopJobs.onRecordingSaved(app, it, f, title) }
                 }
             }
             state.value = RecState(lastSavedId = savedId)

@@ -16,6 +16,8 @@
 #         ./daddyshome --open         …and open the BlackLab Desktop window
 #         ./daddyshome --repair       re-send the phone's key (after reinstalling the app)
 #         ./daddyshome --stop         unload the model and unlink the phone
+#         ./daddyshome --install-whisper   set up offline transcription (faster-whisper, ~2.6 GB)
+#         ./daddyshome --install-vision    pull the nameplate-reading model (qwen2.5vl:7b, ~6 GB)
 set -uo pipefail
 
 HERE="$(cd "$(dirname "$(readlink -f "$0")")" && pwd)"
@@ -93,6 +95,11 @@ else:
     print("OK Desktop AI downloads: " + t(s.get("out") or "?"))
 if not f.get("chat_history") and f: print("WARN Chat history is off (config.json \"chat_history\")")
 if not s.get("task_logs"): print("WARN Desktop AI task logs are off (config.json \"task_logs\")")
+a = s.get("agents") or {}
+if a:
+    print(("OK" if a.get("whisper") else "WARN") + " Transcription: " + ("Whisper ready" if a.get("whisper") else "not installed (./daddyshome --install-whisper)"))
+    print(("OK" if a.get("vision") else "WARN") + " Nameplate reader: " + (a.get("vision") or "not installed (./daddyshome --install-vision)"))
+    print("OK Jobs: %d running, %d queued; equipment on file: %d; morning brief at %s" % (a.get("running", 0), a.get("queued", 0), a.get("assets", 0), a.get("brief_time", "05:30")))
 ' 2>/dev/null)
   else bad "BlackLab Desktop companion is not running"; fi
   local p any=0
@@ -120,7 +127,17 @@ case "${1:-}" in
     json_set keep_alive '"30m"'
     for p in $(phones); do "$ADB" -s "$p" reverse --remove "tcp:$PORT" >/dev/null 2>&1 && ok "Unlinked $p"; done
     exit 0 ;;
-  -h|--help) sed -n '2,20p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+  --install-whisper)
+    step "Offline transcription (Whisper)"
+    V="$HOME/.local/share/blacklab-desktop/whisper"
+    python3 -m venv "$V" && "$V/bin/pip" install -q --upgrade pip && "$V/bin/pip" install -q faster-whisper "av<16" nvidia-cublas-cu12 "nvidia-cudnn-cu12==9.*" \
+      && ok "Installed in ${V/#$HOME/\~} (the model downloads on the first recording)" || bad "Install failed"
+    exit 0 ;;
+  --install-vision)
+    step "Nameplate reader"
+    ollama pull "$(json_get "$CFG" vision_model || echo qwen2.5vl:7b)" && ok "Vision model ready"
+    exit 0 ;;
+  -h|--help) sed -n '2,22p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
 esac
 
 OPEN=0; REPAIR=0; WANT=""

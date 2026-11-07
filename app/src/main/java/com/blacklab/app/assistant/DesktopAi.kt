@@ -44,7 +44,8 @@ object DesktopAi {
         container.appScope.launch {
             while (true) {
                 probe()
-                delay(if (_status.value.state == State.ONLINE) 60_000 else 20_000)
+                if (_status.value.state == State.ONLINE) runCatching { DesktopJobs.sync(container) }
+                delay(if (_status.value.state == State.ONLINE) (if (DesktopJobs.jobs.value.isNotEmpty()) 20_000 else 60_000) else 20_000)
             }
         }
     }
@@ -99,6 +100,29 @@ object DesktopAi {
                 val j = call("POST", "/phone/ask", JSONObject().put("text", text), 180_000)
                 DesktopReply(j.optString("text"), j.optString("source", "Desktop"))
             }.getOrNull()
+        }
+    }
+
+    /** For DesktopJobs: one authenticated call to the companion (throws on failure). */
+    internal fun request(method: String, path: String, body: JSONObject?, timeoutMs: Int): JSONObject = call(method, path, body, timeoutMs)
+
+    /** Streams a file to the companion's inbox and returns its upload id, or null if the computer refused it. */
+    internal fun upload(file: java.io.File): String? {
+        val c = URL(base() + "/phone/upload?name=" + java.net.URLEncoder.encode(file.name, "UTF-8")).openConnection() as HttpURLConnection
+        return try {
+            c.requestMethod = "POST"
+            c.connectTimeout = 3_000
+            c.readTimeout = 600_000
+            c.doOutput = true
+            c.setFixedLengthStreamingMode(file.length())
+            c.setRequestProperty("Authorization", "Bearer " + (token() ?: ""))
+            c.setRequestProperty("X-BlackLab-Phone", android.os.Build.MODEL ?: "phone")
+            c.setRequestProperty("Content-Type", "application/octet-stream")
+            file.inputStream().use { inp -> c.outputStream.use { inp.copyTo(it, 1 shl 16) } }
+            if (c.responseCode !in 200..299) null
+            else JSONObject(c.inputStream.bufferedReader().use { it.readText() }).optString("upload").takeIf { it.isNotBlank() }
+        } finally {
+            c.disconnect()
         }
     }
 

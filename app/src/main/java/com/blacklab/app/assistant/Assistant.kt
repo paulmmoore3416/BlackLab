@@ -824,10 +824,36 @@ User: $text"""
                 else -> "I can't reach the computer right now. " + st.note.ifBlank { "Plug in the phone (or turn on Wireless debugging) and run ./daddyshome." }
             }, listOf(Link("Assistant settings", "assistant/settings")), source = "Desktop AI")
         }
+        jobs(t, l)?.let { return it }
         val m = Regex("^(?:on (?:my |the )?(?:desktop|computer|pc|laptop)[,:]?\\s+|(?:desktop|computer)[:,]\\s*|desktop\\s+|(?:ask|tell|have) (?:my |the )?(?:desktop|computer|pc)(?: to)?\\s+)(.+)$", RegexOption.IGNORE_CASE).find(t) ?: return null
         val req = m.groupValues[1].trim()
         val r = DesktopAi.ask(req) ?: return Reply("I can't reach the computer right now. Plug in the phone (or use Wireless debugging) and run ./daddyshome on the computer.", source = "Desktop AI")
         return Reply(r.text.ifBlank { "Done." }, source = r.source.ifBlank { "Desktop" })
+    }
+
+    /** Hand-off jobs and the equipment registry, both on the computer. */
+    private suspend fun jobs(t: String, l: String): Reply? {
+        val off = "Your computer isn't reachable (or hand-off is off in Assistant settings). Plug in the phone or use Wireless debugging, then run ./daddyshome."
+        val later = "On it. I'll let you know when your computer finishes."
+        if (Regex("^(?:send |write |make |run |start )?(?:the |my )?(?:weekly (?:ops |operations )?(?:summary|report)|week(?:ly)? in review)\\b").containsMatchIn(l))
+            return Reply(if (DesktopJobs.start(app, "weekly", "Weekly summary")) "Your computer is writing the weekly operations summary. I'll notify you when it's ready." else off, source = "Desktop jobs")
+        if (Regex("^(?:(?:desktop|computer|overnight|ops|operations) brief(?:ing)?|brief me from (?:my |the )?(?:computer|desktop))\\b").containsMatchIn(l))
+            return Reply(if (DesktopJobs.start(app, "brief", "Morning brief")) "Your computer is putting the brief together. It takes about a minute." else off, source = "Desktop jobs")
+        if (Regex("^transcribe (?:my |the )?(?:last|latest|newest|most recent) (?:recording|meeting)").containsMatchIn(l)) {
+            val rec = app.db.recordings().allFor(app.settings.current.activeProfile.name).firstOrNull() ?: return Reply("You don't have any recordings yet.", listOf(Link("Recorder", "recorder")))
+            if (!DesktopAi.usable) return Reply(off, source = "Desktop jobs")
+            DesktopJobs.enqueue(app, "transcribe", app.storage.resolve(rec.filePath), rec.title, org.json.JSONObject().put("recording_id", rec.id))
+            return Reply("Sending “${rec.title}” to your computer. The meeting notes and tasks will show up here when it's done.", listOf(Link("Recording", "recording/${rec.id}")), source = "Desktop jobs")
+        }
+        Regex("^(?:in the background|when you can|later|(?:computer|desktop),? work on)[:,]?\\s+(.{6,})$", RegexOption.IGNORE_CASE).find(t)?.let { m ->
+            val req = m.groupValues[1].trim()
+            return Reply(if (DesktopJobs.start(app, "ask", req.take(80), org.json.JSONObject().put("text", req))) later else off, source = "Desktop jobs")
+        }
+        if (Regex("^(?:(?:what'?s|show(?: me)?) (?:the )?)?(?:history|nameplate|record) (?:on|for|of) [a-z]{1,6}[- ]?\\d|^which (?:units|equipment)\\b|^(?:show |list )?(?:my |all )?equipment\\b").containsMatchIn(l)) {
+            val r = DesktopAi.ask(t) ?: return Reply(off, source = "Desktop AI")
+            return Reply(r.text.ifBlank { "Nothing on file." }, source = r.source.ifBlank { "Desktop · equipment" })
+        }
+        return null
     }
 
     // ------------------------------------------------------------------ behavioral health

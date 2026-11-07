@@ -13,7 +13,7 @@ Pro camera & photo editor · dictation · audio recorder · Word-class documents
 [![Jetpack Compose](https://img.shields.io/badge/Jetpack%20Compose-Material%203-4285F4?logo=jetpackcompose&logoColor=white)](https://developer.android.com/compose)
 [![Android CI](https://github.com/paulmmoore3416/BlackLab/actions/workflows/android.yml/badge.svg)](https://github.com/paulmmoore3416/BlackLab/actions/workflows/android.yml)
 
-[Download APK](releases/BlackLab-v5.5.0.apk) · [Features](#features) · [Install](#install) · [Build from source](#build-from-source) · [Architecture](docs/ARCHITECTURE.md)
+[Download APK](releases/BlackLab-v5.6.0.apk) · [Features](#features) · [Install](#install) · [Build from source](#build-from-source) · [Architecture](docs/ARCHITECTURE.md)
 
 </div>
 
@@ -87,6 +87,8 @@ An encrypted workspace for working on a behavioral health unit, using initials a
 - Same glass look, palettes and light styles as the phone; an **Appearance** page that sets them on the phone; a printable **Behavioral Health** reference (crisis lines, de-escalation, group library, safety-round sheets)
 - Run it locally (`desktop/install.sh`) or open **https://paulmmoore3416.github.io/BlackLab/** and sign in with Google
 - Local companion with an offline desktop assistant (Ollama) for desktop tasks
+- **Hand-off jobs** (5.6): record a meeting and walk away. Your computer transcribes it offline (Whisper), writes the minutes and sends the action items back as tasks. Nameplate photos build an **equipment registry** with each unit's history and repeat-failure flags ("history on RTU-4"). An **overnight analyst** writes a ranked morning brief at 05:30 and a Friday weekly summary. Everything stays on your computer
+- `~/Desktop/BlackLab AI/` keeps everything the desktop AI produces: Downloads, Documents (Meetings, Briefs), Chat History with a long-term memory, Equipment and Task Logs, with a privacy guard that never saves clinical content
 
 ### 📷 Camera
 - **Geotagged photos** — GPS plus street address, compass heading, altitude and author/copyright written to EXIF; optional burned-in info stamp
@@ -230,13 +232,13 @@ Internal storage/BlackLab/
 
 ## Install
 
-1. Download **[`BlackLab-v5.5.0.apk`](releases/BlackLab-v5.5.0.apk)** (also attached to the [v5.5.0 release](https://github.com/paulmmoore3416/BlackLab/releases/tag/v5.5.0)).
-   Verify it with the published SHA-256: [`BlackLab-v5.5.0.apk.sha256`](releases/BlackLab-v5.5.0.apk.sha256).
+1. Download **[`BlackLab-v5.6.0.apk`](releases/BlackLab-v5.6.0.apk)** (also attached to the [v5.6.0 release](https://github.com/paulmmoore3416/BlackLab/releases/tag/v5.6.0)).
+   Verify it with the published SHA-256: [`BlackLab-v5.6.0.apk.sha256`](releases/BlackLab-v5.6.0.apk.sha256).
 2. On the phone, allow your browser/Files app to **install unknown apps** when prompted.
 3. Open BlackLab and follow onboarding: name & title, account names, then grant
    **All-files access** (creates the BlackLab folder), **camera & microphone**, **notifications** and optionally **calendars**.
 
-Or with USB debugging: `adb install releases/BlackLab-v5.5.0.apk`
+Or with USB debugging: `adb install releases/BlackLab-v5.6.0.apk`
 
 From 4.3.0 on, BlackLab can update itself: **Settings › App updates › Check now**. Android asks once for permission to install updates.
 

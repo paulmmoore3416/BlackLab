@@ -94,6 +94,39 @@ the roof inspection found" for an answer with its sources, or just ask a questio
 the model uses its `search_documents` tool. The index lives in `~/.cache/blacklab-desktop/doc-index.json`
 and updates itself on every search. `"embed_model"` picks another embedding model.
 
+## Hand-off jobs (companion 1.4)
+
+The phone hands the computer work it shouldn't wait for, and gets the results as notifications.
+
+| Job | Starts when | Result |
+|---|---|---|
+| **transcribe** | a recording is saved (automatic), **Transcribe on computer**, or "transcribe my last recording" | Whisper transcript in the recording, minutes in Documents › Meetings (phone and `BlackLab AI/Documents/Meetings`), action items as tasks |
+| **equipment** | a Snap-to-Work-Order photo | the unit in `BlackLab AI/Equipment` (SQLite + a Markdown card per unit), linked to the work order |
+| **brief** | 05:30 daily (`"brief_time"`), "desktop brief", or the desktop's button | ranked morning brief in Documents › Briefs |
+| **weekly** | Fridays 15:30 (`"weekly_time"`), "weekly summary" | one-page operations summary |
+| **ask** | "in the background: …" | the desktop assistant's answer, with 8 tool rounds instead of 4 |
+
+- **Transport:** `POST /phone/upload?name=` streams a file (2 GB max) into `BlackLab AI/Downloads/From phone`;
+  `POST /phone/jobs` starts a job; `GET /phone/jobs` lists running jobs and finished ones the phone
+  hasn't collected; `POST /phone/jobs/ack` marks them collected. All need the phone's key.
+- **Outbox:** work queued while the computer is unreachable waits on the phone and goes on the next
+  link. Jobs survive a companion restart (`~/.cache/blacklab-desktop/jobs.json`).
+- **One at a time:** a single worker runs jobs so the GPUs never juggle Whisper, the vision model and
+  qwen3 at once. Afterwards the main model is reloaded fully onto the GPUs if it was squeezed out.
+- **Privacy:** a recording with 3 or more clinical terms, or any job marked private, is processed but
+  not kept: no Meetings file, no index entry, no equipment links, and the audio and result are deleted
+  once the phone collects them.
+- **Context snapshot:** every 30 minutes while linked the phone sends `POST /phone/context`: open and
+  recently completed tasks (work-order notes included), the next 3 days of events, coursework due in 14
+  days, exams in 30, flashcards due and weather alerts. Behavioral Health data is never in it. The
+  computer links work orders to equipment by serial number or tag.
+- **Setup:** `./daddyshome --install-whisper` (faster-whisper in `~/.local/share/blacklab-desktop/whisper`)
+  and `./daddyshome --install-vision` (`qwen2.5vl:7b`). config.json: `"whisper_model"` (default
+  `large-v3-turbo`), `"vision_model"`, `"brief_time"`, `"weekly_time"`, `"equipment_dir"`.
+
+Measured on this computer: a 30-second meeting transcribes in 9 s on the GTX 1060 and minutes take ~8 s
+more; a nameplate takes 35–50 s (vision model load included); a morning brief ~50 s.
+
 ## Tool guard
 
 Small models sometimes "try things". A tool that changes something only runs when the request asks for

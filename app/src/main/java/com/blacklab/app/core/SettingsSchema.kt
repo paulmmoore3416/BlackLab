@@ -105,6 +105,7 @@ object SettingsSchema {
             text(Keys.ASST_NAME, "Assistant name", "What the assistant calls itself.", d.asstName),
             choice(Keys.ASST_PERSONA, "Personality", "How replies are worded.", d.asstPersona, "LAIDBACK" to "Laid-back & funny", "PROFESSIONAL" to "Professional", "CONCISE" to "Just the facts"),
             bool(Keys.ASST_USE_NANO, "On-device AI (Gemini Nano)", "Use the Pixel's built-in Gemini Nano for open questions. Runs fully offline.", d.asstUseNano),
+            bool(Keys.ASST_DESKTOP_JOBS, "Hand off work to the computer", "New recordings are transcribed on the computer (meeting notes and tasks come back), nameplate photos go into its equipment registry, and it sends a morning brief and a Friday summary.", d.asstDesktopJobs),
             bool(Keys.ASST_DESKTOP_AI, "Use the desktop AI", "When the computer running BlackLab Desktop is reachable (USB or Wireless debugging), the assistant, summaries and Talk use its local model; otherwise Gemini Nano.", d.asstDesktopAi),
             choice(Keys.ASST_CLOUD_AI, "Cloud AI (Gemini)", "With a free Google AI Studio key: Fallback uses Gemini only when the desktop and Gemini Nano can't answer; Prefer uses it before Gemini Nano. Photo features ask first.", d.asstCloudAi, "OFF" to "Off", "FALLBACK" to "Fallback", "PREFER" to "Prefer"),
             text(Keys.ASST_GEMINI_MODEL, "Gemini model", "Model name for the Gemini API.", d.asstGeminiModel, advanced = true),
