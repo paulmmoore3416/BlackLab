@@ -230,13 +230,13 @@ Internal storage/BlackLab/
 
 ## Install
 
-1. Download **[`BlackLab-v4.6.0.apk`](releases/BlackLab-v4.6.0.apk)** (also attached to the [v4.6.0 release](https://github.com/paulmmoore3416/BlackLab/releases/tag/v4.6.0)).
-   Verify it with the published SHA-256: [`BlackLab-v4.6.0.apk.sha256`](releases/BlackLab-v4.6.0.apk.sha256).
+1. Download **[`BlackLab-v5.5.0.apk`](releases/BlackLab-v5.5.0.apk)** (also attached to the [v5.5.0 release](https://github.com/paulmmoore3416/BlackLab/releases/tag/v5.5.0)).
+   Verify it with the published SHA-256: [`BlackLab-v5.5.0.apk.sha256`](releases/BlackLab-v5.5.0.apk.sha256).
 2. On the phone, allow your browser/Files app to **install unknown apps** when prompted.
 3. Open BlackLab and follow onboarding: name & title, account names, then grant
    **All-files access** (creates the BlackLab folder), **camera & microphone**, **notifications** and optionally **calendars**.
 
-Or with USB debugging: `adb install releases/BlackLab-v4.6.0.apk`
+Or with USB debugging: `adb install releases/BlackLab-v5.5.0.apk`
 
 From 4.3.0 on, BlackLab can update itself: **Settings › App updates › Check now**. Android asks once for permission to install updates.
 
