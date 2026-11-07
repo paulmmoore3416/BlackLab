@@ -80,8 +80,20 @@ status_board() {
   ollama_up && ok "Desktop assistant model: $(model_selected) (keep-alive $(json_get "$CFG" keep_alive || echo 30m))"
   if companion_up; then
     ok "BlackLab Desktop companion on $COMP"
-    local logs; logs="$(curl -fsS -m 2 -H 'X-BlackLab: 1' "$COMP/local/status" | python3 -c 'import json,sys;print(json.load(sys.stdin).get("task_logs") or "")' 2>/dev/null)"
-    if [ -n "$logs" ]; then ok "Desktop AI task logs: ${logs/#$HOME/\~}"; else warn "Desktop AI task logs are off (config.json \"task_logs\")"; fi
+    local st; st="$(curl -fsS -m 2 -H 'X-BlackLab: 1' "$COMP/local/status" 2>/dev/null)"
+    local line; while IFS= read -r line; do
+      case "$line" in OK*) ok "${line#OK }" ;; *) warn "${line#WARN }" ;; esac
+    done < <(printf '%s' "$st" | python3 -c '
+import json, os, sys
+s = json.load(sys.stdin); f = s.get("folders") or {}; h = os.path.expanduser("~")
+t = lambda p: p.replace(h, "~", 1)
+if f.get("ai"):
+    print("OK Desktop AI folder: " + t(f["ai"]) + "  (Downloads · Documents · Chat History · Task Logs)")
+else:
+    print("OK Desktop AI downloads: " + t(s.get("out") or "?"))
+if not f.get("chat_history") and f: print("WARN Chat history is off (config.json \"chat_history\")")
+if not s.get("task_logs"): print("WARN Desktop AI task logs are off (config.json \"task_logs\")")
+' 2>/dev/null)
   else bad "BlackLab Desktop companion is not running"; fi
   local p any=0
   for p in $(phones); do

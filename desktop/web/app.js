@@ -817,13 +817,13 @@ Views.desktop = () => {
     <div class="grid g2" style="margin-top:16px">
       <div class="card"><h2>Phone ⇄ desktop</h2><div class="stack">
         <button class="ghost" data-act="forward">Set up USB link (adb forward)</button>
-        <button class="ghost" data-act="pull-backups">Pull phone backups to ~/BlackLab-Desktop</button>
+        <button class="ghost" data-act="pull-backups">Pull phone backups to Desktop › BlackLab AI › Downloads</button>
         <button class="ghost" data-act="pull-documents">Pull documents</button>
         <button class="ghost" data-act="pull-photos">Pull photos</button>
         <button class="ghost" data-act="backup">Back up the phone now</button>
-        <button class="ghost" data-act="open-folder">Open ~/BlackLab-Desktop</button></div></div>
+        <button class="ghost" data-act="open-folder">Open the BlackLab AI folder</button></div></div>
       <div class="card"><h2>Ask the desktop</h2><div class="stack">
-        ${['System status', 'What is using my disk space?', 'Find files named budget', 'Open my Downloads folder', 'Make a desktop note: call the roofer Monday', 'Android docs: CameraX extensions'].map((q) => `<span class="chip btn" data-q="${esc(q)}">${esc(q)}</span>`).join('')}
+        ${['System status', 'What is using my disk space?', 'Find files named budget', 'Open my Downloads folder', 'Make a desktop note: call the roofer Monday', 'Search my documents for roof inspection', 'Remember that Trane is our chiller vendor', 'Show chat history for chiller', 'Android docs: CameraX extensions'].map((q) => `<span class="chip btn" data-q="${esc(q)}">${esc(q)}</span>`).join('')}
         <div class="small muted">These run on this computer through the companion. With Ollama they work fully offline.</div></div></div>
     </div></div>`;
 };
@@ -838,7 +838,7 @@ Views.desktop.bind = () => {
         if (S.mode !== 'phone') throw new Error('Needs a live phone link');
         const r = await Companion.req('/local/pull', { kind: a.slice(5), phone: { url: Phone.url, token: Phone.token } }); toast(r.message, 5000);
       } else if (a === 'backup') { if (S.mode !== 'phone') throw new Error('Needs a live phone link'); const r = await Phone.req('/api/backup', { body: {} }); toast('Backed up: ' + r.file); }
-      else if (a === 'open-folder') await Companion.req('/local/open', { path: '~/BlackLab-Desktop' });
+      else if (a === 'open-folder') await Companion.req('/local/open', { path: 'blacklab ai' });
     } catch (e) { toast(e.message); }
     b.disabled = false;
   });

@@ -43,10 +43,70 @@ always works.
   Everything else stays HTTPS.
 - The Behavioral Health workspace never uses this path.
 
+## The BlackLab AI folder
+
+Everything the desktop AI produces goes into one folder on the Desktop, **`~/Desktop/BlackLab AI/`**:
+
+| Folder | What goes in it | Say |
+|---|---|---|
+| `Downloads/` | Files pulled from the phone (backups, documents, photos, scans, recordings, dictation), in the phone's own `Personal/…` and `Professional/…` layout | "open ai downloads" |
+| `Documents/` | Notes and documents the AI writes (`2026-11-07-roof-inspection.md`) | "open ai documents" |
+| `Chat History/` | Every conversation: a readable transcript per day (`2026-11/2026-11-07.md`) and `chat-history.jsonl`, the assistant's searchable memory | "open chat history" |
+| `Task Logs/` | One log per job (below) | "open task logs" |
+
+"open blacklab ai" opens the whole folder. All of it is private to your user (folders 700, files 600).
+Companion 1.3 moves the old `~/BlackLab-Desktop` and `~/Desktop/BlackLab AI Task Logs` into place the
+first time it starts.
+
+**Chat memory.** The assistant has a `recall_chats` tool, so "what did we figure out about the chiller
+yesterday?" searches the archive and answers from it. "show chat history for <words>" searches it
+without the AI. Searching never remembers itself, so recall answers don't pile up in later results.
+
+`~/.config/blacklab-desktop/config.json`: `"ai_folder"` moves everything; `"downloads_dir"`,
+`"documents_dir"`, `"chat_history_dir"` or `"task_log_dir"` moves one folder; `"chat_history": false`
+stops archiving chats.
+
+## Privacy
+
+Requests that look clinical (patients, clients, meds, diagnoses, SBAR, peer notes, Behavioral Health,
+q15 checks…) and anything you start with **"privately:"**, **"off the record"**, **"private:"** or
+"don't save this" are answered as usual but **never saved**: not in Chat History, not in memory, and
+the task log records only that a private task ran (no request, tool details or reply). The reply's
+source ends in "private, not saved" so you can tell. Social Security, card and medical-record numbers
+are scrubbed from everything that is saved. config.json: `"private_by_default": true` saves nothing;
+`"clinical_guard": false` turns the clinical check off.
+
+## Memory and follow-ups
+
+- **Follow-ups:** the last 3 exchanges of the past 15 minutes go with each request, so "find files
+  named roof inspection" then "open the first one" works.
+- **Long-term memory:** `Chat History/memory.md` is a plain list the AI reads before every answer.
+  "remember that Trane is our chiller vendor" adds a line, "forget the chiller vendor" removes it,
+  "what do you know about me?" lists it, "open memory" opens it to edit. After 2 AM the AI reads the
+  previous day's chats and adds up to five lasting facts (people, vendors, equipment, preferences,
+  recurring duties). It never stores health details or guesses. `"memory_auto": false` turns that off.
+
+## Document search
+
+The AI can search inside **Documents/** and **Downloads/** (Markdown, text, CSV, HTML, JSON, PDF) using
+the local `nomic-embed-text` model, so nothing leaves the computer. Ask "search my documents for what
+the roof inspection found" for an answer with its sources, or just ask a question about your files and
+the model uses its `search_documents` tool. The index lives in `~/.cache/blacklab-desktop/doc-index.json`
+and updates itself on every search. `"embed_model"` picks another embedding model.
+
+## Tool guard
+
+Small models sometimes "try things". A tool that changes something only runs when the request asks for
+that kind of action: `phone_command` needs a phone-app word (task, calendar, note…), `desktop_note`
+needs note/save/write…, `open_url` needs open/visit/link…, `launch_app` and `open_path` need open/
+launch/show. A blocked call is noted in the task log. The model is also told the real home folder, and
+made-up paths like `/home/user/Downloads` are mapped onto it. With these, qwen3:8b went from 9/10 to
+12/12 on the desktop test set and granite4.2:8b stopped causing side effects (9/12, about twice as slow).
+
 ## Task logs
 
-Every job the desktop AI does is written down in **`~/Desktop/BlackLab AI Task Logs/`**, whether the
-phone's assistant sent it ("on my computer …", "ask my desktop …") or you asked in BlackLab Desktop.
+Every job the desktop AI does is written down in **`Task Logs/`**, whether the phone's assistant sent it
+("on my computer …", "ask my desktop …") or you asked in BlackLab Desktop.
 
 - One Markdown file per task in a month folder (`2026-11/2026-11-06_14-03-22_find-my-resume.md`):
   when it ran and how long it took, where it came from, which engine answered, the request, every
