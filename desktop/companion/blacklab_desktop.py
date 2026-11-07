@@ -876,7 +876,11 @@ for _dir, _names in ((AI_DIR, ("blacklab ai", "ai folder")),
     if str(_dir.resolve()).startswith(str(HOME) + "/"):
         for _k in _names:
             FOLDERS[_k] = str(_dir.resolve().relative_to(HOME))
-OPEN_FOLDER_RE = re.compile(r"^open (?:my |the )?(" + "|".join(sorted((re.escape(k) for k in FOLDERS if k), key=len, reverse=True)) + r")(?: folder)?$")
+def build_open_folder_re():
+    return re.compile(r"^open (?:my |the )?(" + "|".join(sorted((re.escape(k) for k in FOLDERS if k), key=len, reverse=True)) + r")(?: folder)?$")
+
+
+OPEN_FOLDER_RE = build_open_folder_re()
 
 
 @logged_tool("open_path")
@@ -1073,6 +1077,16 @@ def desktop_rules(text: str, phone):
             r = tool_equipment({"query": q})
             if m.group(2) is not None or not r.startswith("No equipment matches"):
                 return r, "Desktop · equipment"
+    if re.match(r"^(?:crypto|crypto desk|trading|desk) (?:status|summary|positions?)\??$|^how(?:'s| is) (?:my )?crypto(?: desk)? doing\??$", low):
+        desk = Path(os.path.expanduser(CONFIG.get("crypto_desk_cmd", "~/.local/bin/desk")))
+        if not desk.exists():
+            return "Crypto Desk isn't installed on this computer.", "Desktop · crypto"
+        try:
+            out = subprocess.run([str(desk), "status"], capture_output=True, text=True, timeout=60).stdout.strip()
+        except (OSError, subprocess.SubprocessError) as e:
+            out = f"Crypto Desk didn't answer: {e}"
+        task_step("tool", "Crypto Desk status (read-only)")
+        return out or "Crypto Desk returned nothing.", "Desktop · Crypto Desk"
     m = re.match(r"^which (?:units|equipment|machines)\b(.*?)\??$", low)
     if m:
         return tool_equipment({"query": m.group(1)}), "Desktop · equipment"
@@ -1478,6 +1492,8 @@ class Handler(SimpleHTTPRequestHandler):
                     if log is not None:
                         log.reply, log.source = msg, "Desktop · phone files"
                 return self.reply(200, {"message": msg})
+            if self.path == "/local/notify":
+                return self.reply(200, agents.public(agents.notice(str(body.get("title", "BlackLab")), str(body.get("text", "")))))
             if self.path == "/local/jobs":
                 upload = None
                 if body.get("path"):
@@ -1529,6 +1545,8 @@ def main():
     threading.Thread(target=keep_usb_link, daemon=True).start()
     threading.Thread(target=memory_keeper, daemon=True).start()
     agents.setup(sys.modules[__name__])
+    global OPEN_FOLDER_RE
+    OPEN_FOLDER_RE = build_open_folder_re()  # agents.setup adds Equipment, Business Intelligence, Crypto Desk
     srv = ThreadingHTTPServer((HOST, PORT), Handler)
     print(f"BlackLab Desktop companion {VERSION} on http://{HOST}:{PORT}  (web: {WEB_DIR})", flush=True)
     try:

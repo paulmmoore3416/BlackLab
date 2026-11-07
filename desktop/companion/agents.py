@@ -54,6 +54,12 @@ def setup(core):
     for k in ("equipment", "equipment list", "assets"):
         C.FOLDERS.setdefault(k, str(EQUIP_DIR.relative_to(C.HOME)) if str(EQUIP_DIR).startswith(str(C.HOME) + "/") else "")
     C.DOC_ROOTS.append(EQUIP_DIR / "Cards")
+    for sub, names in (("Business Intelligence", ("business intelligence", "bi", "marketing")), ("Crypto Desk", ("crypto desk", "crypto"))):
+        d = C.AI_DIR / sub
+        if d.is_dir():
+            C.DOC_ROOTS.append(d)  # its guides and knowledge base become searchable ("search my documents for …")
+            for k in names:
+                C.FOLDERS.setdefault(k, str(d.relative_to(C.HOME)) if str(d).startswith(str(C.HOME) + "/") else "")
     _load()
     threading.Thread(target=_worker, daemon=True, name="jobs").start()
     threading.Thread(target=_scheduler, daemon=True, name="schedule").start()
@@ -227,6 +233,17 @@ def save_upload(name: str, length: int, stream) -> str:
     _save()
     C.task_file("downloaded", dest)
     return uid
+
+
+def notice(title: str, text: str, origin="Phone (notice)") -> dict:
+    """A finished 'job' that only carries a notification (Crypto Desk approvals, alerts). The phone shows it on its next check-in."""
+    j = {"id": uuid.uuid4().hex[:12], "kind": "notice", "title": title[:120], "params": {}, "file": None, "status": "done", "progress": "Done",
+         "created": time.time(), "started": time.time(), "finished": time.time(), "origin": origin, "private": False,
+         "result": {"text": text[:1000], "notify": {"title": title[:80], "text": text[:300]}}, "error": None, "delivered": False}
+    with _LOCK:
+        JOBS[j["id"]] = j
+    _save()
+    return j
 
 
 def pending_for_phone() -> list[dict]:

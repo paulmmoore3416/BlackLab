@@ -130,6 +130,14 @@ The phone hands the computer work it shouldn't wait for, and gets the results as
 Measured on this computer: a 30-second meeting transcribes in 9 s on the GTX 1060 and minutes take ~8 s
 more; a nameplate takes 35–50 s (vision model load included); a morning brief ~50 s.
 
+## Notices and optional add-ons
+
+- `POST /local/notify {"title", "text"}` (local only, `X-BlackLab: 1`) queues a notification the phone shows on
+  its next check-in. Other local tools use it, for example a personal trading journal asking for approval.
+- If `~/.local/bin/desk` exists (or `"crypto_desk_cmd"`), "crypto status" runs `desk status` read-only.
+- `~/Desktop/BlackLab AI/Business Intelligence` and `~/Desktop/BlackLab AI/Crypto Desk`, when present, are
+  indexed for "search my documents" and open by name.
+
 ## Protected paths
 
 No AI tool can read, open, list or search wallet keys and recovery phrases (`~/Desktop/mining/wallet-backup`,
