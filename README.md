@@ -7,13 +7,13 @@
 **A private, all-in-one personal & professional workspace for Android.**
 Pro camera & photo editor · dictation · audio recorder · Word-class documents · journal · to-do · calendar · education & certification tracking — in one app, with every file saved to a real folder on your phone.
 
-[![Version](https://img.shields.io/badge/version-5.6.0-2BD9A8)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-5.7.0-2BD9A8)](CHANGELOG.md)
 [![Android](https://img.shields.io/badge/Android-15%2B-3DDC84?logo=android&logoColor=white)](#requirements)
 [![Kotlin](https://img.shields.io/badge/Kotlin-2.1-7F52FF?logo=kotlin&logoColor=white)](https://kotlinlang.org)
 [![Jetpack Compose](https://img.shields.io/badge/Jetpack%20Compose-Material%203-4285F4?logo=jetpackcompose&logoColor=white)](https://developer.android.com/compose)
 [![Android CI](https://github.com/paulmmoore3416/BlackLab/actions/workflows/android.yml/badge.svg)](https://github.com/paulmmoore3416/BlackLab/actions/workflows/android.yml)
 
-[Download APK](releases/BlackLab-v5.6.0.apk) · [Features](#features) · [Install](#install) · [Build from source](#build-from-source) · [Architecture](docs/ARCHITECTURE.md)
+[Download APK](releases/BlackLab-v5.7.0.apk) · [Features](#features) · [Install](#install) · [Build from source](#build-from-source) · [Architecture](docs/ARCHITECTURE.md)
 
 </div>
 
@@ -233,13 +233,13 @@ Internal storage/BlackLab/
 
 ## Install
 
-1. Download **[`BlackLab-v5.6.0.apk`](releases/BlackLab-v5.6.0.apk)** (also attached to the [v5.6.0 release](https://github.com/paulmmoore3416/BlackLab/releases/tag/v5.6.0)).
-   Verify it with the published SHA-256: [`BlackLab-v5.6.0.apk.sha256`](releases/BlackLab-v5.6.0.apk.sha256).
+1. Download **[`BlackLab-v5.7.0.apk`](releases/BlackLab-v5.7.0.apk)** (also attached to the [v5.7.0 release](https://github.com/paulmmoore3416/BlackLab/releases/tag/v5.7.0)).
+   Verify it with the published SHA-256: [`BlackLab-v5.7.0.apk.sha256`](releases/BlackLab-v5.7.0.apk.sha256).
 2. On the phone, allow your browser/Files app to **install unknown apps** when prompted.
 3. Open BlackLab and follow onboarding: name & title, account names, then grant
    **All-files access** (creates the BlackLab folder), **camera & microphone**, **notifications** and optionally **calendars**.
 
-Or with USB debugging: `adb install releases/BlackLab-v5.6.0.apk`
+Or with USB debugging: `adb install releases/BlackLab-v5.7.0.apk`
 
 From 4.3.0 on, BlackLab can update itself: **Settings › App updates › Check now**. Android asks once for permission to install updates.
 
