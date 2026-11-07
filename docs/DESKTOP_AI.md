@@ -102,7 +102,7 @@ The phone hands the computer work it shouldn't wait for, and gets the results as
 |---|---|---|
 | **transcribe** | a recording is saved (automatic), **Transcribe on computer**, or "transcribe my last recording" | Whisper transcript in the recording, minutes in Documents › Meetings (phone and `BlackLab AI/Documents/Meetings`), action items as tasks |
 | **equipment** | a Snap-to-Work-Order photo | the unit in `BlackLab AI/Equipment` (SQLite + a Markdown card per unit), linked to the work order |
-| **brief** | 05:30 daily (`"brief_time"`), "desktop brief", or the desktop's button | ranked morning brief in Documents › Briefs |
+| **brief** | 05:30 daily, or 10 minutes after Night Mining stops when it's installed (07:10 here; `"brief_time"` overrides), "desktop brief", or the desktop's button | ranked morning brief in Documents › Briefs |
 | **weekly** | Fridays 15:30 (`"weekly_time"`), "weekly summary" | one-page operations summary |
 | **ask** | "in the background: …" | the desktop assistant's answer, with 8 tool rounds instead of 4 |
 
@@ -120,12 +120,23 @@ The phone hands the computer work it shouldn't wait for, and gets the results as
   recently completed tasks (work-order notes included), the next 3 days of events, coursework due in 14
   days, exams in 30, flashcards due and weather alerts. Behavioral Health data is never in it. The
   computer links work orders to equipment by serial number or tag.
+- **Night Mining:** while `~/Desktop/mining` miners hold the GPUs and CPU (23:00–07:00), jobs wait
+  ("Waiting: the computer is mining") and start when mining stops; the nightly memory update waits too.
+  `"run_during_mining": true` overrides.
 - **Setup:** `./daddyshome --install-whisper` (faster-whisper in `~/.local/share/blacklab-desktop/whisper`)
   and `./daddyshome --install-vision` (`qwen2.5vl:7b`). config.json: `"whisper_model"` (default
   `large-v3-turbo`), `"vision_model"`, `"brief_time"`, `"weekly_time"`, `"equipment_dir"`.
 
 Measured on this computer: a 30-second meeting transcribes in 9 s on the GTX 1060 and minutes take ~8 s
 more; a nameplate takes 35–50 s (vision model load included); a morning brief ~50 s.
+
+## Protected paths
+
+No AI tool can read, open, list or search wallet keys and recovery phrases (`~/Desktop/mining/wallet-backup`,
+`~/Desktop/mining/config`), `~/.ssh`, `~/.gnupg`, keyrings, browser profiles, cloud credentials, BlackLab's
+own keys (`~/.config/blacklab-desktop`, `~/.config/blacklab-crypto`, `keystore/`), or any file named like a
+seed, mnemonic, recovery phrase, private key, wallet file, `.pem`/`.jks` or `secrets.json`, whatever a request
+or a document asks. Add more with `"protected_paths"` in config.json (paths relative to home).
 
 ## Tool guard
 

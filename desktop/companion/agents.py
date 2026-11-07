@@ -111,7 +111,7 @@ def status() -> dict:
     js = list(JOBS.values())
     return {"whisper": whisper_ready(), "vision": vm if any(m.split(":")[0] == vm.split(":")[0] for m in have) else None,
             "running": sum(j["status"] == "running" for j in js), "queued": sum(j["status"] == "queued" for j in js), "assets": n,
-            "brief_time": C.CONFIG.get("brief_time", "05:30"), "weekly_time": C.CONFIG.get("weekly_time", "15:30"),
+            "brief_time": C.CONFIG.get("brief_time", default_brief_time()), "mining": mining_active(), "weekly_time": C.CONFIG.get("weekly_time", "15:30"),
             "folders": {"equipment": str(EQUIP_DIR), "meetings": str(MEETINGS_DIR), "briefs": str(BRIEFS_DIR)}}
 
 
@@ -139,12 +139,47 @@ def _progress(j: dict, text: str):
     _save()
 
 
+MINING_UNITS = ("mining-gpu-nvidia.service", "mining-gpu-amd.service", "mining-gpu-qtc.service", "mining-orange-xmrig.service")
+
+
+def mining_active() -> bool:
+    """Night Mining (~/Desktop/mining) owns both GPUs and every CPU core while it runs."""
+    if C.CONFIG.get("run_during_mining"):
+        return False
+    try:
+        out = subprocess.run(["systemctl", "--user", "is-active", *MINING_UNITS], capture_output=True, text=True, timeout=5).stdout
+        return "active" in out.split()
+    except (OSError, subprocess.SubprocessError):
+        return False
+
+
+def mining_stop_time() -> str | None:
+    try:
+        out = subprocess.run(["systemctl", "--user", "cat", "mining-stop.timer"], capture_output=True, text=True, timeout=5).stdout
+        m = re.search(r"OnCalendar=.*?(\d{1,2}):(\d{2})", out)
+        return f"{int(m.group(1)):02d}:{m.group(2)}" if m else None
+    except (OSError, subprocess.SubprocessError):
+        return None
+
+
+def default_brief_time() -> str:
+    """05:30, or 10 minutes after Night Mining hands the GPUs back when it stops between 03:00 and 09:00."""
+    stop = mining_stop_time()
+    if stop and "03:00" <= stop <= "09:00":
+        t = dt.datetime.strptime(stop, "%H:%M") + dt.timedelta(minutes=10)
+        return t.strftime("%H:%M")
+    return "05:30"
+
+
 def _worker():
     while True:
         jid = _Q.get()
         j = JOBS.get(jid)
         if not j or j["status"] != "queued":
             continue
+        while mining_active():
+            _progress(j, "Waiting: the computer is mining (it resumes when mining stops)")
+            time.sleep(60)
         j["status"], j["started"] = "running", time.time()
         _progress(j, "Starting")
         try:
@@ -785,7 +820,7 @@ def _scheduler():
         try:
             now = dt.datetime.now()
             st = C.load_json(state_path, {})
-            for kind, key, default, day_ok in (("brief", "brief_time", "05:30", True), ("weekly", "weekly_time", "15:30", now.weekday() == 4)):
+            for kind, key, default, day_ok in (("brief", "brief_time", default_brief_time(), True), ("weekly", "weekly_time", "15:30", now.weekday() == 4)):
                 at = C.CONFIG.get(key, default)
                 if not at or not day_ok:
                     continue

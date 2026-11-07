@@ -87,7 +87,7 @@ An encrypted workspace for working on a behavioral health unit, using initials a
 - Same glass look, palettes and light styles as the phone; an **Appearance** page that sets them on the phone; a printable **Behavioral Health** reference (crisis lines, de-escalation, group library, safety-round sheets)
 - Run it locally (`desktop/install.sh`) or open **https://paulmmoore3416.github.io/BlackLab/** and sign in with Google
 - Local companion with an offline desktop assistant (Ollama) for desktop tasks
-- **Hand-off jobs** (5.6): record a meeting and walk away. Your computer transcribes it offline (Whisper), writes the minutes and sends the action items back as tasks. Nameplate photos build an **equipment registry** with each unit's history and repeat-failure flags ("history on RTU-4"). An **overnight analyst** writes a ranked morning brief at 05:30 and a Friday weekly summary. Everything stays on your computer
+- **Hand-off jobs** (5.6): record a meeting and walk away. Your computer transcribes it offline (Whisper), writes the minutes and sends the action items back as tasks. Nameplate photos build an **equipment registry** with each unit's history and repeat-failure flags ("history on RTU-4"). An **overnight analyst** writes a ranked morning brief every morning and a Friday weekly summary. Everything stays on your computer
 - `~/Desktop/BlackLab AI/` keeps everything the desktop AI produces: Downloads, Documents (Meetings, Briefs), Chat History with a long-term memory, Equipment and Task Logs, with a privacy guard that never saves clinical content
 
 ### 📷 Camera

@@ -206,11 +206,31 @@ def xdg_open(target: str):
     subprocess.Popen(["xdg-open", target], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
 
 
+# Never readable, openable or searchable by the AI, whatever a request (or a document it reads) asks:
+# wallet keys and recovery phrases, SSH/GPG keys, browser profiles, and the keys of BlackLab itself.
+PROTECTED = [HOME / p for p in (
+    "Desktop/mining/wallet-backup", "Desktop/mining/config", ".ssh", ".gnupg", ".password-store", ".local/share/keyrings",
+    ".config/blacklab-desktop", ".config/blacklab-crypto", "Desktop/BlackLab/keystore", ".mozilla", ".config/google-chrome",
+    ".config/chromium", ".electrum", ".bitcoin", ".monero", ".aws", ".kube", ".docker/config.json", ".netrc", ".git-credentials")]
+PROTECTED += [HOME / p for p in CONFIG.get("protected_paths", [])]
+PROTECTED_NAME_RE = re.compile(r"(seed|mnemonic|recovery[ _-]?phrase|private[ _-]?key|wallet\.(dat|json)|keystore|\.jks$|\.pem$|id_rsa|id_ed25519|secrets?\.json)", re.I)
+
+
+def is_protected(path: Path) -> bool:
+    try:
+        rp = path.resolve()
+    except OSError:
+        return True
+    return any(rp == p or p in rp.parents for p in (x.resolve() for x in PROTECTED)) or bool(PROTECTED_NAME_RE.search(rp.name))
+
+
 def safe_home_path(p: str) -> Path | None:
     # models often invent /home/user/…: map any other home onto this one (it can only ever point inside HOME)
     p = re.sub(r"^/(?:home|Users)/[^/]+(?=/|$)", lambda m: str(HOME), os.path.expanduser(str(p or "").strip()))
     path = Path(p).resolve()
-    return path if str(path).startswith(str(HOME)) else None
+    if not str(path).startswith(str(HOME)) or is_protected(path):
+        return None
+    return path
 
 
 # ---------------------------------------------------------------- privacy
@@ -610,7 +630,7 @@ def memory_keeper():
             st = load_json(state_path, {})
             midnight = dt.datetime.combine(now.date(), dt.time()).isoformat(timespec="seconds")
             if CONFIG.get("memory_auto", True) is not False and CONFIG.get("chat_history", True) is not False \
-                    and now.hour >= 2 and st.get("last") != now.date().isoformat():
+                    and now.hour >= 2 and st.get("last") != now.date().isoformat() and not agents.mining_active():
                 consolidate_memory(st.get("since"), midnight)  # whole days only, up to last midnight
                 CACHE_DIR.mkdir(parents=True, exist_ok=True)
                 state_path.write_text(json.dumps({"last": now.date().isoformat(), "since": midnight}))
@@ -825,12 +845,12 @@ def tool_find_files(args):
     if not q:
         return "What should I look for?"
     hits, scanned, start = [], 0, time.time()
-    records = {str(TASK_LOG_DIR), str(CHAT_DIR)}  # the AI's own records would match every recent request
+    records = {str(TASK_LOG_DIR), str(CHAT_DIR)} | {str(p) for p in PROTECTED}  # own records match every request; secrets never show
     for root, dirs, files in os.walk(HOME):
         dirs[:] = [d for d in dirs if d not in SKIP_DIRS and not d.startswith(".") and os.path.join(root, d) not in records]
         for f in files:
             scanned += 1
-            if q in f.lower():
+            if q in f.lower() and not PROTECTED_NAME_RE.search(f):
                 p = Path(root) / f
                 try:
                     hits.append((p.stat().st_mtime, p))
