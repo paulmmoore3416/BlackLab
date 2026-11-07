@@ -2,6 +2,21 @@
 
 All notable changes to BlackLab are documented here. The project follows [Semantic Versioning](https://semver.org/).
 
+## [5.7.0] — 2026-11-07
+
+The car talks to BlackLab: connect to the Santa Fe's Bluetooth and everything the car can share lands in the Garage.
+
+### Added
+- **Car link**: when the phone connects to the car's Bluetooth (or Android Auto starts), a drive session begins on its own. The car is recognised the first time the phone connects to it, or you pick it under Garage › **Car connection**. **Pair for automatic start** registers it as a companion device, so drives start in the background even after a restart.
+- **Trip log**: every drive is saved with distance (odometer, else GPS, else the car's own speed), time moving and idling, average and top speed, hard braking and acceleration, fuel used and MPG, and where it started and ended. Only the endpoints are kept, not the route. Weekly, monthly and yearly totals; tag trips Personal, Business, Commute, Medical or Charity; business miles × your rate per mile; **Export CSV** for a mileage log. A summary notification arrives when you park.
+- **Odometer that keeps up**: GPS miles between real readings are added to an estimate (shown with ≈), so "what's due" stays current. Real readings from the car replace the estimate.
+- **Where you parked**: saved at the end of every drive (and from Bluelink), with directions. Ask "where did I park?"
+- **OBD-II adapter** (optional, any Bluetooth classic or BLE ELM327-type plug, e.g. OBDLink, Veepeak or Vgate): VIN, check-engine light and stored, pending and permanent trouble codes with plain-language meanings (new codes raise a notification), RPM, speed, engine load, throttle, coolant, oil and intake temperatures, manifold and barometric pressure, mass air flow, fuel flow with instant and per-trip MPG, fuel level, battery and ECU voltage, run time, distance since codes were cleared, and the odometer where the car supports PID A6. **Test** checks the adapter from the setup screen.
+- **Hyundai Bluelink** (optional, US): the car's last report to Hyundai, read a few minutes after you park and at the start of each drive: odometer, fuel and range, low fuel, locks, open doors, windows, liftgate and hood, tire-pressure warnings per tire, washer and brake fluid, key-fob battery, 12V battery charge, climate and where it's parked. A notification tells you if the car was left unlocked or open. The sign-in is Keystore-encrypted and only sent to Hyundai. BlackLab reads saved status only and never wakes the car.
+- **Android Auto** now reads the car for the whole session, not only on the Garage screen: model, fuel types, fuel level, range, low-fuel warning, hybrid battery, speed and odometer. The car's Garage screen adds a **Car health** row (codes, battery, coolant, tires, trip miles).
+- Garage › **From the car**: drive status, headline values, trouble codes, parking spot and **All vehicle data**, grouped, with the source and age of every value.
+- Assistant (phone and car): "where did I park?", "any check-engine codes?", "how much gas do I have?", "is my car locked?", "tire pressure", "how many miles did I drive this month?", "business miles"; "how's the car?" now includes live data.
+
 ## [5.6.0] — 2026-11-07
 
 Your phone and your computer now work as a team: hand work off and pick up the results later.

@@ -557,13 +557,30 @@ class CarSummaryScreen(carContext: CarContext, private val preset: SummarySource
 // ------------------------------------------------------------------ garage (Santa Fe)
 
 class CarGarageScreen(carContext: CarContext) : Screen(carContext) {
-    private val car = CarData(carContext) { invalidate() }
+    private var shown = ""
 
     init {
-        lifecycle.addObserver(object : DefaultLifecycleObserver {
-            override fun onStart(owner: LifecycleOwner) { car.start(); invalidate() }
-            override fun onStop(owner: LifecycleOwner) { car.stop() }
-        })
+        // Redraw when the car reports something new that changes what's on screen (at most every 5 s)
+        lifecycleScope.launch {
+            com.blacklab.app.vehicle.VehicleLink.state.collect {
+                val text = lines().joinToString("|")
+                if (text != shown) { shown = text; invalidate(); kotlinx.coroutines.delay(5000) }
+            }
+        }
+    }
+
+    private fun lines(): List<String> {
+        val s = com.blacklab.app.vehicle.VehicleLink.state.value
+        val T = com.blacklab.app.vehicle.Telemetry
+        val live = com.blacklab.app.vehicle.VehicleLink.live.value
+        val fuel = listOfNotNull(s["fuel_pct"]?.let { "Fuel ${T.format(it)}" }, s["range"]?.let { "${T.format(it)} range" }).joinToString(" · ")
+        val health = listOfNotNull(
+            s.activeDtcs.takeIf { it.isNotEmpty() }?.let { c -> "${c.size} code${if (c.size > 1) "s" else ""}: ${c.first().code}" } ?: s["mil"]?.takeIf { it.bool == true }?.let { "Check engine ON" },
+            s["battery_v"]?.let { "Battery ${T.format(it)}" }, s["coolant"]?.let { "Coolant ${T.format(it)}" },
+            s["tire_warning"]?.takeIf { it.text != "OK" }?.let { "Tires: ${it.text}" },
+            live.takeIf { it.active && it.tripMiles > 0.1 }?.let { "Trip %.1f mi".format(it.tripMiles) },
+        ).joinToString(" · ")
+        return listOf(s["model"]?.text.orEmpty(), fuel, health)
     }
 
     override fun onGetTemplate(): Template {
@@ -574,14 +591,16 @@ class CarGarageScreen(carContext: CarContext) : Screen(carContext) {
         val urgent = due.filter { it.status == Garage.Status.OVERDUE || it.status == Garage.Status.DUE_SOON }
         val next = urgent.firstOrNull() ?: due.firstOrNull { it.status == Garage.Status.OK }
         val stats = Garage.fuelStats(st.fuel)
+        val (model, fuelLine, health) = lines()
         val pane = Pane.Builder()
-        val odo = if (v.odometer > 0) "${Garage.fmtMiles(v.odometer)} mi" else "Odometer not set"
-        pane.addRow(row(car.detected ?: v.name, listOfNotNull(odo, car.fuelLine).joinToString(" · ")))
+        val odo = if (v.odometer > 0) "${if (v.estMiles > 0) "≈ " else ""}${Garage.fmtMiles(v.odometerNow)} mi" else "Odometer not set"
+        pane.addRow(row(model.ifBlank { v.name }, listOfNotNull(odo, fuelLine.ifBlank { null }).joinToString(" · ")))
         pane.addRow(row(if (urgent.isNotEmpty()) "Service due" else "Next service",
             next?.let { "${it.item.name} — ${it.describe()}" } ?: "Log your last service to start tracking",
             if (urgent.size > 1) "+${urgent.size - 1} more due" else ""))
         pane.addRow(row("Fuel", listOfNotNull(stats.avgMpg?.let { "Avg ${"%.1f".format(it)} mpg" }, stats.lastMpg?.let { "last ${"%.1f".format(it)}" },
             stats.monthCost.takeIf { it > 0 }?.let { "$${"%.0f".format(it)} this month" }).joinToString(" · ").ifBlank { "Log a fill-up to see MPG" }))
+        if (health.isNotBlank() && c.limit(ConstraintManager.CONTENT_LIMIT_TYPE_PANE, 4) >= 4) pane.addRow(row("Car health", health))
         pane.addAction(action("Log fuel", c.icon(R.drawable.ic_car_fuel, CarColor.PRIMARY)) { screenManager.pushForResult(CarCaptureScreen(c, CarCaptureScreen.Mode.FUEL)) { invalidate() } })
         pane.addAction(action("Log service", c.icon(R.drawable.ic_car_wrench)) { screenManager.pushForResult(CarCaptureScreen(c, CarCaptureScreen.Mode.SERVICE)) { invalidate() } })
         val strip = ActionStrip.Builder()

@@ -29,6 +29,26 @@ class BlackLabCarAppService : CarAppService() {
 }
 
 class BlackLabCarSession : Session() {
+    private var carData: CarData? = null
+
+    init {
+        // Read the car (fuel, range, speed, odometer) for the whole Android Auto session, not only the Garage screen
+        lifecycle.addObserver(object : androidx.lifecycle.DefaultLifecycleObserver {
+            override fun onCreate(owner: androidx.lifecycle.LifecycleOwner) {
+                val c = carContext
+                val missing = listOf("com.google.android.gms.permission.CAR_FUEL", "com.google.android.gms.permission.CAR_MILEAGE", "com.google.android.gms.permission.CAR_SPEED")
+                    .filter { androidx.core.content.ContextCompat.checkSelfPermission(c, it) != android.content.pm.PackageManager.PERMISSION_GRANTED }
+                if (missing.isNotEmpty()) runCatching { c.requestPermissions(missing) { _, _ -> carData?.stop(); carData?.start() } }
+                carData = CarData(c).also { it.start() }
+                com.blacklab.app.vehicle.VehicleLink.onAndroidAuto(c, true)
+            }
+            override fun onDestroy(owner: androidx.lifecycle.LifecycleOwner) {
+                carData?.stop(); carData = null
+                com.blacklab.app.vehicle.VehicleLink.onAndroidAuto(carContext, false)
+            }
+        })
+    }
+
     override fun onCreateScreen(intent: Intent): Screen {
         val app = carContext.app
         // Speak the daily briefing on connect, once a day, if asked to

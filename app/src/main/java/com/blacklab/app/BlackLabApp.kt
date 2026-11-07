@@ -27,6 +27,8 @@ class BlackLabApp : Application() {
         container = AppContainer(this)
         Notifications.createChannels(this)
         com.blacklab.app.bh.Rounds.createChannel(this)
+        com.blacklab.app.vehicle.VehicleLink.createChannels(this)
+        container.appScope.launch { runCatching { com.blacklab.app.vehicle.CarCompanion.refresh(this@BlackLabApp) } }
         container.storage.ensureStructure()
         container.requestReminderSync()
         container.appScope.launch { container.backups.autoBackupIfDue() }

@@ -80,6 +80,7 @@ An encrypted workspace for working on a behavioral health unit, using initials a
 
 ### 🔧 Garage
 - 2023 Santa Fe profile, editable maintenance schedule (normal or severe service) with what's due next, fuel log with MPG and cost per mile, service history
+- **Car link** (5.7): connect to the car's Bluetooth and a drive starts on its own. You get a trip log with a mileage-deduction CSV, the parking spot, and an odometer estimate between readings. It also pulls everything the car shares through **Android Auto**, a Bluetooth **OBD-II** adapter (VIN, check-engine codes, temperatures, voltage, fuel flow and real MPG) and **Hyundai Bluelink** (locks, doors, tire warnings, fluids, 12V battery, where it's parked). See [docs/ANDROID_AUTO.md](docs/ANDROID_AUTO.md#car-data)
 
 ### 🖥️ BlackLab Desktop
 - **`./daddyshome`** wakes the desktop brain: starts Ollama, loads and pins your desktop assistant model, starts the companion and links the phone both ways. The phone's assistant then **thinks with your computer's local AI** whenever it's linked (USB or Wireless debugging) and falls back to Gemini Nano when it isn't. See [docs/DESKTOP_AI.md](docs/DESKTOP_AI.md)

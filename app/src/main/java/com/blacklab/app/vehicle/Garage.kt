@@ -40,7 +40,11 @@ object Garage {
         val dealer: String = "",
         val insurance: String = "",
         val registrationDue: Long? = null,
+        /** Miles driven (by GPS) since the last real odometer reading — keeps "what's due" current between readings. */
+        val estMiles: Int = 0,
     ) {
+        /** Best guess at the odometer right now. */
+        val odometerNow: Int get() = if (odometer > 0) odometer + estMiles else 0
         val name: String get() = nickname.ifBlank { "$year $make $model" + (trim.takeIf { it.isNotBlank() }?.let { " $it" } ?: "") }
     }
 
@@ -139,7 +143,12 @@ object Garage {
 
     /** Records a new odometer reading (ignored if lower than what we already know). */
     fun setOdometer(context: Context, miles: Int, at: Long = System.currentTimeMillis()) = update(context) { s ->
-        if (miles <= 0 || miles < s.vehicle.odometer) s else s.copy(vehicle = s.vehicle.copy(odometer = miles, odometerAt = at))
+        if (miles <= 0 || miles < s.vehicle.odometer) s else s.copy(vehicle = s.vehicle.copy(odometer = miles, odometerAt = at, estMiles = 0))
+    }
+
+    /** Adds GPS-measured miles from a drive that had no odometer reading at the end. */
+    fun addDrivenMiles(context: Context, miles: Double) = update(context) { s ->
+        if (miles < 0.5 || s.vehicle.odometer <= 0) s else s.copy(vehicle = s.vehicle.copy(estMiles = s.vehicle.estMiles + Math.round(miles).toInt()))
     }
 
     fun upsertItem(context: Context, item: ServiceItem) = update(context) { s ->
@@ -158,14 +167,14 @@ object Garage {
         val names = s.items.filter { it.id in itemIds }.map { it.name }
         val rec = ServiceRecord(UUID.randomUUID().toString(), day, miles, itemIds, title.ifBlank { names.joinToString(", ").ifBlank { "Service" } }, cost, shop, notes)
         val items = s.items.map { if (it.id in itemIds) it.copy(lastMiles = miles ?: it.lastMiles, lastDay = day) else it }
-        val v = if (miles != null && miles > s.vehicle.odometer) s.vehicle.copy(odometer = miles, odometerAt = System.currentTimeMillis()) else s.vehicle
+        val v = if (miles != null && miles > s.vehicle.odometer) s.vehicle.copy(odometer = miles, odometerAt = System.currentTimeMillis(), estMiles = 0) else s.vehicle
         s.copy(vehicle = v, items = items, services = (listOf(rec) + s.services).sortedByDescending { it.day })
     }
 
     fun deleteService(context: Context, id: String) = update(context) { s -> s.copy(services = s.services.filterNot { it.id == id }) }
 
     fun addFuel(context: Context, fuel: Fuel) = update(context) { s ->
-        val v = if (fuel.miles != null && fuel.miles > s.vehicle.odometer) s.vehicle.copy(odometer = fuel.miles, odometerAt = fuel.time) else s.vehicle
+        val v = if (fuel.miles != null && fuel.miles > s.vehicle.odometer) s.vehicle.copy(odometer = fuel.miles, odometerAt = fuel.time, estMiles = 0) else s.vehicle
         s.copy(vehicle = v, fuel = (listOf(fuel) + s.fuel).sortedByDescending { it.time })
     }
 
@@ -174,7 +183,7 @@ object Garage {
     // ---------------------------------------------------------------- calculations (pure; unit-tested)
 
     fun due(s: State, today: LocalDate = LocalDate.now()): List<Due> {
-        val odo = s.vehicle.odometer.takeIf { it > 0 }
+        val odo = s.vehicle.odometerNow.takeIf { it > 0 }
         return s.items.map { item ->
             val miles = if (s.vehicle.severeService) item.severeMiles ?: item.miles else item.miles
             val months = if (s.vehicle.severeService) item.severeMonths ?: item.months else item.months
@@ -264,7 +273,7 @@ object Garage {
         val stats = fuelStats(s.fuel)
         return buildString {
             append(s.vehicle.name)
-            if (s.vehicle.odometer > 0) append(" · ${fmtMiles(s.vehicle.odometer)} mi")
+            if (s.vehicle.odometer > 0) append(" · ${if (s.vehicle.estMiles > 0) "about " else ""}${fmtMiles(s.vehicle.odometerNow)} mi")
             append(". ")
             val overdue = d.count { it.status == Status.OVERDUE }
             if (overdue > 0) append("$overdue service item${if (overdue > 1) "s are" else " is"} overdue. ")
@@ -287,7 +296,7 @@ object Garage {
         val v = s.vehicle
         put("vehicle", JSONObject().put("year", v.year).put("make", v.make).put("model", v.model).put("trim", v.trim).put("engine", v.engine).put("drive", v.drive)
             .put("nickname", v.nickname).put("vin", v.vin).put("plate", v.plate).put("odometer", v.odometer).put("odometerAt", v.odometerAt).put("tankGallons", v.tankGallons)
-            .put("tirePsi", v.tirePsi).put("oil", v.oil).put("severe", v.severeService).put("dealer", v.dealer).put("insurance", v.insurance).put("registrationDue", v.registrationDue ?: JSONObject.NULL))
+            .put("tirePsi", v.tirePsi).put("oil", v.oil).put("severe", v.severeService).put("dealer", v.dealer).put("insurance", v.insurance).put("registrationDue", v.registrationDue ?: JSONObject.NULL).put("estMiles", v.estMiles))
         put("items", JSONArray().apply {
             s.items.forEach { i ->
                 put(JSONObject().put("id", i.id).put("name", i.name).put("miles", i.miles ?: JSONObject.NULL).put("months", i.months ?: JSONObject.NULL)
@@ -314,7 +323,7 @@ object Garage {
             Vehicle(j.optInt("year", 2023), j.optString("make", "Hyundai"), j.optString("model", "Santa Fe"), j.optString("trim"), j.optString("engine", ENGINES.first()),
                 j.optString("drive", "AWD"), j.optString("nickname"), j.optString("vin"), j.optString("plate"), j.optInt("odometer"), j.optLong("odometerAt"),
                 j.optDouble("tankGallons", 18.8), j.optString("tirePsi"), j.optString("oil"), j.optBoolean("severe"), j.optString("dealer"), j.optString("insurance"),
-                j.optLongOrNull("registrationDue"))
+                j.optLongOrNull("registrationDue"), j.optInt("estMiles"))
         } ?: Vehicle()
         fun arr(k: String) = o.optJSONArray(k)?.let { a -> (0 until a.length()).map { a.getJSONObject(it) } }
         val items = arr("items")?.map { j ->

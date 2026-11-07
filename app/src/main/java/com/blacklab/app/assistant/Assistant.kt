@@ -955,16 +955,70 @@ User: $text"""
             g.setOdometer(ctx, miles)
             return Reply(done("odometer set to ${g.fmtMiles(miles)} mi.") + " " + g.summary(g.state.value).substringAfter(". ", ""), listOf(Link("Garage", "garage")), source = "Garage")
         }
+        carData(l)?.let { return it }
         val carTopic = Regex("(oil change|tire rotation|mpg|gas mileage|fuel economy|due on (the|my) (car|santa fe|suv)|car (status|report|health)|how('s| is) (the|my) (car|santa fe))").containsMatchIn(l) ||
             (Regex("(maintenance|service)").containsMatchIn(l) && Regex("\\b(car|santa fe|vehicle|suv)\\b").containsMatchIn(l))
         if (carTopic &&
             Regex("^(when|what|what's|whats|how|is|any|car|santa fe|my car|status|check)").containsMatchIn(l)) {
             val due = g.due(st).filter { it.status == com.blacklab.app.vehicle.Garage.Status.OVERDUE || it.status == com.blacklab.app.vehicle.Garage.Status.DUE_SOON }.take(3)
             val extra = if (due.isEmpty()) "" else "\n" + due.joinToString("\n") { "• ${it.item.name} — ${it.describe()}" }
-            return Reply(g.summary(st) + extra, listOf(Link("Garage", "garage")), source = "Garage")
+            val live = com.blacklab.app.vehicle.VehicleLink.summary(ctx)
+            return Reply(g.summary(st) + (if (live.isNotBlank()) " $live" else "") + extra, listOf(Link("Garage", "garage")), source = "Garage")
         }
         return null
     }
+
+    /** Questions answered from what the car itself reported (OBD-II, Bluelink, Android Auto) and the trip log. */
+    private fun carData(l: String): Reply? {
+        val ctx = app.context
+        val T = com.blacklab.app.vehicle.Telemetry
+        val vl = com.blacklab.app.vehicle.VehicleLink
+        val s = vl.load(ctx)
+        val links = listOf(Link("Garage", "garage"))
+        fun fresh(k: String) = s[k]?.let { "${T.format(it)} (${it.source.label}, ${T.ago(it.time)})" }
+        if (Regex("where('?s| is| did i (park|leave))( my)? (car|santa fe|suv|park)|where did i park|find my car").containsMatchIn(l)) {
+            val p = s.parked ?: return Reply("I don't have a parking spot yet — it's saved when a drive ends.", links, source = "Garage")
+            return Reply("Parked at ${p.place.ifBlank { "%.5f, %.5f".format(p.lat, p.lon) }}, ${T.ago(p.time)}.", links, source = "Garage", nav = "${p.lat},${p.lon}")
+        }
+        if (Regex("check engine|engine light|trouble codes?|dtcs?\\b|diagnostic|error codes?|codes? on (the|my) car").containsMatchIn(l)) {
+            val c = s.activeDtcs
+            val text = when {
+                c.isNotEmpty() -> "${c.size} active code${if (c.size > 1) "s" else ""}: " + c.joinToString("; ") { "${it.code} — ${com.blacklab.app.vehicle.Dtcs.describe(it.code)}" } + "."
+                s["mil"]?.bool == true -> "The check-engine light is on, but no stored codes were read."
+                s["mil"] != null || s["dtc_count"] != null -> "No trouble codes — the check-engine light is off (as of ${T.ago((s["mil"] ?: s["dtc_count"])!!.time)})."
+                else -> "I haven't read the car's codes yet. That needs a Bluetooth OBD-II adapter set up in Garage › Car connection."
+            }
+            return Reply(text, links, source = "Garage")
+        }
+        if (Regex("(how much|what'?s (my|the)) (gas|fuel)|fuel level|gas level|miles (of range|to empty|left)|range (left|remaining)|how far can i (go|drive)").containsMatchIn(l)) {
+            val parts = listOfNotNull(fresh("fuel_pct")?.let { "Fuel $it" }, fresh("range")?.let { "range $it" })
+            return Reply(if (parts.isEmpty()) "The car hasn't reported its fuel level yet — it comes from Android Auto, Bluelink or the OBD-II adapter." else parts.joinToString(", ") + ".", links, source = "Garage")
+        }
+        if (Regex("(is|are) (my|the) (car|doors?|santa fe)( doors?)? locked|did i lock|tire pressure|tyre pressure|car battery|battery voltage|coolant temp").containsMatchIn(l)) {
+            val parts = listOfNotNull(fresh("locked")?.let { "Doors: $it" }, fresh("doors_open")?.takeIf { s["doors_open"]?.text != "None" }?.let { "open: $it" },
+                fresh("tire_warning")?.let { "tire pressure: $it" }, fresh("battery_v")?.let { "battery $it" }, fresh("battery_soc")?.let { "12V charge $it" }, fresh("coolant")?.let { "coolant $it" })
+            return Reply(if (parts.isEmpty()) "I don't have that from the car yet. Set up Bluelink or an OBD-II adapter in Garage › Car connection." else parts.joinToString("; ").replaceFirstChar { it.uppercase() } + ".", links, source = "Garage")
+        }
+        Regex("how (many|far)( miles)? (did|have) i (drive|driven|drove)|miles (did i drive|driven|this (week|month|year)|last (week|month))|business miles|mileage (log|this (week|month|year))|trip log").find(l)?.let {
+            val now = java.time.LocalDate.now()
+            val zone = java.time.ZoneId.systemDefault()
+            val (label, from, to) = when {
+                l.contains("last week") -> Triple("last week", T.weekStart(now.minusWeeks(1)), T.weekStart(now))
+                l.contains("last month") -> Triple("last month", T.monthStart(now.minusMonths(1)), T.monthStart(now))
+                l.contains("year") || l.contains("business") -> Triple("this year", T.yearStart(now), Long.MAX_VALUE)
+                l.contains("today") -> Triple("today", now.atStartOfDay(zone).toInstant().toEpochMilli(), Long.MAX_VALUE)
+                l.contains("week") -> Triple("this week", T.weekStart(now), Long.MAX_VALUE)
+                else -> Triple("this month", T.monthStart(now), Long.MAX_VALUE)
+            }
+            val t = T.totals(s.trips, from, to, s.link.ratePerMile)
+            if (t.trips == 0) return Reply("No drives logged $label.", links, source = "Garage")
+            val biz = t.byPurpose[com.blacklab.app.vehicle.Telemetry.Purpose.BUSINESS] ?: 0.0
+            return Reply("%.1f miles in %d drive%s %s (%s behind the wheel)".format(t.miles, t.trips, if (t.trips == 1) "" else "s", label, T.duration(t.driveSec)) +
+                (if (biz > 0) ", %.1f of them business — about $%,.0f at your rate.".format(biz, t.deductible) else "."), links, source = "Garage")
+        }
+        return null
+    }
+
 
     private suspend fun navigateNext(): Reply {
         val now = java.time.LocalDateTime.now()

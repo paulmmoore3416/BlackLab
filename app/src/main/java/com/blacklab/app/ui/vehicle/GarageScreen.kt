@@ -60,6 +60,7 @@ import com.blacklab.app.ui.theme.Mint
 import com.blacklab.app.ui.theme.Success
 import com.blacklab.app.vehicle.Garage
 import java.time.LocalDate
+import kotlinx.coroutines.launch
 import java.util.UUID
 
 /** Your 2023 Hyundai Santa Fe: what's due, fuel economy, service history and the vehicle profile. */
@@ -81,14 +82,23 @@ fun GarageScreen() {
     var deleteFuel by remember { mutableStateOf<Garage.Fuel?>(null) }
     var showFacts by remember { mutableStateOf(false) }
     var menu by remember { mutableStateOf(false) }
+    remember { com.blacklab.app.vehicle.VehicleLink.load(ctx) }
+    val car by com.blacklab.app.vehicle.VehicleLink.state.collectAsState()
+    val live by com.blacklab.app.vehicle.VehicleLink.live.collectAsState()
+    var setup by remember { mutableStateOf(false) }
+    var showAll by remember { mutableStateOf(false) }
+    var codes by remember { mutableStateOf(false) }
+    var trip by remember { mutableStateOf<com.blacklab.app.vehicle.Telemetry.Trip?>(null) }
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
 
     Scaffold(topBar = {
-        BlTopBar(v.name, subtitle = if (v.odometer > 0) "${Garage.fmtMiles(v.odometer)} mi" + (if (v.odometerAt > 0) " · updated ${Garage.timeLabel(v.odometerAt)}" else "") else "Set your odometer to start tracking",
+        BlTopBar(v.name, subtitle = if (v.odometer > 0) "${if (v.estMiles > 0) "≈ " else ""}${Garage.fmtMiles(v.odometerNow)} mi" + (if (v.odometerAt > 0) " · updated ${Garage.timeLabel(v.odometerAt)}" else "") else "Set your odometer to start tracking",
             onBack = { shell.back() }) {
             IconButton(onClick = { editVehicle = true }) { Icon(Icons.Rounded.Edit, "Edit vehicle") }
             androidx.compose.foundation.layout.Box {
                 IconButton(onClick = { menu = true }) { Icon(Icons.Rounded.MoreVert, "More") }
                 DropdownMenu(menu, { menu = false }) {
+                    DropdownMenuItem(text = { Text("Car connection") }, leadingIcon = { Icon(Icons.Rounded.Bluetooth, null) }, onClick = { menu = false; setup = true })
                     DropdownMenuItem(text = { Text("Add a custom service item") }, leadingIcon = { Icon(Icons.Rounded.Add, null) }, onClick = {
                         menu = false; editItem = Garage.ServiceItem("custom-" + UUID.randomUUID().toString().take(8), "", 10_000, 12)
                     })
@@ -102,7 +112,7 @@ fun GarageScreen() {
         LazyColumn(Modifier.padding(pad).fillMaxSize(), contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             item {
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    StatTile("Odometer", if (v.odometer > 0) Garage.fmtMiles(v.odometer) else "—", Icons.Rounded.Speed, Cobalt, Modifier.weight(1f)) { editOdo = true }
+                    StatTile(if (v.estMiles > 0) "Odometer (est.)" else "Odometer", if (v.odometer > 0) Garage.fmtMiles(v.odometerNow) else "—", Icons.Rounded.Speed, Cobalt, Modifier.weight(1f)) { editOdo = true }
                     StatTile("Avg MPG", stats.avgMpg?.let { "%.1f".format(it) } ?: "—", Icons.Rounded.LocalGasStation, Mint, Modifier.weight(1f)) { fuelDialog = true }
                     StatTile("Fuel · 30 days", if (stats.monthCost > 0) "$" + "%.0f".format(stats.monthCost) else "—", Icons.Rounded.Payments, Amber, Modifier.weight(1f))
                 }
@@ -113,6 +123,8 @@ fun GarageScreen() {
                     OutlinedButton(onClick = { serviceAny = true }, modifier = Modifier.weight(1f)) { Icon(Icons.Rounded.Build, null, Modifier.size(18.dp)); Spacer(Modifier.size(6.dp)); Text("Log service") }
                 }
             }
+            liveCarSection(car, live, showAll, onExpand = { showAll = !showAll }, onSetup = { setup = true },
+                onRefresh = { scope.launch { shell.toast(com.blacklab.app.vehicle.VehicleLink.refreshBluelink(ctx)) } }, onCodes = { codes = true })
             item { SectionHeader("Maintenance") }
             items(due, key = { it.item.id }) { d ->
                 val (tag, color) = when (d.status) {
@@ -149,6 +161,10 @@ fun GarageScreen() {
                 }
             }
             if (stats.costPerMile != null) item { Text("About ${"%.1f".format(stats.costPerMile * 100)}¢ per mile in fuel" + (stats.lastMpg?.let { " · last tank ${"%.1f".format(it)} mpg" } ?: ""), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+            tripsSection(car, v.tankGallons, onTrip = { trip = it }, onExport = {
+                runCatching { com.blacklab.app.core.Files.share(ctx, listOf(com.blacklab.app.vehicle.VehicleLink.exportCsv(ctx)), "Mileage log") }
+                    .onFailure { shell.toast("Couldn't export: ${it.message}") }
+            })
             item { SectionHeader("Service history") }
             if (st.services.isEmpty()) item { Text("Nothing logged yet. Tap a maintenance item above to mark it done.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
             items(st.services.take(20), key = { it.id }) { r ->
@@ -210,6 +226,9 @@ fun GarageScreen() {
         onDelete = { Garage.deleteItem(ctx, item.id) }) { Garage.upsertItem(ctx, it) } }
     deleteFuel?.let { f -> ConfirmDialog("Delete fill-up?", "${"%.2f".format(f.gallons)} gal on ${Garage.timeLabel(f.time)}", onDismiss = { deleteFuel = null }) { Garage.deleteFuel(ctx, f.id) } }
     if (editVehicle) VehicleDialog(v, onDismiss = { editVehicle = false }) { Garage.setVehicle(ctx, it) }
+    if (setup) CarConnectionDialog(shell, onDismiss = { setup = false })
+    if (codes) CodesDialog(car, onDismiss = { codes = false })
+    trip?.let { t -> TripDialog(t, v.tankGallons, onDismiss = { trip = null }) }
 }
 
 private fun intervalLabel(i: Garage.ServiceItem, severe: Boolean): String {
