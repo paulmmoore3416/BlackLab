@@ -148,7 +148,7 @@ dependencies {
     implementation("androidx.glance:glance-material3:1.1.1") // widgets in your palette colors
 
     // QR codes for Brainstorm Live Share links
-    implementation("com.google.zxing:core:3.5.3")
+    implementation("com.google.zxing:core:3.5.4")
 
     implementation("io.coil-kt:coil-compose:2.7.0")
     implementation("io.coil-kt:coil-video:2.7.0")
