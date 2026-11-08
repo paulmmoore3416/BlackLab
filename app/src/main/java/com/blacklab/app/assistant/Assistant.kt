@@ -354,6 +354,9 @@ class Assistant(private val app: AppContainer) {
             if (agenda.isNotEmpty()) append("Upcoming: " + agenda.joinToString("; ") { "${it.title} ${Time.relativeDay(it.start.toLocalDate())} ${Time.time(it.start)}" } + "\n")
             val tasks = Briefing.openTasks(app).sortedBy { it.dueDay ?: Long.MAX_VALUE }.take(5)
             if (tasks.isNotEmpty()) append("Open tasks: " + tasks.joinToString("; ") { it.title } + "\n")
+            // So the model never guesses about the computer link (it used to say "offline" when it was up)
+            val desk = DesktopAi.status.value
+            append("Desktop AI (the user's computer): " + if (DesktopAi.usable) "connected, model ${desk.model.ifBlank { "local model" }} — you are running on it right now.\n" else desk.state.label.lowercase() + ".\n")
         }
         val persona = when (s.asstPersona) {
             "LAIDBACK" -> "You are ${s.asstName}, a laid-back, warm, funny personal assistant with an easygoing, chuckling vibe. Keep it short, friendly and a little playful, but always useful."
@@ -828,11 +831,7 @@ User: $text"""
     // ------------------------------------------------------------------ desktop AI
 
     private suspend fun desktop(t: String, l: String): Reply? {
-        val aiWord = "(desktop|computer|pc|laptop)(?:'?s)? (?:ai|brain|model|llm|assistant)"
-        if (Regex("^(?:what'?s|whats|how'?s|hows|check|show)?\\s*(?:the |my )?$aiWord(?: status| connection)?\\??$").containsMatchIn(l) ||
-            Regex("\\b$aiWord\\b.*\\b(status|working|connected|online|up|running|reachable|there|linked)\\b").containsMatchIn(l) ||
-            Regex("^(?:is|are) (?:the |my )?(desktop|computer|pc)(?:'?s)? (?:ai )?(connected|online|reachable|linked|up)").containsMatchIn(l) ||
-            Regex("^(desktop|computer) (status|connection)$").containsMatchIn(l)) {
+        if (DesktopAi.isStatusQuestion(l)) {
             val st = DesktopAi.probe()
             return Reply(when (st.state) {
                 DesktopAi.State.ONLINE -> "Your computer's AI is connected — ${st.model.ifBlank { "local model" }}, ${st.latencyMs} ms away. I'll use it for anything that needs real thinking."

@@ -54,6 +54,27 @@ object DesktopAi {
     private fun token(): String? = app?.secrets?.get(Secrets.DESKTOP_AI)
     private fun base(): String = (app?.secrets?.get(Secrets.DESKTOP_AI_URL) ?: DEFAULT_URL).trimEnd('/')
 
+    private val handOff = Regex("^(?:on (?:my |the )?(?:desktop|computer|pc|laptop)\\b|(?:ask|tell|have) (?:my |the )?(?:desktop|computer|pc|laptop)\\b|(?:desktop|computer)[:,])")
+    private val bare = Regex("^(?:what'?s|whats|how'?s|hows|check|show)?\\s*(?:the |my )?(?:desktop|computer|pc|laptop)(?:'?s)? (?:ai|brain|model|llm|assistant)(?: status| connection)?$|^(?:desktop|computer) (?:status|connection)$|^(?:is|are) (?:the |my )?(?:desktop|computer|pc|laptop)(?:'?s)? (?:ai )?(?:up|down)$")
+    private val aiNoun = Regex("\\b(?:desktop|computer|pc|laptop)(?:'?s)? (?:ai|brain|model|llm|assistant|link|connection)\\b")
+    private val noun = Regex("\\b(?:desktop|computer|pc|laptop)(?:'?s)?\\b")
+    private val stateWord = Regex("\\b(?:status|state|connected|connection|online|offline|reachable|unreachable|working|running|linked|paired|available|up|down|alive|there|doing|ok|okay)\\b|\\b(?:what|which) model\\b")
+    private val linkWord = Regex("\\b(?:connected|connection|online|offline|reachable|unreachable|linked|paired)\\b")
+    private val machineTopic = Regex("\\b(?:disk|space|storage|files?|folders?|downloads?|cpu|ram|memory|gpu|battery|temp(?:erature)?|apps?|uptime|process(?:es)?)\\b")
+
+    /**
+     * True when [l] (lowercased, normalized) asks whether the desktop AI / link is up — "what's the status of
+     * the desktop AI", "is my computer online" — rather than handing the computer a request
+     * ("ask my desktop how much disk space is left").
+     */
+    fun isStatusQuestion(l: String): Boolean {
+        val q = l.trim().trimEnd('?', '!', '.').trim()
+        if (handOff.containsMatchIn(q)) return false
+        if (bare.containsMatchIn(q)) return true
+        if (aiNoun.containsMatchIn(q) && stateWord.containsMatchIn(q)) return true
+        return noun.containsMatchIn(q) && linkWord.containsMatchIn(q) && !machineTopic.containsMatchIn(q)
+    }
+
     /** True when requests should go to the desktop right now. */
     val usable: Boolean get() = enabled && _status.value.state == State.ONLINE
 
