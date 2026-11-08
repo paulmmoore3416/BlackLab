@@ -152,7 +152,7 @@ dependencies {
 
     implementation("io.coil-kt:coil-compose:2.7.0")
     implementation("io.coil-kt:coil-video:2.7.0")
-    implementation("org.jsoup:jsoup:1.21.1")
+    implementation("org.jsoup:jsoup:1.24.1")
     implementation("androidx.exifinterface:exifinterface:1.4.1")
 
     implementation("com.google.android.gms:play-services-mlkit-document-scanner:16.0.0")
