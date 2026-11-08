@@ -70,7 +70,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-private enum class BTab(val label: String) { NOTEBOOKS("Notebooks"), NOTES("Notes"), TAGS("Tags") }
+private enum class BTab(val label: String) { NOTEBOOKS("Notebooks"), TAGS("Tags") }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -81,25 +81,22 @@ fun BrainstormScreen(startTab: String = "") {
     val scope = rememberCoroutineScope()
     val profile = settingsState().activeProfile
     val prefs = remember { ctx.getSharedPreferences("blacklab_brainstorm", android.content.Context.MODE_PRIVATE) }
-    var tab by remember { mutableStateOf(when (startTab) { "notes" -> BTab.NOTES; "tags" -> BTab.TAGS; "notebooks" -> BTab.NOTEBOOKS; else -> BTab.entries[prefs.getInt("tab", 0).coerceIn(0, 2)] }) }
-    LaunchedEffect(tab) { prefs.edit().putInt("tab", tab.ordinal).apply() }
+    var tab by remember { mutableStateOf(when (startTab) { "tags" -> BTab.TAGS; "notebooks" -> BTab.NOTEBOOKS; else -> BTab.entries[prefs.getInt("tab2", 0).coerceIn(0, 1)] }) }
+    LaunchedEffect(tab) { prefs.edit().putInt("tab2", tab.ordinal).apply() }
     var searching by remember { mutableStateOf(startTab == "search") }
     var query by remember { mutableStateOf("") }
     var menu by remember { mutableStateOf(false) }
     var sheet by remember { mutableStateOf<String?>(if (startTab == "mindmap") "mindmap" else null) }
-    var grid by remember { mutableStateOf(prefs.getBoolean("grid", true)) }
-    val selected = remember { mutableStateListOf<Long>() }
 
     LaunchedEffect(profile) { withContext(Dispatchers.IO) { Brainstorm.ensureStarter(app, profile) } }
     val import = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { u ->
         if (u != null) scope.launch { runCatching { Brainstorm.importNotebook(app, profile, u) }.onSuccess { shell.toast("Notebook imported"); shell.go("notebook/$it") }.onFailure { shell.toast("Couldn't import: ${it.message}") } }
     }
-    BackHandler(searching || selected.isNotEmpty()) { if (selected.isNotEmpty()) selected.clear() else { searching = false; query = "" } }
+    BackHandler(searching) { searching = false; query = "" }
 
     Scaffold(
         topBar = {
             when {
-                selected.isNotEmpty() -> SelectionBar(selected, profile) { selected.clear() }
                 searching -> TopAppBar(
                     navigationIcon = { IconButton(onClick = { searching = false; query = "" }) { Icon(Icons.AutoMirrored.Rounded.ArrowBack, "Close search") } },
                     title = {
@@ -111,17 +108,16 @@ fun BrainstormScreen(startTab: String = "") {
                 )
                 else -> TopAppBar(
                     navigationIcon = { IconButton(onClick = shell.openDrawer) { Icon(Icons.Rounded.Menu, "Menu") } },
-                    title = { Column { Text("Brainstorm"); Text("Notebooks, notes & ideas", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant) } },
+                    title = { Column { Text("Brainstorm"); Text("Notebooks, pages & ideas", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant) } },
                     actions = {
                         IconButton(onClick = { searching = true }) { Icon(Icons.Rounded.Search, "Search") }
-                        if (tab == BTab.NOTES) IconButton(onClick = { grid = !grid; prefs.edit().putBoolean("grid", grid).apply() }) { Icon(if (grid) Icons.Rounded.ViewAgenda else Icons.Rounded.GridView, if (grid) "List view" else "Grid view") }
+                        IconButton(onClick = { shell.go("notes") }) { Icon(Icons.AutoMirrored.Rounded.StickyNote2, "Notes") }
                         Box {
                             IconButton(onClick = { menu = true }) { Icon(Icons.Rounded.MoreVert, "More") }
                             DropdownMenu(menu, { menu = false }) {
                                 DropdownMenuItem(text = { Text("Recycle bin") }, leadingIcon = { Icon(Icons.Rounded.DeleteOutline, null) }, onClick = { menu = false; sheet = "trash" })
                                 DropdownMenuItem(text = { Text("Live Share links") }, leadingIcon = { Icon(Icons.Rounded.Wifi, null) }, onClick = { menu = false; sheet = "shares" })
                                 DropdownMenuItem(text = { Text("Import notebook") }, leadingIcon = { Icon(Icons.Rounded.Unarchive, null) }, onClick = { menu = false; import.launch(arrayOf("*/*")) })
-                                DropdownMenuItem(text = { Text("Manage labels") }, leadingIcon = { Icon(Icons.AutoMirrored.Rounded.Label, null) }, onClick = { menu = false; sheet = "labels" })
                                 if (SectionKeys.anyUnlocked) DropdownMenuItem(text = { Text("Lock all sections") }, leadingIcon = { Icon(Icons.Rounded.Lock, null) }, onClick = { menu = false; SectionKeys.lockAll(); shell.toast("Locked") })
                             }
                         }
@@ -130,17 +126,16 @@ fun BrainstormScreen(startTab: String = "") {
             }
         },
         floatingActionButton = {
-            if (!searching && selected.isEmpty() && tab == BTab.NOTEBOOKS) ExtendedFloatingActionButton(onClick = { sheet = "newNotebook" }, icon = { Icon(Icons.Rounded.Add, null) }, text = { Text("Notebook") })
+            if (!searching && tab == BTab.NOTEBOOKS) ExtendedFloatingActionButton(onClick = { sheet = "newNotebook" }, icon = { Icon(Icons.Rounded.Add, null) }, text = { Text("Notebook") })
         },
     ) { pad ->
         Column(Modifier.padding(pad).fillMaxSize()) {
             if (searching) { SearchResults(profile, query); return@Column }
             PrimaryTabRow(tab.ordinal, containerColor = Color.Transparent) {
-                BTab.entries.forEach { t -> Tab(t == tab, { tab = t; selected.clear() }, text = { Text(t.label) }) }
+                BTab.entries.forEach { t -> Tab(t == tab, { tab = t }, text = { Text(t.label) }) }
             }
             when (tab) {
                 BTab.NOTEBOOKS -> NotebooksTab(profile)
-                BTab.NOTES -> NotesBoard(profile, grid, selected)
                 BTab.TAGS -> TagsTab(profile)
             }
         }
@@ -150,7 +145,6 @@ fun BrainstormScreen(startTab: String = "") {
         "newNotebook" -> NewNotebookDialog(onDismiss = { sheet = null }) { name, color -> scope.launch { val id = Brainstorm.createNotebook(app, profile, name, color); shell.go("notebook/$id") } }
         "trash" -> RecycleBinSheet(profile) { sheet = null }
         "shares" -> SharesSheet { sheet = null }
-        "labels" -> ManageLabelsDialog(profile) { sheet = null }
         "mindmap" -> TextInputDialog("Mind map", "", "Central idea or question", "Create", onDismiss = { sheet = null }) { topic ->
             scope.launch {
                 val dao = app.db.brainstorm()
@@ -189,7 +183,7 @@ private fun NotebooksTab(profile: Profile) {
                         shell.go("page/" + Brainstorm.createPage(app, profile, sec.id, "blank", ""))
                     }
                 }) { Icon(Icons.AutoMirrored.Rounded.NoteAdd, null); Spacer(Modifier.width(6.dp)); Text("Quick page") }
-                FilledTonalButton(onClick = { shell.go("note/0?kind=") }) { Icon(Icons.AutoMirrored.Rounded.StickyNote2, null); Spacer(Modifier.width(6.dp)); Text("Quick note") }
+                FilledTonalButton(onClick = { shell.go("notes") }) { Icon(Icons.AutoMirrored.Rounded.StickyNote2, null); Spacer(Modifier.width(6.dp)); Text("Notes") }
             }
         }
         if (recent.isNotEmpty()) {
@@ -264,96 +258,11 @@ private fun NewNotebookDialog(onDismiss: () -> Unit, onCreate: (String, Int) -> 
         dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } })
 }
 
-// ====================================================================== notes board (Keep-style)
-
-private sealed interface NoteFilter { data object All : NoteFilter; data object Reminders : NoteFilter; data object Archive : NoteFilter; data object Trash : NoteFilter; data class Label(val name: String) : NoteFilter }
+// ====================================================================== note card (also used by Notes and Home)
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun NotesBoard(profile: Profile, grid: Boolean, selected: MutableList<Long>) {
-    val app = rememberApp()
-    val shell = LocalShell.current
-    val scope = rememberCoroutineScope()
-    val notes by app.db.notes().observe(profile.name).collectAsState(initial = emptyList())
-    val labels by app.db.notes().observeLabels(profile.name).collectAsState(initial = emptyList())
-    var filter by remember { mutableStateOf<NoteFilter>(NoteFilter.All) }
-    var trashSheet by remember { mutableStateOf<NoteEntity?>(null) }
-
-    val shown = when (val f = filter) {
-        NoteFilter.All -> notes.filter { it.trashedAt == null && !it.archived }
-        NoteFilter.Reminders -> notes.filter { it.trashedAt == null && (it.reminderAt != null || it.placeLat != null) }.sortedBy { it.reminderAt ?: Long.MAX_VALUE }
-        NoteFilter.Archive -> notes.filter { it.trashedAt == null && it.archived }
-        NoteFilter.Trash -> notes.filter { it.trashedAt != null }
-        is NoteFilter.Label -> notes.filter { it.trashedAt == null && f.name in NoteOps.labels(it) }
-    }
-    Box(Modifier.fillMaxSize()) {
-        Column(Modifier.fillMaxSize()) {
-            Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 12.dp, vertical = 6.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                FilterChip(filter == NoteFilter.All, { filter = NoteFilter.All }, label = { Text("Notes") }, leadingIcon = { Icon(Icons.Rounded.Lightbulb, null, Modifier.size(18.dp)) })
-                FilterChip(filter == NoteFilter.Reminders, { filter = NoteFilter.Reminders }, label = { Text("Reminders") }, leadingIcon = { Icon(Icons.Rounded.NotificationsNone, null, Modifier.size(18.dp)) })
-                labels.forEach { l -> FilterChip(filter == NoteFilter.Label(l.name), { filter = NoteFilter.Label(l.name) }, label = { Text(l.name) }, leadingIcon = { Icon(Icons.AutoMirrored.Outlined.Label, null, Modifier.size(18.dp)) }) }
-                FilterChip(filter == NoteFilter.Archive, { filter = NoteFilter.Archive }, label = { Text("Archive") }, leadingIcon = { Icon(Icons.Rounded.Archive, null, Modifier.size(18.dp)) })
-                FilterChip(filter == NoteFilter.Trash, { filter = NoteFilter.Trash }, label = { Text("Trash") }, leadingIcon = { Icon(Icons.Rounded.DeleteOutline, null, Modifier.size(18.dp)) })
-            }
-            if (filter == NoteFilter.Trash && shown.isNotEmpty()) {
-                Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Text("Notes in Trash are deleted after ${NoteOps.TRASH_DAYS} days.", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.weight(1f))
-                    TextButton(onClick = { scope.launch { shown.forEach { NoteOps.deleteForever(app, it) } } }) { Text("Empty Trash") }
-                }
-            }
-            if (shown.isEmpty()) {
-                EmptyState(when (filter) { NoteFilter.Trash -> Icons.Rounded.DeleteOutline; NoteFilter.Archive -> Icons.Rounded.Archive; NoteFilter.Reminders -> Icons.Rounded.NotificationsNone; else -> Icons.Rounded.Lightbulb },
-                    when (filter) { NoteFilter.Trash -> "No notes in Trash"; NoteFilter.Archive -> "Your archived notes appear here"; NoteFilter.Reminders -> "Notes with upcoming reminders appear here"; else -> "Notes you add appear here" },
-                    "Lists, voice notes, photos and sketches — pin, color, label and set reminders by time or place.")
-            } else {
-                val pinned = if (filter == NoteFilter.All || filter is NoteFilter.Label) shown.filter { it.pinned } else emptyList()
-                val others = shown - pinned.toSet()
-                LazyVerticalStaggeredGrid(
-                    StaggeredGridCells.Fixed(if (grid) 2 else 1), contentPadding = PaddingValues(start = 12.dp, end = 12.dp, top = 4.dp, bottom = 120.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp), verticalItemSpacing = 8.dp, modifier = Modifier.weight(1f),
-                ) {
-                    if (pinned.isNotEmpty()) {
-                        item(span = StaggeredGridItemSpan.FullLine) { SectionHeader("Pinned") }
-                        items(pinned, key = { it.id }) { n -> NoteCard(n, n.id in selected, onClick = { if (selected.isNotEmpty()) toggle(selected, n.id) else shell.go("note/${n.id}") }, onLong = { toggle(selected, n.id) }) }
-                        if (others.isNotEmpty()) item(span = StaggeredGridItemSpan.FullLine) { SectionHeader("Others") }
-                    }
-                    items(others, key = { it.id }) { n ->
-                        NoteCard(n, n.id in selected, onClick = {
-                            when { filter == NoteFilter.Trash -> trashSheet = n; selected.isNotEmpty() -> toggle(selected, n.id); else -> shell.go("note/${n.id}") }
-                        }, onLong = { if (filter != NoteFilter.Trash) toggle(selected, n.id) })
-                    }
-                }
-            }
-        }
-        if (filter != NoteFilter.Trash) TakeNoteBar(Modifier.align(Alignment.BottomCenter))
-    }
-    trashSheet?.let { n ->
-        ActionSheet(title = n.title.ifBlank { NoteOps.summary(n).take(50).ifBlank { "Note" } }, subtitle = "In Trash", onDismiss = { trashSheet = null }, actions = listOf(
-            SheetAction("Restore", Icons.Rounded.RestoreFromTrash) { app.io { NoteOps.restore(app, n) } },
-            SheetAction("Delete forever", Icons.Rounded.DeleteForever, destructive = true) { app.io { NoteOps.deleteForever(app, n) } },
-        ))
-    }
-}
-
-private fun toggle(list: MutableList<Long>, id: Long) { if (id in list) list.remove(id) else list.add(id) }
-
-@Composable
-private fun TakeNoteBar(modifier: Modifier) {
-    val shell = LocalShell.current
-    Surface(modifier.fillMaxWidth().padding(12.dp).navigationBarsPadding(), shape = RoundedCornerShape(28.dp), color = MaterialTheme.colorScheme.surfaceContainerHigh, shadowElevation = 6.dp) {
-        Row(Modifier.padding(start = 20.dp, end = 6.dp), verticalAlignment = Alignment.CenterVertically) {
-            Text("Take a note…", color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.weight(1f).clickable { shell.go("note/0?kind=") }.padding(vertical = 16.dp))
-            IconButton(onClick = { shell.go("note/0?kind=checklist") }) { Icon(Icons.Rounded.CheckBox, "New list") }
-            IconButton(onClick = { shell.go("note/0?kind=drawing") }) { Icon(Icons.Rounded.Brush, "New drawing") }
-            IconButton(onClick = { shell.go("note/0?kind=voice") }) { Icon(Icons.Rounded.Mic, "New voice note") }
-            IconButton(onClick = { shell.go("note/0?kind=image") }) { Icon(Icons.Rounded.Image, "New note with image") }
-        }
-    }
-}
-
-@OptIn(ExperimentalLayoutApi::class)
-@Composable
-fun NoteCard(n: NoteEntity, selected: Boolean, onClick: () -> Unit, onLong: () -> Unit) {
+fun NoteCard(n: NoteEntity, selected: Boolean, onClick: () -> Unit, onLong: () -> Unit, maxBodyLines: Int = 10, maxItems: Int = 8) {
     val app = rememberApp()
     val dark = LocalBlColors.current.isDark
     val bg = noteColor(n.color, dark)
@@ -372,13 +281,13 @@ fun NoteCard(n: NoteEntity, selected: Boolean, onClick: () -> Unit, onLong: () -
                     if (n.title.isNotBlank()) Text(n.title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold, maxLines = 2, overflow = TextOverflow.Ellipsis)
                     if (n.checklist) {
                         val items = NoteOps.items(n)
-                        items.filter { !it.done }.take(8).forEach { Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(start = (it.indent * 14).dp, top = 2.dp)) {
+                        items.filter { !it.done }.take(maxItems).forEach { Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(start = (it.indent * 14).dp, top = 2.dp)) {
                             Icon(Icons.Rounded.CheckBoxOutlineBlank, null, Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant); Spacer(Modifier.width(6.dp))
                             Text(it.text, style = MaterialTheme.typography.bodySmall, maxLines = 1, overflow = TextOverflow.Ellipsis) } }
-                        val doneCount = items.count { it.done }; val more = items.count { !it.done } - 8
+                        val doneCount = items.count { it.done }; val more = items.count { !it.done } - maxItems
                         if (more > 0) Text("+ $more more", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         if (doneCount > 0) Text("+ $doneCount checked item${if (doneCount > 1) "s" else ""}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    } else if (n.body.isNotBlank()) Text(n.body, style = MaterialTheme.typography.bodySmall, maxLines = 10, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 4.dp))
+                    } else if (n.body.isNotBlank()) Text(n.body, style = MaterialTheme.typography.bodySmall, maxLines = maxBodyLines, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 4.dp))
                     if (attachments.any { it.kind == "audio" }) Row(Modifier.padding(top = 6.dp), verticalAlignment = Alignment.CenterVertically) {
                         Icon(Icons.Rounded.GraphicEq, null, Modifier.size(16.dp)); Spacer(Modifier.width(4.dp)); Text("Recording", style = MaterialTheme.typography.labelSmall)
                     }
@@ -395,70 +304,6 @@ fun NoteCard(n: NoteEntity, selected: Boolean, onClick: () -> Unit, onLong: () -
             }
         }
     }
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun SelectionBar(selected: MutableList<Long>, profile: Profile, onClose: () -> Unit) {
-    val app = rememberApp()
-    val shell = LocalShell.current
-    val scope = rememberCoroutineScope()
-    var more by remember { mutableStateOf(false) }
-    var dialog by remember { mutableStateOf<String?>(null) }
-    suspend fun each(block: suspend (NoteEntity) -> Unit) { selected.toList().forEach { id -> app.db.notes().get(id)?.let { block(it) } } }
-    TopAppBar(
-        navigationIcon = { IconButton(onClick = onClose) { Icon(Icons.Rounded.Close, "Done") } },
-        title = { Text("${selected.size}") },
-        actions = {
-            IconButton(onClick = { scope.launch { val allPinned = selected.all { app.db.notes().get(it)?.pinned == true }; each { NoteOps.save(app, it.copy(pinned = !allPinned)) }; onClose() } }) { Icon(Icons.Outlined.PushPin, "Pin") }
-            IconButton(onClick = { dialog = "color" }) { Icon(Icons.Rounded.Palette, "Color") }
-            IconButton(onClick = { dialog = "labels" }) { Icon(Icons.AutoMirrored.Rounded.Label, "Labels") }
-            IconButton(onClick = { scope.launch { each { NoteOps.save(app, it.copy(archived = !it.archived, pinned = false)) }; shell.toast("Archived"); onClose() } }) { Icon(Icons.Rounded.Archive, "Archive") }
-            Box {
-                IconButton(onClick = { more = true }) { Icon(Icons.Rounded.MoreVert, "More") }
-                DropdownMenu(more, { more = false }) {
-                    DropdownMenuItem(text = { Text("Delete") }, leadingIcon = { Icon(Icons.Rounded.Delete, null) }, onClick = { more = false; scope.launch { each { NoteOps.trash(app, it) }; shell.toast("Moved to Trash"); onClose() } })
-                    DropdownMenuItem(text = { Text("Make a copy") }, leadingIcon = { Icon(Icons.Rounded.ContentCopy, null) }, onClick = { more = false; scope.launch { each { NoteOps.copy(app, it) }; onClose() } })
-                    DropdownMenuItem(text = { Text("Send to notebook") }, leadingIcon = { Icon(Icons.AutoMirrored.Rounded.MenuBook, null) }, onClick = { more = false; dialog = "toPage" })
-                    DropdownMenuItem(text = { Text("Move to top") }, leadingIcon = { Icon(Icons.Rounded.VerticalAlignTop, null) }, onClick = { more = false; scope.launch { each { n -> NoteOps.save(app, n.copy(sortOrder = (app.db.notes().maxOrder(n.profile) ?: 0) + 1)) }; onClose() } })
-                }
-            }
-        },
-    )
-    when (dialog) {
-        "color" -> PaletteSheet(-1, "-", LocalBlColors.current.isDark, onDismiss = { dialog = null }, onColor = { c -> scope.launch { each { NoteOps.save(app, it.copy(color = c)) } } }, onBg = { b -> scope.launch { each { NoteOps.save(app, it.copy(bg = b)) } } })
-        "labels" -> LabelsDialog(profile, emptyList(), onDismiss = { dialog = null }) { add -> scope.launch { each { NoteOps.save(app, it.copy(labels = NoteOps.joinLabels(NoteOps.labels(it) + add))) }; onClose() } }
-        "toPage" -> SectionPickerDialog("Send to notebook section", profile, onDismiss = { dialog = null }) { s ->
-            scope.launch { runCatching { each { NoteOps.toPage(app, it, s.id) } }.onSuccess { shell.toast("Sent to ${s.name}") }.onFailure { shell.toast("Unlock “${s.name}” first") }; onClose() }
-        }
-    }
-}
-
-@Composable
-private fun ManageLabelsDialog(profile: Profile, onDismiss: () -> Unit) {
-    val app = rememberApp()
-    val labels by app.db.notes().observeLabels(profile.name).collectAsState(initial = emptyList())
-    var rename by remember { mutableStateOf<com.blacklab.app.data.NoteLabelEntity?>(null) }
-    var newName by remember { mutableStateOf("") }
-    AlertDialog(onDismissRequest = onDismiss, title = { Text("Edit labels") }, text = {
-        Column {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                OutlinedTextField(newName, { newName = it }, placeholder = { Text("Create new label") }, singleLine = true, modifier = Modifier.weight(1f))
-                IconButton(onClick = { val n = newName.trim(); if (n.isNotEmpty()) app.io { app.db.notes().insertLabel(com.blacklab.app.data.NoteLabelEntity(profile = profile.name, name = n)) }; newName = "" }) { Icon(Icons.Rounded.Check, "Add") }
-            }
-            LazyColumn(Modifier.heightIn(max = 340.dp)) {
-                items(labels, key = { it.id }) { l ->
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.AutoMirrored.Rounded.Label, null, tint = MaterialTheme.colorScheme.onSurfaceVariant); Spacer(Modifier.width(10.dp))
-                        Text(l.name, Modifier.weight(1f))
-                        IconButton(onClick = { rename = l }) { Icon(Icons.Rounded.Edit, "Rename") }
-                        IconButton(onClick = { app.io { NoteOps.deleteLabel(app, profile, l) } }) { Icon(Icons.Rounded.Delete, "Delete") }
-                    }
-                }
-            }
-        }
-    }, confirmButton = { TextButton(onClick = onDismiss) { Text("Done") } })
-    rename?.let { l -> TextInputDialog("Rename label", l.name, "Label", onDismiss = { rename = null }) { n -> app.io { NoteOps.renameLabel(app, profile, l, n) } } }
 }
 
 // ====================================================================== tags summary

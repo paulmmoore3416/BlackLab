@@ -112,6 +112,17 @@ object SettingsSchema {
                 "SHOW" to "Show titles and items", "COUNTS" to "Counts only"),
             bool(Keys.SIG_CONFIRM, "Confirm before signing", "Ask for your fingerprint or screen lock before your saved signature is placed on a document.", d.sigConfirm),
         )),
+        Section("home", "Home dashboard", "home", "Choose which cards appear on Home. Reorder them on the phone in Settings › Home dashboard.",
+            HomeLayout.cards.map { c -> bool(HomeLayout.showKey(c.id), "Show ${c.label}", c.help, true) } + listOf(
+                Def(HomeLayout.ORDER_KEY, Store.STRING, "Card order", "Card ids, comma separated, top to bottom. Leave blank for the default order.", "text", default = "", advanced = true),
+            )),
+        Section("notes", "Notes", "note", "Keep-style notes: lists, reminders, labels and how they show on Home.", listOf(
+            bool(Keys.NOTES_NEW_BOTTOM, "Add new items to bottom", "New list items go at the end of a list; off puts them at the top.", d.notesNewBottom),
+            bool(Keys.NOTES_CHECKED_BOTTOM, "Move checked items to bottom", "Ticked items drop into a Checked section; off leaves them in place, crossed out.", d.notesCheckedBottom),
+            choice(Keys.NOTES_HOME_MODE, "Which notes show on Home", "What the Home Notes card shows.", d.notesHomeMode, "PINNED_RECENT" to "Pinned, then latest", "PINNED" to "Pinned only", "RECENT" to "Latest only"),
+            int(Keys.NOTES_HOME_COUNT, "How many notes on Home", "Number of notes on the Home Notes card.", d.notesHomeCount, 2, 12, 1, "notes"),
+            bool(Keys.NOTES_HOME_BAR, "Take a note bar on Home", "Start a note, list, drawing, voice note or photo note right from Home.", d.notesHomeBar),
+        )),
         Section("assistant", "Assistant", "assistant", "Your personal assistant: personality, brain and behavior.", listOf(
             text(Keys.ASST_NAME, "Assistant name", "What the assistant calls itself.", d.asstName),
             choice(Keys.ASST_PERSONA, "Personality", "How replies are worded.", d.asstPersona, "LAIDBACK" to "Laid-back & funny", "PROFESSIONAL" to "Professional", "CONCISE" to "Just the facts"),

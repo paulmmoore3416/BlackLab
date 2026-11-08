@@ -185,7 +185,20 @@ data class Settings(
     // feel
     val haptics: Boolean = true,
     val reduceMotion: Boolean = false,
-)
+    // Home dashboard: card order and the cards you've hidden (see HomeLayout)
+    val homeOrder: List<String> = HomeLayout.order(""),
+    val homeHidden: Set<String> = emptySet(),
+    // Notes (Keep-style)
+    val notesNewBottom: Boolean = true,
+    val notesCheckedBottom: Boolean = true,
+    val notesHomeCount: Int = 4,
+    /** PINNED_RECENT (pinned first, then latest), PINNED (pinned only) or RECENT. */
+    val notesHomeMode: String = "PINNED_RECENT",
+    val notesHomeBar: Boolean = true,
+) {
+    /** Visible dashboard cards in order. */
+    val homeCards: List<String> get() = homeOrder.filter { it !in homeHidden }
+}
 
 object Keys {
     const val ONBOARDED = "onboarded"
@@ -332,6 +345,11 @@ object Keys {
     const val SIG_CONFIRM = "sig_confirm"
     const val HAPTICS = "haptics"
     const val REDUCE_MOTION = "reduce_motion"
+    const val NOTES_NEW_BOTTOM = "notes_new_bottom"
+    const val NOTES_CHECKED_BOTTOM = "notes_checked_bottom"
+    const val NOTES_HOME_COUNT = "notes_home_count"
+    const val NOTES_HOME_MODE = "notes_home_mode"
+    const val NOTES_HOME_BAR = "notes_home_bar"
 }
 
 class SettingsRepository(context: Context) {
@@ -499,6 +517,13 @@ class SettingsRepository(context: Context) {
             sigConfirm = getBoolean(Keys.SIG_CONFIRM, d.sigConfirm),
             haptics = getBoolean(Keys.HAPTICS, d.haptics),
             reduceMotion = getBoolean(Keys.REDUCE_MOTION, d.reduceMotion),
+            homeOrder = HomeLayout.order(getString(HomeLayout.ORDER_KEY, "")),
+            homeHidden = HomeLayout.cards.map { it.id }.filter { !getBoolean(HomeLayout.showKey(it), true) }.toSet(),
+            notesNewBottom = getBoolean(Keys.NOTES_NEW_BOTTOM, d.notesNewBottom),
+            notesCheckedBottom = getBoolean(Keys.NOTES_CHECKED_BOTTOM, d.notesCheckedBottom),
+            notesHomeCount = getInt(Keys.NOTES_HOME_COUNT, d.notesHomeCount).coerceIn(2, 12),
+            notesHomeMode = getString(Keys.NOTES_HOME_MODE, d.notesHomeMode) ?: d.notesHomeMode,
+            notesHomeBar = getBoolean(Keys.NOTES_HOME_BAR, d.notesHomeBar),
         )
     }
 }

@@ -2,6 +2,20 @@
 
 All notable changes to BlackLab are documented here. The project follows [Semantic Versioning](https://semver.org/).
 
+## [5.9.0] — 2026-11-07
+
+Notes gets its own section, and you choose what's on Home.
+
+### Added
+- **Notes**: a dedicated, Google Keep-style section (side menu › Notes). Search pill with grid/list toggle and account bubble; a Keep side menu with Notes, Reminders, your labels, Archive and Deleted; a bottom bar to start a list, drawing, voice note, picture or photo note, plus a **+** button. Pinned / Others, Reminders split into Upcoming / Sent, **swipe a note to archive** (with Undo), multi-select to pin, remind, color, label, archive, delete, copy, send or file into a notebook. Search opens on Types (reminders, lists, images, voice, drawings, URLs), Labels and Colors, then narrows as you type. Starting a note from a label view applies that label.
+- **Undo / redo** in the note editor, plus Keep's list options: **Add new items to bottom** and **Move checked items to bottom**.
+- **Notes card on Home**: a Take a note bar and your pinned and latest notes, two across. Choose pinned-then-latest, pinned only or latest only, and how many.
+- **Settings › Home dashboard**: turn each of the 13 Home cards on or off and move them up or down; **Customize Home** at the bottom of Home goes straight there. The same switches appear in the desktop's settings.
+- The assistant opens Notes ("open notes").
+
+### Changed
+- Brainstorm keeps Notebooks and Tags; its notes now live in Notes (old links to Brainstorm › Notes open Notes).
+
 ## [5.8.1] — 2026-11-07
 
 BlackLab Desktop catches up with the app.

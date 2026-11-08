@@ -74,17 +74,21 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
 
+/** One undo step: the note's text and list as they were. */
+private data class NoteSnap(val title: String, val body: String, val items: List<NoteItem>, val checklist: Boolean)
+
 fun noteColor(index: Int, dark: Boolean): Color? = NoteStyle.colors.getOrNull(index)?.let { c -> if (c.light == 0L) null else Color(if (dark) c.dark else c.light) }
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
-fun NoteEditorScreen(noteId: Long, kind: String = "") {
+fun NoteEditorScreen(noteId: Long, kind: String = "", label: String = "") {
     val app = rememberApp()
     val shell = LocalShell.current
     val ctx = LocalContext.current
     val scope = rememberCoroutineScope()
     val dark = LocalBlColors.current.isDark
-    val profile = settingsState().activeProfile
+    val settings = settingsState()
+    val profile = settings.activeProfile
     val dao = app.db.notes()
 
     var note by remember { mutableStateOf<NoteEntity?>(null) }
@@ -103,13 +107,19 @@ fun NoteEditorScreen(noteId: Long, kind: String = "") {
     var editDrawing by remember { mutableStateOf<NoteAttachment?>(null) }
     var bigImage by remember { mutableStateOf<NoteAttachment?>(null) }
     val bodyFocus = remember { FocusRequester() }
+    // Undo / redo, like Keep: text and list snapshots, committed after each pause in typing
+    val undoStack = remember { mutableStateListOf<NoteSnap>() }
+    val redoStack = remember { mutableStateListOf<NoteSnap>() }
+    var lastSnap by remember { mutableStateOf<NoteSnap?>(null) }
+    fun snap() = NoteSnap(title, body, items.toList(), note?.checklist == true)
 
     // ---- load or create
     LaunchedEffect(noteId) {
-        val n = if (noteId > 0) dao.get(noteId) else NoteEntity(profile = profile.name, checklist = kind == "checklist")
+        val n = if (noteId > 0) dao.get(noteId) else NoteEntity(profile = profile.name, checklist = kind == "checklist", labels = if (label.isNotBlank()) NoteOps.joinLabels(listOf(label)) else "")
         if (n == null) { shell.back(); return@LaunchedEffect }
         note = n; title = n.title; body = n.body; items.clear(); items.addAll(NoteOps.items(n)); lastSavedAt = n.updatedAt; lastWritten = n.items to n.body
         if (kind == "checklist" && items.isEmpty()) { items.add(NoteItem("")); focusItem = 0 }
+        lastSnap = snap()
         when (kind) { "drawing" -> dialog = "drawing"; "voice" -> dialog = "voice"; "image" -> dialog = "pickImage"; "camera" -> dialog = "camera" }
     }
 
@@ -124,7 +134,18 @@ fun NoteEditorScreen(noteId: Long, kind: String = "") {
         if (saved != null) { note = saved; lastSavedAt = saved.updatedAt }
     }
     fun update(block: (NoteEntity) -> NoteEntity) { note = note?.let(block); edits++ }
-    LaunchedEffect(edits) { if (edits > 0) { delay(500); saveNow() } }
+    fun commitSnap() {
+        val cur = snap(); val prev = lastSnap
+        if (prev != null && prev != cur) { undoStack.add(prev); if (undoStack.size > 100) undoStack.removeAt(0); redoStack.clear() }
+        lastSnap = cur
+    }
+    fun restore(sn: NoteSnap) {
+        title = sn.title; body = sn.body; items.clear(); items.addAll(sn.items); note = note?.copy(checklist = sn.checklist)
+        lastSnap = sn; focusItem = -1; edits++
+    }
+    fun undo() { commitSnap(); if (undoStack.isEmpty()) return; lastSnap?.let { redoStack.add(it) }; restore(undoStack.removeAt(undoStack.lastIndex)) }
+    fun redo() { commitSnap(); if (redoStack.isEmpty()) return; lastSnap?.let { undoStack.add(it) }; restore(redoStack.removeAt(redoStack.lastIndex)) }
+    LaunchedEffect(edits) { if (edits > 0) { delay(500); commitSnap(); saveNow() } }
 
     // guests (Live Share) can tick items; adopt their changes when we aren't mid-edit
     val live by remember(note?.id) { dao.observeNote(note?.id ?: -1) }.collectAsState(initial = null)
@@ -132,6 +153,7 @@ fun NoteEditorScreen(noteId: Long, kind: String = "") {
         val l = live ?: return@LaunchedEffect
         if (note?.id == l.id && (l.items to l.body) != lastWritten) {
             items.clear(); items.addAll(NoteOps.items(l)); body = l.body; note = l; lastSavedAt = l.updatedAt; lastWritten = l.items to l.body
+            lastSnap = snap()
         }
     }
 
@@ -213,6 +235,9 @@ fun NoteEditorScreen(noteId: Long, kind: String = "") {
                         }
                     }
                     IconButton(onClick = { dialog = "palette" }) { Icon(Icons.Rounded.Palette, "Background options") }
+                    val canUndo = undoStack.isNotEmpty() || (lastSnap != null && lastSnap != snap())
+                    IconButton(onClick = { undo() }, enabled = canUndo) { Icon(Icons.AutoMirrored.Rounded.Undo, "Undo") }
+                    IconButton(onClick = { redo() }, enabled = redoStack.isNotEmpty()) { Icon(Icons.AutoMirrored.Rounded.Redo, "Redo") }
                     Text(if (n != null && n.id != 0L) "Edited " + Time.time(n.updatedAt) else "", style = MaterialTheme.typography.labelSmall, color = onBg.copy(alpha = 0.7f),
                         modifier = Modifier.weight(1f), textAlign = androidx.compose.ui.text.style.TextAlign.Center)
                     Box {
@@ -222,7 +247,7 @@ fun NoteEditorScreen(noteId: Long, kind: String = "") {
                                 menu = false; scope.launch { saveNow(); note?.takeIf { it.id != 0L }?.let { NoteOps.trash(app, it) }; shell.toast("Note moved to trash"); shell.back() }
                             })
                             DropdownMenuItem(text = { Text("Make a copy") }, leadingIcon = { Icon(Icons.Rounded.ContentCopy, null) }, onClick = {
-                                menu = false; scope.launch { saveNow(); note?.takeIf { it.id != 0L }?.let { val id = NoteOps.copy(app, it); shell.toast("Copied"); shell.nav.navigate("note/$id") { popUpTo("note/{id}?kind={kind}") { inclusive = true } } } }
+                                menu = false; scope.launch { saveNow(); note?.takeIf { it.id != 0L }?.let { val id = NoteOps.copy(app, it); shell.toast("Copied"); shell.nav.navigate("note/$id") { popUpTo("note/{id}?kind={kind}&label={label}") { inclusive = true } } } }
                             })
                             DropdownMenuItem(text = { Text("Send") }, leadingIcon = { Icon(Icons.AutoMirrored.Rounded.Send, null) }, onClick = {
                                 menu = false; current()?.let { c ->
@@ -288,8 +313,19 @@ fun NoteEditorScreen(noteId: Long, kind: String = "") {
                         modifier = Modifier.fillMaxWidth().heightIn(min = 200.dp).focusRequester(bodyFocus),
                         decorationBox = { inner -> Box { if (body.isEmpty()) Text("Note", fontSize = 16.sp, color = onBg.copy(alpha = 0.45f)); inner() } })
                 } else {
-                    val open = items.withIndex().filter { !it.value.done }
-                    val done = items.withIndex().filter { it.value.done }
+                    val checkedBottom = settings.notesCheckedBottom
+                    val open = items.withIndex().filter { !checkedBottom || !it.value.done }
+                    val done = if (checkedBottom) items.withIndex().filter { it.value.done } else emptyList()
+                    val addAt = if (settings.notesNewBottom) open.lastOrNull()?.index?.plus(1) ?: items.size else 0
+                    val addRow: androidx.compose.foundation.lazy.LazyListScope.() -> Unit = {
+                        item(key = "addItem") {
+                            Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).clickable { items.add(addAt, NoteItem("")); focusItem = addAt; edits++ }.padding(vertical = 10.dp, horizontal = 4.dp),
+                                verticalAlignment = Alignment.CenterVertically) {
+                                Icon(Icons.Rounded.Add, null, tint = onBg.copy(alpha = 0.6f)); Spacer(Modifier.width(12.dp)); Text("List item", color = onBg.copy(alpha = 0.6f))
+                            }
+                        }
+                    }
+                    if (!settings.notesNewBottom) addRow()
                     items(open, key = { "o${it.index}" }) { (i, it) ->
                         ChecklistRow(it, onBg, focus = focusItem == i, onFocused = { focusItem = i },
                             onText = { t ->
@@ -301,18 +337,13 @@ fun NoteEditorScreen(noteId: Long, kind: String = "") {
                                 } else items[i] = it.copy(text = t)
                                 edits++
                             },
-                            onCheck = { items[i] = it.copy(done = true); edits++ },
+                            onCheck = { d -> items[i] = it.copy(done = d); edits++ },
                             onIndent = { d -> items[i] = it.copy(indent = (it.indent + d).coerceIn(0, 1)); edits++ },
                             onDelete = { items.removeAt(i); focusItem = (i - 1).coerceAtLeast(-1); edits++ },
                             onUp = { if (i > 0) { items.add(i - 1, items.removeAt(i)); focusItem = i - 1; edits++ } },
                             onDown = { if (i < items.lastIndex) { items.add(i + 1, items.removeAt(i)); focusItem = i + 1; edits++ } })
                     }
-                    item(key = "addItem") {
-                        Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).clickable { items.add(open.lastOrNull()?.index?.plus(1) ?: items.size, NoteItem("")); focusItem = open.lastOrNull()?.index?.plus(1) ?: (items.size - 1); edits++ }.padding(vertical = 10.dp, horizontal = 4.dp),
-                            verticalAlignment = Alignment.CenterVertically) {
-                            Icon(Icons.Rounded.Add, null, tint = onBg.copy(alpha = 0.6f)); Spacer(Modifier.width(12.dp)); Text("List item", color = onBg.copy(alpha = 0.6f))
-                        }
-                    }
+                    if (settings.notesNewBottom) addRow()
                     if (done.isNotEmpty()) {
                         item(key = "doneHeader") {
                             HorizontalDivider(color = onBg.copy(alpha = 0.15f))
@@ -411,12 +442,12 @@ fun NoteEditorScreen(noteId: Long, kind: String = "") {
 }
 
 @Composable
-private fun ChecklistRow(it: NoteItem, onBg: Color, focus: Boolean, onFocused: () -> Unit, onText: (String) -> Unit, onCheck: () -> Unit, onIndent: (Int) -> Unit, onDelete: () -> Unit, onUp: () -> Unit, onDown: () -> Unit) {
+private fun ChecklistRow(it: NoteItem, onBg: Color, focus: Boolean, onFocused: () -> Unit, onText: (String) -> Unit, onCheck: (Boolean) -> Unit, onIndent: (Int) -> Unit, onDelete: () -> Unit, onUp: () -> Unit, onDown: () -> Unit) {
     val fr = remember { FocusRequester() }
     LaunchedEffect(focus) { if (focus) runCatching { fr.requestFocus() } }
     Row(Modifier.fillMaxWidth().padding(start = (it.indent * 24).dp), verticalAlignment = Alignment.CenterVertically) {
-        Checkbox(false, { onCheck() })
-        BasicTextField(it.text, onText, textStyle = TextStyle(fontSize = 16.sp, color = onBg), cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
+        Checkbox(it.done, { c -> onCheck(c) })
+        BasicTextField(it.text, onText, textStyle = TextStyle(fontSize = 16.sp, color = if (it.done) onBg.copy(alpha = 0.55f) else onBg, textDecoration = if (it.done) TextDecoration.LineThrough else null), cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
             keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences),
             modifier = Modifier.weight(1f).focusRequester(fr).onFocusChanged { f -> if (f.isFocused) onFocused() }.padding(vertical = 8.dp))
         if (focus) {

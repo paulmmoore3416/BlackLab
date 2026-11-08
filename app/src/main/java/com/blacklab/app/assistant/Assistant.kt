@@ -312,7 +312,7 @@ class Assistant(private val app: AppContainer) {
             ?.let { r -> return devDocs(r.groupValues.drop(1).first { it.isNotBlank() }) }
 
         // ---- navigation
-        m("^(?:open|go to|show(?: me)?|launch|take me to|pull up)(?: the| my)? (home|dashboard|tasks|to-?do|todos|schedule|calendar|education|learn|courses|certifications|library|files|photos|videos|recordings|scans|documents|docs|journal|recorder|dictation|settings|camera|assistant)$")
+        m("^(?:open|go to|show(?: me)?|launch|take me to|pull up)(?: the| my)? (home|dashboard|tasks|to-?do|todos|schedule|calendar|education|learn|courses|certifications|library|files|photos|videos|recordings|scans|documents|docs|journal|notes|keep|brainstorm|recorder|dictation|settings|camera|assistant)$")
             ?.let { r -> return navigate(r.groupValues[1].lowercase()) }
 
         // ---- feature: Ask my files
@@ -707,7 +707,7 @@ User: $text"""
             "home", "dashboard" -> "home"; "tasks", "to-do", "todo", "todos" -> "tasks"; "schedule", "calendar" -> "schedule"
             "education", "learn", "courses" -> "education"; "certifications" -> "education?tab=Certifications"
             "library", "files" -> "library"; "photos" -> "library?tab=PHOTOS"; "videos" -> "library?tab=VIDEOS"; "recordings" -> "library?tab=RECORDINGS"; "scans" -> "library?tab=SCANS"
-            "documents", "docs" -> "documents"; "journal" -> "journal"; "recorder" -> "recorder"; "dictation" -> "dictation"
+            "documents", "docs" -> "documents"; "journal" -> "journal"; "notes", "keep" -> "notes"; "brainstorm" -> "brainstorm"; "recorder" -> "recorder"; "dictation" -> "dictation"
             "settings" -> "settings"; "camera" -> "camera?mode=photo"; else -> "assistant"
         }
         return Reply("Opening ${target.replaceFirstChar { it.uppercase() }}.", route = route, speak = false)

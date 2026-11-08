@@ -128,6 +128,20 @@ fun SettingsScreen() {
                     }
                 }
             }
+            item {
+                BlCard(Modifier.fillMaxWidth().padding(top = 8.dp), onClick = { shell.go("settings/dashboard") }) {
+                    Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                        androidx.compose.material3.Icon(Icons.Rounded.Dashboard, null, tint = MaterialTheme.colorScheme.primary)
+                        Spacer(Modifier.padding(start = 12.dp))
+                        Column(Modifier.weight(1f)) {
+                            Text("Home dashboard", style = MaterialTheme.typography.titleSmall)
+                            Text("Choose what's on Home: ${s.homeCards.size} of ${s.homeOrder.size} cards shown · order, Notes card and list options",
+                                style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                        androidx.compose.material3.Icon(Icons.Rounded.ChevronRight, null)
+                    }
+                }
+            }
             item { SectionHeader("You") }
             item { SettingRow("Name", s.userName.ifBlank { "Not set" }, Icons.Rounded.Badge) { edit = Triple(Keys.USER_NAME, "Your name", s.userName) } }
             item { SettingRow("Job title", s.jobTitle.ifBlank { "Not set" }, Icons.Rounded.Work) { edit = Triple(Keys.JOB_TITLE, "Job title", s.jobTitle) } }

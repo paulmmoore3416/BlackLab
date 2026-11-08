@@ -26,6 +26,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.MenuBook
+import androidx.compose.material.icons.automirrored.rounded.StickyNote2
 import androidx.compose.material.icons.rounded.*
 import androidx.compose.material.icons.outlined.CalendarMonth
 import androidx.compose.ui.input.nestedscroll.nestedScroll
@@ -147,6 +148,7 @@ private val drawerDests = listOf(
     Dest("dictation", "Dictation", Icons.Rounded.RecordVoiceOver),
     Dest("library", "Library & Files", Icons.Rounded.Folder),
     Dest("create", "Create & Edit", Icons.Rounded.AddCircle),
+    Dest("notes", "Notes", Icons.AutoMirrored.Rounded.StickyNote2),
     Dest("brainstorm", "Brainstorm", Icons.Rounded.Lightbulb),
     Dest("documents", "Documents", Icons.Rounded.Description),
     Dest("signatures", "Signatures", Icons.Rounded.Draw),
@@ -384,7 +386,12 @@ private fun NavGraph(nav: androidx.navigation.NavHostController) {
         screen("music") { com.blacklab.app.ui.music.MusicScreen() }
         screen("create") { com.blacklab.app.ui.create.CreateScreen() }
         screen("brainstorm?tab={tab}", arguments = listOf(navArgument("tab") { defaultValue = "" })) {
-            com.blacklab.app.ui.brainstorm.BrainstormScreen(it.arguments?.getString("tab") ?: "")
+            val tab = it.arguments?.getString("tab") ?: ""
+            // Keep-style notes moved out of Brainstorm into their own section
+            if (tab == "notes") com.blacklab.app.ui.notes.NotesScreen() else com.blacklab.app.ui.brainstorm.BrainstormScreen(tab)
+        }
+        screen("notes?view={view}", arguments = listOf(navArgument("view") { defaultValue = "" })) {
+            com.blacklab.app.ui.notes.NotesScreen(Uri.decode(it.arguments?.getString("view") ?: ""))
         }
         screen("notebook/{id}?section={section}", arguments = listOf(navArgument("id") { type = NavType.LongType }, navArgument("section") { type = NavType.LongType; defaultValue = 0L })) {
             com.blacklab.app.ui.brainstorm.NotebookScreen(it.arguments?.getLong("id") ?: 0, it.arguments?.getLong("section") ?: 0)
@@ -392,8 +399,8 @@ private fun NavGraph(nav: androidx.navigation.NavHostController) {
         screen("page/{id}", arguments = listOf(navArgument("id") { type = NavType.LongType })) {
             com.blacklab.app.ui.brainstorm.PageEditorScreen(it.arguments?.getLong("id") ?: 0)
         }
-        screen("note/{id}?kind={kind}", arguments = listOf(navArgument("id") { type = NavType.LongType }, navArgument("kind") { defaultValue = "" })) {
-            com.blacklab.app.ui.brainstorm.NoteEditorScreen(it.arguments?.getLong("id") ?: 0, it.arguments?.getString("kind") ?: "")
+        screen("note/{id}?kind={kind}&label={label}", arguments = listOf(navArgument("id") { type = NavType.LongType }, navArgument("kind") { defaultValue = "" }, navArgument("label") { defaultValue = "" })) {
+            com.blacklab.app.ui.brainstorm.NoteEditorScreen(it.arguments?.getLong("id") ?: 0, it.arguments?.getString("kind") ?: "", Uri.decode(it.arguments?.getString("label") ?: ""))
         }
         screen("audioedit?path={path}", arguments = listOf(navArgument("path") { defaultValue = "" })) {
             com.blacklab.app.ui.audioedit.AudioEditorScreen(Uri.decode(it.arguments?.getString("path") ?: ""))
@@ -459,6 +466,7 @@ private fun NavGraph(nav: androidx.navigation.NavHostController) {
             ReviewScreen(it.arguments?.getLong("id") ?: 0)
         }
         screen("settings") { SettingsScreen() }
+        screen("settings/dashboard") { com.blacklab.app.ui.settings.DashboardSettingsScreen() }
         screen("updates") { com.blacklab.app.ui.settings.UpdatesScreen() }
         screen("diagnostics") { com.blacklab.app.ui.settings.DiagnosticsScreen() }
         screen("assistant?listen={listen}", arguments = listOf(navArgument("listen") { type = NavType.BoolType; defaultValue = false })) {
@@ -548,7 +556,7 @@ private fun ShareIntake() {
                         app.io {
                             com.blacklab.app.brainstorm.NoteOps.save(app, com.blacklab.app.data.NoteEntity(profile = profile.name, title = (p.subject ?: "").take(120), body = p.text))
                         }
-                        shell.toast("Saved to Brainstorm notes", "Open") { shell.go("brainstorm?tab=notes") }; dismiss()
+                        shell.toast("Saved to Notes", "Open") { shell.go("notes") }; dismiss()
                     }, modifier = Modifier.fillMaxWidth()) { Text("Save as note") }
                     Button(onClick = {
                         val html = ContentStore.textToHtml(p.text)

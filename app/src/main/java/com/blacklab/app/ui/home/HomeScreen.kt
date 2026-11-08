@@ -207,255 +207,293 @@ fun HomeScreen() {
             Text(Time.longDate(today) + (s.jobTitle.takeIf { it.isNotBlank() && profile.name == "PROFESSIONAL" }?.let { " · $it" } ?: ""),
                 style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
-        item {
-            // Ask bar: tap to type, mic to talk, sparkle for a spoken briefing
-            Surface(
-                onClick = { shell.go("assistant") },
-                shape = RoundedCornerShape(28.dp),
-                color = MaterialTheme.colorScheme.surfaceContainerHigh,
-                modifier = Modifier.fillMaxWidth().padding(top = 14.dp),
-            ) {
-                Row(Modifier.padding(start = 18.dp, end = 6.dp, top = 6.dp, bottom = 6.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Rounded.AutoAwesome, null, tint = MaterialTheme.colorScheme.primary)
-                    Text("Ask ${s.asstName}…", Modifier.weight(1f).padding(start = 12.dp), color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    IconButton(onClick = {
-                        app.appScope.launch {
-                            val text = com.blacklab.app.assistant.Briefing.build(app, s.asstPersona)
-                            app.assistant.post(text, source = "Daily briefing · on-device")
-                            app.speaker.speak(text)
-                        }
-                        shell.go("assistant")
-                    }) { Icon(Icons.Rounded.WbSunny, "Brief me", tint = Amber.readable()) }
-                    androidx.compose.material3.FilledIconButton(onClick = { shell.go("assistant?listen=true") }) { Icon(Icons.Rounded.Mic, "Talk") }
-                }
-            }
-        }
-        item {
-            // Smart tools: summarize anything, talk through the knowledge bases, the Santa Fe
-            Row(Modifier.fillMaxWidth().padding(top = 10.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                listOf(
-                    Triple("Summarize", Icons.Rounded.Summarize, "summarize"),
-                    Triple("Talk", Icons.Rounded.Forum, "knowledge"),
-                    Triple("Garage", Icons.Rounded.DirectionsCar, "garage"),
-                ).forEach { (label, icon, route) ->
-                    Surface(onClick = { shell.go(route) }, shape = RoundedCornerShape(16.dp), color = MaterialTheme.colorScheme.surfaceContainer, modifier = Modifier.weight(1f)) {
-                        Row(Modifier.padding(horizontal = 12.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.Center) {
-                            Icon(icon, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
-                            Text(label, Modifier.padding(start = 6.dp), style = MaterialTheme.typography.labelLarge)
+        // Cards in the order chosen in Settings › Home dashboard; hidden ones are skipped
+        s.homeCards.forEach { card -> when (card) {
+            "ask" -> {
+                item {
+                    // Ask bar: tap to type, mic to talk, sparkle for a spoken briefing
+                    Surface(
+                        onClick = { shell.go("assistant") },
+                        shape = RoundedCornerShape(28.dp),
+                        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                        modifier = Modifier.fillMaxWidth().padding(top = 14.dp),
+                    ) {
+                        Row(Modifier.padding(start = 18.dp, end = 6.dp, top = 6.dp, bottom = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Rounded.AutoAwesome, null, tint = MaterialTheme.colorScheme.primary)
+                            Text("Ask ${s.asstName}…", Modifier.weight(1f).padding(start = 12.dp), color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            IconButton(onClick = {
+                                app.appScope.launch {
+                                    val text = com.blacklab.app.assistant.Briefing.build(app, s.asstPersona)
+                                    app.assistant.post(text, source = "Daily briefing · on-device")
+                                    app.speaker.speak(text)
+                                }
+                                shell.go("assistant")
+                            }) { Icon(Icons.Rounded.WbSunny, "Brief me", tint = Amber.readable()) }
+                            androidx.compose.material3.FilledIconButton(onClick = { shell.go("assistant?listen=true") }) { Icon(Icons.Rounded.Mic, "Talk") }
                         }
                     }
                 }
             }
-        }
-        if (dict.active) item {
-            Surface(onClick = { shell.go("dictation") }, shape = RoundedCornerShape(18.dp), color = Color(0xFF8B6CFF).copy(alpha = 0.18f), modifier = Modifier.fillMaxWidth().padding(top = 12.dp)) {
-                Row(Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Box(Modifier.size(10.dp).clip(CircleShape).background(Color(0xFF8B6CFF)))
-                    Spacer(Modifier.width(10.dp))
-                    Text(when (dict.status) { com.blacklab.app.dictation.DictState.Status.STANDBY -> "Dictation standby"; com.blacklab.app.dictation.DictState.Status.PAUSED -> "Dictation paused"; else -> "Dictating" }, Modifier.weight(1f), fontWeight = FontWeight.SemiBold)
-                    Text(Time.duration(dict.elapsedMs), style = com.blacklab.app.ui.theme.MonoDigits, fontWeight = FontWeight.Bold)
-                }
-            }
-        }
-        if (rec.status != RecState.Status.IDLE) item {
-            Surface(onClick = { shell.go("recorder") }, shape = RoundedCornerShape(16.dp), color = Color(0xFFE53935).copy(alpha = 0.18f), modifier = Modifier.fillMaxWidth().padding(top = 12.dp)) {
-                Row(Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Box(Modifier.size(10.dp).clip(CircleShape).background(Color(0xFFE53935)))
-                    Spacer(Modifier.width(10.dp))
-                    Text(if (rec.status == RecState.Status.PAUSED) "Recording paused" else "Recording in progress", Modifier.weight(1f), fontWeight = FontWeight.SemiBold)
-                    Text(Time.duration(rec.elapsedMs), fontWeight = FontWeight.Bold)
-                }
-            }
-        }
-        // Weather + facility prep (OpenWeatherMap)
-        weather?.let { w ->
-            item {
-                val alerts = remember(w) { com.blacklab.app.assistant.Weather.alerts(w) }
-                val c = if (alerts.isNotEmpty()) Color(0xFFFFB74D) else MaterialTheme.colorScheme.primary
-                Surface(onClick = { shell.go(if (alerts.isNotEmpty()) "tasks" else "assistant/settings") }, shape = RoundedCornerShape(16.dp), color = c.copy(alpha = 0.14f), modifier = Modifier.fillMaxWidth().padding(top = 12.dp)) {
-                    Row(Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Text("${w.now.tempF.toInt()}°", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
-                        Spacer(Modifier.width(12.dp))
-                        Column(Modifier.weight(1f)) {
-                            Text(w.now.condition + (w.now.place.takeIf { it.isNotBlank() }?.let { " · $it" } ?: ""), fontWeight = FontWeight.SemiBold, maxLines = 1)
-                            Text(alerts.firstOrNull()?.let { "⚠ ${it.title}" } ?: "High ${w.highF.toInt()}° · low ${w.lowF.toInt()}°", style = MaterialTheme.typography.labelMedium,
-                                color = if (alerts.isNotEmpty()) com.blacklab.app.ui.theme.LocalBlColors.current.warning else MaterialTheme.colorScheme.onSurfaceVariant)
-                        }
-                    }
-                }
-            }
-        }
-        // Behavioral Health: on shift / rounds due — counts only, never initials or rooms
-        if (!bh.prefs.hideOnHome && (bh.roundsOn || bh.activeShift != null)) item {
-            val over = com.blacklab.app.bh.Rounds.overdue(bh, bhNow).size
-            val next = com.blacklab.app.bh.Rounds.nextDue(bh, bhNow)
-            val c = if (over > 0) Color(0xFFEF5350) else Color(0xFF2BD9A8)
-            Surface(onClick = { shell.go(if (bh.roundsOn) "bh/rounds" else "bh/shift") }, shape = RoundedCornerShape(16.dp), color = c.copy(alpha = 0.16f), modifier = Modifier.fillMaxWidth().padding(top = 12.dp)) {
-                Row(Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Box(Modifier.size(10.dp).clip(CircleShape).background(c))
-                    Spacer(Modifier.width(10.dp))
-                    Text(when {
-                        bh.roundsOn && over > 0 -> "Rounds: $over overdue"
-                        bh.roundsOn && next != null -> if (next <= bhNow) "Rounds due now" else "Next check in ${(next - bhNow) / 60_000 + 1} min"
-                        else -> "On shift" + (bh.activeShift?.let { " · ${it.type}" } ?: "")
-                    }, Modifier.weight(1f), fontWeight = FontWeight.SemiBold)
-                    Text(if (bh.census.isNotEmpty()) "${bh.census.size} on census" else "Shift Hub", style = MaterialTheme.typography.labelLarge)
-                }
-            }
-        }
-        item {
-            Spacer(Modifier.height(16.dp))
-            // 5 × 2 grid of quick actions
-            actions.chunked(5).forEach { row ->
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                    row.forEach { a ->
-                        Column(Modifier.weight(1f).clip(RoundedCornerShape(16.dp)).pressable(onClick = a.onClick, onLongClick = { if (a.more.isNotEmpty()) quickMenu = a else a.onClick() }).padding(vertical = 8.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                            Box(Modifier.size(50.dp).clip(RoundedCornerShape(16.dp)).background(a.color.copy(alpha = 0.16f)), contentAlignment = Alignment.Center) {
-                                Icon(a.icon, a.label, tint = a.color)
-                            }
-                            Text(a.label, style = MaterialTheme.typography.labelSmall, modifier = Modifier.padding(top = 4.dp), maxLines = 1)
-                        }
-                    }
-                }
-            }
-        }
-        if (feed.isNotEmpty()) {
-            item { SectionHeader("Since you last looked", action = "Got it") { feedSince = System.currentTimeMillis(); feedPrefs.edit().putLong("seen_" + profile.name, feedSince).apply() } }
-            item {
-                BlCard(Modifier.fillMaxWidth(), contentPadding = PaddingValues(vertical = 6.dp, horizontal = 6.dp)) {
-                    feed.forEach { f ->
-                        Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).clickable { shell.go(f.route) }.padding(horizontal = 8.dp, vertical = 7.dp), verticalAlignment = Alignment.CenterVertically) {
-                            val (icon, tint) = when (f.kind) {
-                                com.blacklab.app.core.ActivityFeed.Kind.TASK_DONE -> Icons.Rounded.TaskAlt to LocalBlColors.current.success
-                                com.blacklab.app.core.ActivityFeed.Kind.TASK_NEW -> Icons.Rounded.AddTask to MaterialTheme.colorScheme.primary
-                                com.blacklab.app.core.ActivityFeed.Kind.EVENT_NEW -> Icons.Rounded.EventAvailable to MaterialTheme.colorScheme.tertiary
-                                com.blacklab.app.core.ActivityFeed.Kind.REMINDER -> Icons.Rounded.NotificationsActive to LocalBlColors.current.warning
-                                com.blacklab.app.core.ActivityFeed.Kind.RECORDING -> Icons.Rounded.Mic to MaterialTheme.colorScheme.secondary
-                                com.blacklab.app.core.ActivityFeed.Kind.DOCUMENT -> Icons.Rounded.Description to MaterialTheme.colorScheme.primary
-                                com.blacklab.app.core.ActivityFeed.Kind.NOTE -> Icons.Rounded.Lightbulb to MaterialTheme.colorScheme.tertiary
-                                com.blacklab.app.core.ActivityFeed.Kind.COMMENT -> Icons.Rounded.Forum to MaterialTheme.colorScheme.secondary
-                            }
-                            Icon(icon, null, tint = tint, modifier = Modifier.size(20.dp))
-                            Spacer(Modifier.width(12.dp))
-                            Column(Modifier.weight(1f)) {
-                                Text(f.title, maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.bodyMedium)
-                                Text(f.detail, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                            }
-                            Text(Time.ago(f.time), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        }
-                    }
-                }
-            }
-        }
-        item { SectionHeader("Today", action = "Schedule") { shell.go("schedule") } }
-        item {
-            if (dayItems.isEmpty()) BlCard(Modifier.fillMaxWidth()) { Text("Nothing on the calendar today.", color = MaterialTheme.colorScheme.onSurfaceVariant) }
-            else Column {
-                if (upcoming.isEmpty()) BlCard(Modifier.fillMaxWidth()) { Text("All done for today. ✓", color = MaterialTheme.colorScheme.onSurfaceVariant) }
-                upcoming.take(6).forEach { item ->
-                    val live = !item.allDay && item.start <= now && item.end > now
-                    Box {
-                        ItemRow(item, today) { when (item.kind) { CalKind.EVENT -> shell.go("event/${item.refId}"); CalKind.CLASS, CalKind.ASSIGNMENT, CalKind.EXAM -> shell.go("course/${item.refId}"); else -> shell.go("schedule") } }
-                        if (live) Text("NOW", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onPrimary,
-                            modifier = Modifier.align(Alignment.TopEnd).padding(top = 8.dp, end = 10.dp).clip(RoundedCornerShape(50)).background(MaterialTheme.colorScheme.primary).padding(horizontal = 7.dp, vertical = 1.dp))
-                    }
-                }
-                if (finishedToday > 0) Text("✓ $finishedToday finished earlier today", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(start = 6.dp, top = 4.dp))
-            }
-        }
-        item {
-            SectionHeader("Focus · ${focus.size} task(s)" + (if (overdue > 0) " · $overdue overdue" else "") + (if (doneToday > 0) " · $doneToday done" else ""), action = "To-Do") { shell.go("tasks") }
-        }
-        item {
-            BlCard(Modifier.fillMaxWidth().animateContentSize(com.blacklab.app.ui.theme.Motion.emphasized()), contentPadding = PaddingValues(vertical = 4.dp, horizontal = 4.dp)) {
-                if (tasksLoading) com.blacklab.app.ui.components.SkeletonRows(3, Modifier.padding(12.dp))
-                else if (focus.isEmpty()) Text("No tasks due. Add one to My Day from To-Do.", color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(12.dp))
-                focus.take(6).forEach { t ->
-                    val done = t.id in completing
-                    Row(Modifier.fillMaxWidth().sharedCard("task-${t.id}").clip(RoundedCornerShape(10.dp)).clickable { shell.go("task/${t.id}") }, verticalAlignment = Alignment.CenterVertically) {
-                        Checkbox(done, { if (!done) { completing += t.id; haptics.confirm(); app.io { TaskOps.setCompleted(app, t, true) }; shell.toast("Completed “${t.title.take(30)}”") } })
-                        Column(Modifier.weight(1f).alpha(if (done) 0.55f else 1f)) {
-                            Text(t.title, maxLines = 1, overflow = TextOverflow.Ellipsis, textDecoration = if (done) androidx.compose.ui.text.style.TextDecoration.LineThrough else null)
-                            t.dueDay?.let { d ->
-                                Text(Time.relativeDay(LocalDate.ofEpochDay(d)) + (t.dueMinute?.let { " " + Time.time(it) } ?: ""), style = MaterialTheme.typography.labelSmall,
-                                    color = if (d < todayEpoch) LocalBlColors.current.danger else MaterialTheme.colorScheme.onSurfaceVariant)
+            "tools" -> {
+                item {
+                    // Smart tools: summarize anything, talk through the knowledge bases, the Santa Fe
+                    Row(Modifier.fillMaxWidth().padding(top = 10.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        listOf(
+                            Triple("Summarize", Icons.Rounded.Summarize, "summarize"),
+                            Triple("Talk", Icons.Rounded.Forum, "knowledge"),
+                            Triple("Garage", Icons.Rounded.DirectionsCar, "garage"),
+                        ).forEach { (label, icon, route) ->
+                            Surface(onClick = { shell.go(route) }, shape = RoundedCornerShape(16.dp), color = MaterialTheme.colorScheme.surfaceContainer, modifier = Modifier.weight(1f)) {
+                                Row(Modifier.padding(horizontal = 12.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.Center) {
+                                    Icon(icon, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
+                                    Text(label, Modifier.padding(start = 6.dp), style = MaterialTheme.typography.labelLarge)
+                                }
                             }
                         }
-                        if (t.important) Icon(Icons.Rounded.Star, null, tint = Amber.readable(), modifier = Modifier.padding(end = 12.dp).size(18.dp))
                     }
                 }
             }
-        }
-        // Education snapshot
-        val classes = CalendarLogic.classOccurrences(edu.courses, edu.meetings, edu.terms.associateBy { it.id }, today, today.plusDays(6)).filter { it.end > now }
-        val dueSoon = edu.assignments.filter { it.status != "SUBMITTED" && it.status != "GRADED" && it.dueAt != null && Time.toDate(it.dueAt) <= today.plusDays(5) }.sortedBy { it.dueAt }
-        val certAlerts = edu.certs.filter { c -> (c.expiresDay != null && c.expiresDay - todayEpoch in 0..90) || (c.examAt != null && Time.toDate(c.examAt) >= today && Time.toDate(c.examAt) <= today.plusDays(30)) }
-        if (classes.isNotEmpty() || dueSoon.isNotEmpty() || certAlerts.isNotEmpty()) {
-            item { SectionHeader("Learning", action = "Education") { shell.go("education") } }
-            item {
-                BlCard(Modifier.fillMaxWidth()) {
-                    classes.firstOrNull()?.let { o ->
-                        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.clickable { shell.go("course/${o.course.id}") }.padding(vertical = 4.dp)) {
-                            Icon(Icons.Rounded.School, null, tint = Color(o.course.color))
+            "status" -> {
+                if (dict.active) item {
+                    Surface(onClick = { shell.go("dictation") }, shape = RoundedCornerShape(18.dp), color = Color(0xFF8B6CFF).copy(alpha = 0.18f), modifier = Modifier.fillMaxWidth().padding(top = 12.dp)) {
+                        Row(Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Box(Modifier.size(10.dp).clip(CircleShape).background(Color(0xFF8B6CFF)))
                             Spacer(Modifier.width(10.dp))
-                            Column {
-                                Text("Next class: ${o.course.code.ifBlank { o.course.title }}", style = MaterialTheme.typography.titleSmall)
-                                Text("${Time.relativeDay(o.start.toLocalDate())} ${Time.time(o.start)}" + (o.meeting.location.ifBlank { o.course.location }.takeIf { it.isNotBlank() }?.let { " · $it" } ?: ""),
-                                    style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            }
+                            Text(when (dict.status) { com.blacklab.app.dictation.DictState.Status.STANDBY -> "Dictation standby"; com.blacklab.app.dictation.DictState.Status.PAUSED -> "Dictation paused"; else -> "Dictating" }, Modifier.weight(1f), fontWeight = FontWeight.SemiBold)
+                            Text(Time.duration(dict.elapsedMs), style = com.blacklab.app.ui.theme.MonoDigits, fontWeight = FontWeight.Bold)
                         }
                     }
-                    dueSoon.take(3).forEach { a ->
-                        val c = edu.courseById[a.courseId]
-                        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.clickable { shell.go("course/${a.courseId}") }.padding(vertical = 4.dp)) {
-                            Icon(Icons.Rounded.Assignment, null, tint = c?.let { Color(it.color) } ?: Cobalt, modifier = Modifier.size(20.dp))
-                            Spacer(Modifier.width(12.dp))
-                            Text(a.title, Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
-                            Text(Time.relativeDay(Time.toDate(a.dueAt!!)), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        }
-                    }
-                    certAlerts.take(2).forEach { c ->
-                        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.clickable { shell.go("education?tab=Certifications") }.padding(vertical = 4.dp)) {
-                            Icon(Icons.Rounded.WorkspacePremium, null, tint = Amber.readable(), modifier = Modifier.size(20.dp))
-                            Spacer(Modifier.width(12.dp))
-                            Text(c.name.substringBefore(" —"), Modifier.weight(1f), maxLines = 1)
-                            Text(c.examAt?.takeIf { c.status != "EARNED" }?.let { "Exam ${Time.relativeDay(Time.toDate(it))}" } ?: "Renew in ${c.expiresDay!! - todayEpoch}d",
-                                style = MaterialTheme.typography.labelMedium, color = Amber.readable())
+                }
+                if (rec.status != RecState.Status.IDLE) item {
+                    Surface(onClick = { shell.go("recorder") }, shape = RoundedCornerShape(16.dp), color = Color(0xFFE53935).copy(alpha = 0.18f), modifier = Modifier.fillMaxWidth().padding(top = 12.dp)) {
+                        Row(Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Box(Modifier.size(10.dp).clip(CircleShape).background(Color(0xFFE53935)))
+                            Spacer(Modifier.width(10.dp))
+                            Text(if (rec.status == RecState.Status.PAUSED) "Recording paused" else "Recording in progress", Modifier.weight(1f), fontWeight = FontWeight.SemiBold)
+                            Text(Time.duration(rec.elapsedMs), fontWeight = FontWeight.Bold)
                         }
                     }
                 }
             }
-        }
-        if (docs.isNotEmpty()) {
-            item { SectionHeader("Recent documents", action = "All") { shell.go("documents") } }
-            item {
-                LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    items(docs.sortedByDescending { it.updatedAt }.take(8), key = { it.id }) { d ->
-                        Surface(onClick = { shell.go("doc/${d.id}") }, shape = RoundedCornerShape(16.dp), color = MaterialTheme.colorScheme.surfaceContainer, modifier = Modifier.width(150.dp)) {
-                            Column(Modifier.padding(12.dp)) {
-                                Icon(Icons.Rounded.Description, null, tint = MaterialTheme.colorScheme.primary)
-                                Text(d.title, style = MaterialTheme.typography.titleSmall, maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 6.dp))
-                                Text(Time.ago(d.updatedAt), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            "weather" -> {
+                // Weather + facility prep (OpenWeatherMap)
+                weather?.let { w ->
+                    item {
+                        val alerts = remember(w) { com.blacklab.app.assistant.Weather.alerts(w) }
+                        val c = if (alerts.isNotEmpty()) Color(0xFFFFB74D) else MaterialTheme.colorScheme.primary
+                        Surface(onClick = { shell.go(if (alerts.isNotEmpty()) "tasks" else "assistant/settings") }, shape = RoundedCornerShape(16.dp), color = c.copy(alpha = 0.14f), modifier = Modifier.fillMaxWidth().padding(top = 12.dp)) {
+                            Row(Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
+                                Text("${w.now.tempF.toInt()}°", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+                                Spacer(Modifier.width(12.dp))
+                                Column(Modifier.weight(1f)) {
+                                    Text(w.now.condition + (w.now.place.takeIf { it.isNotBlank() }?.let { " · $it" } ?: ""), fontWeight = FontWeight.SemiBold, maxLines = 1)
+                                    Text(alerts.firstOrNull()?.let { "⚠ ${it.title}" } ?: "High ${w.highF.toInt()}° · low ${w.lowF.toInt()}°", style = MaterialTheme.typography.labelMedium,
+                                        color = if (alerts.isNotEmpty()) com.blacklab.app.ui.theme.LocalBlColors.current.warning else MaterialTheme.colorScheme.onSurfaceVariant)
+                                }
                             }
                         }
                     }
                 }
             }
-        }
-        item {
-            SectionHeader("Reflect")
-            BlCard(Modifier.fillMaxWidth(), onClick = { shell.go("journal") }) {
-                Text(promptOfDay(profile), style = MaterialTheme.typography.titleSmall)
-                Text("Open journal", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(top = 4.dp))
+            "bh" -> {
+                // Behavioral Health: on shift / rounds due — counts only, never initials or rooms
+                if (!bh.prefs.hideOnHome && (bh.roundsOn || bh.activeShift != null)) item {
+                    val over = com.blacklab.app.bh.Rounds.overdue(bh, bhNow).size
+                    val next = com.blacklab.app.bh.Rounds.nextDue(bh, bhNow)
+                    val c = if (over > 0) Color(0xFFEF5350) else Color(0xFF2BD9A8)
+                    Surface(onClick = { shell.go(if (bh.roundsOn) "bh/rounds" else "bh/shift") }, shape = RoundedCornerShape(16.dp), color = c.copy(alpha = 0.16f), modifier = Modifier.fillMaxWidth().padding(top = 12.dp)) {
+                        Row(Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Box(Modifier.size(10.dp).clip(CircleShape).background(c))
+                            Spacer(Modifier.width(10.dp))
+                            Text(when {
+                                bh.roundsOn && over > 0 -> "Rounds: $over overdue"
+                                bh.roundsOn && next != null -> if (next <= bhNow) "Rounds due now" else "Next check in ${(next - bhNow) / 60_000 + 1} min"
+                                else -> "On shift" + (bh.activeShift?.let { " · ${it.type}" } ?: "")
+                            }, Modifier.weight(1f), fontWeight = FontWeight.SemiBold)
+                            Text(if (bh.census.isNotEmpty()) "${bh.census.size} on census" else "Shift Hub", style = MaterialTheme.typography.labelLarge)
+                        }
+                    }
+                }
             }
-        }
+            "actions" -> {
+                item {
+                    Spacer(Modifier.height(16.dp))
+                    // 5 × 2 grid of quick actions
+                    actions.chunked(5).forEach { row ->
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                            row.forEach { a ->
+                                Column(Modifier.weight(1f).clip(RoundedCornerShape(16.dp)).pressable(onClick = a.onClick, onLongClick = { if (a.more.isNotEmpty()) quickMenu = a else a.onClick() }).padding(vertical = 8.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                                    Box(Modifier.size(50.dp).clip(RoundedCornerShape(16.dp)).background(a.color.copy(alpha = 0.16f)), contentAlignment = Alignment.Center) {
+                                        Icon(a.icon, a.label, tint = a.color)
+                                    }
+                                    Text(a.label, style = MaterialTheme.typography.labelSmall, modifier = Modifier.padding(top = 4.dp), maxLines = 1)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            "feed" -> {
+                if (feed.isNotEmpty()) {
+                    item { SectionHeader("Since you last looked", action = "Got it") { feedSince = System.currentTimeMillis(); feedPrefs.edit().putLong("seen_" + profile.name, feedSince).apply() } }
+                    item {
+                        BlCard(Modifier.fillMaxWidth(), contentPadding = PaddingValues(vertical = 6.dp, horizontal = 6.dp)) {
+                            feed.forEach { f ->
+                                Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).clickable { shell.go(f.route) }.padding(horizontal = 8.dp, vertical = 7.dp), verticalAlignment = Alignment.CenterVertically) {
+                                    val (icon, tint) = when (f.kind) {
+                                        com.blacklab.app.core.ActivityFeed.Kind.TASK_DONE -> Icons.Rounded.TaskAlt to LocalBlColors.current.success
+                                        com.blacklab.app.core.ActivityFeed.Kind.TASK_NEW -> Icons.Rounded.AddTask to MaterialTheme.colorScheme.primary
+                                        com.blacklab.app.core.ActivityFeed.Kind.EVENT_NEW -> Icons.Rounded.EventAvailable to MaterialTheme.colorScheme.tertiary
+                                        com.blacklab.app.core.ActivityFeed.Kind.REMINDER -> Icons.Rounded.NotificationsActive to LocalBlColors.current.warning
+                                        com.blacklab.app.core.ActivityFeed.Kind.RECORDING -> Icons.Rounded.Mic to MaterialTheme.colorScheme.secondary
+                                        com.blacklab.app.core.ActivityFeed.Kind.DOCUMENT -> Icons.Rounded.Description to MaterialTheme.colorScheme.primary
+                                        com.blacklab.app.core.ActivityFeed.Kind.NOTE -> Icons.Rounded.Lightbulb to MaterialTheme.colorScheme.tertiary
+                                        com.blacklab.app.core.ActivityFeed.Kind.COMMENT -> Icons.Rounded.Forum to MaterialTheme.colorScheme.secondary
+                                    }
+                                    Icon(icon, null, tint = tint, modifier = Modifier.size(20.dp))
+                                    Spacer(Modifier.width(12.dp))
+                                    Column(Modifier.weight(1f)) {
+                                        Text(f.title, maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.bodyMedium)
+                                        Text(f.detail, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                    }
+                                    Text(Time.ago(f.time), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            "notes" -> {
+                item { SectionHeader("Notes", action = "All notes") { shell.go("notes") } }
+                item { com.blacklab.app.ui.notes.NotesDashboardCard(feedNotes, s) }
+            }
+            "today" -> {
+                item { SectionHeader("Today", action = "Schedule") { shell.go("schedule") } }
+                item {
+                    if (dayItems.isEmpty()) BlCard(Modifier.fillMaxWidth()) { Text("Nothing on the calendar today.", color = MaterialTheme.colorScheme.onSurfaceVariant) }
+                    else Column {
+                        if (upcoming.isEmpty()) BlCard(Modifier.fillMaxWidth()) { Text("All done for today. ✓", color = MaterialTheme.colorScheme.onSurfaceVariant) }
+                        upcoming.take(6).forEach { item ->
+                            val live = !item.allDay && item.start <= now && item.end > now
+                            Box {
+                                ItemRow(item, today) { when (item.kind) { CalKind.EVENT -> shell.go("event/${item.refId}"); CalKind.CLASS, CalKind.ASSIGNMENT, CalKind.EXAM -> shell.go("course/${item.refId}"); else -> shell.go("schedule") } }
+                                if (live) Text("NOW", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onPrimary,
+                                    modifier = Modifier.align(Alignment.TopEnd).padding(top = 8.dp, end = 10.dp).clip(RoundedCornerShape(50)).background(MaterialTheme.colorScheme.primary).padding(horizontal = 7.dp, vertical = 1.dp))
+                            }
+                        }
+                        if (finishedToday > 0) Text("✓ $finishedToday finished earlier today", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(start = 6.dp, top = 4.dp))
+                    }
+                }
+            }
+            "focus" -> {
+                item {
+                    SectionHeader("Focus · ${focus.size} task(s)" + (if (overdue > 0) " · $overdue overdue" else "") + (if (doneToday > 0) " · $doneToday done" else ""), action = "To-Do") { shell.go("tasks") }
+                }
+                item {
+                    BlCard(Modifier.fillMaxWidth().animateContentSize(com.blacklab.app.ui.theme.Motion.emphasized()), contentPadding = PaddingValues(vertical = 4.dp, horizontal = 4.dp)) {
+                        if (tasksLoading) com.blacklab.app.ui.components.SkeletonRows(3, Modifier.padding(12.dp))
+                        else if (focus.isEmpty()) Text("No tasks due. Add one to My Day from To-Do.", color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(12.dp))
+                        focus.take(6).forEach { t ->
+                            val done = t.id in completing
+                            Row(Modifier.fillMaxWidth().sharedCard("task-${t.id}").clip(RoundedCornerShape(10.dp)).clickable { shell.go("task/${t.id}") }, verticalAlignment = Alignment.CenterVertically) {
+                                Checkbox(done, { if (!done) { completing += t.id; haptics.confirm(); app.io { TaskOps.setCompleted(app, t, true) }; shell.toast("Completed “${t.title.take(30)}”") } })
+                                Column(Modifier.weight(1f).alpha(if (done) 0.55f else 1f)) {
+                                    Text(t.title, maxLines = 1, overflow = TextOverflow.Ellipsis, textDecoration = if (done) androidx.compose.ui.text.style.TextDecoration.LineThrough else null)
+                                    t.dueDay?.let { d ->
+                                        Text(Time.relativeDay(LocalDate.ofEpochDay(d)) + (t.dueMinute?.let { " " + Time.time(it) } ?: ""), style = MaterialTheme.typography.labelSmall,
+                                            color = if (d < todayEpoch) LocalBlColors.current.danger else MaterialTheme.colorScheme.onSurfaceVariant)
+                                    }
+                                }
+                                if (t.important) Icon(Icons.Rounded.Star, null, tint = Amber.readable(), modifier = Modifier.padding(end = 12.dp).size(18.dp))
+                            }
+                        }
+                    }
+                }
+            }
+            "learning" -> {
+                // Education snapshot
+                val classes = CalendarLogic.classOccurrences(edu.courses, edu.meetings, edu.terms.associateBy { it.id }, today, today.plusDays(6)).filter { it.end > now }
+                val dueSoon = edu.assignments.filter { it.status != "SUBMITTED" && it.status != "GRADED" && it.dueAt != null && Time.toDate(it.dueAt) <= today.plusDays(5) }.sortedBy { it.dueAt }
+                val certAlerts = edu.certs.filter { c -> (c.expiresDay != null && c.expiresDay - todayEpoch in 0..90) || (c.examAt != null && Time.toDate(c.examAt) >= today && Time.toDate(c.examAt) <= today.plusDays(30)) }
+                if (classes.isNotEmpty() || dueSoon.isNotEmpty() || certAlerts.isNotEmpty()) {
+                    item { SectionHeader("Learning", action = "Education") { shell.go("education") } }
+                    item {
+                        BlCard(Modifier.fillMaxWidth()) {
+                            classes.firstOrNull()?.let { o ->
+                                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.clickable { shell.go("course/${o.course.id}") }.padding(vertical = 4.dp)) {
+                                    Icon(Icons.Rounded.School, null, tint = Color(o.course.color))
+                                    Spacer(Modifier.width(10.dp))
+                                    Column {
+                                        Text("Next class: ${o.course.code.ifBlank { o.course.title }}", style = MaterialTheme.typography.titleSmall)
+                                        Text("${Time.relativeDay(o.start.toLocalDate())} ${Time.time(o.start)}" + (o.meeting.location.ifBlank { o.course.location }.takeIf { it.isNotBlank() }?.let { " · $it" } ?: ""),
+                                            style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    }
+                                }
+                            }
+                            dueSoon.take(3).forEach { a ->
+                                val c = edu.courseById[a.courseId]
+                                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.clickable { shell.go("course/${a.courseId}") }.padding(vertical = 4.dp)) {
+                                    Icon(Icons.Rounded.Assignment, null, tint = c?.let { Color(it.color) } ?: Cobalt, modifier = Modifier.size(20.dp))
+                                    Spacer(Modifier.width(12.dp))
+                                    Text(a.title, Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                    Text(Time.relativeDay(Time.toDate(a.dueAt!!)), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                }
+                            }
+                            certAlerts.take(2).forEach { c ->
+                                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.clickable { shell.go("education?tab=Certifications") }.padding(vertical = 4.dp)) {
+                                    Icon(Icons.Rounded.WorkspacePremium, null, tint = Amber.readable(), modifier = Modifier.size(20.dp))
+                                    Spacer(Modifier.width(12.dp))
+                                    Text(c.name.substringBefore(" —"), Modifier.weight(1f), maxLines = 1)
+                                    Text(c.examAt?.takeIf { c.status != "EARNED" }?.let { "Exam ${Time.relativeDay(Time.toDate(it))}" } ?: "Renew in ${c.expiresDay!! - todayEpoch}d",
+                                        style = MaterialTheme.typography.labelMedium, color = Amber.readable())
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            "documents" -> {
+                if (docs.isNotEmpty()) {
+                    item { SectionHeader("Recent documents", action = "All") { shell.go("documents") } }
+                    item {
+                        LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                            items(docs.sortedByDescending { it.updatedAt }.take(8), key = { it.id }) { d ->
+                                Surface(onClick = { shell.go("doc/${d.id}") }, shape = RoundedCornerShape(16.dp), color = MaterialTheme.colorScheme.surfaceContainer, modifier = Modifier.width(150.dp)) {
+                                    Column(Modifier.padding(12.dp)) {
+                                        Icon(Icons.Rounded.Description, null, tint = MaterialTheme.colorScheme.primary)
+                                        Text(d.title, style = MaterialTheme.typography.titleSmall, maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 6.dp))
+                                        Text(Time.ago(d.updatedAt), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            "reflect" -> {
+                item {
+                    SectionHeader("Reflect")
+                    BlCard(Modifier.fillMaxWidth(), onClick = { shell.go("journal") }) {
+                        Text(promptOfDay(profile), style = MaterialTheme.typography.titleSmall)
+                        Text("Open journal", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(top = 4.dp))
+                    }
+                }
+            }
+        } }
         if (!app.storage.isPublic) item {
             BlCard(Modifier.fillMaxWidth().padding(top = 12.dp), accent = Amber) {
                 Text("Files are in app storage", style = MaterialTheme.typography.titleSmall)
                 Text("Allow All-files access so BlackLab can keep everything in Internal storage › BlackLab (visible in Files, kept across reinstalls).",
                     style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 FilledTonalButton(onClick = { shell.go("settings") }, modifier = Modifier.padding(top = 6.dp)) { Text("Fix in Settings") }
+            }
+        }
+        item {
+            Row(Modifier.fillMaxWidth().padding(top = 16.dp), horizontalArrangement = Arrangement.Center) {
+                androidx.compose.material3.TextButton(onClick = { shell.go("settings/dashboard") }) {
+                    Icon(Icons.Rounded.Tune, null, Modifier.size(18.dp)); Spacer(Modifier.width(6.dp)); Text("Customize Home")
+                }
             }
         }
     }
