@@ -1,5 +1,6 @@
 package com.blacklab.app
 
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
@@ -64,7 +65,7 @@ class MainActivity : FragmentActivity() {
         })
 
         setContent {
-            val settings by app.settings.state.collectAsState()
+            val settings by app.settings.state.collectAsStateWithLifecycle()
             val themeMode = com.blacklab.app.ui.theme.rememberThemeMode(settings)
             val dark = when (themeMode) { "LIGHT" -> false; "SYSTEM" -> isSystemInDarkTheme(); else -> true }
             LaunchedEffect(dark) {

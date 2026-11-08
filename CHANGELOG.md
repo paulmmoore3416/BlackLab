@@ -2,6 +2,35 @@
 
 All notable changes to BlackLab are documented here. The project follows [Semantic Versioning](https://semver.org/).
 
+## [5.10.0] — 2026-11-08
+
+Facility gets its own section, backups are encrypted, and the desktop link is locked down.
+
+### Added
+- **Facility** (side menu › Facility): an asset register with QR / asset tags, preventive-maintenance and life-safety inspection schedules, and a log of inspections, work orders and findings.
+  - **Life-safety & PM program**: add common inspections in one step, each with a checklist — extinguishers (monthly, annual · NFPA 10), emergency generator (weekly inspection, monthly 30-minute load test · NFPA 110), emergency & exit lighting (monthly 30-second, annual 90-minute · NFPA 101), eyewash (weekly · ANSI Z358.1), fire alarm (NFPA 72), sprinklers (NFPA 25), fire doors (NFPA 80), kitchen hood suppression, backflow, elevators and filter changes. Every interval is editable; confirm them with your AHJ and accreditor.
+  - **Due** list with overdue and due-soon counts; log an inspection as Pass / Fail / N/A with its checklist, readings, who did it and the date. A failure can create a **work order** in To-Do › Work Orders; any schedule can go to To-Do › Inspections.
+  - **Scan an asset tag** to open that asset, or start a new one with the tag filled in. The code scanner everywhere now offers "Open <asset>" / "New Facility asset with this tag".
+  - **Survey binder (PDF)**: every schedule and its status, the inspection & work log for 30 days to 3 years, deficiencies and the asset register, saved to Professional › Exports.
+  - A daily reminder when inspections come due or go overdue, a **Facility** card on Home (shows only when something is due), and "what inspections are due?" in the assistant.
+- **Settings › Backup passphrase**: backups made after it's set restore on any phone; **Verify latest backup** decrypts and checks a backup without changing anything; **Delete unencrypted backups** removes the old plain `.zip` files.
+
+### Changed
+- **Backups are encrypted** (`.blbackup`, AES-256-GCM) and now also include Garage (vehicles, service, fuel, trips), saved knowledge conversations, playlists, the custom wake word and Facility. Database snapshots are consistent (`VACUUM INTO`). Uploading a backup to Drive uploads the encrypted file.
+- **Restore checks everything first**: it decrypts and unpacks the backup into a scratch folder, checks the database's integrity and version, shows what's in it, and saves your current data as a "before-restore" backup before replacing anything. Backups from a newer BlackLab are refused instead of crashing the app. Old `.zip` backups still restore.
+- **Desktop link over Wi-Fi**: reading files, storing API keys and making backups now work only over the USB (adb) link, and security and link settings (app lock, widget privacy, link and cloud sync switches) can't be changed over Wi-Fi or through Drive. Only BlackLab Desktop's own pages may call the phone from a browser, and the pairing code is never accepted in a URL (desktop downloads send it in a header).
+- The document editor runs only its own script: scripts, event handlers and remote images inside imported documents are blocked.
+- Screens stop watching for changes while BlackLab is in the background.
+
+### Fixed
+- Assistant messages sent at the same moment from the phone and the desktop could overwrite each other, and the history file could be cut short.
+
+### Desktop (companion 1.4.1)
+- After the desktop AI reads a file or document, it only opens links you typed yourself, so a document can't make it open a link that sends data out.
+
+### Project
+- Release APKs are no longer committed (they're attached to GitHub Releases; `releases/` keeps the checksums). CI actions are pinned to commit SHAs, and Dependabot proposes weekly updates for Gradle dependencies and actions.
+
 ## [5.9.0] — 2026-11-07
 
 Notes gets its own section, and you choose what's on Home.

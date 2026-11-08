@@ -1,5 +1,6 @@
 package com.blacklab.app.ui.documents
 
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.blacklab.app.ui.theme.readable
 import android.content.Context
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -145,7 +146,7 @@ fun DocumentsScreen() {
     val ctx = LocalContext.current
     val s = settingsState()
     val profile = s.activeProfile
-    val docs by remember(profile) { app.db.documents().observe(profile.name) }.collectAsState(emptyList())
+    val docs by remember(profile) { app.db.documents().observe(profile.name) }.collectAsStateWithLifecycle(emptyList())
     var folder by rememberSaveable { mutableStateOf("ALL") }
     var query by rememberSaveable { mutableStateOf("") }
     var searching by remember { mutableStateOf(false) }

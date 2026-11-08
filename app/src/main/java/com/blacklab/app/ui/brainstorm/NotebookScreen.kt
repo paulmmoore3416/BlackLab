@@ -1,5 +1,6 @@
 package com.blacklab.app.ui.brainstorm
 
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
@@ -53,12 +54,12 @@ fun NotebookScreen(notebookId: Long, startSection: Long = 0) {
     val scope = rememberCoroutineScope()
     val dao = app.db.brainstorm()
     val prefs = remember { ctx.getSharedPreferences("blacklab_brainstorm", android.content.Context.MODE_PRIVATE) }
-    val notebook by dao.observeNotebook(notebookId).collectAsState(initial = null)
-    val sections by dao.observeSections(notebookId).collectAsState(initial = emptyList())
+    val notebook by dao.observeNotebook(notebookId).collectAsStateWithLifecycle(initialValue = null)
+    val sections by dao.observeSections(notebookId).collectAsStateWithLifecycle(initialValue = emptyList())
     var selected by remember { mutableLongStateOf(if (startSection > 0) startSection else prefs.getLong("nb_${notebookId}_sec", 0L)) }
     val current = sections.firstOrNull { it.id == selected } ?: sections.firstOrNull()
     LaunchedEffect(current?.id) { current?.let { prefs.edit().putLong("nb_${notebookId}_sec", it.id).apply() } }
-    val pages by remember(current?.id) { dao.observePages(current?.id ?: -1) }.collectAsState(initial = emptyList())
+    val pages by remember(current?.id) { dao.observePages(current?.id ?: -1) }.collectAsStateWithLifecycle(initialValue = emptyList())
     var unlockTick by remember { mutableIntStateOf(0) }
     val unlocked = remember(current?.id, unlockTick) { current?.let { !it.locked || SectionKeys.get(it.id) != null } ?: true }
 

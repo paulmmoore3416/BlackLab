@@ -1,5 +1,6 @@
 package com.blacklab.app.ui.summarize
 
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import android.Manifest
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -118,7 +119,7 @@ fun SummarizeScreen() {
     var style by rememberSaveable { mutableStateOf(Summarizer.Style.KEY_POINTS) }
     var length by rememberSaveable { mutableStateOf(Summarizer.Length.MEDIUM) }
     var custom by rememberSaveable { mutableStateOf("") }
-    val speaking by app.speaker.speaking.collectAsState()
+    val speaking by app.speaker.speaking.collectAsStateWithLifecycle()
 
     LaunchedEffect(s.activeProfile) { catalog = SummarySources.catalog(app, s.activeProfile); selected.clear() }
     DisposableEffect(Unit) { onDispose { app.speaker.stop() } }

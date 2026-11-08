@@ -1,5 +1,6 @@
 package com.blacklab.app.ui.settings
 
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import android.Manifest
 import android.content.Intent
@@ -82,16 +83,15 @@ fun SettingsScreen() {
     var timeEdit by remember { mutableStateOf<Pair<String, Int>?>(null) }
     var allFiles by remember { mutableStateOf(app.storage.hasAllFilesAccess) }
     var notifOk by remember { mutableStateOf(NotificationManagerCompat.from(ctx).areNotificationsEnabled()) }
-    var restoreList by remember { mutableStateOf(false) }
     var query by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf("") }
-    var restoreTarget by remember { mutableStateOf<Any?>(null) }
+    val backup = remember { BackupUi(app, shell) }
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) {
         allFiles = app.storage.hasAllFilesAccess
         if (allFiles) app.storage.ensureStructure()
         notifOk = NotificationManagerCompat.from(ctx).areNotificationsEnabled()
+        backup.refresh()
     }
     val notifPerm = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { notifOk = it }
-    val restorePicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri -> if (uri != null) restoreTarget = uri }
     val activity = ctx.findActivity() as? MainActivity
 
     val titleScroll = com.blacklab.app.ui.components.rememberCollapsingTitle()
@@ -227,18 +227,7 @@ fun SettingsScreen() {
                 }
             }
             item { SettingRow("Browse the BlackLab folder", null, Icons.Rounded.FolderOpen) { shell.go("library?tab=BROWSE") } }
-            item {
-                SettingRow("Back up now", if (s.lastBackupDay > 0) "Last backup ${Time.date(java.time.LocalDate.ofEpochDay(s.lastBackupDay))} · BlackLab/Backups" else "Database + settings → BlackLab/Backups", Icons.Rounded.Backup) {
-                    app.io {
-                        val f = runCatching { app.backups.backupNow() }
-                        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
-                            f.onSuccess { shell.toast("Backup saved: ${it.name}", "Share") { Files.share(ctx, listOf(it)) } }.onFailure { shell.toast("Backup failed: ${it.message}") }
-                        }
-                    }
-                }
-            }
-            item { LabeledSwitchRow("Automatic daily backup", "Keeps the 14 most recent", s.autoBackup, icon = Icons.Rounded.Autorenew) { v -> app.settings.update { putBoolean(Keys.AUTO_BACKUP, v) } } }
-            item { SettingRow("Restore from backup", "Replace current data with a backup", Icons.Rounded.Restore) { restoreList = true } }
+            backupItems(backup, s, app) { Files.share(ctx, listOf(it)) }
 
             item { SectionHeader("Notifications") }
             if (!notifOk) item {
@@ -284,7 +273,7 @@ fun SettingsScreen() {
 
             item { SectionHeader("About") }
             item {
-                val upd by com.blacklab.app.update.Updater.state.collectAsState()
+                val upd by com.blacklab.app.update.Updater.state.collectAsStateWithLifecycle()
                 SettingRow("App updates", when (val u = upd) {
                     is com.blacklab.app.update.Updater.State.Available -> "Version ${u.release.version} is available"
                     is com.blacklab.app.update.Updater.State.Verified -> "Version ${u.release.version} is ready to install"
@@ -292,7 +281,7 @@ fun SettingsScreen() {
                 }, Icons.Rounded.SystemUpdate) { shell.go("updates") }
             }
             item {
-                val unseen by com.blacklab.app.core.CrashLog.unseen.collectAsState()
+                val unseen by com.blacklab.app.core.CrashLog.unseen.collectAsStateWithLifecycle()
                 SettingRow("Problem reports", if (unseen > 0) "$unseen new · kept only on this phone" else "Crash and freeze reports, kept only on this phone", Icons.Rounded.BugReport) { shell.go("diagnostics") }
             }
             item {
@@ -318,33 +307,7 @@ fun SettingsScreen() {
     timeEdit?.let { (key, minute) ->
         TimePickerDialogBox(minute, { timeEdit = null }) { m -> app.settings.update { putInt(key, m) }; app.requestReminderSync() }
     }
-    if (restoreList) {
-        val backups = remember { app.backups.listBackups() }
-        AlertDialog(
-            onDismissRequest = { restoreList = false },
-            title = { Text("Restore from backup") },
-            text = {
-                Column(Modifier.heightIn(max = 420.dp).verticalScroll(rememberScrollState())) {
-                    if (backups.isEmpty()) Text("No backups in BlackLab/Backups yet.")
-                    backups.forEach { f ->
-                        SettingRow(f.nameWithoutExtension.removePrefix("BlackLab_backup_"), "${Files.formatSize(f.length())} · ${Time.dateTime(f.lastModified())}", Icons.Rounded.Restore) {
-                            restoreList = false; restoreTarget = f
-                        }
-                    }
-                    HorizontalDivider(Modifier.padding(vertical = 6.dp))
-                    TextButton(onClick = { restoreList = false; restorePicker.launch(arrayOf("application/zip", "*/*")) }) { Text("Choose a backup file…") }
-                }
-            },
-            confirmButton = { TextButton(onClick = { restoreList = false }) { Text("Close") } },
-        )
-    }
-    restoreTarget?.let { target ->
-        ConfirmDialog("Restore this backup?", "Your current tasks, events, courses and document index will be replaced. Files in the BlackLab folder are not touched. BlackLab will close; reopen it afterwards.",
-            "Restore", onDismiss = { restoreTarget = null }) {
-            val ok = when (target) { is File -> app.backups.restore(target); is Uri -> app.backups.restore(target); else -> false }
-            if (ok) { activity?.finishAffinity(); exitProcess(0) } else shell.toast("Restore failed — not a BlackLab backup")
-        }
-    }
+    BackupDialogs(backup, app)
 }
 
 @Suppress("unused")

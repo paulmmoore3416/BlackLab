@@ -1,5 +1,6 @@
 package com.blacklab.app.ui.assistant
 
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import android.Manifest
 import android.content.pm.PackageManager
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -101,11 +102,11 @@ fun AssistantScreen(startListening: Boolean = false) {
     val s = settingsState()
     val scope = rememberCoroutineScope()
     val assistant = app.assistant
-    val messages by assistant.messages.collectAsState()
-    val busy by assistant.busy.collectAsState()
-    val pending by assistant.pending.collectAsState()
-    val nano by Nano.status.collectAsState()
-    val speaking by app.speaker.speaking.collectAsState()
+    val messages by assistant.messages.collectAsStateWithLifecycle()
+    val busy by assistant.busy.collectAsStateWithLifecycle()
+    val pending by assistant.pending.collectAsStateWithLifecycle()
+    val nano by Nano.status.collectAsStateWithLifecycle()
+    val speaking by app.speaker.speaking.collectAsStateWithLifecycle()
     var input by remember { mutableStateOf("") }
     var listening by remember { mutableStateOf(false) }
     var partial by remember { mutableStateOf("") }
@@ -205,7 +206,7 @@ fun AssistantScreen(startListening: Boolean = false) {
             if (prefs.getLong("brief_day", 0) != today) { prefs.edit().putLong("brief_day", today).apply(); send("brief me") }
         }
     }
-    val ask by com.blacklab.app.MainActivity.pendingAsk.collectAsState()
+    val ask by com.blacklab.app.MainActivity.pendingAsk.collectAsStateWithLifecycle()
     LaunchedEffect(ask) { ask?.let { com.blacklab.app.MainActivity.pendingAsk.value = null; send(it) } }
     LaunchedEffect(messages.size) { if (messages.isNotEmpty()) listState.animateScrollToItem(messages.size - 1) }
 

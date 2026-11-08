@@ -34,6 +34,7 @@ class BlackLabApp : Application() {
         container.appScope.launch { container.backups.autoBackupIfDue() }
         com.blacklab.app.vehicle.Nhtsa.schedule(this)
         com.blacklab.app.vehicle.ServiceReminders.schedule(this)
+        com.blacklab.app.facility.FacilityReminders.schedule(this)
         container.appScope.launch {
             // Vehicle details pushed with adb (VIN, odometer): applied once, then the file is deleted
             if (runCatching { com.blacklab.app.vehicle.Garage.importProvisioning(this@BlackLabApp, container.storage.root) }.getOrDefault(false))

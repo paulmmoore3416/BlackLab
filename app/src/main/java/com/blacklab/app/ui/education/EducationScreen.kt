@@ -1,5 +1,6 @@
 package com.blacklab.app.ui.education
 
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.blacklab.app.ui.theme.readable
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -491,7 +492,7 @@ private fun StudyTab(data: EduData) {
     val app = rememberApp()
     val s = settingsState()
     val timer = remember { StudyTimer.get(ctx) }
-    val st by timer.state.collectAsState()
+    val st by timer.state.collectAsStateWithLifecycle()
     var now by remember { mutableLongStateOf(System.currentTimeMillis()) }
     LaunchedEffect(st.running) {
         while (st.running) { now = System.currentTimeMillis(); timer.checkCompletion(); delay(250) }

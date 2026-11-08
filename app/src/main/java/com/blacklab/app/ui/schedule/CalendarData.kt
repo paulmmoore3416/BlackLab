@@ -1,5 +1,6 @@
 package com.blacklab.app.ui.schedule
 
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import android.Manifest
 import android.content.ContentUris
 import android.content.Context
@@ -59,12 +60,12 @@ fun rememberCalendarItems(from: LocalDate, to: LocalDate): List<CalItem> {
     val profiles = remember(s.activeProfile, s.showOtherProfileInCalendar) {
         if (s.showOtherProfileInCalendar) Profile.entries.map { it.name } else listOf(s.activeProfile.name)
     }
-    val events by remember(profiles) { app.db.events().observe(profiles) }.collectAsState(emptyList())
-    val calendars by remember(profiles) { app.db.events().observeCalendars(profiles) }.collectAsState(emptyList())
-    val tasks by remember(profiles) { app.db.tasks().observeDated(profiles) }.collectAsState(emptyList())
-    val courses by remember(profiles) { app.db.education().observeCourses(profiles) }.collectAsState(emptyList())
-    val meetings by remember(profiles) { app.db.education().observeMeetings(profiles) }.collectAsState(emptyList())
-    val assignments by remember(profiles) { app.db.education().observeAssignments(profiles) }.collectAsState(emptyList())
+    val events by remember(profiles) { app.db.events().observe(profiles) }.collectAsStateWithLifecycle(emptyList())
+    val calendars by remember(profiles) { app.db.events().observeCalendars(profiles) }.collectAsStateWithLifecycle(emptyList())
+    val tasks by remember(profiles) { app.db.tasks().observeDated(profiles) }.collectAsStateWithLifecycle(emptyList())
+    val courses by remember(profiles) { app.db.education().observeCourses(profiles) }.collectAsStateWithLifecycle(emptyList())
+    val meetings by remember(profiles) { app.db.education().observeMeetings(profiles) }.collectAsStateWithLifecycle(emptyList())
+    val assignments by remember(profiles) { app.db.education().observeAssignments(profiles) }.collectAsStateWithLifecycle(emptyList())
     // Re-read the phone's calendars when they change (new event in Google Calendar, a sync) or the screen resumes
     val deviceVersion = com.blacklab.app.ui.components.rememberDeviceCalendarVersion(s.showDeviceCalendars)
     val device by produceState(emptyList<CalItem>(), from, to, s.showDeviceCalendars, s.hiddenDeviceCalendars, deviceVersion) {

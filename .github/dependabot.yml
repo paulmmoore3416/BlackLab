@@ -1,0 +1,20 @@
+# Weekly update PRs for the Android build and the CI actions (actions are pinned by commit SHA).
+version: 2
+updates:
+  - package-ecosystem: gradle
+    directory: /
+    schedule: { interval: weekly, day: monday }
+    open-pull-requests-limit: 8
+    groups:
+      androidx:
+        patterns: ["androidx.*"]
+      kotlin-and-build:
+        patterns: ["org.jetbrains.kotlin*", "com.android.*", "com.google.devtools.ksp*"]
+      play-services-and-mlkit:
+        patterns: ["com.google.android.gms*", "com.google.mlkit*"]
+  - package-ecosystem: github-actions
+    directory: /
+    schedule: { interval: weekly, day: monday }
+    groups:
+      actions:
+        patterns: ["*"]

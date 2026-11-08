@@ -30,7 +30,8 @@ Every entity carries a `profile` column (`PERSONAL` / `PROFESSIONAL`). The activ
 - **Room** holds structured data and *metadata* for rich content.
 - **Rich content (documents, journal)** is written as standalone `.html` files via `ContentStore`, so it is portable and avoids SQLite's row-size limits for embedded images. Writes are atomic (temp file + rename).
 - Paths in the database are **relative** to the BlackLab root, so data keeps working if the root moves between app storage and public storage (with automatic migration once All-files access is granted).
-- `BackupManager` checkpoints the WAL and zips the database + settings daily into `BlackLab/Backups`.
+- `BackupManager` takes a consistent database copy (`VACUUM INTO`) and zips it with settings and app-private data (assistant, garage, knowledge, facility, playlists, wake word) daily into `BlackLab/Backups`, encrypted by `BackupCrypto` (`.blbackup`: header + AES-GCM chunks; data key in `Secrets`, optionally wrapped by a passphrase). Restore = inspect (decrypt → unpack allowlisted entries → `quick_check` + schema version) → safety backup → swap files → restart.
+- `facility/Facility` keeps assets, PM / inspection schedules and the log in `filesDir/facility/facility.json` (pure due / binder logic, unit-tested); `FacilityReminders` is a daily WorkManager job and the To-Do bridge.
 
 ## Rich-text editor
 The editor is a `contenteditable` page in `assets/editor/editor.html` hosted in a `WebView`. Kotlin talks to it through `EditorController` (`evaluateJavascript`) and receives state through a `@JavascriptInterface` bridge (formatting state, word counts, edit ticks for debounced autosave). The Compose `EditorRibbon` provides Word-style tabs. File access is disabled in the WebView; images are embedded as downscaled data URIs.

@@ -1,5 +1,6 @@
 package com.blacklab.app.ui.assistant
 
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
@@ -71,12 +72,12 @@ fun AssistantSettingsScreen() {
     val ctx = LocalContext.current
     val s = settingsState()
     val scope = rememberCoroutineScope()
-    val nano by Nano.status.collectAsState()
-    val nanoBytes by Nano.downloadProgress.collectAsState()
-    val linkRunning by app.link.running.collectAsState()
-    val clients by app.link.clients.collectAsState()
-    val lastSync by CloudSync.lastSync.collectAsState()
-    val syncError by CloudSync.lastError.collectAsState()
+    val nano by Nano.status.collectAsStateWithLifecycle()
+    val nanoBytes by Nano.downloadProgress.collectAsStateWithLifecycle()
+    val linkRunning by app.link.running.collectAsStateWithLifecycle()
+    val clients by app.link.clients.collectAsStateWithLifecycle()
+    val lastSync by CloudSync.lastSync.collectAsStateWithLifecycle()
+    val syncError by CloudSync.lastError.collectAsStateWithLifecycle()
     var keyEdit by remember { mutableStateOf<Pair<String, String>?>(null) }
     var keysVersion by remember { mutableIntStateOf(0) }
     var token by remember { mutableStateOf(app.secrets.linkToken()) }
@@ -133,7 +134,7 @@ fun AssistantSettingsScreen() {
 
             item { SectionHeader("Desktop AI") }
             item {
-                val dst by com.blacklab.app.assistant.DesktopAi.status.collectAsState()
+                val dst by com.blacklab.app.assistant.DesktopAi.status.collectAsStateWithLifecycle()
                 BlCard(Modifier.fillMaxWidth(), accent = if (dst.state == com.blacklab.app.assistant.DesktopAi.State.ONLINE) MaterialTheme.colorScheme.primary else null) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Icon(Icons.Rounded.Computer, null, tint = MaterialTheme.colorScheme.primary)
@@ -153,8 +154,8 @@ fun AssistantSettingsScreen() {
                     com.blacklab.app.ui.components.LabeledSwitchRow("Hand off work to the computer", "Recordings → meeting notes and tasks, nameplates → equipment registry, morning brief and Friday summary", s.asstDesktopJobs) { v ->
                         app.settings.update { putBoolean(com.blacklab.app.core.Keys.ASST_DESKTOP_JOBS, v) }
                     }
-                    val jobs by com.blacklab.app.assistant.DesktopJobs.jobs.collectAsState()
-                    val waiting by com.blacklab.app.assistant.DesktopJobs.outbox.collectAsState()
+                    val jobs by com.blacklab.app.assistant.DesktopJobs.jobs.collectAsStateWithLifecycle()
+                    val waiting by com.blacklab.app.assistant.DesktopJobs.outbox.collectAsStateWithLifecycle()
                     if (jobs.isNotEmpty() || waiting > 0) Text(
                         (jobs.joinToString("\n") { "• ${it.title}: ${it.progress}" } + if (waiting > 0) "\n• $waiting waiting to send" else "").trim(),
                         style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(top = 4.dp))
@@ -186,7 +187,7 @@ fun AssistantSettingsScreen() {
 
             item { SectionHeader("Wake word · Picovoice") }
             item {
-                val wake by com.blacklab.app.assistant.WakeWordService.status.collectAsState()
+                val wake by com.blacklab.app.assistant.WakeWordService.status.collectAsStateWithLifecycle()
                 val ppn = androidx.activity.compose.rememberLauncherForActivityResult(androidx.activity.result.contract.ActivityResultContracts.OpenDocument()) { uri ->
                     if (uri != null) scope.launch(kotlinx.coroutines.Dispatchers.IO) {
                         val f = com.blacklab.app.assistant.WakeWordService.customFile(ctx); f.parentFile?.mkdirs()
@@ -228,8 +229,8 @@ fun AssistantSettingsScreen() {
 
             item { SectionHeader("Weather · OpenWeatherMap") }
             item {
-                val w by com.blacklab.app.assistant.Weather.report.collectAsState()
-                val werr by com.blacklab.app.assistant.Weather.error.collectAsState()
+                val w by com.blacklab.app.assistant.Weather.report.collectAsStateWithLifecycle()
+                val werr by com.blacklab.app.assistant.Weather.error.collectAsStateWithLifecycle()
                 var site by remember(s.weatherSite) { mutableStateOf(s.weatherSite) }
                 BlCard(Modifier.fillMaxWidth()) {
                     Text(w?.let { com.blacklab.app.assistant.Weather.summary(it) } ?: (werr ?: if (app.secrets.has(Secrets.OPENWEATHER)) "Tap Refresh" else "Add a free OpenWeatherMap key below"),

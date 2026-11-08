@@ -1,5 +1,6 @@
 package com.blacklab.app.capture
 
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import android.Manifest
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
@@ -101,7 +102,7 @@ class QuickCaptureActivity : ComponentActivity() {
         val noteId = intent.getLongExtra(EXTRA_NOTE, 0)
         val app = app
         setContent {
-            val s by app.settings.state.collectAsState()
+            val s by app.settings.state.collectAsStateWithLifecycle()
             var profile by remember { mutableStateOf(s.activeProfile) }
             BlackLabTheme(com.blacklab.app.ui.theme.rememberThemeMode(s), s.dynamicColor, profile, com.blacklab.app.ui.theme.ThemeChoice.from(s)) {
                 when (mode) {

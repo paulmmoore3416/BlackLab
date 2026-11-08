@@ -1,5 +1,6 @@
 package com.blacklab.app.ui.brainstorm
 
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import android.annotation.SuppressLint
 import android.app.Activity
 import android.content.Context
@@ -225,16 +226,16 @@ fun PageEditorScreen(pageId: Long) {
     val ctx = LocalContext.current
     val scope = rememberCoroutineScope()
     val dao = app.db.brainstorm()
-    val page by dao.observePage(pageId).collectAsState(initial = null)
+    val page by dao.observePage(pageId).collectAsStateWithLifecycle(initialValue = null)
     var section by remember { mutableStateOf<SectionEntity?>(null) }
     var notebookName by remember { mutableStateOf("") }
     var loaded by remember { mutableStateOf(false) }
     var needUnlock by remember { mutableStateOf(false) }
     var key by remember { mutableStateOf<SecretKey?>(null) }
     val controller = remember(pageId) { PageController() }
-    val st by controller.state.collectAsState()
-    val title by controller.title.collectAsState()
-    val ready by controller.ready.collectAsState()
+    val st by controller.state.collectAsStateWithLifecycle()
+    val title by controller.title.collectAsStateWithLifecycle()
+    val ready by controller.ready.collectAsStateWithLifecycle()
 
     var tab by remember { mutableStateOf(PTab.HOME) }
     var busy by remember { mutableStateOf<String?>(null) }
@@ -729,7 +730,7 @@ fun openLink(shell: com.blacklab.app.ui.components.Shell, ctx: Context, href: St
 @Composable
 private fun PageFindBar(controller: PageController, onClose: () -> Unit) {
     var term by remember { mutableStateOf("") }
-    val (count, idx) = controller.find.collectAsState().value
+    val (count, idx) = controller.find.collectAsStateWithLifecycle().value
     Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
         OutlinedTextField(term, { term = it; controller.call("find", it, false) }, placeholder = { Text("Find on page") }, singleLine = true, modifier = Modifier.weight(1f))
         Text(if (count > 0) "${idx + 1}/$count" else "0", style = MaterialTheme.typography.labelMedium, modifier = Modifier.padding(horizontal = 6.dp))

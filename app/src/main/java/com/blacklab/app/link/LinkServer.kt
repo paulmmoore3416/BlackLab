@@ -44,7 +44,6 @@ import java.net.ServerSocket
 import java.net.Socket
 import java.net.URLDecoder
 import java.security.MessageDigest
-import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicLong
 
 /**
@@ -140,7 +139,8 @@ class LinkService : Service() {
  */
 class LinkServer(private val app: AppContainer, private val port: Int, private val lan: Boolean) {
     private var socket: ServerSocket? = null
-    private val pool = Executors.newCachedThreadPool()
+    // Bounded: long-polls hold a thread each, and a flood from the Wi-Fi side must not exhaust the phone
+    private val pool = java.util.concurrent.ThreadPoolExecutor(2, 32, 30, java.util.concurrent.TimeUnit.SECONDS, java.util.concurrent.SynchronousQueue())
     private val failures = java.util.concurrent.ConcurrentHashMap<String, Pair<Int, Long>>()
     @Volatile private var stopped = false
 
@@ -155,7 +155,8 @@ class LinkServer(private val app: AppContainer, private val port: Int, private v
                 socket = ss
                 while (!stopped) {
                     val c = ss.accept()
-                    pool.execute { runCatching { serve(c) }; runCatching { c.close() } }
+                    try { pool.execute { runCatching { serve(c) }; runCatching { c.close() } } }
+                    catch (_: java.util.concurrent.RejectedExecutionException) { runCatching { c.close() } }
                 }
             }
         }
@@ -188,9 +189,11 @@ class LinkServer(private val app: AppContainer, private val port: Int, private v
         val parts = first.split(' ')
         if (parts.size < 2) return
         val headers = HashMap<String, String>()
+        var count = 0
         while (true) {
             val line = readLine(input) ?: break
             if (line.isEmpty()) break
+            if (++count > 100) return
             val i = line.indexOf(':')
             if (i > 0) headers[line.substring(0, i).trim().lowercase()] = line.substring(i + 1).trim()
         }
@@ -201,7 +204,12 @@ class LinkServer(private val app: AppContainer, private val port: Int, private v
         val query = target.substringAfter('?', "").split('&').filter { it.contains('=') }
             .associate { URLDecoder.decode(it.substringBefore('='), "UTF-8") to URLDecoder.decode(it.substringAfter('='), "UTF-8") }
         val req = Req(parts[0].uppercase(), path, query, headers, body)
-        val origin = headers["origin"]
+        val local = c.inetAddress.isLoopbackAddress
+        val rawOrigin = headers["origin"]
+        // Browsers send Origin on cross-site requests; only BlackLab Desktop's pages may call the API
+        val sameOrigin = rawOrigin != null && headers["host"] != null && rawOrigin.removePrefix("http://") == headers["host"]
+        if (rawOrigin != null && !sameOrigin && !LinkAccess.originAllowed(rawOrigin)) { respond(out, 403, err("Origin not allowed"), null); return }
+        val origin = rawOrigin?.takeIf { LinkAccess.originAllowed(it) }
 
         if (req.method == "OPTIONS") { respond(out, 204, "", origin); return }
         if (path.startsWith("/s/")) {
@@ -217,7 +225,7 @@ class LinkServer(private val app: AppContainer, private val port: Int, private v
 
         val addr = c.inetAddress.hostAddress ?: "?"
         failures[addr]?.let { (n, t) -> if (n >= 8 && Time.now() - t < 60_000) { respond(out, 429, err("Too many wrong pairing codes. Wait a minute."), origin); return } }
-        val token = headers["authorization"]?.removePrefix("Bearer ")?.trim() ?: query["token"]
+        val token = headers["authorization"]?.removePrefix("Bearer ")?.trim()
         if (token == null || !MessageDigest.isEqual(token.uppercase().toByteArray(), app.secrets.linkToken().toByteArray())) {
             val (n, _) = failures[addr] ?: (0 to 0L)
             failures[addr] = (n + 1) to Time.now()
@@ -226,24 +234,27 @@ class LinkServer(private val app: AppContainer, private val port: Int, private v
         failures.remove(addr)
         app.link.clients.value = app.link.clients.value + (addr to Time.now())
 
+        if (!local && LinkAccess.usbOnly(req.method, path)) { respond(out, 403, err("That needs the USB link (adb), not Wi-Fi"), origin); return }
         if (req.method == "GET" && path == "/api/file") { sendFile(out, req.query["path"].orEmpty(), origin); return }
-        val (code, json) = runCatching { runBlocking { handle(req) } }.getOrElse { 500 to err(it.message ?: "error") }
+        val (code, json) = runCatching { runBlocking { handle(req, local) } }.getOrElse { 500 to err(it.message ?: "error") }
         respond(out, code, json, origin)
     }
 
     private fun err(m: String) = JSONObject().put("error", m).toString()
 
-    private suspend fun handle(r: Req): Pair<Int, String> {
+    private suspend fun handle(r: Req, local: Boolean): Pair<Int, String> {
         val body = if (r.body.isNotBlank()) runCatching { JSONObject(r.body) }.getOrDefault(JSONObject()) else JSONObject()
         return when {
             r.method == "GET" && r.path == "/api/info" -> 200 to Snapshot.info(app).toString()
             r.method == "GET" && r.path == "/api/schema" -> 200 to JSONObject().put("sections", SettingsSchema.toJson()).toString()
             r.method == "GET" && r.path == "/api/settings" -> 200 to SettingsSchema.values(app.settings.prefs).toString()
             (r.method == "PUT" || r.method == "POST") && r.path == "/api/settings" -> {
+                val refused = if (local) emptyList() else body.keys().asSequence().filter { it in LinkAccess.usbOnlySettings }.toList()
+                refused.forEach { body.remove(it) }
                 val applied = SettingsSchema.apply(app.settings, body)
                 app.requestReminderSync()
                 LinkService.sync(app.context)
-                200 to JSONObject().put("applied", JSONArray(applied)).put("values", SettingsSchema.values(app.settings.prefs)).toString()
+                200 to JSONObject().put("applied", JSONArray(applied)).put("refused", JSONArray(refused)).put("values", SettingsSchema.values(app.settings.prefs)).toString()
             }
             r.method == "GET" && r.path == "/api/snapshot" -> 200 to Snapshot.build(app).toString()
             r.method == "GET" && r.path == "/api/changes" -> {
@@ -333,7 +344,7 @@ class LinkServer(private val app: AppContainer, private val port: Int, private v
         out.flush()
     }
 
-    private fun cors(origin: String?) = "Access-Control-Allow-Origin: ${origin ?: "*"}\r\nVary: Origin\r\n" +
+    private fun cors(origin: String?) = if (origin == null) "Vary: Origin\r\n" else "Access-Control-Allow-Origin: $origin\r\nVary: Origin\r\n" +
         "Access-Control-Allow-Methods: GET, POST, PUT, OPTIONS\r\nAccess-Control-Allow-Headers: Authorization, Content-Type\r\n" +
         "Access-Control-Allow-Private-Network: true\r\nAccess-Control-Max-Age: 600\r\n"
 
@@ -357,4 +368,31 @@ class LinkServer(private val app: AppContainer, private val port: Int, private v
         out.write(bytes)
         out.flush()
     }
+}
+
+/** Who may call the link, and what stays USB-only. Pure so it is unit-tested. */
+object LinkAccess {
+    private val pages = setOf("https://paulmmoore3416.github.io")
+    private val loopback = Regex("^http://(127\\.0\\.0\\.1|localhost)(:\\d{1,5})?$")
+
+    /** BlackLab Desktop: the GitHub Pages site or the local companion page. */
+    fun originAllowed(origin: String): Boolean = origin in pages || loopback.matches(origin)
+
+    /**
+     * Over Wi-Fi the link is plain HTTP, so anyone on the network who captures the pairing code could replay it.
+     * These calls read files, write API keys or make backups, and only work over the USB (adb) link.
+     */
+    fun usbOnly(method: String, path: String): Boolean = when {
+        path == "/api/file" || path == "/api/files" -> true
+        method == "POST" && (path == "/api/secrets" || path == "/api/backup") -> true
+        else -> false
+    }
+
+    /** Settings that can turn off protections or reroute the link — changed only over USB or on the phone. */
+    val usbOnlySettings: Set<String> = setOf(
+        com.blacklab.app.core.Keys.APP_LOCK, com.blacklab.app.core.Keys.LOCK_PROFESSIONAL, com.blacklab.app.core.Keys.LOCK_TIMEOUT,
+        com.blacklab.app.core.Keys.WIDGET_PRIVACY, com.blacklab.app.core.Keys.SIG_CONFIRM,
+        com.blacklab.app.core.Keys.LINK_ENABLED, com.blacklab.app.core.Keys.LINK_LAN, com.blacklab.app.core.Keys.LINK_PORT,
+        com.blacklab.app.core.Keys.CLOUD_SYNC,
+    )
 }

@@ -1,5 +1,6 @@
 package com.blacklab.app.ui.components
 
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.geometry.isSpecified
 import androidx.compose.ui.draw.drawBehind
 import com.blacklab.app.ui.theme.readable
@@ -126,7 +127,7 @@ fun rememberApp(): AppContainer {
 @Composable
 fun settingsState(): Settings {
     val app = rememberApp()
-    val s by app.settings.state.collectAsState()
+    val s by app.settings.state.collectAsStateWithLifecycle()
     return s
 }
 

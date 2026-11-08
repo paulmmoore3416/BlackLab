@@ -1,5 +1,6 @@
 package com.blacklab.app.ui.schedule
 
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import android.Manifest
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -652,7 +653,7 @@ private fun CalendarsDialog(onDismiss: () -> Unit) {
     val app = rememberApp()
     val ctx = LocalContext.current
     val s = settingsState()
-    val calendars by remember(s.activeProfile) { app.db.events().observeCalendars(listOf(s.activeProfile.name)) }.collectAsState(emptyList())
+    val calendars by remember(s.activeProfile) { app.db.events().observeCalendars(listOf(s.activeProfile.name)) }.collectAsStateWithLifecycle(emptyList())
     var hasPerm by remember { mutableStateOf(DeviceCalendar.hasPermission(ctx)) }
     val deviceCals = remember(hasPerm) { DeviceCalendar.calendars(ctx) }
     val perm = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { ok ->

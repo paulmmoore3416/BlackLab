@@ -1,5 +1,6 @@
 package com.blacklab.app.ui.knowledge
 
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import android.Manifest
 import android.content.pm.PackageManager
 import android.net.Uri
@@ -119,7 +120,7 @@ fun KnowledgeScreen(startTab: String = "") {
     val bases = remember { Knowledge.bases(ctx) }
     var tab by rememberSaveable { mutableIntStateOf(if (startTab.equals("library", true)) 1 else 0) }
     var query by rememberSaveable { mutableStateOf("") }
-    val nano by Nano.status.collectAsState()
+    val nano by Nano.status.collectAsStateWithLifecycle()
     val convs = bases.filter { it.kind == Knowledge.Kind.CONVERSATION }
     val domains = bases.filter { it.kind == Knowledge.Kind.DOMAIN }
     val results = remember(query) { if (query.isBlank()) emptyList() else Knowledge.search(ctx, query, 25) }
@@ -261,7 +262,7 @@ fun KbEntryScreen(id: String) {
     val shell = LocalShell.current
     val ctx = LocalContext.current
     val e = remember(id) { Knowledge.entry(ctx, id) }
-    val speaking by app.speaker.speaking.collectAsState()
+    val speaking by app.speaker.speaking.collectAsStateWithLifecycle()
     if (e == null) { EmptyState(Icons.AutoMirrored.Rounded.MenuBook, "Not found", "That entry isn't in this version."); return }
     val base = remember(id) { Knowledge.base(ctx, e.kbId) }
     val (_, color) = kbStyle(e.kbId)
@@ -326,10 +327,10 @@ fun TalkScreen(id: String, initial: String = "") {
     if (base == null) { EmptyState(Icons.Rounded.Forum, "Not found", "That conversation isn't in this version."); return }
     val (icon, color) = kbStyle(id)
     val conv = app.conversations
-    val all by conv.turns.collectAsState()
+    val all by conv.turns.collectAsStateWithLifecycle()
     val turns = all[id] ?: remember(id) { conv.open(id) }
-    val busy by conv.busy.collectAsState()
-    val speaking by app.speaker.speaking.collectAsState()
+    val busy by conv.busy.collectAsStateWithLifecycle()
+    val speaking by app.speaker.speaking.collectAsStateWithLifecycle()
     var input by rememberSaveable { mutableStateOf("") }
     var listening by remember { mutableStateOf(false) }
     var partial by remember { mutableStateOf("") }

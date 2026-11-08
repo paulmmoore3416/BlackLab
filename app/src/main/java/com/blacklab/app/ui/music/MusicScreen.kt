@@ -1,5 +1,6 @@
 package com.blacklab.app.ui.music
 
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import android.Manifest
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
@@ -416,9 +417,9 @@ fun NowPlayingScreen() {
     val p = rememberPlayer()
     val c = p.controller
     var dialog by remember { mutableStateOf<String?>(null) }
-    val loopA by PlaybackService.loopA.collectAsState()
-    val loopB by PlaybackService.loopB.collectAsState()
-    val sleepAt by Music.sleepAt.collectAsState()
+    val loopA by PlaybackService.loopA.collectAsStateWithLifecycle()
+    val loopB by PlaybackService.loopB.collectAsStateWithLifecycle()
+    val sleepAt by Music.sleepAt.collectAsStateWithLifecycle()
     var seeking by remember { mutableStateOf<Float?>(null) }
     val file = remember(p.uri) { Music.fileOf(ctx, p.uri) }
     var fav by remember(p.uri) { mutableStateOf(p.uri?.let { Music.isFavorite(ctx, it.toString()) } == true) }
@@ -476,7 +477,7 @@ fun NowPlayingScreen() {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
                 NpAction(Icons.Rounded.Speed, if (p.speed == 1f && p.pitch == 1f) "Speed" else "${"%.2f".format(p.speed).trimEnd('0').trimEnd('.')}×") { dialog = "speed" }
                 NpAction(Icons.Rounded.Bedtime, if (sleepAt > 0) "${((sleepAt - System.currentTimeMillis()) / 60000 + 1)} min" else "Sleep", sleepAt > 0) { dialog = "sleep" }
-                NpAction(Icons.Rounded.Equalizer, "EQ", Fx.state.collectAsState().value.enabled) { dialog = "eq" }
+                NpAction(Icons.Rounded.Equalizer, "EQ", Fx.state.collectAsStateWithLifecycle().value.enabled) { dialog = "eq" }
                 NpAction(Icons.Rounded.Loop, when { loopA == null -> "A-B"; loopB == null -> "Set B"; else -> "Clear" }, loopA != null) {
                     when { loopA == null -> PlaybackService.loopA.value = p.position; loopB == null -> PlaybackService.loopB.value = p.position.takeIf { it > loopA!! }; else -> { PlaybackService.loopA.value = null; PlaybackService.loopB.value = null } }
                 }
@@ -538,7 +539,7 @@ fun SpeedDialog(speed: Float, pitch: Float, onDismiss: () -> Unit, onChange: (Fl
 @Composable
 private fun EqualizerDialog(onDismiss: () -> Unit) {
     val ctx = LocalContext.current
-    val st by Fx.state.collectAsState()
+    val st by Fx.state.collectAsStateWithLifecycle()
     val (lo, hi) = Fx.levelRange
     val bands = remember(st) { Fx.currentBands() }
     AlertDialog(

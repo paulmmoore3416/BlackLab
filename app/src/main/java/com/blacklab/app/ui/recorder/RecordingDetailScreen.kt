@@ -1,5 +1,6 @@
 package com.blacklab.app.ui.recorder
 
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
@@ -76,7 +77,7 @@ fun RecordingDetailScreen(id: Long) {
     val app = rememberApp()
     val shell = LocalShell.current
     val ctx = LocalContext.current
-    val rec by remember(id) { app.db.recordings().observeOne(id) }.collectAsState(null)
+    val rec by remember(id) { app.db.recordings().observeOne(id) }.collectAsStateWithLifecycle(null)
     val r = rec
     val player = remember { ExoPlayer.Builder(ctx).build() }
     var playing by remember { mutableStateOf(false) }
@@ -197,7 +198,7 @@ fun RecordingDetailScreen(id: Long) {
                     }
                 }) { Text("Save as document") }
             }
-            val desk by com.blacklab.app.assistant.DesktopAi.status.collectAsState()
+            val desk by com.blacklab.app.assistant.DesktopAi.status.collectAsStateWithLifecycle()
             if (desk.state == com.blacklab.app.assistant.DesktopAi.State.ONLINE && app.settings.current.asstDesktopJobs) {
                 OutlinedButton(onClick = {
                     com.blacklab.app.assistant.DesktopJobs.enqueue(app, "transcribe", file, r.title, org.json.JSONObject().put("recording_id", r.id))

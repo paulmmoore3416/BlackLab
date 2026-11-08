@@ -1,5 +1,6 @@
 package com.blacklab.app.ui.brainstorm
 
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.blacklab.app.ui.components.sharedCard
 import android.graphics.Bitmap
 import android.graphics.ImageDecoder
@@ -148,7 +149,7 @@ fun NoteEditorScreen(noteId: Long, kind: String = "", label: String = "") {
     LaunchedEffect(edits) { if (edits > 0) { delay(500); commitSnap(); saveNow() } }
 
     // guests (Live Share) can tick items; adopt their changes when we aren't mid-edit
-    val live by remember(note?.id) { dao.observeNote(note?.id ?: -1) }.collectAsState(initial = null)
+    val live by remember(note?.id) { dao.observeNote(note?.id ?: -1) }.collectAsStateWithLifecycle(initialValue = null)
     LaunchedEffect(live?.updatedAt) {
         val l = live ?: return@LaunchedEffect
         if (note?.id == l.id && (l.items to l.body) != lastWritten) {
@@ -495,7 +496,7 @@ fun PaletteSheet(color: Int, bg: String, dark: Boolean, onDismiss: () -> Unit, o
 @Composable
 fun LabelsDialog(profile: Profile, selected: List<String>, onDismiss: () -> Unit, onSave: (List<String>) -> Unit) {
     val app = rememberApp()
-    val labels by app.db.notes().observeLabels(profile.name).collectAsState(initial = emptyList())
+    val labels by app.db.notes().observeLabels(profile.name).collectAsStateWithLifecycle(initialValue = emptyList())
     val chosen = remember { mutableStateListOf<String>().apply { addAll(selected) } }
     var q by remember { mutableStateOf("") }
     AlertDialog(

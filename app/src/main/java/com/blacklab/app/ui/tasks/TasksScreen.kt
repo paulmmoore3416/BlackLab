@@ -1,5 +1,6 @@
 package com.blacklab.app.ui.tasks
 
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.blacklab.app.ui.theme.readable
 import com.blacklab.app.ui.components.sharedCard
 import androidx.compose.animation.AnimatedVisibility
@@ -99,9 +100,9 @@ fun TasksScreen() {
     val shell = LocalShell.current
     val settings = settingsState()
     val profile = settings.activeProfile
-    val tasks by remember(profile) { app.db.tasks().observe(profile.name) }.collectAsState(emptyList())
-    val lists by remember(profile) { app.db.tasks().observeLists(profile.name) }.collectAsState(emptyList())
-    val subtasks by remember(profile) { app.db.tasks().observeAllSubtasks(profile.name) }.collectAsState(emptyList())
+    val tasks by remember(profile) { app.db.tasks().observe(profile.name) }.collectAsStateWithLifecycle(emptyList())
+    val lists by remember(profile) { app.db.tasks().observeLists(profile.name) }.collectAsStateWithLifecycle(emptyList())
+    val subtasks by remember(profile) { app.db.tasks().observeAllSubtasks(profile.name) }.collectAsStateWithLifecycle(emptyList())
     var filter by rememberSaveable { mutableStateOf("myday") }
     var search by rememberSaveable { mutableStateOf("") }
     var searching by remember { mutableStateOf(false) }

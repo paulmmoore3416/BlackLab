@@ -1,5 +1,6 @@
 package com.blacklab.app.ui.education
 
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -94,16 +95,16 @@ fun rememberEduData(): EduData {
     val app = rememberApp()
     val p = settingsState().activeProfile.name
     val dao = app.db.education()
-    val courses by remember(p) { dao.observeCourses(listOf(p)) }.collectAsState(emptyList())
-    val terms by remember(p) { dao.observeTerms(p) }.collectAsState(emptyList())
-    val meetings by remember(p) { dao.observeMeetings(listOf(p)) }.collectAsState(emptyList())
-    val categories by remember(p) { dao.observeCategories(p) }.collectAsState(emptyList())
-    val assignments by remember(p) { dao.observeAssignments(listOf(p)) }.collectAsState(emptyList())
-    val certs by remember(p) { dao.observeCerts(p) }.collectAsState(emptyList())
-    val ceus by remember(p) { dao.observeCeus(p) }.collectAsState(emptyList())
-    val sessions by remember(p) { dao.observeSessions(p) }.collectAsState(emptyList())
-    val decks by remember(p) { dao.observeDecks(p) }.collectAsState(emptyList())
-    val cards by remember(p) { dao.observeAllCards(p) }.collectAsState(emptyList())
+    val courses by remember(p) { dao.observeCourses(listOf(p)) }.collectAsStateWithLifecycle(emptyList())
+    val terms by remember(p) { dao.observeTerms(p) }.collectAsStateWithLifecycle(emptyList())
+    val meetings by remember(p) { dao.observeMeetings(listOf(p)) }.collectAsStateWithLifecycle(emptyList())
+    val categories by remember(p) { dao.observeCategories(p) }.collectAsStateWithLifecycle(emptyList())
+    val assignments by remember(p) { dao.observeAssignments(listOf(p)) }.collectAsStateWithLifecycle(emptyList())
+    val certs by remember(p) { dao.observeCerts(p) }.collectAsStateWithLifecycle(emptyList())
+    val ceus by remember(p) { dao.observeCeus(p) }.collectAsStateWithLifecycle(emptyList())
+    val sessions by remember(p) { dao.observeSessions(p) }.collectAsStateWithLifecycle(emptyList())
+    val decks by remember(p) { dao.observeDecks(p) }.collectAsStateWithLifecycle(emptyList())
+    val cards by remember(p) { dao.observeAllCards(p) }.collectAsStateWithLifecycle(emptyList())
     return remember(courses, terms, meetings, categories, assignments, certs, ceus, sessions, decks, cards) {
         EduData(courses, terms, meetings, categories, assignments, certs, ceus, sessions, decks, cards)
     }

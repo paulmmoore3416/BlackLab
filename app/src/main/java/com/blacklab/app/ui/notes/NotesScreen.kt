@@ -1,5 +1,6 @@
 package com.blacklab.app.ui.notes
 
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import android.net.Uri
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
@@ -127,8 +128,8 @@ fun NotesScreen(start: String = "") {
     val selected = remember { mutableStateListOf<Long>() }
     var dialog by remember { mutableStateOf<String?>(null) }
     val drawer = rememberDrawerState(DrawerValue.Closed)
-    val notes by remember(profile) { app.db.notes().observe(profile.name) }.collectAsState(initial = null)
-    val labels by remember(profile) { app.db.notes().observeLabels(profile.name) }.collectAsState(initial = emptyList())
+    val notes by remember(profile) { app.db.notes().observe(profile.name) }.collectAsStateWithLifecycle(initialValue = null)
+    val labels by remember(profile) { app.db.notes().observeLabels(profile.name) }.collectAsStateWithLifecycle(initialValue = emptyList())
     val all = notes.orEmpty()
 
     LaunchedEffect(Unit) { app.io { NoteOps.purgeTrash(app) } }
@@ -538,7 +539,7 @@ private fun NotesSelectionBar(selected: MutableList<Long>, profile: Profile, vie
 @Composable
 fun EditLabelsDialog(profile: Profile, onDismiss: () -> Unit) {
     val app = rememberApp()
-    val labels by remember(profile) { app.db.notes().observeLabels(profile.name) }.collectAsState(initial = emptyList())
+    val labels by remember(profile) { app.db.notes().observeLabels(profile.name) }.collectAsStateWithLifecycle(initialValue = emptyList())
     var rename by remember { mutableStateOf<NoteLabelEntity?>(null) }
     var remove by remember { mutableStateOf<NoteLabelEntity?>(null) }
     var newName by remember { mutableStateOf("") }

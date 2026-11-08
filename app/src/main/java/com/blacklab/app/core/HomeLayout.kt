@@ -15,6 +15,7 @@ object HomeLayout {
         Card("status", "Recording & dictation", "Shows only while a recording or dictation is running."),
         Card("weather", "Weather", "Current conditions and facility weather alerts."),
         Card("bh", "Behavioral Health", "On shift and rounds due. Counts only, never initials or rooms."),
+        Card("facility", "Facility", "Inspections and PMs overdue or due soon. Shows only when something is."),
         Card("actions", "Quick actions", "Photo, video, dictate, record, scan, document, journal, task, event and focus."),
         Card("feed", "Since you last looked", "What changed since you last opened Home."),
         Card("notes", "Notes", "Your pinned and latest notes, with a Take a note bar."),

@@ -71,6 +71,8 @@ object CloudSync {
                     val ts = inbox.optLong("settingsTs", 0)
                     val changes = inbox.optJSONObject("settings")
                     if (changes != null && changes.length() > 0 && ts > settingsTs) {
+                        // Security and link settings never change remotely through Drive (USB or the phone only)
+                        LinkAccess.usbOnlySettings.forEach { changes.remove(it) }
                         SettingsSchema.apply(app.settings, changes)
                         app.requestReminderSync()
                         settingsTs = ts

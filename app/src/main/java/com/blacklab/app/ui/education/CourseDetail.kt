@@ -1,5 +1,6 @@
 package com.blacklab.app.ui.education
 
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
@@ -80,7 +81,7 @@ fun CourseDetailScreen(id: Long) {
     val ctx = LocalContext.current
     val data = rememberEduData()
     val course = data.courseById[id]
-    val notes by remember(id) { app.db.documents().observeForCourse(id) }.collectAsState(emptyList())
+    val notes by remember(id) { app.db.documents().observeForCourse(id) }.collectAsStateWithLifecycle(emptyList())
     var edit by remember { mutableStateOf<String?>(null) }
     var meetingEdit by remember { mutableStateOf<ClassMeetingEntity?>(null) }
 
@@ -241,7 +242,7 @@ fun DeckScreen(id: Long) {
     val shell = LocalShell.current
     val data = rememberEduData()
     val deck = data.decks.firstOrNull { it.id == id }
-    val cards by remember(id) { app.db.education().observeCards(id) }.collectAsState(emptyList())
+    val cards by remember(id) { app.db.education().observeCards(id) }.collectAsStateWithLifecycle(emptyList())
     var editCard by remember { mutableStateOf<FlashcardEntity?>(null) }
     var editDeck by remember { mutableStateOf(false) }
     var confirmDelete by remember { mutableStateOf(false) }

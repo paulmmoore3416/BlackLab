@@ -1,5 +1,6 @@
 package com.blacklab.app.ui.tasks
 
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.blacklab.app.ui.theme.readable
 import com.blacklab.app.ui.components.sharedCard
 import androidx.activity.compose.BackHandler
@@ -94,8 +95,8 @@ fun TaskDetailScreen(id: Long) {
     LaunchedEffect(id) {
         task = if (id == 0L) TaskEntity(profile = settings.activeProfile.name, title = "") else app.db.tasks().get(id)
     }
-    val steps by remember(taskId) { app.db.tasks().observeSubtasks(taskId) }.collectAsState(emptyList())
-    val lists by remember(settings.activeProfile) { app.db.tasks().observeLists(settings.activeProfile.name) }.collectAsState(emptyList())
+    val steps by remember(taskId) { app.db.tasks().observeSubtasks(taskId) }.collectAsStateWithLifecycle(emptyList())
+    val lists by remember(settings.activeProfile) { app.db.tasks().observeLists(settings.activeProfile.name) }.collectAsStateWithLifecycle(emptyList())
     var dialog by remember { mutableStateOf<String?>(null) }
     var pendingReminderDay by remember { mutableStateOf<LocalDate?>(null) }
 

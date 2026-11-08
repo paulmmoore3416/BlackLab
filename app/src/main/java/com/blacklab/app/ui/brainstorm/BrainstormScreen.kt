@@ -1,5 +1,6 @@
 package com.blacklab.app.ui.brainstorm
 
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.blacklab.app.ui.components.sharedCard
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -167,9 +168,9 @@ private fun NotebooksTab(profile: Profile) {
     val shell = LocalShell.current
     val scope = rememberCoroutineScope()
     val dao = app.db.brainstorm()
-    val notebooks by dao.observeNotebooks(profile.name).collectAsState(initial = emptyList())
-    val counts by dao.observeCounts(profile.name).collectAsState(initial = emptyList())
-    val recent by dao.observeRecent(profile.name, 8).collectAsState(initial = emptyList())
+    val notebooks by dao.observeNotebooks(profile.name).collectAsStateWithLifecycle(initialValue = emptyList())
+    val counts by dao.observeCounts(profile.name).collectAsStateWithLifecycle(initialValue = emptyList())
+    val recent by dao.observeRecent(profile.name, 8).collectAsStateWithLifecycle(initialValue = emptyList())
     var sheetFor by remember { mutableStateOf<NotebookEntity?>(null) }
     var confirmDelete by remember { mutableStateOf<NotebookEntity?>(null) }
 
@@ -330,7 +331,7 @@ private fun TagsTab(profile: Profile) {
     val app = rememberApp()
     val shell = LocalShell.current
     val scope = rememberCoroutineScope()
-    val pages by app.db.brainstorm().observeTagged(profile.name).collectAsState(initial = emptyList())
+    val pages by app.db.brainstorm().observeTagged(profile.name).collectAsStateWithLifecycle(initialValue = emptyList())
     val places = rememberPlaces(profile, pages.size)
     var openOnly by remember { mutableStateOf(false) }
     var tagFilter by remember { mutableStateOf<String?>(null) }
@@ -376,7 +377,7 @@ private fun TagsTab(profile: Profile) {
 private fun SearchResults(profile: Profile, query: String) {
     val app = rememberApp()
     val shell = LocalShell.current
-    val notes by app.db.notes().observe(profile.name).collectAsState(initial = emptyList())
+    val notes by app.db.notes().observe(profile.name).collectAsStateWithLifecycle(initialValue = emptyList())
     var pages by remember { mutableStateOf<List<PageEntity>>(emptyList()) }
     LaunchedEffect(query) { pages = if (query.isBlank()) emptyList() else withContext(Dispatchers.IO) { app.db.brainstorm().search(profile.name, "%${query.trim()}%") } }
     val places = rememberPlaces(profile, pages.size)
@@ -415,7 +416,7 @@ private fun RecycleBinSheet(profile: Profile, onDismiss: () -> Unit) {
     val app = rememberApp()
     val shell = LocalShell.current
     val scope = rememberCoroutineScope()
-    val pages by app.db.brainstorm().observeDeleted(profile.name).collectAsState(initial = emptyList())
+    val pages by app.db.brainstorm().observeDeleted(profile.name).collectAsStateWithLifecycle(initialValue = emptyList())
     ModalBottomSheet(onDismissRequest = onDismiss, containerColor = MaterialTheme.colorScheme.surfaceContainerLow) {
         Column(Modifier.padding(horizontal = 16.dp).navigationBarsPadding()) {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -446,8 +447,8 @@ private fun RecycleBinSheet(profile: Profile, onDismiss: () -> Unit) {
 private fun SharesSheet(onDismiss: () -> Unit) {
     val app = rememberApp()
     val shell = LocalShell.current
-    val shares by app.db.brainstorm().observeShares().collectAsState(initial = emptyList())
-    val guestComments by app.db.brainstorm().observeGuestComments().collectAsState(initial = emptyList())
+    val shares by app.db.brainstorm().observeShares().collectAsStateWithLifecycle(initialValue = emptyList())
+    val guestComments by app.db.brainstorm().observeGuestComments().collectAsStateWithLifecycle(initialValue = emptyList())
     val active = shares.filter { !it.revoked && it.expiresAt > Time.now() }
     var qr by remember { mutableStateOf<com.blacklab.app.data.ShareLinkEntity?>(null) }
     ModalBottomSheet(onDismissRequest = onDismiss, containerColor = MaterialTheme.colorScheme.surfaceContainerLow) {

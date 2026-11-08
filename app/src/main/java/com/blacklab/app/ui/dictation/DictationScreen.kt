@@ -1,5 +1,6 @@
 package com.blacklab.app.ui.dictation
 
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import android.Manifest
 import android.content.pm.PackageManager
 import android.net.Uri
@@ -109,7 +110,7 @@ fun DictationScreen() {
     val app = rememberApp()
     val shell = LocalShell.current
     val s = settingsState()
-    val st by DictationService.state.collectAsState()
+    val st by DictationService.state.collectAsStateWithLifecycle()
     var refresh by remember { mutableIntStateOf(0) }
     var settingsOpen by remember { mutableStateOf(false) }
     var query by remember { mutableStateOf("") }

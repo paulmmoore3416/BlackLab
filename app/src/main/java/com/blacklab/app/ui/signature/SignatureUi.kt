@@ -1,5 +1,6 @@
 package com.blacklab.app.ui.signature
 
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.Paint
@@ -100,14 +101,14 @@ object SignatureGate {
 @Composable
 fun rememberSignatures(): List<Signatures.Sig> {
     val ctx = LocalContext.current
-    val v by Signatures.version.collectAsState()
+    val v by Signatures.version.collectAsStateWithLifecycle()
     return produceState(emptyList(), v) { value = withContext(Dispatchers.IO) { Signatures.list(ctx) } }.value
 }
 
 @Composable
 fun rememberSignatureBitmap(id: String?): Bitmap? {
     val ctx = LocalContext.current
-    val v by Signatures.version.collectAsState()
+    val v by Signatures.version.collectAsStateWithLifecycle()
     return produceState<Bitmap?>(null, id, v) { value = id?.let { withContext(Dispatchers.IO) { Signatures.load(ctx, it) } } }.value
 }
 

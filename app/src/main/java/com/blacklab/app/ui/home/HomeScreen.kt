@@ -1,5 +1,6 @@
 package com.blacklab.app.ui.home
 
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.blacklab.app.ui.theme.readable
 import com.blacklab.app.ui.components.sharedCard
 import androidx.compose.animation.animateContentSize
@@ -93,27 +94,29 @@ fun HomeScreen() {
     val now = com.blacklab.app.ui.components.rememberNow()
     val today = now.toLocalDate()
     val greeting = remember(now.hour) { Time.greeting() }
-    val rec by RecorderService.state.collectAsState()
+    val rec by RecorderService.state.collectAsStateWithLifecycle()
     val bh = com.blacklab.app.ui.bh.bhState()
-    val weather by com.blacklab.app.assistant.Weather.report.collectAsState()
+    val facState by remember { com.blacklab.app.facility.Facility.load(app.context); com.blacklab.app.facility.Facility.state }.collectAsStateWithLifecycle()
+    val facOpen = remember(facState, today) { com.blacklab.app.facility.Facility.due(facState).filter { it.status != com.blacklab.app.facility.Facility.Status.OK } }
+    val weather by com.blacklab.app.assistant.Weather.report.collectAsStateWithLifecycle()
     val bhNow = com.blacklab.app.ui.bh.rememberTicker(30_000)
-    val dict by DictationService.state.collectAsState()
+    val dict by DictationService.state.collectAsStateWithLifecycle()
     val ctx = androidx.compose.ui.platform.LocalContext.current
     // null until the first database read, so Home shows placeholders instead of a "no tasks" flash
-    val tasksOrNull by remember(profile) { app.db.tasks().observe(profile.name) }.collectAsState(null)
+    val tasksOrNull by remember(profile) { app.db.tasks().observe(profile.name) }.collectAsStateWithLifecycle(null)
     val tasks = tasksOrNull.orEmpty()
     val tasksLoading = tasksOrNull == null
     val haptics = com.blacklab.app.ui.components.rememberHaptics()
     // Optimistic completion: a ticked task shows done at once, then leaves when the save lands
     val completing = remember { androidx.compose.runtime.mutableStateListOf<Long>() }
-    val docs by remember(profile) { app.db.documents().observe(profile.name) }.collectAsState(emptyList())
+    val docs by remember(profile) { app.db.documents().observe(profile.name) }.collectAsStateWithLifecycle(emptyList())
     // "Since you last looked": the window starts at your previous visit to Home and stays put while you're here
     val feedPrefs = remember { ctx.getSharedPreferences("blacklab_home", 0) }
     var feedSince by remember(profile) { mutableStateOf(com.blacklab.app.core.ActivityFeed.since(feedPrefs.getLong("seen_" + profile.name, 0), System.currentTimeMillis())) }
-    val feedEvents by remember(profile) { app.db.events().observe(listOf(profile.name)) }.collectAsState(emptyList())
-    val feedRecordings by remember(profile) { app.db.recordings().observe(profile.name) }.collectAsState(emptyList())
-    val feedNotes by remember(profile) { app.db.notes().observe(profile.name) }.collectAsState(emptyList())
-    val feedComments by remember { app.db.brainstorm().observeGuestComments() }.collectAsState(emptyList())
+    val feedEvents by remember(profile) { app.db.events().observe(listOf(profile.name)) }.collectAsStateWithLifecycle(emptyList())
+    val feedRecordings by remember(profile) { app.db.recordings().observe(profile.name) }.collectAsStateWithLifecycle(emptyList())
+    val feedNotes by remember(profile) { app.db.notes().observe(profile.name) }.collectAsStateWithLifecycle(emptyList())
+    val feedComments by remember { app.db.brainstorm().observeGuestComments() }.collectAsStateWithLifecycle(emptyList())
     val homeLifecycle = androidx.lifecycle.compose.LocalLifecycleOwner.current.lifecycle
     androidx.compose.runtime.DisposableEffect(homeLifecycle, profile) {
         fun markSeen() = feedPrefs.edit().putLong("seen_" + profile.name, System.currentTimeMillis()).apply()
@@ -311,6 +314,26 @@ fun HomeScreen() {
                                 else -> "On shift" + (bh.activeShift?.let { " · ${it.type}" } ?: "")
                             }, Modifier.weight(1f), fontWeight = FontWeight.SemiBold)
                             Text(if (bh.census.isNotEmpty()) "${bh.census.size} on census" else "Shift Hub", style = MaterialTheme.typography.labelLarge)
+                        }
+                    }
+                }
+            }
+            "facility" -> {
+                // Facility: life-safety inspections and PMs overdue or coming due (hidden when all are current)
+                val fac = facOpen
+                if (fac.isNotEmpty()) item {
+                    val over = fac.count { it.status == com.blacklab.app.facility.Facility.Status.OVERDUE }
+                    val c = if (over > 0) Color(0xFFEF5350) else Color(0xFFFFB74D)
+                    Surface(onClick = { shell.go("facility") }, shape = RoundedCornerShape(16.dp), color = c.copy(alpha = 0.16f), modifier = Modifier.fillMaxWidth().padding(top = 12.dp)) {
+                        Row(Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Box(Modifier.size(10.dp).clip(CircleShape).background(c))
+                            Spacer(Modifier.width(10.dp))
+                            Column(Modifier.weight(1f)) {
+                                Text(if (over > 0) "Facility: $over overdue" + (if (fac.size > over) " · ${fac.size - over} due soon" else "") else "Facility: ${fac.size} due soon", fontWeight = FontWeight.SemiBold)
+                                Text(fac.first().let { "${it.pm.title} · ${it.asset.name} — ${it.describe()}" }, style = MaterialTheme.typography.bodySmall,
+                                    maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                            Text("Open", style = MaterialTheme.typography.labelLarge)
                         }
                     }
                 }

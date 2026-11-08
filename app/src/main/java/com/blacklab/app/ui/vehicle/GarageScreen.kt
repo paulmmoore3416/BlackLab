@@ -1,5 +1,6 @@
 package com.blacklab.app.ui.vehicle
 
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.blacklab.app.ui.theme.readable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -69,11 +70,11 @@ fun GarageScreen() {
     val shell = LocalShell.current
     val ctx = LocalContext.current
     remember { Garage.load(ctx) }
-    val st by Garage.state.collectAsState()
+    val st by Garage.state.collectAsStateWithLifecycle()
     val v = st.vehicle
     remember { com.blacklab.app.vehicle.Nhtsa.load(ctx) }
-    val nhtsa by com.blacklab.app.vehicle.Nhtsa.state.collectAsState()
-    val pace = remember(st, com.blacklab.app.vehicle.VehicleLink.state.collectAsState().value.trips.size) { com.blacklab.app.vehicle.ServiceReminders.pace(ctx) }
+    val nhtsa by com.blacklab.app.vehicle.Nhtsa.state.collectAsStateWithLifecycle()
+    val pace = remember(st, com.blacklab.app.vehicle.VehicleLink.state.collectAsStateWithLifecycle().value.trips.size) { com.blacklab.app.vehicle.ServiceReminders.pace(ctx) }
     val due = remember(st, pace) { Garage.due(st, milesPerDay = pace) }
     var fillPrefill by remember { mutableStateOf<com.blacklab.app.vehicle.Telemetry.PendingFill?>(null) }
     var recall by remember { mutableStateOf<com.blacklab.app.vehicle.Nhtsa.Recall?>(null) }
@@ -93,8 +94,8 @@ fun GarageScreen() {
     var showFacts by remember { mutableStateOf(false) }
     var menu by remember { mutableStateOf(false) }
     remember { com.blacklab.app.vehicle.VehicleLink.load(ctx) }
-    val car by com.blacklab.app.vehicle.VehicleLink.state.collectAsState()
-    val live by com.blacklab.app.vehicle.VehicleLink.live.collectAsState()
+    val car by com.blacklab.app.vehicle.VehicleLink.state.collectAsStateWithLifecycle()
+    val live by com.blacklab.app.vehicle.VehicleLink.live.collectAsStateWithLifecycle()
     var setup by remember { mutableStateOf(false) }
     var showAll by remember { mutableStateOf(false) }
     var codes by remember { mutableStateOf(false) }

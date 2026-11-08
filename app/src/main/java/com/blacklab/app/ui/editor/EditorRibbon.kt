@@ -1,5 +1,6 @@
 package com.blacklab.app.ui.editor
 
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.blacklab.app.ui.signature.toPngDataUri
 
 import android.app.Activity
@@ -104,8 +105,8 @@ fun EditorRibbon(
     onPageChange: (PageSetup) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val st by controller.state.collectAsState()
-    val imageSelected by controller.imageSelected.collectAsState()
+    val st by controller.state.collectAsStateWithLifecycle()
+    val imageSelected by controller.imageSelected.collectAsStateWithLifecycle()
     var tab by remember { mutableStateOf(RibbonTab.HOME) }
     var dialog by remember { mutableStateOf<String?>(null) }
     var findOpen by remember { mutableStateOf(false) }
@@ -307,8 +308,8 @@ fun EditorRibbon(
             confirmButton = { TextButton(onClick = { dialog = null }) { Text("Close") } },
         )
         "count" -> {
-            val words by controller.words.collectAsState()
-            val chars by controller.chars.collectAsState()
+            val words by controller.words.collectAsStateWithLifecycle()
+            val chars by controller.chars.collectAsStateWithLifecycle()
             AlertDialog(
                 onDismissRequest = { dialog = null },
                 title = { Text("Word count") },
@@ -485,7 +486,7 @@ private fun FindReplaceBar(controller: EditorController, onClose: () -> Unit) {
     var rep by remember { mutableStateOf("") }
     var matchCase by remember { mutableStateOf(false) }
     var showReplace by remember { mutableStateOf(false) }
-    val result by controller.findResult.collectAsState()
+    val result by controller.findResult.collectAsStateWithLifecycle()
     LaunchedEffect(term, matchCase) { kotlinx.coroutines.delay(200); controller.find(term, matchCase) }
     Column(Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 6.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {

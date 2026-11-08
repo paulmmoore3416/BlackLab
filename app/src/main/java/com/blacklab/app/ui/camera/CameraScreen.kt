@@ -1,5 +1,6 @@
 package com.blacklab.app.ui.camera
 
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import android.Manifest
 import android.content.pm.PackageManager
 import android.hardware.camera2.CaptureRequest
@@ -195,7 +196,7 @@ private fun CameraContent(initialMode: String, micOk: Boolean, locOk: Boolean, o
     val scope = rememberCoroutineScope()
     val density = LocalDensity.current
     val engine = remember { CameraEngine(ctx) }
-    val st by engine.state.collectAsState()
+    val st by engine.state.collectAsStateWithLifecycle()
     val sound = remember { MediaActionSound() }
     val location = remember { LocationTracker(ctx) }
     val orientation = remember { OrientationTracker(ctx) }
@@ -253,7 +254,7 @@ private fun CameraContent(initialMode: String, micOk: Boolean, locOk: Boolean, o
     // ---------------- panorama
     val stitcher = remember(st.analysisFocalPx) { if (st.analysisFocalPx > 0f) PanoramaStitcher(ctx, st.analysisFocalPx) else null }
     val idlePano = remember { kotlinx.coroutines.flow.MutableStateFlow(com.blacklab.app.imaging.PanoProgress()) }
-    val pano by (stitcher?.progress ?: idlePano).collectAsState()
+    val pano by (stitcher?.progress ?: idlePano).collectAsStateWithLifecycle()
     var panoResult by remember { mutableStateOf<android.graphics.Bitmap?>(null) }
     var panoProcessing by remember { mutableStateOf(false) }
     LaunchedEffect(cfg.mode, stitcher) { engine.analyzer = if (cfg.mode == CamMode.PANO) stitcher else null }

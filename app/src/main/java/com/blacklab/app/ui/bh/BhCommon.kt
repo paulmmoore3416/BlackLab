@@ -1,5 +1,6 @@
 package com.blacklab.app.ui.bh
 
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.blacklab.app.ui.theme.readable
 import android.content.ClipData
 import android.content.ClipDescription
@@ -89,7 +90,7 @@ fun rememberTicker(periodMs: Long = 1_000): Long {
 fun bhState(): Bh.State {
     val ctx = LocalContext.current
     remember { BhStore.load(ctx) }
-    val s by BhStore.state.collectAsState()
+    val s by BhStore.state.collectAsStateWithLifecycle()
     return s
 }
 

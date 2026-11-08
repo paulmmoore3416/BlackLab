@@ -1,5 +1,6 @@
 package com.blacklab.app.ui.documents
 
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
@@ -135,7 +136,7 @@ fun DocumentEditorScreen(id: Long, template: String?, courseId: Long?) {
 
     val d = doc
     val c = controller
-    val words by (c?.words ?: kotlinx.coroutines.flow.MutableStateFlow(0)).collectAsState()
+    val words by (c?.words ?: kotlinx.coroutines.flow.MutableStateFlow(0)).collectAsStateWithLifecycle()
 
     Column(Modifier.fillMaxSize().imePadding()) {
         TopAppBar(

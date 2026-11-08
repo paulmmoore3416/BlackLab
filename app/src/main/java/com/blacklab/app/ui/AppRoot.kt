@@ -1,5 +1,6 @@
 package com.blacklab.app.ui
 
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import android.net.Uri
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
@@ -116,7 +117,7 @@ import java.io.File
 @Composable
 fun AppRoot(activity: MainActivity) {
     val settings = settingsState()
-    val locked by MainActivity.locked.collectAsState()
+    val locked by MainActivity.locked.collectAsStateWithLifecycle()
     when {
         !settings.onboarded -> OnboardingScreen()
         locked -> LockScreen(activity)
@@ -141,6 +142,7 @@ private val drawerDests = listOf(
     Dest("knowledge", "Knowledge & Talk", Icons.Rounded.Psychology),
     Dest("summarize", "Summarize", Icons.Rounded.Summarize),
     Dest("bh", "Behavioral Health", Icons.Rounded.Diversity3),
+    Dest("facility", "Facility", Icons.Rounded.Apartment),
     Dest("garage", "Garage · Santa Fe", Icons.Rounded.DirectionsCar),
     Dest("camera", "Camera", Icons.Rounded.PhotoCamera),
     Dest("recorder", "Recorder", Icons.Rounded.Mic),
@@ -209,7 +211,7 @@ private fun AppShell(activity: MainActivity) {
     }
 
     // Deep links from notifications
-    val pending by MainActivity.pendingRoute.collectAsState()
+    val pending by MainActivity.pendingRoute.collectAsStateWithLifecycle()
     LaunchedEffect(pending) {
         val r = pending ?: return@LaunchedEffect
         MainActivity.pendingRoute.value = null
@@ -299,7 +301,7 @@ private fun AppShell(activity: MainActivity) {
             Scaffold(
                 snackbarHost = { SnackbarHost(snackbar) },
                 bottomBar = { Column {
-                    val musicOn by com.blacklab.app.media.PlaybackService.running.collectAsState()
+                    val musicOn by com.blacklab.app.media.PlaybackService.running.collectAsStateWithLifecycle()
                     if (showBottom && musicOn) com.blacklab.app.ui.music.MiniPlayer(com.blacklab.app.ui.music.rememberPlayer(), bottomInset = false) { nav.navigate("nowplaying") { launchSingleTop = true } }
                     AnimatedVisibility(showBottom && barShown, enter = slideInVertically(Motion.enter()) { it } + fadeIn(Motion.enter()), exit = slideOutVertically(Motion.exit()) { it } + fadeOut(Motion.exit())) {
                         NavigationBar(containerColor = com.blacklab.app.ui.theme.LocalGlass.current.let { g -> if (g.enabled) g.barFill(MaterialTheme.colorScheme.surface, 0.86f) else MaterialTheme.colorScheme.surfaceContainerLow }, tonalElevation = 0.dp) {
@@ -485,6 +487,10 @@ private fun NavGraph(nav: androidx.navigation.NavHostController) {
         }
         screen("summarize") { com.blacklab.app.ui.summarize.SummarizeScreen() }
         screen("garage") { com.blacklab.app.ui.vehicle.GarageScreen() }
+        screen("facility?tab={tab}&tag={tag}", arguments = listOf(navArgument("tab") { defaultValue = "" }, navArgument("tag") { defaultValue = "" })) {
+            com.blacklab.app.ui.facility.FacilityScreen(it.arguments?.getString("tab") ?: "", Uri.decode(it.arguments?.getString("tag") ?: ""))
+        }
+        screen("facility/asset/{id}") { com.blacklab.app.ui.facility.FacilityAssetScreen(it.arguments?.getString("id") ?: "") }
         // ---- Behavioral Health (MHT & Peer Support) — every screen is behind BhGuarded
         screen("bh") { com.blacklab.app.ui.bh.BhHubScreen() }
         screen("bh/shift") { com.blacklab.app.ui.bh.BhShiftScreen() }
@@ -509,7 +515,7 @@ private fun NavGraph(nav: androidx.navigation.NavHostController) {
 /** Handles files/text shared into BlackLab from other apps. */
 @Composable
 private fun ShareIntake() {
-    val payload by MainActivity.pendingShare.collectAsState()
+    val payload by MainActivity.pendingShare.collectAsStateWithLifecycle()
     val p = payload ?: return
     val app = rememberApp()
     val shell = LocalShell.current

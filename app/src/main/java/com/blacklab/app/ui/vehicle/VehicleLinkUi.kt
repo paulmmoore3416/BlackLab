@@ -1,5 +1,6 @@
 package com.blacklab.app.ui.vehicle
 
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import android.Manifest
 import android.annotation.SuppressLint
 import android.app.Activity
@@ -351,8 +352,8 @@ fun CodesDialog(st: Telemetry.State, onDismiss: () -> Unit) {
 fun CarConnectionDialog(shell: Shell, onDismiss: () -> Unit) {
     val ctx = LocalContext.current
     val app = ctx.app
-    val st by VehicleLink.state.collectAsState()
-    val liveNow by VehicleLink.live.collectAsState()
+    val st by VehicleLink.state.collectAsStateWithLifecycle()
+    val liveNow by VehicleLink.live.collectAsStateWithLifecycle()
     val link = st.link
     val scope = rememberCoroutineScope()
     var refresh by remember { mutableIntStateOf(0) }

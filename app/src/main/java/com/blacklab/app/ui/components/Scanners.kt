@@ -139,6 +139,10 @@ fun CodeResultDialog(code: Barcode, onDismiss: () -> Unit) {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 SelectionContainer { Text(value, style = MaterialTheme.typography.bodyLarge) }
                 if (url != null) FilledTonalButton(onClick = { Files.openUrl(ctx, url); onDismiss() }, modifier = Modifier.fillMaxWidth()) { Text("Open link") }
+                val asset = remember(value) { com.blacklab.app.facility.Facility.findByTag(com.blacklab.app.facility.Facility.load(ctx), value) }
+                FilledTonalButton(onClick = { shell.go("facility?tag=" + android.net.Uri.encode(value)); onDismiss() }, modifier = Modifier.fillMaxWidth()) {
+                    Text(if (asset != null) "Open ${asset.name}" else "New Facility asset with this tag")
+                }
                 OutlinedButton(onClick = {
                     app.io { TaskOps.save(app, TaskEntity(profile = profile.name, title = "Asset $value", notes = "Scanned ${com.blacklab.app.core.Time.dateTime(System.currentTimeMillis())}\n$value")) }
                     shell.toast("Task created"); onDismiss()

@@ -90,7 +90,15 @@ const Phone = {
     const c = new AbortController(); const t = setTimeout(() => c.abort(), 2500);
     try { const r = await fetch(this.url + '/api/ping', { signal: c.signal }); return r.ok; } catch { return false; } finally { clearTimeout(t); }
   },
-  fileUrl(path) { return `${this.url}/api/file?path=${encodeURIComponent(path)}&token=${encodeURIComponent(this.token)}`; },
+  // Files download with the pairing code in a header (never in the URL, where it would land in history and logs)
+  async download(path) {
+    const r = await fetch(`${this.url}/api/file?path=${encodeURIComponent(path)}`, { headers: { Authorization: 'Bearer ' + this.token } });
+    if (!r.ok) { const j = await r.json().catch(() => ({})); throw new Error(j.error || 'HTTP ' + r.status); }
+    const url = URL.createObjectURL(await r.blob());
+    const a = Object.assign(document.createElement('a'), { href: url, download: path.split('/').pop() || 'file' });
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 60_000);
+  },
   looping: false,
   async loop() {
     if (this.looping) return; this.looping = true;
@@ -287,7 +295,8 @@ async function setSetting(key, value) {
   try {
     if (S.mode === 'phone') {
       const r = await Phone.req('/api/settings', { method: 'PUT', body: { [key]: value } });
-      if (!r.applied.includes(key)) toast('The phone rejected that value'); else toast('Saved to phone');
+      if ((r.refused || []).includes(key)) toast('Security and link settings change only over USB or on the phone');
+      else if (!r.applied.includes(key)) toast('The phone rejected that value'); else toast('Saved to phone');
       S.values = r.values; persist();
     } else if (S.mode === 'cloud') {
       await Cloud.queueSettings({ [key]: value });
@@ -786,7 +795,7 @@ Views.documents = () => {
     <div class="toolbar"><input type="search" id="docQ" placeholder="Filter documents" value="${esc(S.ui.docQuery || '')}"><button class="ghost" id="askDocs">Ask my files…</button></div>
     <div class="card"><table class="table"><thead><tr><th>Title</th><th>Folder</th><th>Words</th><th>Modified</th><th></th></tr></thead><tbody>
     ${docs.map((d) => `<tr><td><b>${d.pinned ? '📌 ' : ''}${esc(d.title)}</b><div class="small muted">${esc(d.preview).slice(0, 140)}</div></td><td>${esc(d.folder || '—')}</td><td>${d.words}</td><td class="muted">${ago(d.updatedAt)}</td>
-      <td>${S.mode === 'phone' && d.path ? `<a class="chip btn" href="${Phone.fileUrl(d.path)}" target="_blank" rel="noopener">Open</a>` : ''}</td></tr>`).join('') || '<tr><td colspan="5" class="empty">No documents.</td></tr>'}
+      <td>${S.mode === 'phone' && d.path ? `<a class="chip btn" href="#" data-dl="${esc(d.path)}">Open</a>` : ''}</td></tr>`).join('') || '<tr><td colspan="5" class="empty">No documents.</td></tr>'}
     </tbody></table></div></div>`;
 };
 Views.documents.bind = () => {
@@ -823,7 +832,7 @@ Views.journal.bind = () => { bindProfile(); const add = () => { const v = $('#jI
 
 Views.media = () => {
   const rec = D.prof(S.snap?.recordings); const dic = D.prof(S.snap?.dictations);
-  const link = (p) => S.mode === 'phone' && p ? `<a class="chip btn" href="${Phone.fileUrl(p)}" target="_blank" rel="noopener">Download</a>` : '';
+  const link = (p) => S.mode === 'phone' && p ? `<a class="chip btn" href="#" data-dl="${esc(p)}">Download</a>` : '';
   return `<div class="view-inner"><div class="hero"><h1>Recordings & dictation</h1><div class="spacer"></div>${profileSwitch()}</div>${needData()}
     <div class="row wrap" style="margin-bottom:14px">${['Start recording', 'Start dictation', 'Stop recording', 'Action items from my last meeting'].map((q) => `<span class="chip btn" data-q="${q}">${q}</span>`).join('')}</div>
     <div class="grid g2"><div class="card"><h2>Recordings</h2>${rec.length ? `<ul class="list">${rec.map((r) => `<li><span class="t">${esc(r.title)}</span>${r.hasTranscript ? '<span class="chip accent">transcript</span>' : ''}<span class="meta">${dur(r.durationMs)} · ${relDay(r.createdAt)}</span>${link(r.path)}</li>`).join('')}</ul>` : '<div class="empty">None.</div>'}</div>
@@ -844,7 +853,7 @@ Views.files.bind = async () => {
     const up = path.includes('/') ? path.slice(0, path.lastIndexOf('/')) : '';
     $('#fileList').innerHTML = `<table class="table"><thead><tr><th>Name</th><th>Size</th><th>Modified</th><th></th></tr></thead><tbody>
       ${path ? `<tr><td colspan="4"><a href="#/files/${encodeURIComponent(up)}">↑ Up</a></td></tr>` : ''}
-      ${r.files.map((f) => `<tr><td>${f.dir ? `<a href="#/files/${encodeURIComponent(f.path)}">📁 ${esc(f.name)}</a>` : esc(f.name)}</td><td class="muted">${f.dir ? '' : bytes(f.size)}</td><td class="muted">${ago(f.modified)}</td><td>${f.dir ? '' : `<a class="chip btn" href="${Phone.fileUrl(f.path)}" target="_blank" rel="noopener">Download</a>`}</td></tr>`).join('') || '<tr><td colspan="4" class="empty">Empty folder.</td></tr>'}
+      ${r.files.map((f) => `<tr><td>${f.dir ? `<a href="#/files/${encodeURIComponent(f.path)}">📁 ${esc(f.name)}</a>` : esc(f.name)}</td><td class="muted">${f.dir ? '' : bytes(f.size)}</td><td class="muted">${ago(f.modified)}</td><td>${f.dir ? '' : `<a class="chip btn" href="#" data-dl="${esc(f.path)}">Download</a>`}</td></tr>`).join('') || '<tr><td colspan="4" class="empty">Empty folder.</td></tr>'}
     </tbody></table>`;
   } catch (e) { $('#fileList').innerHTML = `<div class="empty">${esc(e.message)}</div>`; }
 };
@@ -1399,3 +1408,11 @@ async function boot() {
   setInterval(async () => { if (S.mode !== 'phone' && Phone.token) { if (Companion.ok) await Companion.detect(); connectPhone(true); } }, 20000);
 }
 boot();
+
+// Phone file downloads (see Phone.download)
+document.addEventListener('click', (e) => {
+  const a = e.target.closest && e.target.closest('[data-dl]');
+  if (!a) return;
+  e.preventDefault();
+  Phone.download(a.dataset.dl).catch((err) => toast(err.message));
+});

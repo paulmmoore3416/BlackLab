@@ -1,5 +1,6 @@
 package com.blacklab.app.ui.brainstorm
 
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import android.Manifest
 import android.content.ClipData
 import android.content.ClipboardManager
@@ -503,7 +504,7 @@ fun CommentsSheet(pageId: Long?, noteId: Long?, onDismiss: () -> Unit) {
     val app = rememberApp()
     val me = settingsState().userName.ifBlank { "Me" }
     val flow = remember(pageId, noteId) { if (pageId != null) app.db.brainstorm().observePageComments(pageId) else app.db.brainstorm().observeNoteComments(noteId ?: 0) }
-    val comments by flow.collectAsState(initial = emptyList())
+    val comments by flow.collectAsStateWithLifecycle(initialValue = emptyList())
     var text by remember { mutableStateOf("") }
     var showResolved by remember { mutableStateOf(false) }
     ModalBottomSheet(onDismissRequest = onDismiss, containerColor = MaterialTheme.colorScheme.surfaceContainerLow) {
@@ -559,10 +560,10 @@ fun LiveShareSheet(kind: String, refId: Long, title: String, locked: Boolean = f
     val app = rememberApp()
     val ctx = LocalContext.current
     val scope = rememberCoroutineScope()
-    val running by app.link.running.collectAsState()
+    val running by app.link.running.collectAsStateWithLifecycle()
     val settings = settingsState()
     val ready = settings.linkEnabled && settings.linkLan && running
-    val all by app.db.brainstorm().observeShares().collectAsState(initial = emptyList())
+    val all by app.db.brainstorm().observeShares().collectAsStateWithLifecycle(initialValue = emptyList())
     val mine = all.filter { it.kind == kind && it.refId == refId && !it.revoked && it.expiresAt > Time.now() }
     var permission by remember { mutableStateOf("COMMENT") }
     var hours by remember { mutableIntStateOf(24) }

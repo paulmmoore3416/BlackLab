@@ -7,13 +7,13 @@
 **A private, all-in-one personal & professional workspace for Android.**
 Pro camera & photo editor · dictation · audio recorder · Word-class documents · journal · to-do · calendar · education & certification tracking — in one app, with every file saved to a real folder on your phone.
 
-[![Version](https://img.shields.io/badge/version-5.9.0-2BD9A8)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-5.10.0-2BD9A8)](CHANGELOG.md)
 [![Android](https://img.shields.io/badge/Android-15%2B-3DDC84?logo=android&logoColor=white)](#requirements)
 [![Kotlin](https://img.shields.io/badge/Kotlin-2.1-7F52FF?logo=kotlin&logoColor=white)](https://kotlinlang.org)
 [![Jetpack Compose](https://img.shields.io/badge/Jetpack%20Compose-Material%203-4285F4?logo=jetpackcompose&logoColor=white)](https://developer.android.com/compose)
 [![Android CI](https://github.com/paulmmoore3416/BlackLab/actions/workflows/android.yml/badge.svg)](https://github.com/paulmmoore3416/BlackLab/actions/workflows/android.yml)
 
-[Download APK](releases/BlackLab-v5.9.0.apk) · [Features](#features) · [Install](#install) · [Build from source](#build-from-source) · [Architecture](docs/ARCHITECTURE.md)
+[Download APK](https://github.com/paulmmoore3416/BlackLab/releases/latest) · [Features](#features) · [Install](#install) · [Build from source](#build-from-source) · [Architecture](docs/ARCHITECTURE.md)
 
 </div>
 
@@ -83,6 +83,7 @@ An encrypted workspace for working on a behavioral health unit, using initials a
 - **Car link** (5.7): connect to the car's Bluetooth and a drive starts on its own. You get a trip log with a mileage-deduction CSV, the parking spot, and an odometer estimate between readings. It also pulls everything the car shares through **Android Auto**, a Bluetooth **OBD-II** adapter (VIN, check-engine codes, temperatures, voltage, fuel flow and real MPG) and **Hyundai Bluelink** (locks, doors, tire warnings, fluids, 12V battery, where it's parked). See [docs/ANDROID_AUTO.md](docs/ANDROID_AUTO.md#car-data)
 - **5.8**: recalls and build details from your VIN (NHTSA), fill-up detection, predicted service dates with To-Do reminders, automatic trip tags, a Car widget, a practice-drive simulator, Garage charts, and a Garage page on BlackLab Desktop. Appearance adds True black and other dark styles, corner and size options, font and reading-font choices, and an Android 16 Live Update for drives
 - **5.8.1**: BlackLab Desktop adds Brainstorm (notebooks, notes with checklists, tagged lines), Knowledge (every knowledge base), Summarize and Flashcards, to match the app
+- **5.10.0**: **Facility** — assets with QR tags, PM and life-safety inspection schedules (NFPA 10/101/110, ANSI Z358.1 and more), pass/fail logging with work orders, and a survey binder PDF; encrypted backups with a passphrase and a checked, reversible restore
 - **5.9.0**: Notes gets its own Google Keep-style section (labels, reminders, archive, swipe to archive, undo/redo) with a Notes card on Home, and Settings › Home dashboard lets you choose and order every Home card
 
 ### 🖥️ BlackLab Desktop
@@ -210,7 +211,7 @@ Rich-text entries saved as dated files, mood tracking, tags & location, favorite
 ### 🔐 Accounts, privacy & storage
 - Personal / Professional accounts with separate data and folders; default account at launch
 - Optional **biometric / device-credential lock** for the app and/or the Professional account
-- Daily automatic **backups** of the database & settings to `BlackLab/Backups` (14 kept) with one-tap restore
+- Daily automatic **encrypted backups** (database, settings, Garage, Facility, conversations) to `BlackLab/Backups` (14 kept); a backup passphrase lets them restore on a new phone, and every restore is checked first and reversible
 - **Safe in-app updates** from GitHub Releases: an update installs only if its SHA-256 matches the published checksum **and** it is signed with the same key as the installed app (optional weekly check, off by default)
 - **Problem reports** kept only on the phone: crashes, freezes (ANRs) and native crashes, with share/copy/delete
 - BlackLab has no backend, no account and no analytics of its own; your content never leaves the device unless you share or export it
@@ -231,18 +232,18 @@ Internal storage/BlackLab/
 │   ├── Education/     Certificates, syllabi
 │   ├── Exports/       DOCX / PDF / MD / TXT / ICS exports
 │   └── Imports/       Files shared or imported into BlackLab
-└── Backups/           Automatic database backups (.zip)
+└── Backups/           Automatic encrypted backups (.blbackup)
 ```
 
 ## Install
 
-1. Download **[`BlackLab-v5.9.0.apk`](releases/BlackLab-v5.9.0.apk)** (also attached to the [v5.9.0 release](https://github.com/paulmmoore3416/BlackLab/releases/tag/v5.9.0)).
-   Verify it with the published SHA-256: [`BlackLab-v5.9.0.apk.sha256`](releases/BlackLab-v5.9.0.apk.sha256).
+1. Download **`BlackLab-v5.10.0.apk`** from the [latest release](https://github.com/paulmmoore3416/BlackLab/releases/latest).
+   Verify it with the published SHA-256: [`BlackLab-v5.10.0.apk.sha256`](releases/BlackLab-v5.10.0.apk.sha256).
 2. On the phone, allow your browser/Files app to **install unknown apps** when prompted.
 3. Open BlackLab and follow onboarding: name & title, account names, then grant
    **All-files access** (creates the BlackLab folder), **camera & microphone**, **notifications** and optionally **calendars**.
 
-Or with USB debugging: `adb install releases/BlackLab-v5.9.0.apk`
+Or with USB debugging: `adb install BlackLab-v5.10.0.apk`
 
 From 4.3.0 on, BlackLab can update itself: **Settings › App updates › Check now**. Android asks once for permission to install updates.
 

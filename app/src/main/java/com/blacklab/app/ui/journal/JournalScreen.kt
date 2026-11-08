@@ -1,5 +1,6 @@
 package com.blacklab.app.ui.journal
 
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.blacklab.app.ui.theme.readable
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -121,7 +122,7 @@ fun JournalScreen() {
     val shell = LocalShell.current
     val s = settingsState()
     val profile = s.activeProfile
-    val entries by remember(profile) { app.db.journal().observe(profile.name) }.collectAsState(emptyList())
+    val entries by remember(profile) { app.db.journal().observe(profile.name) }.collectAsStateWithLifecycle(emptyList())
     var query by rememberSaveable { mutableStateOf("") }
     var searching by remember { mutableStateOf(false) }
     var favoritesOnly by rememberSaveable { mutableStateOf(false) }

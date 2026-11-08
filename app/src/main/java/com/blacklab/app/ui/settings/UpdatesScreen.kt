@@ -1,5 +1,6 @@
 package com.blacklab.app.ui.settings
 
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import android.content.Intent
 import android.net.Uri
@@ -67,7 +68,7 @@ fun UpdatesScreen() {
     val shell = LocalShell.current
     val ctx = LocalContext.current
     val s = settingsState()
-    val state by Updater.state.collectAsState()
+    val state by Updater.state.collectAsStateWithLifecycle()
     val scope = rememberCoroutineScope()
     var canInstall by remember { mutableStateOf(Updater.canInstall(ctx)) }
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { canInstall = Updater.canInstall(ctx) }

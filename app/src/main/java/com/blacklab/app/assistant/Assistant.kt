@@ -25,6 +25,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asSharedFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
@@ -108,7 +109,8 @@ class Assistant(private val app: AppContainer) {
     fun clearHistory() { messages.value = emptyList(); saveHistory() }
 
     private fun append(m: Msg) {
-        messages.value = (messages.value + m).takeLast(s.asstHistory.coerceAtLeast(20))
+        // The phone screen, background work and the desktop link all add messages at once: update atomically
+        messages.update { (it + m).takeLast(s.asstHistory.coerceAtLeast(20)) }
         saveHistory()
     }
 
@@ -122,10 +124,13 @@ class Assistant(private val app: AppContainer) {
         }
     }.getOrDefault(emptyList())
 
+    @Synchronized
     private fun saveHistory() {
         runCatching {
             historyFile.parentFile?.mkdirs()
-            historyFile.writeText(JSONArray().apply { messages.value.forEach { put(it.toJson()) } }.toString())
+            val tmp = File(historyFile.path + ".tmp")
+            tmp.writeText(JSONArray().apply { messages.value.forEach { put(it.toJson()) } }.toString())
+            if (!tmp.renameTo(historyFile)) tmp.delete()
         }
     }
 
@@ -201,6 +206,8 @@ class Assistant(private val app: AppContainer) {
             return Reply("Marked.")
         }
 
+        // ---- Facility: inspections & PMs — before tasks so "what inspections are due" lands here
+        facility(l)?.let { return it }
         // ---- Garage: the Santa Fe (fuel, service, odometer, what's due) — before tasks so "what's due on the car" lands here
         garage(t, l)?.let { return it }
 
@@ -399,6 +406,7 @@ User: $text"""
 • Weather — “what's the weather”, “will it freeze tonight?”, “weather alerts” (facility prep checklists)
 • Desktop — “on my computer open my downloads”, “ask my desktop how much disk space is left”, “desktop AI status”
 • Behavioral Health — “start rounds”, “when are rounds due?”, “start my shift”, “new peer note”, “SBAR handoff”, “crisis lines”, “grounding”
+• Facility — “what inspections are due?”, “any PMs overdue?”
 • Garage — “log fuel 13.2 gallons $48 at 31,250 miles”, “I got an oil change at 31,000”, “what's due on the car?”
 • Driving — “navigate to my next meeting”, “find a gas station”, “call 555-0100”
 • 🌐 Gmail — “check email”, “search email for invoice”, “draft email to x@y.com about … saying …”
@@ -623,7 +631,7 @@ User: $text"""
         canOnline()?.let { return Reply(it) }
         val token = googleToken() ?: return signInReply()
         val (file, mime) = when {
-            l.contains("backup") || l.contains("back up") -> app.backups.backupNow() to "application/zip"
+            l.contains("backup") || l.contains("back up") -> app.backups.backupNow() to "application/octet-stream"
             l.contains("photo") || l.contains("picture") -> latest(app.storage.dir(profile, Folder.PHOTOS)) to "image/jpeg"
             l.contains("scan") -> latest(app.storage.dir(profile, Folder.SCANS), "pdf") to "application/pdf"
             l.contains("record") -> latest(app.storage.dir(profile, Folder.RECORDINGS)) to "audio/mp4"
@@ -932,6 +940,25 @@ User: $text"""
             else -> null
         }
         return screen?.let { Reply("Opening it.", route = it) }
+    }
+
+    // ------------------------------------------------------------------ facility
+
+    /** Questions only ("what inspections are due?") — never a task like "remind me at 3 pm the facility report is due". */
+    private val facilityAsk = Regex("^(what|which|any|are|is|show|list|how many|tell me|do i have)\\b.*\\b(inspections?|pms|preventive maintenance|life[- ]safety|facility)\\b.*\\b(due|overdue|coming up|behind)\\b")
+
+    private fun facility(l: String): Reply? {
+        if (!facilityAsk.containsMatchIn(l)) return null
+        val f = com.blacklab.app.facility.Facility
+        val due = f.due(f.load(app.context))
+        if (due.isEmpty()) return Reply("No facility schedules yet. Add your life-safety program in Facility.", listOf(Link("Facility", "facility")), source = "Facility")
+        val open = due.filter { it.status != com.blacklab.app.facility.Facility.Status.OK }
+        if (open.isEmpty()) return Reply("All ${due.size} facility schedules are current. Next up: ${due.first().pm.title} for ${due.first().asset.name}, ${due.first().describe()}.",
+            listOf(Link("Facility", "facility")), source = "Facility")
+        val over = open.count { it.status == com.blacklab.app.facility.Facility.Status.OVERDUE }
+        val head = if (over > 0) "$over overdue" + (if (open.size > over) " and ${open.size - over} due soon" else "") else "${open.size} due soon"
+        return Reply("Facility: $head. " + open.take(4).joinToString("; ") { "${it.pm.title}, ${it.asset.name} — ${it.describe()}" } + if (open.size > 4) "; and ${open.size - 4} more." else ".",
+            listOf(Link("Facility", "facility")), source = "Facility")
     }
 
     // ------------------------------------------------------------------ garage & driving

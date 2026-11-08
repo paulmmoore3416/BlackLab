@@ -1,5 +1,6 @@
 package com.blacklab.app.ui.recorder
 
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import android.Manifest
 import android.content.pm.PackageManager
 import android.media.MediaMetadataRetriever
@@ -106,14 +107,14 @@ fun RecorderScreen() {
     val app = rememberApp()
     val shell = LocalShell.current
     val s = settingsState()
-    val rec by RecorderService.state.collectAsState()
-    val recordings by remember(s.activeProfile) { app.db.recordings().observe(s.activeProfile.name) }.collectAsState(emptyList())
+    val rec by RecorderService.state.collectAsStateWithLifecycle()
+    val recordings by remember(s.activeProfile) { app.db.recordings().observe(s.activeProfile.name) }.collectAsStateWithLifecycle(emptyList())
     var micOk by remember { mutableStateOf(ContextCompat.checkSelfPermission(ctx, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) }
     val perm = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { micOk = it }
     var settingsOpen by remember { mutableStateOf(false) }
     var query by rememberSaveable { mutableStateOf("") }
 
-    val device by RecorderService.preferredDevice.collectAsState()
+    val device by RecorderService.preferredDevice.collectAsStateWithLifecycle()
     val config = RecConfig(
         deviceId = device,
         format = s.recFormat, sampleRate = s.recSampleRate, channels = s.recChannels, bitrate = s.recBitrate, source = s.recSource,

@@ -1,5 +1,6 @@
 package com.blacklab.app.ui.schedule
 
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.blacklab.app.ui.theme.readable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -74,7 +75,7 @@ fun EventEditorScreen(id: Long, start: Long?, allDayDefault: Boolean) {
     val shell = LocalShell.current
     val ctx = LocalContext.current
     val s = settingsState()
-    val calendars by remember(s.activeProfile) { app.db.events().observeCalendars(listOf(s.activeProfile.name)) }.collectAsState(emptyList())
+    val calendars by remember(s.activeProfile) { app.db.events().observeCalendars(listOf(s.activeProfile.name)) }.collectAsStateWithLifecycle(emptyList())
     var e by remember { mutableStateOf<EventEntity?>(null) }
     LaunchedEffect(id) {
         e = if (id != 0L) app.db.events().get(id) else {
