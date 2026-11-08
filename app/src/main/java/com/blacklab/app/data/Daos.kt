@@ -218,6 +218,8 @@ interface EducationDao {
     fun observeDecks(profile: String): Flow<List<DeckEntity>>
     @Query("SELECT * FROM decks WHERE id = :id")
     suspend fun deck(id: Long): DeckEntity?
+    @Query("SELECT * FROM decks") suspend fun allDecks(): List<DeckEntity>
+    @Query("SELECT * FROM flashcards") suspend fun allCards(): List<FlashcardEntity>
     @Insert suspend fun insertDeck(e: DeckEntity): Long
     @Update suspend fun updateDeck(e: DeckEntity)
     @Delete suspend fun deleteDeck(e: DeckEntity)

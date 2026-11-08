@@ -389,7 +389,10 @@ const NAV = [
   { id: 'tasks', label: 'To-Do', ico: '✓' },
   { id: 'calendar', label: 'Schedule', ico: '▦' },
   { id: 'documents', label: 'Documents', ico: '❏' },
+  { id: 'brainstorm', label: 'Brainstorm', ico: '✧' },
   { id: 'learning', label: 'Education', ico: '◎' },
+  { id: 'knowledge', label: 'Knowledge', ico: '❖' },
+  { id: 'summarize', label: 'Summarize', ico: '≡' },
   { id: 'journal', label: 'Journal', ico: '✎' },
   { id: 'media', label: 'Recordings', ico: '◉' },
   { id: 'files', label: 'Phone files', ico: '▤' },
@@ -593,6 +596,133 @@ Views.garage = () => {
     </div></div>`;
 };
 
+// ---------------- brainstorm (notebooks › sections › pages, and Keep-style notes)
+const noteBg = (n) => { const dark = document.documentElement.getAttribute('data-theme') !== 'light'; const c = dark ? n.dark : n.light; return c ? `background:${c};${dark ? '' : 'color:#14161A'}` : ''; };
+Views.brainstorm = () => {
+  const B = S.snap?.brainstorm;
+  const tab = S.sub === 'notes' || S.sub === 'tagged' ? S.sub : 'notebooks';
+  const q = (S.ui.bsQuery || '').toLowerCase();
+  const nbs = D.prof(B?.notebooks); const notes = D.prof(B?.notes);
+  const tabs = [['notebooks', 'Notebooks'], ['notes', 'Notes'], ['tagged', 'Tagged']].map(([k, l]) => `<a href="#/brainstorm/${k}" class="chip btn ${tab === k ? 'accent' : ''}">${l}</a>`).join('');
+  const head = `<div class="hero"><h1>Brainstorm</h1><div class="spacer"></div>${profileSwitch()}</div>${needData()}
+    <div class="toolbar"><div class="row wrap">${tabs}</div><span class="spacer"></span><input type="search" id="bsQ" placeholder="Search pages and notes" value="${esc(S.ui.bsQuery || '')}"></div>`;
+  if (!B) return `<div class="view-inner">${head}${S.snap ? '<div class="notice">Update the phone to BlackLab 5.8.1 to see Brainstorm here.</div>' : ''}</div>`;
+  const allPages = nbs.flatMap((nb) => nb.sections.flatMap((sec) => sec.pages.map((p) => ({ ...p, nb, sec }))));
+  const hit = (p) => !q || (p.title + ' ' + p.preview + ' ' + p.text).toLowerCase().includes(q);
+  const noteHit = (n) => !q || (n.title + ' ' + n.body + ' ' + n.items.map((i) => i.t).join(' ') + ' ' + n.labels.join(' ')).toLowerCase().includes(q);
+  if (tab === 'notes') {
+    const shown = notes.filter((n) => !n.archived && noteHit(n));
+    const live = S.mode === 'phone';
+    const card = (n) => `<div class="note" style="${noteBg(n)}">${n.pinned ? '<span class="pin" title="Pinned">📌</span>' : ''}${n.title ? `<b>${esc(n.title)}</b>` : ''}
+      ${n.checklist ? `<ul class="checks">${n.items.map((it, i) => `<li style="padding-left:${it.i * 16}px"><label><input type="checkbox" data-note="${n.id}" data-item="${i}" ${it.d ? 'checked' : ''} ${live ? '' : 'disabled'}> <span class="${it.d ? 'done' : ''}">${esc(it.t)}</span></label></li>`).join('')}</ul>` : `<div class="nb">${esc(n.body).slice(0, 900)}</div>`}
+      <div class="small muted" style="margin-top:6px">${[...n.labels.map((l) => '#' + esc(l)), n.reminderAt ? '⏰ ' + relDay(n.reminderAt) + ' ' + fmtTime(n.reminderAt) : '', n.attachments ? '📎 ' + n.attachments : '', ago(n.updatedAt)].filter(Boolean).join(' · ')}</div></div>`;
+    return `<div class="view-inner">${head}
+      <div class="card" style="margin-bottom:16px"><div class="stack"><input id="nTitle" placeholder="Title">
+        <textarea id="nBody" placeholder="Take a note… (one item per line for a checklist)"></textarea>
+        <div class="row"><label class="row small"><label class="switch"><input type="checkbox" id="nList"><span></span></label> Checklist</label><span class="spacer"></span><button id="nAdd" ${live ? '' : 'disabled title="Needs the live phone link"'}>Add note</button></div>
+        ${live ? '' : '<div class="muted small">Adding notes and ticking items needs the live phone link. <a href="#/connect">Connect →</a></div>'}</div></div>
+      ${shown.length ? `<div class="notes">${shown.map(card).join('')}</div>` : '<div class="empty">No notes.</div>'}
+      ${notes.some((n) => n.archived) ? `<details style="margin-top:16px"><summary class="muted">Archived (${notes.filter((n) => n.archived).length})</summary><div class="notes" style="margin-top:10px">${notes.filter((n) => n.archived && noteHit(n)).map(card).join('')}</div></details>` : ''}</div>`;
+  }
+  if (tab === 'tagged') {
+    const tagged = allPages.flatMap((p) => (p.tags || []).map((t) => ({ ...t, p }))).filter((t) => !q || (t.tag + ' ' + t.text).toLowerCase().includes(q));
+    const byTag = {}; tagged.forEach((t) => (byTag[t.tag] = byTag[t.tag] || []).push(t));
+    return `<div class="view-inner">${head}${Object.keys(byTag).length ? `<div class="grid g2">${Object.entries(byTag).map(([tag, ts]) => `<div class="card"><h2>${esc(tag)} <span class="chip">${ts.filter((t) => !t.done).length} open</span></h2><ul class="list">
+      ${ts.map((t) => `<li><span>${t.done ? '☑' : '☐'}</span><span class="t ${t.done ? 'muted' : ''}">${esc(t.text)}<br><span class="small muted">${esc(t.p.nb.name)} › ${esc(t.p.sec.name)} › ${esc(t.p.title || 'Untitled page')}</span></span></li>`).join('')}</ul></div>`).join('')}</div>`
+      : '<div class="empty">No tagged paragraphs. Tag lines on a page (To Do, Important, Question…) and they gather here.</div>'}</div>`;
+  }
+  // notebooks
+  const selSec = S.ui.bsSection;
+  const sec = nbs.flatMap((nb) => nb.sections.map((x) => ({ ...x, nb }))).find((x) => x.id === selSec) || nbs[0]?.sections?.[0] && { ...nbs[0].sections[0], nb: nbs[0] };
+  const pages = q ? allPages.filter(hit) : (sec?.pages || []).map((p) => ({ ...p, nb: sec.nb, sec }));
+  const open = S.ui.bsPage;
+  return `<div class="view-inner">${head}
+    <div class="bs-layout">
+      <div class="card bs-tree">${nbs.length ? nbs.map((nb) => `<div class="bs-nb"><div class="bs-nb-name"><span class="dot" style="background:${argb(nb.color)}"></span>${esc(nb.emoji ? nb.emoji + ' ' : '')}${esc(nb.name)}</div>
+        ${nb.sections.map((x) => `<a class="bs-sec ${sec && x.id === sec.id && !q ? 'on' : ''}" data-sec="${x.id}"><span class="bar" style="background:${argb(x.color)}"></span>${x.group ? `<span class="muted small">${esc(x.group)} › </span>` : ''}${esc(x.name)}${x.locked ? ' 🔒' : ''}<span class="spacer"></span><span class="muted small">${x.pages.length}</span></a>`).join('') || '<div class="muted small" style="padding:4px 10px">No sections</div>'}</div>`).join('')
+        : '<div class="empty">No notebooks yet.</div>'}</div>
+      <div class="card bs-pages"><h2>${q ? `Pages matching “${esc(S.ui.bsQuery)}”` : sec ? esc(sec.nb.name) + ' › ' + esc(sec.name) : 'Pages'}</h2>
+        ${sec?.locked && !q ? '<div class="notice">This section is password-protected on the phone, so only page titles are shared.</div>' : ''}
+        ${pages.length ? `<ul class="list">${pages.map((p) => `<li class="bs-page" data-page="${p.id}" style="padding-left:${4 + p.level * 18}px;cursor:pointer;flex-wrap:wrap"><span class="t">${p.pinned ? '📌 ' : ''}<b>${esc(p.title || 'Untitled page')}</b>${q ? `<span class="muted small"> · ${esc(p.nb.name)} › ${esc(p.sec.name)}</span>` : ''}<br><span class="small muted">${esc(p.preview).slice(0, 160)}</span></span><span class="meta">${p.words} words · ${ago(p.updatedAt)}</span>
+          ${open === p.id && p.text ? `<div class="bs-text">${esc(p.text)}${p.text.length >= 1500 ? '…' : ''}${(p.tags || []).length ? `<div style="margin-top:8px">${p.tags.map((t) => `<span class="chip">${t.done ? '☑' : '☐'} ${esc(t.tag)}: ${esc(t.text).slice(0, 80)}</span>`).join(' ')}</div>` : ''}</div>` : ''}</li>`).join('')}</ul>` : '<div class="empty">No pages.</div>'}
+        <div class="muted small" style="margin-top:8px">Pages are drawn and edited on the phone (ink, pictures, audio). Here you can read and search their text.</div></div>
+    </div></div>`;
+};
+Views.brainstorm.bind = () => {
+  bindProfile();
+  const qi = $('#bsQ'); qi.oninput = (e) => { S.ui.bsQuery = e.target.value; const p = e.target.selectionStart; render(); const i = $('#bsQ'); i.focus(); i.setSelectionRange(p, p); };
+  $$('[data-sec]').forEach((a) => a.onclick = () => { S.ui.bsSection = Number(a.dataset.sec); S.ui.bsPage = null; S.ui.bsQuery = ''; saveUi(); render(); });
+  $$('[data-page]').forEach((li) => li.onclick = () => { const id = Number(li.dataset.page); S.ui.bsPage = S.ui.bsPage === id ? null : id; render(); });
+  $$('[data-note]').forEach((c) => c.onchange = async () => {
+    try { await Phone.req(`/api/notes/${c.dataset.note}/item`, { body: { index: Number(c.dataset.item), done: c.checked } }); await loadFromPhone(); } catch (e) { toast(e.message); c.checked = !c.checked; }
+  });
+  const add = $('#nAdd'); if (add) add.onclick = async () => {
+    const title = $('#nTitle').value.trim(); const body = $('#nBody').value; const list = $('#nList').checked;
+    if (!title && !body.trim()) return;
+    const profile = S.ui.profile === 'ALL' ? undefined : S.ui.profile;
+    try {
+      await Phone.req('/api/notes', { body: list ? { title, items: body.split('\n').map((x) => x.trim()).filter(Boolean), profile } : { title, body, profile } });
+      toast('Note added on the phone'); await loadFromPhone();
+    } catch (e) { toast(e.message); }
+  };
+};
+
+// ---------------- knowledge (the app's expert and conversation knowledge bases, from knowledge.js)
+let kbLoading = null;
+function loadKb() {
+  if (window.BL_KB || kbLoading) return kbLoading;
+  kbLoading = new Promise((ok) => { const sc = document.createElement('script'); sc.src = 'knowledge.js'; sc.onload = () => { ok(); render(); }; sc.onerror = () => { ok(); toast('Knowledge bases didn’t load'); }; document.head.appendChild(sc); });
+  return kbLoading;
+}
+Views.knowledge = () => {
+  if (!window.BL_KB) { loadKb(); return '<div class="view-inner"><div class="hero"><h1>Knowledge</h1></div><div class="empty">Loading the knowledge bases…</div></div>'; }
+  const K = window.BL_KB; const [kbId, entryId] = (S.sub || '').split(':');
+  const q = (S.ui.kbQuery || '').toLowerCase();
+  const base = K.find((b) => b.id === kbId);
+  const para = (t) => t.split(/\n\s*\n/).map((x) => x.trim()).filter(Boolean).map((x) => x.split('\n').every((l) => /^\s*[-*] /.test(l))
+    ? `<ul>${x.split('\n').map((l) => `<li>${esc(l.replace(/^\s*[-*] /, '').replace(/\*\*/g, ''))}</li>`).join('')}</ul>` : `<p>${esc(x.replace(/\*\*/g, '').replace(/\s*\n\s*/g, ' '))}</p>`).join('');
+  const search = q ? K.flatMap((b) => b.entries.filter((e) => (e.title + ' ' + e.tags.join(' ') + ' ' + e.body).toLowerCase().includes(q)).map((e) => ({ e, b }))).slice(0, 60) : [];
+  const head = `<div class="hero"><div><h1>${base ? esc(base.title) : 'Knowledge'}</h1><div class="muted">${base ? esc(base.summary) : `${K.length} knowledge bases · ${K.reduce((a, b) => a + b.entries.length, 0)} entries — the same ones the phone's assistant answers from`}</div></div></div>
+    <div class="toolbar">${base ? '<a href="#/knowledge" class="chip btn">← All knowledge bases</a>' : ''}<span class="spacer"></span><input type="search" id="kbQ" placeholder="Search every entry" value="${esc(S.ui.kbQuery || '')}"></div>`;
+  if (q) return `<div class="view-inner">${head}<div class="card">${search.length ? `<ul class="list">${search.map(({ e, b }) => `<li><a class="t" href="#/knowledge/${encodeURIComponent(b.id + ':' + e.id)}"><b>${esc(e.title)}</b><br><span class="small muted">${esc(b.title)} — ${esc(e.body.slice(0, 150))}…</span></a></li>`).join('')}</ul>` : '<div class="empty">Nothing matches.</div>'}</div></div>`;
+  if (base && entryId) {
+    const e = base.entries.find((x) => x.id === entryId);
+    if (e) return `<div class="view-inner">${head}<div class="card kb-entry"><h2>${esc(e.title)}</h2>${e.tags.length ? `<div class="row wrap" style="margin-bottom:8px">${e.tags.slice(0, 10).map((t) => `<span class="chip">${esc(t)}</span>`).join('')}</div>` : ''}${para(e.body)}
+      ${e.ask.length ? `<h3 style="margin-top:14px">Ask about it</h3><div class="row wrap">${e.ask.map((a) => `<span class="chip btn" data-ask="${esc(a)}">${esc(a)}</span>`).join('')}</div>` : ''}
+      <div style="margin-top:14px"><a href="#/knowledge/${encodeURIComponent(base.id)}" class="small">← ${esc(base.title)}</a></div></div></div>`;
+  }
+  if (base) return `<div class="view-inner">${head}
+    ${base.starters?.length ? `<div class="row wrap" style="margin-bottom:14px">${base.starters.map((a) => `<span class="chip btn" data-ask="${esc(a)}">${esc(a)}</span>`).join('')}</div>` : ''}
+    <div class="card"><ul class="list">${base.entries.map((e) => `<li><a class="t" href="#/knowledge/${encodeURIComponent(base.id + ':' + e.id)}"><b>${esc(e.title)}</b><br><span class="small muted">${esc(e.body.replace(/\*\*/g, '').slice(0, 170))}…</span></a></li>`).join('')}</ul></div></div>`;
+  const group = (kind, title, blurb) => `<h2 style="margin:18px 0 8px">${title}</h2><div class="muted small" style="margin-bottom:10px">${blurb}</div><div class="grid g3">${K.filter((b) => b.kind === kind).map((b) => `<a class="card kb-card" href="#/knowledge/${encodeURIComponent(b.id)}"><b>${esc(b.title)}</b><div class="small muted" style="margin-top:4px">${esc(b.summary)}</div><div class="small" style="margin-top:8px">${b.entries.length} entries</div></a>`).join('')}</div>`;
+  return `<div class="view-inner">${head}${group('DOMAIN', 'Expert knowledge', 'Reference you can read here or ask the assistant about.')}${group('CONVERSATION', 'Conversations', 'Topics to talk through with the assistant — tap a starter to begin.')}</div>`;
+};
+Views.knowledge.bind = () => {
+  const qi = $('#kbQ'); if (qi) qi.oninput = (e) => { S.ui.kbQuery = e.target.value; const p = e.target.selectionStart; render(); const i = $('#kbQ'); i.focus(); i.setSelectionRange(p, p); };
+  $$('[data-ask]').forEach((c) => c.onclick = () => { go('assistant'); ask(c.dataset.ask); });
+};
+
+// ---------------- summarize (the phone's summaries: pick what and how)
+Views.summarize = () => {
+  const what = [['today', 'Today'], ['tomorrow', 'Tomorrow'], ['this week', 'This week'], ['my open tasks', 'Open tasks'], ['my recent notes', 'Recent notes'], ['my journal', 'Journal'], ['my last meeting', 'Last meeting']];
+  const how = [['a quick brief', 'Quick brief'], ['action items', 'Action items'], ['bullet points', 'Bullets'], ['an email to my boss', 'Email to my boss'], ['a status report', 'Status report'], ['talking points', 'Talking points']];
+  const w = S.ui.sumWhat || 'this week'; const h = S.ui.sumHow || 'action items';
+  return `<div class="view-inner"><div class="hero"><div><h1>Summarize</h1><div class="muted">Summaries of your own stuff, written by the phone's assistant (or the desktop's AI when it's connected).</div></div></div>
+    <div class="grid g2">
+      <div class="card"><h2>What</h2><div class="row wrap">${what.map(([k, l]) => `<span class="chip btn ${w === k ? 'accent' : ''}" data-sw="${esc(k)}">${l}</span>`).join('')}</div>
+        <h2 style="margin-top:16px">As</h2><div class="row wrap">${how.map(([k, l]) => `<span class="chip btn ${h === k ? 'accent' : ''}" data-sh="${esc(k)}">${l}</span>`).join('')}</div>
+        <div class="row" style="margin-top:16px"><button id="sumGo">Summarize ${esc(w)} as ${esc(h)}</button></div></div>
+      <div class="card"><h2>Or paste anything</h2><textarea id="sumText" placeholder="Paste text — an email thread, notes, an article…" style="min-height:160px"></textarea>
+        <div class="row" style="margin-top:10px"><button class="ghost" id="sumPaste">Summarize this as ${esc(h)}</button></div></div>
+    </div></div>`;
+};
+Views.summarize.bind = () => {
+  $$('[data-sw]').forEach((c) => c.onclick = () => { S.ui.sumWhat = c.dataset.sw; saveUi(); render(); });
+  $$('[data-sh]').forEach((c) => c.onclick = () => { S.ui.sumHow = c.dataset.sh; saveUi(); render(); });
+  $('#sumGo').onclick = () => { go('assistant'); ask(`summarize ${S.ui.sumWhat || 'this week'} as ${S.ui.sumHow || 'action items'}`); };
+  $('#sumPaste').onclick = () => { const t = $('#sumText').value.trim(); if (t) { go('assistant'); ask(`summarize this as ${S.ui.sumHow || 'action items'}: ${t.replace(/\s*\n+\s*/g, ' ¶ ')}`); } };
+};
+
 Views.tasks = () => {
   const all = D.tasks; const lists = D.prof(S.snap?.lists);
   const f = S.sub || 'open';
@@ -672,6 +802,9 @@ Views.learning = () => {
     <div class="grid g2">
       <div class="card"><h2>Courses</h2>${courses.length ? `<ul class="list">${courses.map((c) => `<li><span class="dot" style="background:${argb(c.color)}"></span><span class="t"><b>${esc(c.code)}</b> ${esc(c.title)}</span><span class="chip">${esc(c.kind.toLowerCase())}</span><span class="chip ${c.status === 'COMPLETED' ? 'accent' : ''}">${esc(c.status.replace('_', ' ').toLowerCase())}${c.finalGrade ? ' · ' + esc(c.finalGrade) : ''}</span></li>`).join('')}</ul>` : '<div class="empty">No courses.</div>'}</div>
       <div class="card"><h2>Certifications</h2>${certs.length ? `<ul class="list">${certs.map((c) => { const days = c.expiresDay ? Math.round((c.expiresDay - now) / DAY) : null; return `<li><span class="t"><b>${esc(c.name)}</b> <span class="muted">${esc(c.issuer)}</span></span><span class="chip">${esc(c.status.replace('_', ' ').toLowerCase())}</span>${days != null ? `<span class="chip ${days < 45 ? 'warn' : ''}">${days >= 0 ? 'renews in ' + days + ' d' : 'expired'}</span>` : ''}${c.examAt ? `<span class="chip pro">exam ${relDay(c.examAt).toLowerCase()}</span>` : ''}</li>`; }).join('')}</ul>` : '<div class="empty">No certifications.</div>'}</div>
+      <div class="card span2"><h2>Flashcards</h2>${(() => { const dk = D.prof(S.snap?.decks); return dk.length ? `<table class="table"><thead><tr><th>Deck</th><th>Course</th><th>Cards</th><th>Learned</th><th>Due today</th></tr></thead><tbody>
+        ${dk.map((d) => `<tr><td><b>${esc(d.name)}</b></td><td>${esc(d.course || '—')}</td><td>${d.cards}</td><td>${d.cards ? Math.round(d.learned / d.cards * 100) + '%' : '—'}</td><td>${d.due ? `<span class="chip accent">${d.due} due</span>` : '<span class="muted">none</span>'}</td></tr>`).join('')}</tbody></table>
+        <div class="muted small" style="margin-top:6px">Review on the phone (Education › Flashcards); spaced repetition schedules each card.</div>` : '<div class="empty">No flashcard decks yet — make one on the phone in Education.</div>'; })()}</div>
       <div class="card span2"><h2>Assignments & exams</h2><table class="table"><thead><tr><th>Due</th><th>Title</th><th>Course</th><th>Type</th><th>Status</th></tr></thead><tbody>
         ${asg.map((a) => `<tr><td style="${a.dueAt && a.dueAt < now ? 'color:var(--danger)' : ''}">${a.dueAt ? relDay(a.dueAt) + ' ' + fmtTime(a.dueAt) : '—'}</td><td>${esc(a.title)}</td><td>${esc(a.course)}</td><td>${esc(a.kind)}</td><td><span class="chip">${esc(a.status.toLowerCase().replace('_', ' '))}</span></td></tr>`).join('') || '<tr><td colspan="5" class="empty">Nothing due.</td></tr>'}
       </tbody></table></div>

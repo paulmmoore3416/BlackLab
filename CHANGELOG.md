@@ -2,6 +2,17 @@
 
 All notable changes to BlackLab are documented here. The project follows [Semantic Versioning](https://semver.org/).
 
+## [5.8.1] — 2026-11-07
+
+BlackLab Desktop catches up with the app.
+
+### Added
+- **Brainstorm on the desktop**: your notebooks, sections and pages (titles, previews and searchable text; locked sections share titles only), Keep-style notes in their colors with checklists you can tick, a **Tagged** view that gathers To Do / Important / Question lines from every page, search across all of it, and **Add note** (text or checklist) straight to the phone over the live link.
+- **Knowledge on the desktop**: all expert and conversation knowledge bases the assistant answers from, with full entries, search across every entry, and one-tap questions and conversation starters.
+- **Summarize on the desktop**: pick what (today, tomorrow, this week, open tasks, recent notes, journal, last meeting) and how (brief, action items, bullets, email to your boss, status report, talking points), or paste any text to summarize.
+- **Flashcards on the desktop**: your decks with cards learned and due today, under Education.
+- The phone's assistant summarizes pasted text ("summarize this as action items: …").
+
 ## [5.8.0] — 2026-11-07
 
 Twelve improvements on top of the car link: six features and six looks.

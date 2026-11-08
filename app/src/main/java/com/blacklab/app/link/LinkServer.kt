@@ -275,6 +275,25 @@ class LinkServer(private val app: AppContainer, private val port: Int, private v
                 TaskOps.setCompleted(app, t, r.path.endsWith("complete"))
                 200 to "{}"
             }
+            // Brainstorm notes from the desktop: a new note (text or checklist) and ticking checklist items
+            r.method == "POST" && r.path == "/api/notes" -> {
+                val profile = body.optString("profile").ifBlank { app.settings.current.activeProfile.name }
+                val items = body.optJSONArray("items")?.let { a -> (0 until a.length()).map { com.blacklab.app.brainstorm.NoteItem(a.optString(it).take(500)) } }.orEmpty().filter { it.text.isNotBlank() }
+                val title = body.optString("title").take(200); val text = body.optString("body").take(20_000)
+                if (title.isBlank() && text.isBlank() && items.isEmpty()) return 400 to err("Empty note")
+                val id = com.blacklab.app.brainstorm.NoteOps.save(app, com.blacklab.app.data.NoteEntity(profile = profile, title = title, body = text,
+                    checklist = items.isNotEmpty(), items = com.blacklab.app.brainstorm.NoteOps.itemsJson(items)))
+                200 to JSONObject().put("id", id).toString()
+            }
+            r.method == "POST" && r.path.matches(Regex("/api/notes/\\d+/item")) -> {
+                val n = app.db.notes().get(r.path.split('/')[3].toLong()) ?: return 404 to err("No such note")
+                val list = com.blacklab.app.brainstorm.NoteOps.items(n).toMutableList()
+                val i = body.optInt("index", -1)
+                if (i !in list.indices) return 400 to err("No such item")
+                list[i] = list[i].copy(done = body.optBoolean("done"))
+                com.blacklab.app.brainstorm.NoteOps.save(app, n.copy(items = com.blacklab.app.brainstorm.NoteOps.itemsJson(list)))
+                200 to "{}"
+            }
             r.method == "POST" && r.path == "/api/secrets" -> {
                 val set = ArrayList<String>()
                 body.keys().forEach { k -> if (k in Secrets.provisionable) { app.secrets.put(k, body.optString(k)); set += k } }

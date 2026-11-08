@@ -716,6 +716,15 @@ User: $text"""
     // ------------------------------------------------------------------ summaries
 
     private suspend fun summarize(rest: String, origin: Origin): Reply? {
+        // Pasted text (from the desktop's Summarize page): "summarize this as action items: <text>"
+        Regex("^this(?:\\s+as\\s+([^:]{2,60}))?\\s*:\\s*(.{40,})$", RegexOption.IGNORE_CASE).find(rest.trim())?.let { p ->
+            val how = p.groupValues[1].trim()
+            val text = p.groupValues[2].replace(" ¶ ", "\n").take(30_000)
+            val style = Summarizer.styleFrom(how) ?: if (how.isBlank()) Summarizer.Style.KEY_POINTS else Summarizer.Style.CUSTOM
+            val r = Summarizer.run(Summarizer.Request(listOf(Summarizer.Source("Pasted text", "Pasted text", text, Time.now())), style,
+                Summarizer.lengthFrom(how) ?: Summarizer.Length.MEDIUM, if (style == Summarizer.Style.CUSTOM) how else ""), s.asstUseNano)
+            return Reply("${r.style.label}:\n\n${r.text}", listOf(Link("Summarize more", "summarize")), source = "Summaries · ${r.engine}")
+        }
         val l = rest.lowercase(Locale.US)
         val target = l.substringBefore(" as ").substringBefore(" for my ").substringBefore(" in ")
         val preset = when {

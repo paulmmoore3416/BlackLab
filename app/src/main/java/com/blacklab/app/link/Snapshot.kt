@@ -99,6 +99,55 @@ object Snapshot {
         }
     }.getOrElse { JSONObject().put("error", it.message ?: "unavailable") }
 
+    /**
+     * Brainstorm for the desktop: notebooks › sections › pages (title, preview, tagged lines and a
+     * text excerpt) and Keep-style notes. Locked sections share only page titles; trashed notes and
+     * deleted pages are left out, and note places are never shared.
+     */
+    suspend fun brainstorm(app: AppContainer): JSONObject {
+        val b = app.db.brainstorm()
+        val sections = b.allSections().groupBy { it.notebookId }
+        val pages = b.allPages().filter { it.deletedAt == null }.groupBy { it.sectionId }
+        fun hex(c: Long) = if (c == 0L) "" else "#%06X".format(c and 0xFFFFFF)
+        return JSONObject().apply {
+            put("notebooks", JSONArray().apply {
+                b.allNotebooks().sortedWith(compareBy({ it.profile }, { it.sortOrder }, { it.createdAt })).forEach { nb ->
+                    put(JSONObject().put("id", nb.id).put("profile", nb.profile).put("name", nb.name).put("emoji", nb.emoji).put("color", nb.color).put("updatedAt", nb.updatedAt)
+                        .put("sections", JSONArray().apply {
+                            sections[nb.id].orEmpty().sortedBy { it.sortOrder }.forEach { s ->
+                                put(JSONObject().put("id", s.id).put("name", s.name).put("color", s.color).put("group", s.groupName).put("locked", s.locked)
+                                    .put("pages", JSONArray().apply {
+                                        pages[s.id].orEmpty().sortedBy { it.sortOrder }.take(300).forEach { p ->
+                                            put(JSONObject().put("id", p.id).put("title", p.title).put("level", p.level).put("pinned", p.pinned).put("words", p.wordCount)
+                                                .put("updatedAt", p.updatedAt).put("reminderAt", p.reminderAt ?: JSONObject.NULL)
+                                                .put("preview", if (s.locked) "" else p.preview)
+                                                .put("text", if (s.locked) "" else p.searchText.take(1500))
+                                                .put("tags", JSONArray().apply {
+                                                    if (!s.locked) p.tagIndex.lines().filter { it.isNotBlank() }.take(40).forEach { l ->
+                                                        val parts = l.split('|', limit = 3)
+                                                        if (parts.size == 3) put(JSONObject().put("tag", parts[0]).put("done", parts[1] == "1" || parts[1] == "true").put("text", parts[2]))
+                                                    }
+                                                }))
+                                        }
+                                    }))
+                            }
+                        }))
+                }
+            })
+            put("notes", JSONArray().apply {
+                app.db.notes().all().filter { it.trashedAt == null }.sortedWith(compareByDescending<com.blacklab.app.data.NoteEntity> { it.pinned }.thenByDescending { it.sortOrder }.thenByDescending { it.updatedAt })
+                    .take(400).forEach { n ->
+                        val col = com.blacklab.app.brainstorm.NoteStyle.colors.getOrNull(n.color)
+                        put(JSONObject().put("id", n.id).put("profile", n.profile).put("title", n.title).put("body", n.body.take(4000)).put("checklist", n.checklist)
+                            .put("items", JSONArray().apply { com.blacklab.app.brainstorm.NoteOps.items(n).forEach { put(JSONObject().put("t", it.text).put("d", it.done).put("i", it.indent)) } })
+                            .put("light", hex(col?.light ?: 0)).put("dark", hex(col?.dark ?: 0)).put("pinned", n.pinned).put("archived", n.archived)
+                            .put("labels", JSONArray(com.blacklab.app.brainstorm.NoteOps.labels(n))).put("reminderAt", n.reminderAt ?: JSONObject.NULL)
+                            .put("attachments", com.blacklab.app.brainstorm.NoteOps.attachments(n).size).put("updatedAt", n.updatedAt))
+                    }
+            })
+        }
+    }
+
     suspend fun build(app: AppContainer): JSONObject {
         val db = app.db
         val today = Time.today()
@@ -174,6 +223,16 @@ object Snapshot {
                 }
             })
             put("vehicle", vehicle(app))
+            put("brainstorm", brainstorm(app))
+            put("decks", JSONArray().apply {
+                val cards = edu.allCards().groupBy { it.deckId }
+                edu.allDecks().sortedBy { it.name.lowercase() }.forEach { d ->
+                    val c = cards[d.id].orEmpty()
+                    put(JSONObject().put("id", d.id).put("profile", d.profile).put("name", d.name)
+                        .put("course", d.courseId?.let { courseById[it] }?.let { it.code.ifBlank { it.title } } ?: "")
+                        .put("cards", c.size).put("due", c.count { it.dueDay <= todayEpoch }).put("learned", c.count { it.repetitions >= 2 }))
+                }
+            })
             put("backups", JSONArray().apply { app.backups.listBackups().take(14).forEach { put(JSONObject().put("name", it.name).put("size", it.length()).put("time", it.lastModified())) } })
             put("assistant", JSONArray().apply { app.assistant.messages.value.takeLast(60).forEach { put(it.toPublicJson()) } })
         }
