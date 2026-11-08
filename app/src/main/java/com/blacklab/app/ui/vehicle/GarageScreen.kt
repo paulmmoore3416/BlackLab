@@ -71,7 +71,17 @@ fun GarageScreen() {
     remember { Garage.load(ctx) }
     val st by Garage.state.collectAsState()
     val v = st.vehicle
-    val due = remember(st) { Garage.due(st) }
+    remember { com.blacklab.app.vehicle.Nhtsa.load(ctx) }
+    val nhtsa by com.blacklab.app.vehicle.Nhtsa.state.collectAsState()
+    val pace = remember(st, com.blacklab.app.vehicle.VehicleLink.state.collectAsState().value.trips.size) { com.blacklab.app.vehicle.ServiceReminders.pace(ctx) }
+    val due = remember(st, pace) { Garage.due(st, milesPerDay = pace) }
+    var fillPrefill by remember { mutableStateOf<com.blacklab.app.vehicle.Telemetry.PendingFill?>(null) }
+    var recall by remember { mutableStateOf<com.blacklab.app.vehicle.Nhtsa.Recall?>(null) }
+    var showSpecs by remember { mutableStateOf(false) }
+    androidx.compose.runtime.LaunchedEffect(v.vin) {
+        // First look (or a week on): check NHTSA for recalls and decode the VIN
+        if (System.currentTimeMillis() - com.blacklab.app.vehicle.Nhtsa.load(ctx).checkedAt > 7 * 86_400_000L) com.blacklab.app.vehicle.Nhtsa.refresh(ctx)
+    }
     val stats = remember(st.fuel) { Garage.fuelStats(st.fuel) }
     var editOdo by remember { mutableStateOf(false) }
     var editVehicle by remember { mutableStateOf(false) }
@@ -124,7 +134,57 @@ fun GarageScreen() {
                 }
             }
             liveCarSection(car, live, showAll, onExpand = { showAll = !showAll }, onSetup = { setup = true },
-                onRefresh = { scope.launch { shell.toast(com.blacklab.app.vehicle.VehicleLink.refreshBluelink(ctx)) } }, onCodes = { codes = true })
+                onRefresh = { scope.launch { shell.toast(com.blacklab.app.vehicle.VehicleLink.refreshBluelink(ctx)) } }, onCodes = { codes = true },
+                next = due.firstOrNull { it.status != Garage.Status.UNKNOWN }, severe = v.severeService,
+                onLogFill = { fillPrefill = it }, onDismissFill = { com.blacklab.app.vehicle.VehicleLink.clearPendingFill(ctx) })
+            // ---- recalls & build
+            item { SectionHeader("Recalls & safety", action = "Check now") { scope.launch { shell.toast(com.blacklab.app.vehicle.Nhtsa.refresh(ctx, notify = false)) } } }
+            item {
+                val open = nhtsa.open
+                BlCard(Modifier.fillMaxWidth(), accent = if (open.isNotEmpty()) Amber else null) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(if (open.isEmpty()) Icons.Rounded.VerifiedUser else Icons.Rounded.ReportProblem, null, tint = if (open.isEmpty()) Success.readable() else Amber.readable())
+                        Spacer(Modifier.size(10.dp))
+                        Column(Modifier.weight(1f)) {
+                            Text(when {
+                                nhtsa.checkedAt == 0L -> "Not checked yet"
+                                open.isEmpty() && nhtsa.recalls.isNotEmpty() -> "All ${nhtsa.recalls.size} listed recalls marked done or not for your car"
+                                open.isEmpty() -> "No recalls listed for the ${v.year} ${v.model}"
+                                else -> "${open.size} recall${if (open.size > 1) "s" else ""} to check"
+                            }, style = MaterialTheme.typography.titleSmall)
+                            Text(listOfNotNull(nhtsa.checkedAt.takeIf { it > 0 }?.let { "NHTSA · checked ${com.blacklab.app.vehicle.Telemetry.ago(it)}" }, nhtsa.error.ifBlank { null }).joinToString(" · ")
+                                .ifBlank { "Weekly check of NHTSA's public recall list" }, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    }
+                    if (v.vin.length == 17) TextButton(onClick = { com.blacklab.app.core.Files.openUrl(ctx, com.blacklab.app.vehicle.Nhtsa.vinCheckUrl(v.vin)) }) { Text("Check open recalls for my VIN on nhtsa.gov") }
+                }
+            }
+            items(nhtsa.recalls, key = { "recall-" + it.campaign }) { rc ->
+                val done = rc.campaign in nhtsa.resolved
+                BlCard(Modifier.fillMaxWidth(), onClick = { recall = rc }) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Column(Modifier.weight(1f)) {
+                            Text(rc.component.lowercase().replaceFirstChar { it.uppercase() }, style = MaterialTheme.typography.titleSmall)
+                            Text("${rc.campaign} · ${rc.date}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                        Pill(if (done) "Done / n.a." else if (rc.parkIt || rc.parkOutside) "Park it" else "Open", if (done) Success else if (rc.parkIt || rc.parkOutside) Danger else Amber)
+                    }
+                }
+            }
+            nhtsa.decoded?.takeIf { it.specs.isNotEmpty() }?.let { d ->
+                item { SectionHeader("From your VIN", action = if (showSpecs) "Hide" else "Show") { showSpecs = !showSpecs } }
+                if (showSpecs) item {
+                    BlCard(Modifier.fillMaxWidth()) {
+                        d.specs.forEach { (k, value) ->
+                            Row(Modifier.fillMaxWidth().padding(vertical = 3.dp)) {
+                                Text(k, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.weight(0.42f))
+                                Text(value, style = MaterialTheme.typography.bodySmall, modifier = Modifier.weight(0.58f))
+                            }
+                        }
+                        Text("Decoded by NHTSA from VIN …${d.vin.takeLast(6)}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 4.dp))
+                    }
+                }
+            }
             item { SectionHeader("Maintenance") }
             items(due, key = { it.item.id }) { d ->
                 val (tag, color) = when (d.status) {
@@ -142,6 +202,10 @@ fun GarageScreen() {
                                 style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                         Pill(tag, color)
+                        if (d.status == Garage.Status.OVERDUE || d.status == Garage.Status.DUE_SOON || d.expectedDay != null)
+                            IconButton(onClick = { scope.launch { com.blacklab.app.vehicle.ServiceReminders.addTask(ctx, d); shell.toast("Added to To-Do" + (d.expectedDay?.let { " for ${Garage.dayLabel(it.coerceAtLeast(LocalDate.now().toEpochDay()))}" } ?: "")) } }) {
+                                Icon(Icons.Rounded.AddTask, "Add to To-Do")
+                            }
                         IconButton(onClick = { editItem = d.item }) { Icon(Icons.Rounded.Tune, "Edit interval") }
                     }
                 }
@@ -160,6 +224,11 @@ fun GarageScreen() {
                     }
                 }
             }
+            val mpgPts = Garage.mpgSeries(st.fuel)
+            if (mpgPts.size >= 2) item(key = "mpg-chart") { MpgTrendChart(mpgPts.takeLast(12)) }
+            val spend = Garage.monthlySpend(st.fuel)
+            if (spend.any { it.second > 0 }) item(key = "spend-chart") { MonthlySpendChart(spend) }
+            if (pace != null) item { Text("Your pace: about %.0f mi a day (%,.0f a year) — used to predict service dates.".format(pace, pace * 365), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant) }
             if (stats.costPerMile != null) item { Text("About ${"%.1f".format(stats.costPerMile * 100)}¢ per mile in fuel" + (stats.lastMpg?.let { " · last tank ${"%.1f".format(it)} mpg" } ?: ""), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant) }
             tripsSection(car, v.tankGallons, onTrip = { trip = it }, onExport = {
                 runCatching { com.blacklab.app.core.Files.share(ctx, listOf(com.blacklab.app.vehicle.VehicleLink.exportCsv(ctx)), "Mileage log") }
@@ -211,6 +280,12 @@ fun GarageScreen() {
             if (m < v.odometer) shell.toast("That's lower than the last reading (${Garage.fmtMiles(v.odometer)})") else Garage.setOdometer(ctx, m)
         }
     }
+    fillPrefill?.let { pf -> FuelDialog(pf.odometer ?: v.odometerNow, onDismiss = { fillPrefill = null }, gallons0 = "%.1f".format(pf.gallons), station0 = pf.station, full0 = pf.toPct >= 92, time = pf.time) { f ->
+        Garage.addFuel(ctx, f)
+        com.blacklab.app.vehicle.VehicleLink.clearPendingFill(ctx)
+        shell.toast("Fill-up logged" + (Garage.fuelStats(Garage.state.value.fuel).lastMpg?.let { " · ${"%.1f".format(it)} mpg" } ?: ""))
+    } }
+    recall?.let { rc -> RecallDialog(rc, rc.campaign in nhtsa.resolved, onDismiss = { recall = null }) { done -> com.blacklab.app.vehicle.Nhtsa.setResolved(ctx, rc.campaign, done) } }
     if (fuelDialog) FuelDialog(v.odometer, onDismiss = { fuelDialog = false }) { f ->
         Garage.addFuel(ctx, f)
         val last = Garage.fuelStats(Garage.state.value.fuel).lastMpg
@@ -243,12 +318,12 @@ private fun num(label: String, value: String, onChange: (String) -> Unit, decima
         keyboardOptions = KeyboardOptions(keyboardType = if (decimal) KeyboardType.Decimal else KeyboardType.Number))
 
 @Composable
-private fun FuelDialog(odometer: Int, onDismiss: () -> Unit, onSave: (Garage.Fuel) -> Unit) {
-    var gallons by remember { mutableStateOf("") }
+private fun FuelDialog(odometer: Int, onDismiss: () -> Unit, gallons0: String = "", station0: String = "", full0: Boolean = true, time: Long? = null, onSave: (Garage.Fuel) -> Unit) {
+    var gallons by remember { mutableStateOf(gallons0) }
     var cost by remember { mutableStateOf("") }
     var miles by remember { mutableStateOf(if (odometer > 0) odometer.toString() else "") }
-    var station by remember { mutableStateOf("") }
-    var full by remember { mutableStateOf(true) }
+    var station by remember { mutableStateOf(station0) }
+    var full by remember { mutableStateOf(full0) }
     AlertDialog(onDismissRequest = onDismiss, title = { Text("Log fuel") }, text = {
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -264,7 +339,7 @@ private fun FuelDialog(odometer: Int, onDismiss: () -> Unit, onSave: (Garage.Fue
         }
     }, confirmButton = {
         TextButton(enabled = gallons.toDoubleOrNull()?.let { it > 0 } == true, onClick = {
-            onSave(Garage.Fuel(UUID.randomUUID().toString(), System.currentTimeMillis(), miles.toIntOrNull(), gallons.toDouble(), cost.toDoubleOrNull(), full, station.trim()))
+            onSave(Garage.Fuel(UUID.randomUUID().toString(), time ?: System.currentTimeMillis(), miles.toIntOrNull(), gallons.toDouble(), cost.toDoubleOrNull(), full, station.trim()))
             onDismiss()
         }) { Text("Save") }
     }, dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } })
@@ -352,6 +427,7 @@ private fun VehicleDialog(v: Garage.Vehicle, onDismiss: () -> Unit, onSave: (Gar
             OutlinedTextField(x.vin, { x = x.copy(vin = it.uppercase().take(17)) }, Modifier.fillMaxWidth(), label = { Text("VIN") }, singleLine = true)
             OutlinedTextField(x.plate, { x = x.copy(plate = it.uppercase()) }, Modifier.fillMaxWidth(), label = { Text("Plate") }, singleLine = true)
             num("Fuel tank (gal)", tank, { tank = it }, decimal = true)
+            num("Miles per year (blank = learn from trips)", if (x.milesPerYear > 0) x.milesPerYear.toString() else "", { x = x.copy(milesPerYear = it.toIntOrNull() ?: 0) })
             OutlinedTextField(x.tirePsi, { x = x.copy(tirePsi = it) }, Modifier.fillMaxWidth(), label = { Text("Tire pressure (door placard)") }, placeholder = { Text("e.g. 35 front / 35 rear") }, singleLine = true)
             OutlinedTextField(x.oil, { x = x.copy(oil = it) }, Modifier.fillMaxWidth(), label = { Text("Oil spec & capacity (manual)") }, singleLine = true)
             OutlinedTextField(x.dealer, { x = x.copy(dealer = it) }, Modifier.fillMaxWidth(), label = { Text("Service dealer (for navigation)") }, singleLine = true)
@@ -367,4 +443,22 @@ private fun VehicleDialog(v: Garage.Vehicle, onDismiss: () -> Unit, onSave: (Gar
     }, confirmButton = {
         TextButton(onClick = { onSave(x.copy(tankGallons = tank.toDoubleOrNull() ?: x.tankGallons)); onDismiss() }) { Text("Save") }
     }, dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } })
+}
+
+@Composable
+private fun RecallDialog(r: com.blacklab.app.vehicle.Nhtsa.Recall, done: Boolean, onDismiss: () -> Unit, onDone: (Boolean) -> Unit) {
+    AlertDialog(onDismissRequest = onDismiss, title = { Text(r.component.lowercase().replaceFirstChar { it.uppercase() }) }, text = {
+        Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text("NHTSA campaign ${r.campaign} · reported ${r.date}", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            if (r.parkIt) Text("NHTSA says: park it until it's fixed.", color = Danger.readable(), fontWeight = FontWeight.SemiBold)
+            if (r.parkOutside) Text("NHTSA says: park outside, away from buildings, until it's fixed.", color = Danger.readable(), fontWeight = FontWeight.SemiBold)
+            listOf("What" to r.summary, "Risk" to r.consequence, "Fix" to r.remedy).filter { it.second.isNotBlank() }.forEach { (k, t) ->
+                Text(k, style = MaterialTheme.typography.labelLarge); Text(t, style = MaterialTheme.typography.bodySmall)
+            }
+            if (r.overTheAir) Text("This one can be fixed with an over-the-air update.", style = MaterialTheme.typography.bodySmall)
+            Text("Recalls are listed by year, make and model, so some won't apply to your car (for example, ones for accessories you don't have). The nhtsa.gov VIN check or your Hyundai dealer can confirm.",
+                style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+    }, confirmButton = { TextButton(onClick = { onDone(!done); onDismiss() }) { Text(if (done) "Mark as open" else "Done or not for my car") } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Close") } })
 }

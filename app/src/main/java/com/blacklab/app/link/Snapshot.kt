@@ -40,6 +40,65 @@ object Snapshot {
         }
     }
 
+    /** The car for the desktop's Garage page: profile, what's due, fuel, trips, live values, codes, recalls. */
+    fun vehicle(app: AppContainer): JSONObject = runCatching {
+        val ctx = app.context
+        val vehicleGarage = com.blacklab.app.vehicle.Garage
+        val g = vehicleGarage.load(ctx)
+        val t = com.blacklab.app.vehicle.VehicleLink.load(ctx)
+        val n = com.blacklab.app.vehicle.Nhtsa.load(ctx)
+        val pace = com.blacklab.app.vehicle.ServiceReminders.pace(ctx)
+        val v = g.vehicle
+        val stats = vehicleGarage.fuelStats(g.fuel)
+        val Tm = com.blacklab.app.vehicle.Telemetry
+        JSONObject().apply {
+            put("name", v.name); put("year", v.year); put("make", v.make); put("model", v.model); put("trim", v.trim); put("engine", v.engine); put("drive", v.drive)
+            put("vin", v.vin); put("odometer", v.odometerNow); put("odometerEstimated", v.estMiles > 0); put("odometerAt", v.odometerAt); put("tankGallons", v.tankGallons)
+            put("milesPerDay", pace ?: JSONObject.NULL)
+            put("fuelStats", JSONObject().put("avgMpg", stats.avgMpg ?: JSONObject.NULL).put("lastMpg", stats.lastMpg ?: JSONObject.NULL)
+                .put("costPerMile", stats.costPerMile ?: JSONObject.NULL).put("monthCost", stats.monthCost))
+            put("due", JSONArray().apply {
+                vehicleGarage.due(g, milesPerDay = pace).forEach { d ->
+                    put(JSONObject().put("name", d.item.name).put("status", d.status.name).put("text", d.describe()).put("milesLeft", d.milesLeft ?: JSONObject.NULL)
+                        .put("expected", d.expectedDay?.let { Time.millis(java.time.LocalDate.ofEpochDay(it)) } ?: JSONObject.NULL))
+                }
+            })
+            put("fuel", JSONArray().apply { g.fuel.take(40).forEach { f -> put(JSONObject().put("time", f.time).put("miles", f.miles ?: JSONObject.NULL).put("gallons", f.gallons).put("cost", f.cost ?: JSONObject.NULL).put("full", f.full).put("station", f.station)) } })
+            put("mpgSeries", JSONArray().apply { vehicleGarage.mpgSeries(g.fuel).takeLast(24).forEach { (time, mpg) -> put(JSONArray().put(time).put(mpg)) } })
+            put("weekly", JSONArray().apply { Tm.weeklyMiles(t.trips, 12).forEach { (d, b, o) -> put(JSONArray().put(Time.millis(d)).put(b).put(o)) } })
+            val now = System.currentTimeMillis()
+            put("totals", JSONObject().apply {
+                listOf("week" to Tm.weekStart(), "month" to Tm.monthStart(), "year" to Tm.yearStart()).forEach { (k, from) ->
+                    val x = Tm.totals(t.trips, from, now + 1, t.link.ratePerMile)
+                    put(k, JSONObject().put("miles", x.miles).put("trips", x.trips).put("business", x.byPurpose[com.blacklab.app.vehicle.Telemetry.Purpose.BUSINESS] ?: 0.0).put("deductible", x.deductible))
+                }
+            })
+            put("trips", JSONArray().apply {
+                t.trips.filter { it.end != null }.take(60).forEach { tr ->
+                    put(JSONObject().put("start", tr.start).put("end", tr.end).put("miles", tr.miles).put("from", tr.startPlace).put("to", tr.endPlace).put("purpose", tr.purpose.label)
+                        .put("mpg", tr.mpg(v.tankGallons) ?: JSONObject.NULL).put("sim", tr.simulated).put("note", tr.note))
+                }
+            })
+            put("live", JSONArray().apply {
+                t.snapshot.values.sortedBy { m -> Tm.DEFS.indexOfFirst { it.key == m.key } }.forEach { m ->
+                    val d = Tm.def(m.key)
+                    put(JSONObject().put("key", m.key).put("label", d?.label ?: m.key).put("group", d?.group?.label ?: "").put("value", Tm.format(m))
+                        .put("num", m.num ?: JSONObject.NULL).put("source", m.source.label).put("time", m.time).put("alert", Tm.isAlert(m)))
+                }
+            })
+            put("codes", JSONArray().apply { t.activeDtcs.forEach { d -> put(JSONObject().put("code", d.code).put("kind", d.kind).put("text", com.blacklab.app.vehicle.Dtcs.describe(d.code)).put("since", d.firstSeen)) } })
+            t.parked?.let { p -> put("parked", JSONObject().put("place", p.place).put("time", p.time)) }
+            t.pendingFill?.let { f -> put("pendingFill", JSONObject().put("gallons", f.gallons).put("from", f.fromPct).put("to", f.toPct).put("time", f.time)) }
+            put("lastSession", t.lastSession)
+            put("recalls", JSONArray().apply {
+                n.recalls.forEach { r -> put(JSONObject().put("campaign", r.campaign).put("date", r.date).put("component", r.component).put("summary", r.summary)
+                    .put("remedy", r.remedy).put("resolved", r.campaign in n.resolved).put("parkIt", r.parkIt || r.parkOutside)) }
+            })
+            put("recallsCheckedAt", n.checkedAt)
+            put("specs", JSONArray().apply { n.decoded?.specs?.forEach { (k, value) -> put(JSONArray().put(k).put(value)) } })
+        }
+    }.getOrElse { JSONObject().put("error", it.message ?: "unavailable") }
+
     suspend fun build(app: AppContainer): JSONObject {
         val db = app.db
         val today = Time.today()
@@ -114,6 +173,7 @@ object Snapshot {
                     }
                 }
             })
+            put("vehicle", vehicle(app))
             put("backups", JSONArray().apply { app.backups.listBackups().take(14).forEach { put(JSONObject().put("name", it.name).put("size", it.length()).put("time", it.lastModified())) } })
             put("assistant", JSONArray().apply { app.assistant.messages.value.takeLast(60).forEach { put(it.toPublicJson()) } })
         }

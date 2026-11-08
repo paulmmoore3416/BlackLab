@@ -238,7 +238,7 @@ fun TextEditorScreen(file: File) {
             Box(Modifier.weight(1f).fillMaxWidth()) {
                 if (preview) HtmlView(bodyHtml(), Modifier.fillMaxSize())
                 else if (loaded) {
-                    val style = TextStyle(fontFamily = if (mono) FontFamily.Monospace else FontFamily.Default, fontSize = size.sp, lineHeight = (size * 1.45f).sp, color = MaterialTheme.colorScheme.onSurface)
+                    val style = TextStyle(fontFamily = if (mono) FontFamily.Monospace else com.blacklab.app.ui.theme.readingStyle(TextStyle(fontFamily = FontFamily.Default)).fontFamily, fontSize = size.sp, lineHeight = (size * 1.45f).sp, color = MaterialTheme.colorScheme.onSurface)
                     val screenW = LocalConfiguration.current.screenWidthDp.dp
                     Row(Modifier.fillMaxSize().verticalScroll(vScroll)) {
                         if (!wrap) {

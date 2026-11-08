@@ -12,7 +12,6 @@ import android.location.LocationListener
 import android.location.LocationManager
 import android.os.IBinder
 import android.os.Looper
-import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
 import androidx.work.CoroutineWorker
@@ -54,6 +53,7 @@ class DriveService : Service() {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private var session: Session? = null
     private var endJob: Job? = null
+    private var started = System.currentTimeMillis()
 
     override fun onBind(intent: Intent?): IBinder? = null
 
@@ -63,7 +63,8 @@ class DriveService : Service() {
             ACTION_START -> {
                 if (!foreground()) { stopSelf(); return START_NOT_STICKY }
                 endJob?.cancel(); endJob = null
-                val s = session ?: Session(this, intent.getStringExtra("car").orEmpty()).also { session = it; it.begin() }
+                val s = session ?: Session(this, intent.getStringExtra("car").orEmpty(), intent.getBooleanExtra("sim", false), intent.getBooleanExtra("simCode", false))
+                    .also { session = it; started = it.startedAt; it.begin() }
                 s.vias += via
                 VehicleLink.setLive { it.copy(ending = false, via = s.vias.joinToString(" + ")) }
             }
@@ -94,16 +95,30 @@ class DriveService : Service() {
         return false
     }
 
-    private fun notification(title: String, text: String) = NotificationCompat.Builder(this, VehicleLink.CH_DRIVE)
-        .setSmallIcon(R.drawable.ic_notification).setContentTitle(title).setContentText(text).setOngoing(true).setOnlyAlertOnce(true)
-        .setSilent(true).setColor(0xFF2BD9A8.toInt()).setCategory(NotificationCompat.CATEGORY_NAVIGATION)
-        .setContentIntent(Notifications.openAppIntent(this, "garage", NOTIF_ID))
-        .addAction(0, "End trip", android.app.PendingIntent.getService(this, NOTIF_ID, Intent(this, DriveService::class.java).setAction(ACTION_END_NOW),
-            android.app.PendingIntent.FLAG_IMMUTABLE or android.app.PendingIntent.FLAG_UPDATE_CURRENT))
-        .build()
+    /**
+     * The drive notification. On Android 16+ it asks to be a Live Update: it stays at the top of the
+     * shade and the lock screen, with the trip miles as a chip in the status bar and a running clock.
+     */
+    private fun notification(title: String, text: String, chip: String? = null): android.app.Notification {
+        val end = android.app.PendingIntent.getService(this, NOTIF_ID, Intent(this, DriveService::class.java).setAction(ACTION_END_NOW),
+            android.app.PendingIntent.FLAG_IMMUTABLE or android.app.PendingIntent.FLAG_UPDATE_CURRENT)
+        val b = android.app.Notification.Builder(this, VehicleLink.CH_DRIVE)
+            .setSmallIcon(R.drawable.ic_notification).setContentTitle(title).setContentText(text)
+            .setStyle(android.app.Notification.BigTextStyle().bigText(text))
+            .setOngoing(true).setOnlyAlertOnce(true).setColor(VehicleLink.accent(this)).setCategory(android.app.Notification.CATEGORY_NAVIGATION)
+            .setWhen(started).setShowWhen(true).setUsesChronometer(true)
+            .setContentIntent(Notifications.openAppIntent(this, "garage", NOTIF_ID))
+            .addAction(android.app.Notification.Action.Builder(null as android.graphics.drawable.Icon?, "End trip", end).build())
+        if (android.os.Build.VERSION.SDK_INT >= 36) {
+            // Notification.EXTRA_REQUEST_PROMOTED_ONGOING (the Builder setter arrives in a later SDK; the extra is what it sets)
+            b.addExtras(android.os.Bundle().apply { putBoolean("android.requestPromotedOngoing", true) })
+            chip?.let { b.setShortCriticalText(it) }
+        }
+        return b.build()
+    }
 
     @SuppressLint("MissingPermission")
-    internal fun updateNotification(title: String, text: String) { runCatching { NotificationManagerCompat.from(this).notify(NOTIF_ID, notification(title, text)) } }
+    internal fun updateNotification(title: String, text: String, chip: String? = null) { runCatching { NotificationManagerCompat.from(this).notify(NOTIF_ID, notification(title, text, chip)) } }
 
     private suspend fun finish() {
         val s = session ?: return
@@ -115,7 +130,7 @@ class DriveService : Service() {
     }
 
     override fun onDestroy() {
-        session?.let { s -> runCatching { s.saveOpen() }; s.release() }
+        session?.let { s -> runCatching { s.saveOpen() }; s.release(); if (s.sim) VehicleLink.endSim(applicationContext) }
         session = null
         VehicleLink.setLive { VehicleLink.Live(androidAuto = it.androidAuto) }
         scope.cancel()
@@ -123,13 +138,14 @@ class DriveService : Service() {
     }
 
     /** Everything about the drive in progress. */
-    private class Session(val svc: DriveService, carName: String) : LocationListener {
+    private class Session(val svc: DriveService, carName: String, val sim: Boolean = false, val simCode: Boolean = false) : LocationListener {
         val ctx: Context = svc.applicationContext
         val vias = LinkedHashSet<String>()
         var stopAt: Long? = null
         private val job = SupervisorJob()
         private val scope = CoroutineScope(job + Dispatchers.Main.immediate)
-        private var trip = Telemetry.Trip(UUID.randomUUID().toString(), System.currentTimeMillis(), car = carName)
+        private var trip = Telemetry.Trip(UUID.randomUUID().toString(), System.currentTimeMillis(), car = if (sim) "Simulator" else carName, simulated = sim)
+        val startedAt: Long get() = trip.start
         private var last: Location? = null
         private var lastSpeed: Float? = null
         private var lastEventAt = 0L
@@ -145,19 +161,30 @@ class DriveService : Service() {
         fun begin() {
             closeStaleTrips()
             Garage.load(ctx)
+            if (sim) VehicleLink.beginSim(ctx)
             val snap = VehicleLink.state.value
             val start = trip.start
             trip = trip.copy(fuelPctStart = snap["fuel_pct"]?.takeIf { start - it.time < 6 * 3_600_000L }?.num, purpose = link.defaultPurpose)
-            VehicleLink.setLive { it.copy(active = true, since = start, tripMiles = 0.0, mph = null, obd = if (link.obdAddress.isBlank()) "" else "Waiting for the OBD adapter…", bluelink = "") }
-            VehicleLink.put(ctx, listOfNotNull(Telemetry.text("car_bt", trip.car.ifBlank { link.carName }, Telemetry.Source.CAR_BT)))
+            VehicleLink.setLive { it.copy(active = true, since = start, tripMiles = 0.0, mph = null, sim = sim,
+                obd = if (sim) "Starting the simulator…" else if (link.obdAddress.isBlank()) "" else "Waiting for the OBD adapter…", bluelink = "") }
+            if (!sim) VehicleLink.put(ctx, listOfNotNull(Telemetry.text("car_bt", trip.car.ifBlank { link.carName }, Telemetry.Source.CAR_BT)))
             VehicleLink.onOdometer = { miles ->
                 trip = trip.copy(odoStart = trip.odoStart ?: miles, odoEnd = miles)
                 milesSinceOdo = 0.0
             }
             VehicleLink.update(ctx) { it.copy(lastSession = start) }
-            startGps()
-            if (link.obdAddress.isNotBlank()) scope.launch(Dispatchers.IO) { runObd() }
-            if (link.bluelink) scope.launch(Dispatchers.IO) { VehicleLink.refreshBluelink(ctx) }
+            if (sim) {
+                // The pretend car does the driving; the phone's GPS sitting on a desk would only add noise
+                scope.launch(Dispatchers.IO) { runObd() }
+                scope.launch {
+                    delay(((SimCar.DURATION_S + 6) * 1000).toLong())
+                    runCatching { svc.startService(Intent(svc, DriveService::class.java).setAction(ACTION_END_NOW)) }
+                }
+            } else {
+                startGps()
+                if (link.obdAddress.isNotBlank()) scope.launch(Dispatchers.IO) { runObd() }
+                if (link.bluelink) scope.launch(Dispatchers.IO) { VehicleLink.refreshBluelink(ctx) }
+            }
             scope.launch { tick() }
         }
 
@@ -231,13 +258,21 @@ class DriveService : Service() {
                     val line = listOfNotNull("%.1f mi".format(trip.miles), Telemetry.duration(trip.durationSec),
                         snap["inst_mpg"]?.takeIf { now - it.time < 10_000 }?.let { "${Telemetry.format(it)}" },
                         live.obd.takeIf { it.isNotBlank() && !it.startsWith("OBD-II connected") }).joinToString(" · ")
-                    svc.updateNotification(if (live.ending) "Drive ending…" else "Driving · ${trip.car.ifBlank { "your car" }}", line)
+                    svc.updateNotification(if (live.ending) "Drive ending…" else (if (sim) "Simulated drive" else "Driving · ${trip.car.ifBlank { "your car" }}"), line,
+                        "%.1f mi".format(trip.miles))
                 }
                 if (++n % 30 == 0) saveOpen()
             }
         }
 
         private suspend fun runObd() {
+            if (sim) {
+                val r = ObdReader(ctx, link, onStatus = { s -> VehicleLink.setLive { it.copy(obd = s) } }, onMetrics = { m -> VehicleLink.put(ctx, m) },
+                    onCodes = { a, b, c -> VehicleLink.putCodes(ctx, a, b, c) }, simPort = SimObdPort(simCode))
+                obd = r
+                try { if (r.connect()) { sources += Telemetry.Source.OBD; r.readOnce(); r.poll() } } finally { r.close(); obd = null }
+                return
+            }
             if (ContextCompat.checkSelfPermission(ctx, Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) {
                 VehicleLink.setLive { it.copy(obd = "Allow Nearby devices to use the OBD adapter") }; return
             }
@@ -282,17 +317,20 @@ class DriveService : Service() {
                 fuelPctEnd = snap["fuel_pct"]?.takeIf { endAt - it.time < 15 * 60_000L && it.time >= trip.start }?.num, endLat = fix?.latitude, endLon = fix?.longitude)
             val place = if (fix != null && link.recordPlaces) withTimeoutOrNull(8000) { Geo.address(ctx, fix.latitude, fix.longitude) }.orEmpty() else ""
             trip = trip.copy(endPlace = place)
+            if (sim) trip = trip.copy(note = "Simulated drive (practice; not counted in totals)", movingSec = (SimCar.DURATION_S * 0.7).toLong(), idleSec = (SimCar.DURATION_S * 0.3).toLong())
+            else if (trip.purpose == link.defaultPurpose) Telemetry.matchRule(trip, link.rules)?.let { r -> trip = trip.copy(purpose = r.purpose, rule = r.name) }
             val keep = trip.miles >= 0.2 || trip.movingSec >= 90
             val t = trip
             VehicleLink.update(ctx) { s ->
                 val rest = s.trips.filterNot { it.id == t.id }
                 s.copy(trips = (if (keep) listOf(t) + rest else rest).take(3000),
-                    parked = fix?.let { Telemetry.Parked(it.latitude, it.longitude, place, endAt, Telemetry.Source.PHONE) } ?: s.parked)
+                    parked = if (sim) s.parked else fix?.let { Telemetry.Parked(it.latitude, it.longitude, place, endAt, Telemetry.Source.PHONE) } ?: s.parked)
             }
-            if (milesSinceOdo > 0.5) Garage.addDrivenMiles(ctx, milesSinceOdo)
+            if (sim) VehicleLink.endSim(ctx)
+            if (!sim && milesSinceOdo > 0.5) Garage.addDrivenMiles(ctx, milesSinceOdo)
             VehicleLink.flush(ctx)
-            if (keep && link.tripSummary) summarize(t)
-            if (link.bluelink) {
+            if (keep && (link.tripSummary || sim)) summarize(t)
+            if (link.bluelink && !sim) {
                 // The car uploads its status a few minutes after it's switched off: read it then
                 WorkManager.getInstance(ctx).enqueueUniqueWork("bluelink_after_drive", ExistingWorkPolicy.REPLACE,
                     OneTimeWorkRequestBuilder<BluelinkWorker>().setInitialDelay(5, TimeUnit.MINUTES).build())
@@ -304,11 +342,12 @@ class DriveService : Service() {
             val g = Garage.load(ctx)
             val mpg = t.mpg(g.vehicle.tankGallons)
             val next = Garage.due(g).firstOrNull { it.status == Garage.Status.OVERDUE || it.status == Garage.Status.DUE_SOON }
-            val title = "Drive logged: %.1f mi in %s".format(t.miles, Telemetry.duration(t.durationSec))
+            val title = (if (t.simulated) "Simulated drive: " else "Drive logged: ") + "%.1f mi in %s".format(t.miles, Telemetry.duration(t.durationSec))
             val lines = listOfNotNull(
                 listOf(t.startPlace, t.endPlace).filter { it.isNotBlank() }.takeIf { it.size == 2 }?.joinToString(" → "),
                 listOfNotNull(mpg?.let { "%.1f mpg".format(it) }, t.avgMph?.let { "avg %.0f mph".format(it) }, "top %.0f mph".format(t.maxMph).takeIf { t.maxMph > 5 },
                     (t.hardBrakes + t.hardAccels).takeIf { it > 0 }?.let { "$it hard brake/accel" }).joinToString(" · ").ifBlank { null },
+                t.rule.takeIf { it.isNotBlank() }?.let { "Tagged ${t.purpose.label} (rule: $it)" },
                 g.vehicle.odometerNow.takeIf { it > 0 }?.let { "Odometer ${if (g.vehicle.estMiles > 0) "≈ " else ""}${Garage.fmtMiles(it)}" },
                 next?.let { "${it.item.name} ${it.describe()}" },
             )

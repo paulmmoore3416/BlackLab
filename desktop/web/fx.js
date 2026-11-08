@@ -57,10 +57,13 @@
     const target = hc ? 7 : 4.5;
     const shade = dark ? pal.dark : pal.light;
     let page, v;
+    const ds = (DATA.darkStyles || []).find((s) => s.id === values.dark_style) || (DATA.darkStyles || [])[0] ||
+      { id: 'GRAPHITE', background: '#0E1014', low: '#13161B', card: '#171A20', high: '#1D2128', highest: '#242830', line: '#262A32', wash: 0 };
     if (dark) {
-      page = hc ? '#07080A' : '#0E1014';
+      const w = (c, t = ds.wash) => t > 0 ? mix(c, shade[0], t) : c;
+      page = hc && ds.id !== 'OLED' ? mix(w(ds.background), '#000000', 0.45) : w(ds.background);
       const acc = ensure(shade[0], page, target), sec = ensure(secPal ? secPal.dark[0] : shade[1], page, target), ter = ensure(shade[2], page, target);
-      v = { '--bg': page, '--bg-2': '#111419', '--surface': '#161A20', '--surface-2': '#1C2027', '--surface-3': '#242932', '--line': hc ? '#3A404A' : '#262B33',
+      v = { '--bg': page, '--bg-2': w(ds.low, ds.wash * 0.6), '--surface': w(ds.card, ds.wash * 0.7), '--surface-2': w(ds.high, ds.wash * 0.7), '--surface-3': w(ds.highest, ds.wash * 0.7), '--line': hc ? '#3A404A' : ds.line,
         '--text': hc ? '#F7F8FA' : '#E9EBEF', '--muted': hc ? '#CDD2DA' : '#A6ADB8', '--accent': acc, '--accent-ink': mix(acc, '#000000', 0.85),
         '--accent-soft': rgba(acc, 0.16), '--accent-2': sec, '--accent-3': ter, '--pro': ensure('#4F8CFF', page, target),
         '--warn': ensure('#FFB74D', page, target), '--danger': ensure('#FF6B6B', page, target), '--ok': ensure('#4CD38A', page, target),
@@ -78,6 +81,13 @@
         '--glass-shadow': '0 10px 34px rgba(17,24,39,.08)', '--shadow': '0 10px 30px rgba(10,30,25,.10)' };
       state.accent = acc; state.secondary = sec; state.tertiary = ter;
     }
+    // Corners and font follow the phone's Appearance choices too
+    const cs = (DATA.corners || []).find((c) => c.id === values.corner_style);
+    v['--radius'] = (cs ? Math.round(cs.card * 0.75) : 16) + 'px';
+    v['--radius-sm'] = (cs ? Math.max(3, Math.round(cs.small * 0.72)) : 10) + 'px';
+    v['--font'] = values.font_family === 'SERIF' ? 'ui-serif, Georgia, "Times New Roman", serif'
+      : values.font_family === 'SYSTEM' ? 'system-ui, -apple-system, "Segoe UI", Roboto, sans-serif'
+      : '"Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif';
     for (const [k, val] of Object.entries(v)) root.style.setProperty(k, val);
     root.setAttribute('data-theme', dark ? 'dark' : 'light');
     root.style.colorScheme = dark ? 'dark' : 'light';
@@ -160,5 +170,5 @@
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start); else start();
 
-  window.BLFX = { apply, countUp, ensure, ratio, state, palettes: DATA.palettes, lightStyles: DATA.lightStyles, reapply: null };
+  window.BLFX = { apply, countUp, ensure, ratio, state, palettes: DATA.palettes, lightStyles: DATA.lightStyles, darkStyles: DATA.darkStyles || [], reapply: null };
 })();

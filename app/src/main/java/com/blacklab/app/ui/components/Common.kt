@@ -219,7 +219,8 @@ fun BlCard(
     contentPadding: PaddingValues = PaddingValues(14.dp),
     content: @Composable ColumnScope.() -> Unit,
 ) {
-    val shape = RoundedCornerShape(22.dp)
+    val cardRadius = com.blacklab.app.ui.theme.LocalCorners.current.card.dp
+    val shape = RoundedCornerShape(cardRadius)
     val glass = com.blacklab.app.ui.theme.LocalGlass.current
     val light = !com.blacklab.app.ui.theme.LocalBlColors.current.isDark
     val interaction = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
@@ -246,7 +247,7 @@ fun BlCard(
         elevation = CardDefaults.cardElevation(defaultElevation = if (light) 1.dp else 0.dp, pressedElevation = if (light) 2.dp else 0.dp)
     }
     // Sheen and press glow are painted behind the frosted fill as rounded shapes, so they cover the whole card
-    val radius = with(androidx.compose.ui.platform.LocalDensity.current) { 22.dp.toPx() }
+    val radius = with(androidx.compose.ui.platform.LocalDensity.current) { cardRadius.toPx() }
     val glass2 = glass.enabled
     val surfaceFx = Modifier.drawBehind {
         if (!glass2) return@drawBehind

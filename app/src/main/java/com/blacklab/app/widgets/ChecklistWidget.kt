@@ -80,7 +80,7 @@ class ChecklistWidget : GlanceAppWidget() {
                 .putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId)
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         )
-        Column(GlanceModifier.fillMaxSize().appWidgetBackground().cornerRadius(24.dp).background(GlanceTheme.colors.widgetBackground)) {
+        Column(GlanceModifier.fillMaxSize().appWidgetBackground().cornerRadius(WUi.corner(LocalContext.current)).background(GlanceTheme.colors.widgetBackground)) {
             WUi.noteColor(m.color)?.let { c -> Box(GlanceModifier.fillMaxWidth().height(6.dp).background(c)) {} }
             Column(GlanceModifier.fillMaxSize().padding(12.dp)) {
                 if (m.missing) {

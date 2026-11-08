@@ -32,7 +32,12 @@ class BlackLabApp : Application() {
         container.storage.ensureStructure()
         container.requestReminderSync()
         container.appScope.launch { container.backups.autoBackupIfDue() }
+        com.blacklab.app.vehicle.Nhtsa.schedule(this)
+        com.blacklab.app.vehicle.ServiceReminders.schedule(this)
         container.appScope.launch {
+            // Vehicle details pushed with adb (VIN, odometer): applied once, then the file is deleted
+            if (runCatching { com.blacklab.app.vehicle.Garage.importProvisioning(this@BlackLabApp, container.storage.root) }.getOrDefault(false))
+                com.blacklab.app.vehicle.Nhtsa.refreshSoon(this@BlackLabApp)
             val imported = container.secrets.importProvisioning(container.storage.root)
             if (imported > 0) android.util.Log.i("BlackLab", "Imported $imported provisioned key(s)")
             com.blacklab.app.assistant.Nano.refresh()

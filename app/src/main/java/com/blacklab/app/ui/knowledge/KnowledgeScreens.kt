@@ -306,9 +306,9 @@ internal fun KbBody(body: String) {
             val lines = para.lines().filter { it.isNotBlank() }
             if (lines.all { it.trimStart().startsWith("- ") }) {
                 lines.forEach { l ->
-                    Row { Text("•  ", style = MaterialTheme.typography.bodyLarge); Text(l.trimStart().removePrefix("- ").replace("**", ""), style = MaterialTheme.typography.bodyLarge) }
+                    Row { Text("•  ", style = com.blacklab.app.ui.theme.readingStyle(MaterialTheme.typography.bodyLarge)); Text(l.trimStart().removePrefix("- ").replace("**", ""), style = com.blacklab.app.ui.theme.readingStyle(MaterialTheme.typography.bodyLarge)) }
                 }
-            } else Text(para.replace("**", "").replace(Regex("\\s*\\n\\s*"), " ").trim(), style = MaterialTheme.typography.bodyLarge)
+            } else Text(para.replace("**", "").replace(Regex("\\s*\\n\\s*"), " ").trim(), style = com.blacklab.app.ui.theme.readingStyle(MaterialTheme.typography.bodyLarge))
         }
     }
 }

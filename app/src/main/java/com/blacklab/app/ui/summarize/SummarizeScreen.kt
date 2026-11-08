@@ -349,11 +349,11 @@ private fun SummaryText(text: String) {
                 l.isBlank() -> Spacer(Modifier.height(6.dp))
                 l.startsWith("- ") || l.startsWith("• ") || l.startsWith("* ") -> Row {
                     Text("•  ", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.primary)
-                    Text(l.drop(2).replace("**", ""), style = MaterialTheme.typography.bodyMedium)
+                    Text(l.drop(2).replace("**", ""), style = com.blacklab.app.ui.theme.readingStyle(MaterialTheme.typography.bodyMedium))
                 }
                 l.endsWith(":") && l.length < 60 || l.startsWith("#") -> Text(l.trimStart('#', ' ').replace("**", ""), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold,
                     modifier = Modifier.padding(top = 4.dp))
-                else -> Text(l.replace("**", ""), style = MaterialTheme.typography.bodyMedium)
+                else -> Text(l.replace("**", ""), style = com.blacklab.app.ui.theme.readingStyle(MaterialTheme.typography.bodyMedium))
             }
         }
     }

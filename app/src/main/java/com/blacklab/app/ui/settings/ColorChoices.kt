@@ -112,6 +112,67 @@ fun ColorChoices() {
         Text(choice.lightStyle.blurb + if (dark) " — shown when the light theme is on." else "", style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 4.dp))
 
+        Text("Dark mode style", style = MaterialTheme.typography.labelLarge, modifier = Modifier.padding(top = 14.dp, bottom = 6.dp))
+        Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            com.blacklab.app.ui.theme.DarkStyle.entries.forEach { st ->
+                DarkStyleSwatch(st, palette, selected = choice.darkStyle == st) { app.settings.update { putString(Keys.DARK_STYLE, st.name) } }
+            }
+        }
+        Text(choice.darkStyle.blurb + if (!dark) " — shown when the dark theme is on." else "", style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 4.dp))
+
+        Text("Corners", style = MaterialTheme.typography.labelLarge, modifier = Modifier.padding(top = 14.dp, bottom = 6.dp))
+        SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
+            com.blacklab.app.ui.theme.CornerStyle.entries.forEachIndexed { i, c ->
+                SegmentedButton(choice.corners == c, { app.settings.update { putString(Keys.CORNER_STYLE, c.name) } }, SegmentedButtonDefaults.itemShape(i, 3)) { Text(c.label) }
+            }
+        }
+
+        Text("Interface size", style = MaterialTheme.typography.labelLarge, modifier = Modifier.padding(top = 14.dp, bottom = 6.dp))
+        SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
+            listOf(100 to "Comfortable", 92 to "Compact", 85 to "Dense").forEachIndexed { i, (v, l) ->
+                SegmentedButton(s.uiScale == v, { app.settings.update { putInt(Keys.UI_SCALE, v) } }, SegmentedButtonDefaults.itemShape(i, 3)) { Text(l) }
+            }
+        }
+        Text("Compact and Dense fit more on screen. They work on top of the phone's own display and font size.", style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 4.dp))
+
+        Text("Font", style = MaterialTheme.typography.labelLarge, modifier = Modifier.padding(top = 14.dp, bottom = 6.dp))
+        androidx.compose.foundation.layout.FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            com.blacklab.app.ui.theme.FontChoice.entries.forEach { f ->
+                val fam = when (f) {
+                    com.blacklab.app.ui.theme.FontChoice.INTER -> com.blacklab.app.ui.theme.InterFamily
+                    com.blacklab.app.ui.theme.FontChoice.SYSTEM -> androidx.compose.ui.text.font.FontFamily.Default
+                    com.blacklab.app.ui.theme.FontChoice.SERIF -> androidx.compose.ui.text.font.FontFamily.Serif
+                }
+                androidx.compose.material3.FilterChip(choice.font == f, { app.settings.update { putString(Keys.FONT_FAMILY, f.name) } }, label = { Text(f.label, fontFamily = fam) })
+            }
+        }
+
+        Text("Long reading", style = MaterialTheme.typography.labelLarge, modifier = Modifier.padding(top = 14.dp, bottom = 6.dp))
+        androidx.compose.foundation.layout.FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            listOf("SAME" to "Same as app", "SERIF" to "Serif", "SANS" to "Inter", "MONO" to "Mono").forEach { (k, l) ->
+                androidx.compose.material3.FilterChip(s.readingFont == k, { app.settings.update { putString(Keys.READING_FONT, k) } }, label = { Text(l) })
+            }
+        }
+        run {
+            var size by remember(s.readingSize) { mutableStateOf(s.readingSize.toFloat()) }
+            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 6.dp)) {
+                Text("Size", style = MaterialTheme.typography.labelLarge, modifier = Modifier.width(80.dp))
+                androidx.compose.material3.Slider(size, { size = it }, Modifier.weight(1f), valueRange = 80f..160f, steps = 7,
+                    onValueChangeFinished = { app.settings.update { putInt(Keys.READING_SIZE, size.toInt()) } })
+                Text("${size.toInt()}%", style = MaterialTheme.typography.labelMedium, modifier = Modifier.width(44.dp))
+            }
+            Text("The quick brown fox reads the Owner's Manual so you don't have to.",
+                style = com.blacklab.app.ui.theme.readingStyle(MaterialTheme.typography.bodyLarge).let { st ->
+                    val fam = when (s.readingFont) { "SERIF" -> androidx.compose.ui.text.font.FontFamily.Serif; "SANS" -> com.blacklab.app.ui.theme.InterFamily
+                        "MONO" -> androidx.compose.ui.text.font.FontFamily.Monospace; else -> st.fontFamily }
+                    st.copy(fontFamily = fam, fontSize = MaterialTheme.typography.bodyLarge.fontSize * (size / 100f))
+                })
+            Text("Used in Knowledge, Journal, Summaries and text files; the document editor opens at this zoom.", style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 4.dp))
+        }
+
         Text("Visual style", style = MaterialTheme.typography.labelLarge, modifier = Modifier.padding(top = 14.dp, bottom = 6.dp))
         SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
             listOf("GLASS" to "Glass", "SOLID" to "Solid").forEachIndexed { i, (k, l) ->
@@ -142,6 +203,30 @@ fun ColorChoices() {
             icon = Icons.Rounded.Contrast) { v -> app.settings.update { putBoolean(Keys.HIGH_CONTRAST, v) } }
 
         Preview(choice, which, dark)
+    }
+}
+
+/** A tiny page-and-card mock of a dark style. */
+@Composable
+private fun DarkStyleSwatch(st: com.blacklab.app.ui.theme.DarkStyle, palette: AccentPalette, selected: Boolean, onClick: () -> Unit) {
+    val page = if (st.wash > 0f) palette.accent(true).copy(alpha = st.wash).compositeOverColor(Color(st.background)) else Color(st.background)
+    Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.width(76.dp)) {
+        Box(
+            Modifier.size(width = 68.dp, height = 52.dp).clip(RoundedCornerShape(12.dp)).background(page)
+                .border(if (selected) 3.dp else 1.dp, if (selected) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.outline, RoundedCornerShape(12.dp))
+                .clickable(onClick = onClick)
+                .semantics { contentDescription = "${st.label} dark style"; this.selected = selected }
+                .padding(8.dp),
+        ) {
+            Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(6.dp)).background(Color(st.container)).border(1.dp, Color(st.outlineVariant), RoundedCornerShape(6.dp)).padding(5.dp)) {
+                Box(Modifier.fillMaxWidth(0.8f).height(4.dp).clip(RoundedCornerShape(2.dp)).background(Color(0xFFE9EBEF)))
+                Spacer(Modifier.height(3.dp))
+                Box(Modifier.fillMaxWidth(0.55f).height(4.dp).clip(RoundedCornerShape(2.dp)).background(Color(0xFFA6ADB8)))
+                Spacer(Modifier.height(4.dp))
+                Box(Modifier.fillMaxWidth().height(5.dp).clip(RoundedCornerShape(3.dp)).background(palette.accent(true)))
+            }
+        }
+        Text(st.label, style = MaterialTheme.typography.labelSmall, modifier = Modifier.padding(top = 3.dp), maxLines = 1)
     }
 }
 
@@ -217,7 +302,7 @@ private fun Preview(choice: ThemeChoice, p: Profile, currentDark: Boolean) {
             val accent = pal.accent(dark); val ter = pal.tertiary(dark)
             // matches the theme: dark-mode selections use the main color unless a secondary was picked
             val sec = if (dark && !choice.secondaryChosen(p)) accent else choice.secondary(p, dark)
-            val bg = if (dark) Color(0xFF0E1014) else pal.accent(false).copy(alpha = choice.lightStyle.wash).compositeOverColor(Color(choice.lightStyle.background))
+            val bg = if (dark) Color(choice.darkStyle.background) else pal.accent(false).copy(alpha = choice.lightStyle.wash).compositeOverColor(Color(choice.lightStyle.background))
             val fg = if (dark) Color(0xFFE9EBEF) else Color(choice.lightStyle.ink)
             Surface(Modifier.weight(1f), shape = RoundedCornerShape(16.dp), color = bg, border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)) {
                 Column(Modifier.padding(10.dp)) {

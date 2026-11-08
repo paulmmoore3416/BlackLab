@@ -980,6 +980,23 @@ User: $text"""
             val p = s.parked ?: return Reply("I don't have a parking spot yet — it's saved when a drive ends.", links, source = "Garage")
             return Reply("Parked at ${p.place.ifBlank { "%.5f, %.5f".format(p.lat, p.lon) }}, ${T.ago(p.time)}.", links, source = "Garage", nav = "${p.lat},${p.lon}")
         }
+        if (Regex("recalls?\\b|safety (notice|campaign)").containsMatchIn(l)) {
+            val n = com.blacklab.app.vehicle.Nhtsa.load(ctx)
+            val v = com.blacklab.app.vehicle.Garage.load(ctx).vehicle
+            val text = when {
+                n.checkedAt == 0L -> "I haven't checked NHTSA yet — open the Garage and I'll look up recalls for the ${v.year} ${v.model}."
+                n.open.isEmpty() && n.recalls.isEmpty() -> "No recalls are listed for the ${v.year} ${v.make} ${v.model} (checked ${T.ago(n.checkedAt)})."
+                n.open.isEmpty() -> "All ${n.recalls.size} listed recalls are marked done or not for your car."
+                else -> "${n.open.size} recall${if (n.open.size > 1) "s" else ""} to check: " + n.open.joinToString("; ") { "${it.component.lowercase()} (${it.campaign})" } +
+                    ". Recalls are listed by model year, so confirm with the VIN check on nhtsa.gov or your dealer."
+            }
+            return Reply(text, links, source = "NHTSA")
+        }
+        if (Regex("when('?s| is) (my |the )?(next )?(oil change|service|maintenance|tire rotation)|next (oil change|service)|service due").containsMatchIn(l)) {
+            val d = com.blacklab.app.vehicle.ServiceReminders.due(ctx).filter { it.status != com.blacklab.app.vehicle.Garage.Status.UNKNOWN }
+            val pick = d.firstOrNull { l.contains("oil") && it.item.id == "oil" || l.contains("rotation") && it.item.id == "rotate" } ?: d.firstOrNull()
+            return Reply(pick?.let { "${it.item.name}: ${it.describe()}." } ?: "Set the odometer in the Garage and I'll work out what's due.", links, source = "Garage")
+        }
         if (Regex("check engine|engine light|trouble codes?|dtcs?\\b|diagnostic|error codes?|codes? on (the|my) car").containsMatchIn(l)) {
             val c = s.activeDtcs
             val text = when {

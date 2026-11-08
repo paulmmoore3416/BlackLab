@@ -282,3 +282,22 @@ button:not(.ghost):not(.danger):not(.icon-btn) { box-shadow: 0 6px 18px color-mi
   .print-only { display: block; }
   .card::before, .tile::before { display: none; }
 }
+
+/* garage charts: thin marks, 4px rounded tops, 2px gaps, recessive grid; text in text colors */
+.chart { width: 100%; height: auto; display: block; }
+.chart .grid { stroke: var(--line); stroke-width: 1; }
+.chart .ax { fill: var(--muted); font-size: 10px; }
+.chart .b1 { fill: var(--accent); }
+.chart .b2 { fill: var(--accent-2); }
+.chart .bar-g:hover path { opacity: .82; }
+.chart .ln { fill: none; stroke: var(--accent); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.chart .dot { fill: var(--accent); stroke: var(--surface); stroke-width: 2; }
+.legend { display: flex; gap: 14px; font-size: 12px; color: var(--muted); margin: -4px 0 6px; }
+.legend i { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; vertical-align: middle; }
+.legend i.b1 { background: var(--accent); } .legend i.b2 { background: var(--accent-2); }
+.meter { height: 6px; border-radius: 3px; background: var(--surface-3); overflow: hidden; margin-top: 6px; }
+.meter span { display: block; height: 100%; background: var(--accent); border-radius: 3px; }
+.table-wrap { overflow-x: auto; }
+.tbl { width: 100%; border-collapse: collapse; font-size: 13px; }
+.tbl th { text-align: left; color: var(--muted); font-weight: 600; padding: 6px 8px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+.tbl td { padding: 7px 8px; border-bottom: 1px solid var(--line); }

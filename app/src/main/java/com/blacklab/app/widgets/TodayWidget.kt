@@ -66,7 +66,7 @@ class TodayWidget : GlanceAppWidget() {
     @Composable
     private fun Content(m: TodayModel) {
         val ctx = LocalContext.current
-        Column(GlanceModifier.fillMaxSize().appWidgetBackground().cornerRadius(24.dp).background(GlanceTheme.colors.widgetBackground).padding(12.dp)) {
+        Column(GlanceModifier.fillMaxSize().appWidgetBackground().cornerRadius(WUi.corner(LocalContext.current)).background(GlanceTheme.colors.widgetBackground).padding(12.dp)) {
             WUi.Header(R.drawable.ic_w_today, m.date, "Today · ${m.account}", actionStartActivity(Widgets.openIntent(ctx, "home")),
                 R.drawable.ic_w_add, "Add a task", actionStartActivity(Widgets.captureIntent(ctx, "task")))
             if (m.hideDetails) {

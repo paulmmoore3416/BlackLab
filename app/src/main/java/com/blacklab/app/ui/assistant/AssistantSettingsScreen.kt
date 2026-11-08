@@ -89,7 +89,9 @@ fun AssistantSettingsScreen() {
         GoogleAuth.resultFromIntent(ctx, r.data)?.accessToken?.let { t -> scope.launch { GoogleAuth.rememberAccount(app, t); shell.toast("Google connected") } }
             ?: shell.toast("Google sign-in was cancelled")
     }
+    var googleError by remember { mutableStateOf("") }
     fun googleSignIn() {
+        googleError = ""
         val act = ctx.findActivity() ?: return
         scope.launch {
             GoogleAuth.authorize(act).onSuccess { r ->
@@ -97,7 +99,7 @@ fun AssistantSettingsScreen() {
                 if (r.hasResolution() && pi != null) signIn.launch(IntentSenderRequest.Builder(pi.intentSender).build())
                 else r.accessToken?.let { GoogleAuth.rememberAccount(app, it); shell.toast("Google connected") }
             }.onFailure {
-                shell.toast("Google sign-in needs an Android OAuth client for this app in your Cloud project — see docs/ASSISTANT.md")
+                googleError = GoogleAuth.explain(ctx, it)
             }
         }
     }
@@ -257,6 +259,16 @@ fun AssistantSettingsScreen() {
                         }
                         if (s.googleAccount.isBlank()) Button(onClick = { googleSignIn() }) { Text("Sign in") }
                         else TextButton(onClick = { GoogleAuth.signOut(app) }) { Text("Disconnect") }
+                    }
+                    if (googleError.isNotBlank()) Text(googleError, style = MaterialTheme.typography.bodySmall, color = com.blacklab.app.ui.theme.LocalBlColors.current.danger,
+                        modifier = Modifier.padding(top = 8.dp))
+                    if (s.googleAccount.isBlank()) {
+                        val (pkg, sha1) = remember { GoogleAuth.androidClientInfo(ctx) }
+                        val clip = androidx.compose.ui.platform.LocalClipboardManager.current
+                        Text("One-time setup in Google Cloud (console.cloud.google.com): enable the Gmail and Google Drive APIs, set up the OAuth consent screen (External, add yourself as a test user), then Credentials › Create OAuth client ID › Android with:",
+                            style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 8.dp))
+                        Text("Package: $pkg\nSHA-1: $sha1", style = com.blacklab.app.ui.theme.MonoDigits.copy(fontSize = MaterialTheme.typography.bodySmall.fontSize), modifier = Modifier.padding(top = 4.dp))
+                        TextButton(onClick = { clip.setText(androidx.compose.ui.text.AnnotatedString(sha1)); shell.toast("SHA-1 copied") }) { Text("Copy SHA-1") }
                     }
                     Text("Google Keep has no public API for personal accounts, so “save to Keep” hands the note to the Keep app.",
                         style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 8.dp))

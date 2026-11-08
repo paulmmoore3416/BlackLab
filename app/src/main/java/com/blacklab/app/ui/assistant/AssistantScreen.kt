@@ -170,7 +170,7 @@ fun AssistantScreen(startListening: Boolean = false) {
                 val pi = r.pendingIntent
                 if (r.hasResolution() && pi != null) signIn.launch(IntentSenderRequest.Builder(pi.intentSender).build())
                 else r.accessToken?.let { GoogleAuth.rememberAccount(app, it); shell.toast("Google connected") }
-            }.onFailure { shell.toast("Google sign-in unavailable: ${it.message?.take(80)}") }
+            }.onFailure { shell.toast(GoogleAuth.explain(ctx, it)) }
         }
     }
 

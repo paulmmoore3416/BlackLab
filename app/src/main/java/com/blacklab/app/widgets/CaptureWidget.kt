@@ -65,7 +65,7 @@ class CaptureWidget : GlanceAppWidget() {
         val room = ((size.width.value - if (tall) 16f else 126f) / 48f).toInt().coerceIn(0, buttons.size)
         val shown = buttons.take(room)
         Column(
-            GlanceModifier.fillMaxSize().appWidgetBackground().cornerRadius(28.dp).background(GlanceTheme.colors.widgetBackground).padding(8.dp),
+            GlanceModifier.fillMaxSize().appWidgetBackground().cornerRadius(WUi.corner(androidx.glance.LocalContext.current) + 4.dp).background(GlanceTheme.colors.widgetBackground).padding(8.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             if (tall) {

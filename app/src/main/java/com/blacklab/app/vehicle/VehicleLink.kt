@@ -45,6 +45,7 @@ object VehicleLink {
         val bluelink: String = "",
         val androidAuto: Boolean = false,
         val ending: Boolean = false,
+        val sim: Boolean = false,
     )
 
     private val _state = MutableStateFlow(Telemetry.State())
@@ -103,6 +104,46 @@ object VehicleLink {
     fun update(context: Context, immediate: Boolean = true, change: (Telemetry.State) -> Telemetry.State) {
         synchronized(this) { load(context); _state.value = change(_state.value) }
         save(context, immediate)
+        com.blacklab.app.widgets.CarWidget.refreshSoon(context)
+    }
+
+    // ---------------------------------------------------------------- simulator
+
+    /** True while a practice drive runs: nothing it reports touches the Garage, and the car's real values come back afterwards. */
+    @Volatile var simulating = false
+        private set
+    private var simBackup: Telemetry.State? = null
+
+    fun beginSim(context: Context) = synchronized(this) {
+        if (simulating) return
+        simBackup = load(context)
+        simulating = true
+    }
+
+    fun endSim(context: Context) {
+        val b = synchronized(this) { simBackup.also { simBackup = null; simulating = false } } ?: return
+        update(context) { it.copy(snapshot = b.snapshot, dtcs = b.dtcs, parked = b.parked, lastSession = b.lastSession, pendingFill = b.pendingFill) }
+    }
+
+    // ---------------------------------------------------------------- fill-ups
+
+    fun clearPendingFill(context: Context, loggedAt: Long = System.currentTimeMillis()) {
+        val p = load(context).pendingFill ?: return
+        if (loggedAt >= p.time - 6 * 3_600_000L) update(context) { it.copy(pendingFill = null) }
+    }
+
+    private fun checkFill(context: Context, before: Map<String, Telemetry.Metric>, metrics: List<Telemetry.Metric>) {
+        val s = load(context)
+        if (simulating || !s.link.detectFills) return
+        val now = metrics.firstOrNull { it.key == "fuel_pct" } ?: return
+        val prev = before["fuel_pct"] ?: return
+        if (now.time < prev.time) return
+        val g = Garage.load(context).vehicle
+        val gal = Telemetry.detectFill(prev.num, now.num, g.tankGallons) ?: return
+        val station = s.parked?.takeIf { now.time - it.time < 3 * 3_600_000L }?.place?.substringBefore(",").orEmpty()
+        update(context) { it.copy(pendingFill = Telemetry.PendingFill(now.time, prev.num ?: 0.0, now.num ?: 0.0, gal, g.odometerNow.takeIf { o -> o > 0 }, station)) }
+        alert(context, "car_fill", "Filled up? About %.1f gal".format(gal),
+            "The fuel gauge went from %.0f%% to %.0f%%%s. Tap to log it with the price, so MPG and fuel costs stay right.".format(prev.num ?: 0.0, now.num ?: 0.0, if (station.isNotBlank()) " at $station" else ""))
     }
 
     fun flush(context: Context) = save(context, true)
@@ -122,6 +163,13 @@ object VehicleLink {
         if (metrics.isEmpty()) return
         val before = load(context).snapshot
         update(context, immediate = false) { it.copy(snapshot = Telemetry.merge(it.snapshot, metrics)) }
+        checkFill(context, before, metrics)
+        if (simulating) {
+            metrics.filter { Telemetry.isAlert(it) && it.key !in setOf("fuel_pct", "coolant", "battery_v", "dtc_count") }.forEach { m ->
+                if (before[m.key]?.let(Telemetry::isAlert) != true) alert(context, "car_${m.key}", "Simulated · ${Telemetry.def(m.key)?.label ?: m.key}: ${Telemetry.format(m)}", "From the drive simulator.")
+            }
+            return
+        }
         metrics.firstOrNull { it.key == "odometer" }?.num?.let { miles ->
             val m = Math.round(miles).toInt()
             val g = Garage.load(context)
@@ -129,7 +177,7 @@ object VehicleLink {
         }
         metrics.firstOrNull { it.key == "vin" }?.text?.let { vin ->
             val v = Garage.load(context).vehicle
-            if (v.vin.isBlank() && vin.length == 17) Garage.setVehicle(context, v.copy(vin = vin))
+            if (v.vin.isBlank() && vin.length == 17) { Garage.setVehicle(context, v.copy(vin = vin)); Nhtsa.refreshSoon(context) }
         }
         // Warnings that just turned on (not the ones we already told you about)
         metrics.filter { Telemetry.isAlert(it) && it.key !in setOf("fuel_pct", "coolant", "battery_v", "dtc_count") }.forEach { m ->
@@ -145,7 +193,7 @@ object VehicleLink {
             added = new
             s.copy(dtcs = all, snapshot = Telemetry.merge(s.snapshot, listOfNotNull(Telemetry.num("dtc_count", stored.size.toDouble(), Telemetry.Source.OBD))))
         }
-        if (added.isNotEmpty()) alert(context, "car_dtc", if (added.size == 1) "Trouble code ${added[0].code}" else "${added.size} new trouble codes",
+        if (added.isNotEmpty()) alert(context, "car_dtc", (if (simulating) "Simulated · " else "") + if (added.size == 1) "Trouble code ${added[0].code}" else "${added.size} new trouble codes",
             added.joinToString("\n") { "${it.code} — ${Dtcs.describe(it.code)}" + if (it.kind != "stored") " (${it.kind})" else "" })
     }
 
@@ -155,10 +203,18 @@ object VehicleLink {
         if (!nm.areNotificationsEnabled()) return
         val n = NotificationCompat.Builder(context, CH_VEHICLE)
             .setSmallIcon(R.drawable.ic_notification).setContentTitle(title).setContentText(text.lineSequence().first())
-            .setStyle(NotificationCompat.BigTextStyle().bigText(text)).setAutoCancel(true).setColor(0xFF2BD9A8.toInt())
+            .setStyle(NotificationCompat.BigTextStyle().bigText(text)).setAutoCancel(true).setColor(accent(context))
             .setContentIntent(Notifications.openAppIntent(context, "garage", tag.hashCode())).build()
         runCatching { nm.notify(tag, 1, n) }
     }
+
+    /** Your current account color, so car notifications match the app. */
+    fun accent(context: Context): Int = runCatching {
+        val s = context.app.settings.current
+        com.blacklab.app.ui.theme.ThemeChoice.from(s).palette(s.activeProfile).accent(true).let { c ->
+            android.graphics.Color.argb(255, (c.red * 255).toInt(), (c.green * 255).toInt(), (c.blue * 255).toInt())
+        }
+    }.getOrDefault(0xFF2BD9A8.toInt())
 
     // ---------------------------------------------------------------- Bluetooth
 
@@ -213,6 +269,13 @@ object VehicleLink {
         if (link.carAddress.isNotBlank() && address.equals(link.carAddress, true)) stop(context, "Car Bluetooth")
     }
 
+    /** A four-minute practice drive from the simulator (the app must be open; nothing it reports touches the Garage). */
+    fun simulate(context: Context, withCode: Boolean) {
+        if (_live.value.active) return
+        val i = Intent(context, DriveService::class.java).setAction(DriveService.ACTION_START).putExtra("via", "Simulator").putExtra("sim", true).putExtra("simCode", withCode)
+        ContextCompat.startForegroundService(context, i)
+    }
+
     @SuppressLint("MissingPermission")
     fun start(context: Context, via: String, carName: String = "") {
         val i = Intent(context, DriveService::class.java).setAction(DriveService.ACTION_START).putExtra("via", via).putExtra("car", carName)
@@ -263,6 +326,21 @@ object VehicleLink {
 
     fun setTrip(context: Context, id: String, change: (Telemetry.Trip) -> Telemetry.Trip) = update(context) { s -> s.copy(trips = s.trips.map { if (it.id == id) change(it) else it }) }
     fun deleteTrip(context: Context, id: String) = update(context) { s -> s.copy(trips = s.trips.filterNot { it.id == id }) }
+    fun addRule(context: Context, rule: Telemetry.Rule) = setLink(context) { it.copy(rules = it.rules.filterNot { r -> r.id == rule.id } + rule) }
+    fun deleteRule(context: Context, id: String) = setLink(context) { it.copy(rules = it.rules.filterNot { r -> r.id == id }) }
+
+    /** Tags earlier trips that still have the default tag and no note. Returns how many changed. */
+    fun applyRules(context: Context): Int {
+        var n = 0
+        update(context) { s ->
+            s.copy(trips = s.trips.map { t ->
+                if (t.end == null || t.simulated || t.rule.isNotBlank() || t.note.isNotBlank() || t.purpose != s.link.defaultPurpose) t
+                else Telemetry.matchRule(t, s.link.rules)?.takeIf { it.purpose != t.purpose }?.let { r -> n++; t.copy(purpose = r.purpose, rule = r.name) } ?: t
+            })
+        }
+        return n
+    }
+
     fun clearCodes(context: Context) = update(context) { s -> s.copy(dtcs = s.dtcs.map { it.copy(active = false) }) }
 
     /** Writes the trip log as CSV into the cache and returns it for sharing. */

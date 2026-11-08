@@ -99,6 +99,35 @@ object GoogleAuth {
         if (email.isNotBlank()) app.settings.update { putString(Keys.GOOGLE_ACCOUNT, email) }
     }
 
+    /** The values Google Cloud needs for this app's Android OAuth client. The SHA-1 is read from the installed app's own signature. */
+    fun androidClientInfo(context: Context): Pair<String, String> {
+        val sha1 = runCatching {
+            val info = context.packageManager.getPackageInfo(context.packageName, android.content.pm.PackageManager.GET_SIGNING_CERTIFICATES)
+            val sig = info.signingInfo?.apkContentsSigners?.firstOrNull() ?: return@runCatching ""
+            java.security.MessageDigest.getInstance("SHA-1").digest(sig.toByteArray()).joinToString(":") { "%02X".format(it) }
+        }.getOrDefault("")
+        return context.packageName to sha1
+    }
+
+    /**
+     * Turns a sign-in failure into what to fix. The common one is DEVELOPER_ERROR (10): Google found
+     * no Android OAuth client for this package + signing SHA-1 in a Cloud project, or the consent
+     * screen doesn't list you as a test user.
+     */
+    fun explain(context: Context, e: Throwable): String {
+        val code = (e as? com.google.android.gms.common.api.ApiException)?.statusCode
+        val (pkg, sha1) = androidClientInfo(context)
+        return when (code) {
+            10 -> "Google rejected the app (error 10): create an Android OAuth client in Google Cloud for $pkg with SHA-1 $sha1, enable the Gmail and Drive APIs, and add your Google account as a test user on the OAuth consent screen."
+            7 -> "No connection to Google (error 7). Check the network and try again."
+            8 -> "Google Play services had an internal error (8). Try again in a minute."
+            16, 12501 -> "Sign-in was cancelled."
+            17 -> "Google Play services is out of date on this phone (17). Update it from the Play Store."
+            else -> "Google sign-in failed" + (code?.let { " (error $it)" } ?: "") + ": " + (e.message?.take(120) ?: "unknown") +
+                ". Check the Android OAuth client ($pkg, SHA-1 $sha1) and test users in Google Cloud."
+        }
+    }
+
     fun signOut(app: AppContainer) = app.settings.update { putString(Keys.GOOGLE_ACCOUNT, ""); putBoolean(Keys.CLOUD_SYNC, false) }
 }
 

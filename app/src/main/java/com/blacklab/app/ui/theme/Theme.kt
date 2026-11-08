@@ -95,6 +95,61 @@ enum class LightStyle(
     }
 }
 
+/**
+ * How dark mode looks. Graphite is the original near-black; True black turns the page and cards
+ * fully black on OLED screens (saves battery, deepest contrast); Slate is a cool blue-gray; Accent
+ * wash lets your main color tint the dark page.
+ */
+enum class DarkStyle(
+    val label: String,
+    val blurb: String,
+    val background: Long, val lowest: Long, val low: Long, val container: Long, val high: Long, val highest: Long, val variant: Long, val outlineVariant: Long,
+    val wash: Float,
+) {
+    GRAPHITE("Graphite", "Soft near-black, the original look", 0xFF0E1014, 0xFF0A0B0E, 0xFF13161B, 0xFF171A20, 0xFF1D2128, 0xFF242830, 0xFF1D2027, 0xFF262A32, 0f),
+    OLED("True black", "Pure black page for OLED screens — saves battery", 0xFF000000, 0xFF000000, 0xFF08090B, 0xFF0E1013, 0xFF15171B, 0xFF1C1F24, 0xFF15171B, 0xFF1F2228, 0f),
+    SLATE("Slate", "Cool blue-gray", 0xFF0F141B, 0xFF0B0F15, 0xFF141A23, 0xFF18202A, 0xFF1E2733, 0xFF252F3C, 0xFF1E2733, 0xFF2A3442, 0f),
+    WASH("Accent wash", "Your main color tints the dark page", 0xFF0E1014, 0xFF0A0B0E, 0xFF13161B, 0xFF171A20, 0xFF1D2128, 0xFF242830, 0xFF1D2027, 0xFF262A32, 0.07f);
+
+    companion object { fun of(name: String?) = entries.firstOrNull { it.name == name } ?: GRAPHITE }
+}
+
+/** Corner roundness everywhere: cards, chips, fields, dialogs, sheets and widgets. */
+enum class CornerStyle(val label: String, val xs: Int, val sm: Int, val md: Int, val lg: Int, val xl: Int, val card: Int, val widget: Int) {
+    ROUND("Round", 10, 14, 20, 26, 32, 22, 24),
+    SOFT("Soft", 6, 8, 12, 16, 20, 14, 16),
+    SQUARE("Square", 2, 4, 6, 8, 10, 6, 8);
+
+    companion object { fun of(name: String?) = entries.firstOrNull { it.name == name } ?: ROUND }
+}
+
+/** The app's typeface. Inter is bundled; System uses the phone's own font (Google Sans Flex on Pixel); Serif is an editorial look. */
+enum class FontChoice(val label: String) {
+    INTER("Inter"), SYSTEM("Phone's font"), SERIF("Serif");
+    companion object { fun of(name: String?) = entries.firstOrNull { it.name == name } ?: INTER }
+}
+
+/** Long reading (Documents, Journal, Knowledge, Summaries, text files): its own typeface and size. */
+data class ReadingStyle(val font: String = "SAME", val scale: Float = 1f)
+
+val LocalReading = staticCompositionLocalOf { ReadingStyle() }
+val LocalCorners = staticCompositionLocalOf { CornerStyle.ROUND }
+
+/** [base] in the reading font and size you picked in Appearance. */
+@Composable
+fun readingStyle(base: TextStyle): TextStyle {
+    val r = LocalReading.current
+    val family = when (r.font) {
+        "SERIF" -> androidx.compose.ui.text.font.FontFamily.Serif
+        "SANS" -> InterFamily
+        "MONO" -> androidx.compose.ui.text.font.FontFamily.Monospace
+        else -> base.fontFamily
+    }
+    if (r.font == "SAME" && r.scale == 1f) return base
+    return base.copy(fontFamily = family, fontSize = if (base.fontSize.isSp) base.fontSize * r.scale else base.fontSize,
+        lineHeight = if (base.lineHeight.isSp) base.lineHeight * r.scale else base.lineHeight)
+}
+
 /** The user's color choices: a palette per account, and an optional secondary override ("AUTO" = the palette's complement). */
 data class ThemeChoice(
     val personal: AccentPalette = AccentPalette.MINT,
@@ -110,6 +165,12 @@ data class ThemeChoice(
     val backdrop: String = "AURORA",
     /** 0–100. */
     val intensity: Int = 60,
+    val darkStyle: DarkStyle = DarkStyle.GRAPHITE,
+    val corners: CornerStyle = CornerStyle.ROUND,
+    /** Interface size: 1.0 comfortable, smaller = compact. */
+    val uiScale: Float = 1f,
+    val font: FontChoice = FontChoice.INTER,
+    val reading: ReadingStyle = ReadingStyle(),
 ) {
     fun palette(p: Profile) = if (p == Profile.PERSONAL) personal else professional
     fun secondaryChosen(p: Profile) = (if (p == Profile.PERSONAL) personalSecondary else professionalSecondary) != "AUTO"
@@ -124,6 +185,8 @@ data class ThemeChoice(
             AccentPalette.of(s.accentPersonal, AccentPalette.MINT), AccentPalette.of(s.accentProfessional, AccentPalette.COBALT),
             s.secondaryPersonal, s.secondaryProfessional, LightStyle.of(s.lightStyle), s.highContrast,
             s.visualStyle, s.backdrop, s.backdropIntensity,
+            DarkStyle.of(s.darkStyle), CornerStyle.of(s.cornerStyle), (s.uiScale / 100f).coerceIn(0.8f, 1.1f), FontChoice.of(s.fontFamily),
+            ReadingStyle(s.readingFont, (s.readingSize / 100f).coerceIn(0.8f, 1.6f)),
         )
     }
 }
@@ -150,7 +213,7 @@ fun rememberThemeMode(s: com.blacklab.app.core.Settings): String {
 /** The full color scheme for an account outside Compose screens (home-screen widgets). */
 fun colorSchemeFor(choice: ThemeChoice, profile: Profile, dark: Boolean): ColorScheme {
     val pal = choice.palette(profile)
-    return if (dark) dark(pal.accent(true), choice.secondary(profile, true), pal.tertiary(true), choice.secondaryChosen(profile), choice.highContrast)
+    return if (dark) dark(pal.accent(true), choice.secondary(profile, true), pal.tertiary(true), choice.secondaryChosen(profile), choice.highContrast, choice.darkStyle)
     else light(pal.accent(false), choice.secondary(profile, false), pal.tertiary(false), choice.lightStyle, choice.highContrast)
 }
 
@@ -175,8 +238,9 @@ private fun mix(c: Color, other: Color, t: Float) = Color(
  * complements turn muddy over near-black. A secondary color you pick yourself is used as chosen.
  * Stronger contrast deepens the background, brightens text and borders and lifts accents to 7:1.
  */
-private fun dark(accent0: Color, secondary0: Color, tertiary0: Color, secondaryChosen: Boolean, hc: Boolean = false): ColorScheme {
-    val bg = if (hc) Color(0xFF07080A) else Color(0xFF0E1014)
+private fun dark(accent0: Color, secondary0: Color, tertiary0: Color, secondaryChosen: Boolean, hc: Boolean = false, style: DarkStyle = DarkStyle.GRAPHITE): ColorScheme {
+    fun wash(c: Long, t: Float = style.wash) = if (t <= 0f) Color(c) else accent0.copy(alpha = t).compositeOver(Color(c))
+    val bg = if (hc && style != DarkStyle.OLED) mix(wash(style.background), Color.Black, 0.45f) else wash(style.background)
     val target = if (hc) Contrast.AAA else Contrast.AA
     val accent = accent0.ensureContrast(bg, target)
     val secondary = secondary0.ensureContrast(bg, target)
@@ -198,15 +262,15 @@ private fun dark(accent0: Color, secondary0: Color, tertiary0: Color, secondaryC
         onBackground = if (hc) Color(0xFFF7F8FA) else Color(0xFFE9EBEF),
         surface = bg,
         onSurface = if (hc) Color(0xFFF7F8FA) else Color(0xFFE9EBEF),
-        surfaceVariant = Color(0xFF1D2027),
+        surfaceVariant = wash(style.variant, style.wash * 0.7f),
         onSurfaceVariant = if (hc) Color(0xFFCDD2DA) else Color(0xFFA6ADB8),
-        surfaceContainerLowest = Color(0xFF0A0B0E),
-        surfaceContainerLow = Color(0xFF13161B),
-        surfaceContainer = Color(0xFF171A20),
-        surfaceContainerHigh = Color(0xFF1D2128),
-        surfaceContainerHighest = Color(0xFF242830),
+        surfaceContainerLowest = wash(style.lowest, style.wash * 0.5f),
+        surfaceContainerLow = wash(style.low, style.wash * 0.6f),
+        surfaceContainer = wash(style.container, style.wash * 0.7f),
+        surfaceContainerHigh = wash(style.high, style.wash * 0.7f),
+        surfaceContainerHighest = wash(style.highest, style.wash * 0.7f),
         outline = if (hc) Color(0xFF6E7682) else Color(0xFF4A505B),
-        outlineVariant = if (hc) Color(0xFF3A404A) else Color(0xFF262A32),
+        outlineVariant = if (hc) Color(0xFF3A404A) else Color(style.outlineVariant),
         error = Danger,
         onError = Color.White,
         inverseSurface = Color(0xFFE8EAED),
@@ -272,13 +336,13 @@ private fun Color.compositeOver(bg: Color): Color {
     return Color(red * a + bg.red * (1 - a), green * a + bg.green * (1 - a), blue * a + bg.blue * (1 - a), 1f)
 }
 
-/** Rounder, softer corners everywhere (chips, fields, cards, dialogs, sheets). */
-private val BlShapes = androidx.compose.material3.Shapes(
-    extraSmall = androidx.compose.foundation.shape.RoundedCornerShape(10.dp),
-    small = androidx.compose.foundation.shape.RoundedCornerShape(14.dp),
-    medium = androidx.compose.foundation.shape.RoundedCornerShape(20.dp),
-    large = androidx.compose.foundation.shape.RoundedCornerShape(26.dp),
-    extraLarge = androidx.compose.foundation.shape.RoundedCornerShape(32.dp),
+/** Corners everywhere (chips, fields, cards, dialogs, sheets), from Appearance › Corners. */
+private fun shapesFor(c: CornerStyle) = androidx.compose.material3.Shapes(
+    extraSmall = androidx.compose.foundation.shape.RoundedCornerShape(c.xs.dp),
+    small = androidx.compose.foundation.shape.RoundedCornerShape(c.sm.dp),
+    medium = androidx.compose.foundation.shape.RoundedCornerShape(c.md.dp),
+    large = androidx.compose.foundation.shape.RoundedCornerShape(c.lg.dp),
+    extraLarge = androidx.compose.foundation.shape.RoundedCornerShape(c.xl.dp),
 )
 
 /**
@@ -295,11 +359,16 @@ val InterFamily = androidx.compose.ui.text.font.FontFamily(
     },
 )
 
-private fun TextStyle.bl() = copy(fontFamily = InterFamily)
-/** Display sizes are mostly numbers (timers, big counts): tabular figures so they don't shift. */
-private fun TextStyle.blNum() = copy(fontFamily = InterFamily, fontFeatureSettings = "tnum")
-
-private val BlTypography = Typography().let { t ->
+private fun typographyFor(font: FontChoice): Typography {
+    val fam = when (font) {
+        FontChoice.INTER -> InterFamily
+        FontChoice.SYSTEM -> androidx.compose.ui.text.font.FontFamily.Default
+        FontChoice.SERIF -> androidx.compose.ui.text.font.FontFamily.Serif
+    }
+    fun TextStyle.bl() = copy(fontFamily = fam)
+    /** Display sizes are mostly numbers (timers, big counts): tabular figures so they don't shift. */
+    fun TextStyle.blNum() = copy(fontFamily = fam, fontFeatureSettings = "tnum")
+    return Typography().let { t ->
     t.copy(
         bodyLarge = t.bodyLarge.copy(lineHeight = 25.sp, letterSpacing = 0.2.sp),
         bodyMedium = t.bodyMedium.copy(lineHeight = 21.sp),
@@ -319,6 +388,7 @@ private val BlTypography = Typography().let { t ->
             bodyLarge = c.bodyLarge.bl(), bodyMedium = c.bodyMedium.bl(), bodySmall = c.bodySmall.bl(),
             labelLarge = c.labelLarge.bl(), labelMedium = c.labelMedium.bl(), labelSmall = c.labelSmall.bl(),
         )
+    }
     }
 }
 
@@ -354,7 +424,7 @@ fun BlackLabTheme(themeMode: String, dynamic: Boolean, profile: Profile, choice:
     val solid = when {
         dynamic && dark -> dynamicDarkColorScheme(ctx)
         dynamic -> dynamicLightColorScheme(ctx)
-        dark -> dark(accent, secondary, tertiary, choice.secondaryChosen(profile), choice.highContrast)
+        dark -> dark(accent, secondary, tertiary, choice.secondaryChosen(profile), choice.highContrast, choice.darkStyle)
         else -> light(accent, secondary, tertiary, choice.lightStyle, choice.highContrast)
     }
     // Every color change — palette, secondary, light style, light/dark, contrast — blends over ~half a second
@@ -373,8 +443,14 @@ fun BlackLabTheme(themeMode: String, dynamic: Boolean, profile: Profile, choice:
     )
     // With glass on, screens are see-through and the aurora shows behind them
     val drawn = if (glass.enabled) scheme.copy(background = Color.Transparent) else scheme
-    androidx.compose.runtime.CompositionLocalProvider(LocalBlColors provides bl, LocalThemeChoice provides choice, LocalGlass provides glass) {
-        MaterialTheme(colorScheme = drawn, typography = BlTypography, shapes = BlShapes) {
+    val typography = androidx.compose.runtime.remember(choice.font) { typographyFor(choice.font) }
+    val shapes = androidx.compose.runtime.remember(choice.corners) { shapesFor(choice.corners) }
+    val baseDensity = androidx.compose.ui.platform.LocalDensity.current
+    // Interface size scales layout and text together (on top of the phone's own display and font size)
+    val density = if (choice.uiScale == 1f) baseDensity else androidx.compose.ui.unit.Density(baseDensity.density * choice.uiScale, baseDensity.fontScale)
+    androidx.compose.runtime.CompositionLocalProvider(LocalBlColors provides bl, LocalThemeChoice provides choice, LocalGlass provides glass,
+        LocalCorners provides choice.corners, LocalReading provides choice.reading, androidx.compose.ui.platform.LocalDensity provides density) {
+        MaterialTheme(colorScheme = drawn, typography = typography, shapes = shapes) {
             androidx.compose.foundation.layout.Box(androidx.compose.ui.Modifier.fillMaxSize()) {
                 if (glass.enabled) Backdrop(scheme.background, scheme.primary, scheme.secondary, scheme.tertiary, glass)
                 // Root surface so every screen inherits the correct on-background text color

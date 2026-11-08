@@ -42,6 +42,8 @@ object Garage {
         val registrationDue: Long? = null,
         /** Miles driven (by GPS) since the last real odometer reading — keeps "what's due" current between readings. */
         val estMiles: Int = 0,
+        /** Your own estimate of yearly miles (0 = learn it from trips and fill-ups). Used to predict service dates. */
+        val milesPerYear: Int = 0,
     ) {
         /** Best guess at the odometer right now. */
         val odometerNow: Int get() = if (odometer > 0) odometer + estMiles else 0
@@ -66,10 +68,16 @@ object Garage {
     data class State(val vehicle: Vehicle = Vehicle(), val items: List<ServiceItem> = defaultSchedule(), val services: List<ServiceRecord> = emptyList(), val fuel: List<Fuel> = emptyList())
 
     enum class Status { OVERDUE, DUE_SOON, OK, UNKNOWN }
-    data class Due(val item: ServiceItem, val status: Status, val milesLeft: Int?, val daysLeft: Long?, val dueMiles: Int?, val dueDay: Long?) {
+    data class Due(val item: ServiceItem, val status: Status, val milesLeft: Int?, val daysLeft: Long?, val dueMiles: Int?, val dueDay: Long?,
+                   /** When the miles will run out at your usual pace (epoch day), if we know your pace. */
+                   val predictedDay: Long? = null) {
+        /** The earlier of the calendar due date and the predicted mileage date. */
+        val expectedDay: Long? get() = listOfNotNull(dueDay, predictedDay).minOrNull()
         fun describe(): String {
+            val predicted = predictedDay?.takeIf { milesLeft != null && milesLeft >= 0 && (dueDay == null || it < dueDay) }
+                ?.let { " (around ${LocalDate.ofEpochDay(it).let { d -> "${d.month.name.lowercase().replaceFirstChar { c -> c.uppercase() }.take(3)} ${d.dayOfMonth}" }})" }.orEmpty()
             val parts = listOfNotNull(
-                milesLeft?.let { if (it < 0) "${fmtMiles(-it)} mi overdue" else "in ${fmtMiles(it)} mi" },
+                milesLeft?.let { if (it < 0) "${fmtMiles(-it)} mi overdue" else "in ${fmtMiles(it)} mi$predicted" },
                 daysLeft?.let { if (it < 0) "${-it} days overdue" else if (it < 60) "in $it days" else "by ${LocalDate.ofEpochDay(dueDay!!).let { d -> "${d.month.name.lowercase().replaceFirstChar { c -> c.uppercase() }.take(3)} ${d.year}" }}" },
             )
             return if (parts.isEmpty()) "Log when it was last done" else parts.joinToString(" or ")
@@ -135,6 +143,7 @@ object Garage {
             tmp.writeText(toJson(s).toString())
             tmp.renameTo(f)
         }
+        com.blacklab.app.widgets.CarWidget.refreshSoon(context)
     }
 
     fun update(context: Context, change: (State) -> State) = synchronized(this) { commit(context, change(load(context))) }
@@ -176,14 +185,15 @@ object Garage {
     fun addFuel(context: Context, fuel: Fuel) = update(context) { s ->
         val v = if (fuel.miles != null && fuel.miles > s.vehicle.odometer) s.vehicle.copy(odometer = fuel.miles, odometerAt = fuel.time, estMiles = 0) else s.vehicle
         s.copy(vehicle = v, fuel = (listOf(fuel) + s.fuel).sortedByDescending { it.time })
-    }
+    }.also { VehicleLink.clearPendingFill(context, fuel.time) }
 
     fun deleteFuel(context: Context, id: String) = update(context) { s -> s.copy(fuel = s.fuel.filterNot { it.id == id }) }
 
     // ---------------------------------------------------------------- calculations (pure; unit-tested)
 
-    fun due(s: State, today: LocalDate = LocalDate.now()): List<Due> {
+    fun due(s: State, today: LocalDate = LocalDate.now(), milesPerDay: Double? = null): List<Due> {
         val odo = s.vehicle.odometerNow.takeIf { it > 0 }
+        val pace = milesPerDay?.takeIf { it > 0.5 } ?: s.vehicle.milesPerYear.takeIf { it > 0 }?.let { it / 365.0 }
         return s.items.map { item ->
             val miles = if (s.vehicle.severeService) item.severeMiles ?: item.miles else item.miles
             val months = if (s.vehicle.severeService) item.severeMonths ?: item.months else item.months
@@ -203,8 +213,66 @@ object Garage {
                 milesLeft == null && daysLeft == null -> Status.UNKNOWN
                 else -> Status.OK
             }
-            Due(item, status, milesLeft, daysLeft, dueMiles, dueDay)
+            val predicted = if (milesLeft != null && pace != null) today.plusDays(Math.round(milesLeft.coerceAtLeast(0) / pace)).toEpochDay() else null
+            Due(item, status, milesLeft, daysLeft, dueMiles, dueDay, predicted)
         }.sortedWith(compareBy<Due> { it.status.ordinal }.thenBy { it.milesLeft ?: Int.MAX_VALUE }.thenBy { it.daysLeft ?: Long.MAX_VALUE })
+    }
+
+    /**
+     * Your usual miles per day: from the trip log when it covers at least a week, otherwise from the
+     * fill-up odometer readings over at least two weeks; null until there's enough to go on.
+     */
+    fun milesPerDay(fuel: List<Fuel>, trips: List<Pair<Long, Double>>, now: Long = System.currentTimeMillis()): Double? {
+        val day = 86_400_000.0
+        val recent = trips.filter { it.first > now - 90 * 86_400_000L }
+        if (recent.size >= 3) {
+            val span = (now - recent.minOf { it.first }) / day
+            if (span >= 7) return recent.sumOf { it.second } / span
+        }
+        val f = fuel.filter { it.miles != null && it.time > now - 365 * 86_400_000L }.sortedBy { it.time }
+        if (f.size >= 2) {
+            val span = (f.last().time - f.first().time) / day
+            val miles = (f.last().miles!! - f.first().miles!!).toDouble()
+            if (span >= 14 && miles > 0) return miles / span
+        }
+        return null
+    }
+
+    /**
+     * One-time import of `BlackLab/.provision/vehicle.json` (pushed with adb), so details like the VIN
+     * and the current odometer never have to be typed or committed anywhere. Recognised keys: vin,
+     * odometer, year, make, model, trim, engine, drive, tankGallons, nickname, plate, milesPerYear.
+     * The file is deleted after it's read. Returns true when something was applied.
+     */
+    fun importProvisioning(context: Context, root: File): Boolean {
+        val dir = File(root, ".provision")
+        val f = File(dir, "vehicle.json")
+        if (!f.exists()) return false
+        val ok = runCatching {
+            val j = JSONObject(f.readText())
+            update(context) { s ->
+                var v = s.vehicle
+                j.optString("vin").uppercase().filter { it.isLetterOrDigit() }.takeIf { it.length == 17 }?.let { v = v.copy(vin = it) }
+                if (j.has("year")) v = v.copy(year = j.optInt("year", v.year))
+                j.optString("make").takeIf { it.isNotBlank() }?.let { v = v.copy(make = it) }
+                j.optString("model").takeIf { it.isNotBlank() }?.let { v = v.copy(model = it) }
+                j.optString("trim").takeIf { it.isNotBlank() }?.let { v = v.copy(trim = it) }
+                j.optString("engine").takeIf { it.isNotBlank() }?.let { v = v.copy(engine = it) }
+                j.optString("drive").takeIf { it == "AWD" || it == "FWD" }?.let { v = v.copy(drive = it) }
+                j.optString("nickname").takeIf { it.isNotBlank() }?.let { v = v.copy(nickname = it) }
+                j.optString("plate").takeIf { it.isNotBlank() }?.let { v = v.copy(plate = it.uppercase()) }
+                j.optDouble("tankGallons").takeIf { it.isFinite() && it in 5.0..60.0 }?.let { v = v.copy(tankGallons = it) }
+                j.optInt("milesPerYear", -1).takeIf { it >= 0 }?.let { v = v.copy(milesPerYear = it) }
+                // A reading you give on purpose replaces the estimate even if it's lower than the GPS-padded one
+                j.optInt("odometer", 0).takeIf { it > 0 }?.let { v = v.copy(odometer = it, odometerAt = System.currentTimeMillis(), estMiles = 0) }
+                val items = if (v.drive == "FWD") s.items.filterNot { it.id == "awd" } else s.items
+                s.copy(vehicle = v, items = items)
+            }
+            true
+        }.getOrDefault(false)
+        f.delete()
+        dir.delete()
+        return ok
     }
 
     data class FuelStats(val avgMpg: Double?, val lastMpg: Double?, val costPerMile: Double?, val monthCost: Double, val avgPrice: Double?)
@@ -233,6 +301,33 @@ object Garage {
         val cpm = if (avg != null && avgPrice != null) avgPrice / avg else null
         val monthAgo = now - 30L * 86_400_000
         return FuelStats(avg, last, cpm, fuel.filter { it.time >= monthAgo }.sumOf { it.cost ?: 0.0 }, avgPrice)
+    }
+
+    /** MPG of each full tank (time of the fill that closed it, mpg), oldest first. */
+    fun mpgSeries(fuel: List<Fuel>): List<Pair<Long, Double>> {
+        val asc = fuel.filter { it.miles != null }.sortedBy { it.miles }
+        val out = ArrayList<Pair<Long, Double>>()
+        var lastFull: Fuel? = null
+        var gal = 0.0
+        asc.forEach { f ->
+            if (lastFull == null) { if (f.full) lastFull = f; return@forEach }
+            gal += f.gallons
+            if (f.full) {
+                val miles = (f.miles!! - lastFull!!.miles!!).toDouble()
+                if (miles > 0 && gal > 0) (miles / gal).takeIf { it in 5.0..80.0 }?.let { out += f.time to it }
+                lastFull = f; gal = 0.0
+            }
+        }
+        return out
+    }
+
+    /** Fuel spend per calendar month for the last [months] months, oldest first. */
+    fun monthlySpend(fuel: List<Fuel>, months: Int = 6, today: LocalDate = LocalDate.now(), zone: ZoneId = ZoneId.systemDefault()): List<Pair<java.time.YearMonth, Double>> {
+        val now = java.time.YearMonth.from(today)
+        return (months - 1 downTo 0).map { i ->
+            val ym = now.minusMonths(i.toLong())
+            ym to fuel.filter { java.time.YearMonth.from(Instant.ofEpochMilli(it.time).atZone(zone)) == ym }.sumOf { it.cost ?: 0.0 }
+        }
     }
 
     /**
@@ -296,7 +391,7 @@ object Garage {
         val v = s.vehicle
         put("vehicle", JSONObject().put("year", v.year).put("make", v.make).put("model", v.model).put("trim", v.trim).put("engine", v.engine).put("drive", v.drive)
             .put("nickname", v.nickname).put("vin", v.vin).put("plate", v.plate).put("odometer", v.odometer).put("odometerAt", v.odometerAt).put("tankGallons", v.tankGallons)
-            .put("tirePsi", v.tirePsi).put("oil", v.oil).put("severe", v.severeService).put("dealer", v.dealer).put("insurance", v.insurance).put("registrationDue", v.registrationDue ?: JSONObject.NULL).put("estMiles", v.estMiles))
+            .put("tirePsi", v.tirePsi).put("oil", v.oil).put("severe", v.severeService).put("dealer", v.dealer).put("insurance", v.insurance).put("registrationDue", v.registrationDue ?: JSONObject.NULL).put("estMiles", v.estMiles).put("milesPerYear", v.milesPerYear))
         put("items", JSONArray().apply {
             s.items.forEach { i ->
                 put(JSONObject().put("id", i.id).put("name", i.name).put("miles", i.miles ?: JSONObject.NULL).put("months", i.months ?: JSONObject.NULL)
@@ -323,7 +418,7 @@ object Garage {
             Vehicle(j.optInt("year", 2023), j.optString("make", "Hyundai"), j.optString("model", "Santa Fe"), j.optString("trim"), j.optString("engine", ENGINES.first()),
                 j.optString("drive", "AWD"), j.optString("nickname"), j.optString("vin"), j.optString("plate"), j.optInt("odometer"), j.optLong("odometerAt"),
                 j.optDouble("tankGallons", 18.8), j.optString("tirePsi"), j.optString("oil"), j.optBoolean("severe"), j.optString("dealer"), j.optString("insurance"),
-                j.optLongOrNull("registrationDue"), j.optInt("estMiles"))
+                j.optLongOrNull("registrationDue"), j.optInt("estMiles"), j.optInt("milesPerYear"))
         } ?: Vehicle()
         fun arr(k: String) = o.optJSONArray(k)?.let { a -> (0 until a.length()).map { a.getJSONObject(it) } }
         val items = arr("items")?.map { j ->

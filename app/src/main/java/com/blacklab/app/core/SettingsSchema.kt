@@ -55,6 +55,10 @@ object SettingsSchema {
     /** Mirrors ui/theme LightStyle. */
     private val LIGHT_STYLES = arrayOf("CLEAN" to "Clean", "PURE" to "Pure white", "WARM" to "Warm paper", "COOL" to "Cool mist", "WASH" to "Accent wash")
 
+    /** Mirrors ui/theme DarkStyle and CornerStyle. */
+    private val DARK_STYLES = arrayOf("GRAPHITE" to "Graphite", "OLED" to "True black", "SLATE" to "Slate", "WASH" to "Accent wash")
+    private val CORNER_STYLES = arrayOf("ROUND" to "Round", "SOFT" to "Soft", "SQUARE" to "Square")
+
     private fun choice(key: String, label: String, help: String, default: String, vararg options: Pair<String, String>, advanced: Boolean = false) =
         Def(key, Store.STRING, label, help, "choice", options.toList(), default = default, advanced = advanced)
 
@@ -80,6 +84,13 @@ object SettingsSchema {
             time(Keys.THEME_DARK_FROM, "Dark from", "Custom hours: when the dark theme starts.", d.themeDarkFrom),
             time(Keys.THEME_DARK_TO, "Dark until", "Custom hours: when the light theme comes back.", d.themeDarkTo),
             choice(Keys.LIGHT_STYLE, "Light mode style", "How the light theme's page and cards look.", d.lightStyle, *LIGHT_STYLES),
+            choice(Keys.DARK_STYLE, "Dark mode style", "How the dark theme's page and cards look. True black is pure black for OLED screens.", d.darkStyle, *DARK_STYLES),
+            choice(Keys.CORNER_STYLE, "Corners", "How rounded cards, buttons, fields and widgets are.", d.cornerStyle, *CORNER_STYLES),
+            intChoice(Keys.UI_SCALE, "Interface size", "Compact fits more on screen. Works on top of the phone's display and font size.", d.uiScale, 100 to "Comfortable", 92 to "Compact", 85 to "Dense"),
+            choice(Keys.FONT_FAMILY, "Font", "The app's typeface. Phone's font is Google Sans Flex on Pixel.", d.fontFamily, "INTER" to "Inter", "SYSTEM" to "Phone's font", "SERIF" to "Serif"),
+            choice(Keys.READING_FONT, "Reading font", "For long reading: Knowledge, Journal, Summaries, text files and the document editor's zoom.", d.readingFont,
+                "SAME" to "Same as the app", "SERIF" to "Serif", "SANS" to "Inter", "MONO" to "Monospace"),
+            Def(Keys.READING_SIZE, Store.INT, "Reading size", "Text size for long reading.", "percent", min = 80.0, max = 160.0, step = 10.0, unit = "%", default = d.readingSize),
             choice(Keys.VISUAL_STYLE, "Visual style", "Glass: a slowly moving backdrop in your palette colors with frosted cards. Solid: the classic flat look.", d.visualStyle,
                 "GLASS" to "Glass", "SOLID" to "Solid"),
             choice(Keys.BACKDROP, "Backdrop", "Glass style background: moving aurora, still gradient, or plain.", d.backdrop, "AURORA" to "Aurora (moving)", "GRADIENT" to "Gradient (still)", "PLAIN" to "Plain"),

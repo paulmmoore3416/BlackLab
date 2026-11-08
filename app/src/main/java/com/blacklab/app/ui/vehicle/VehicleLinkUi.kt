@@ -90,8 +90,28 @@ private fun Context.granted(p: String) = ContextCompat.checkSelfPermission(this,
 
 /** Live car data, diagnostics and where you parked — shown near the top of the Garage. */
 @OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
-fun LazyListScope.liveCarSection(st: Telemetry.State, live: VehicleLink.Live, expanded: Boolean, onExpand: () -> Unit, onSetup: () -> Unit, onRefresh: () -> Unit, onCodes: () -> Unit) {
+fun LazyListScope.liveCarSection(st: Telemetry.State, live: VehicleLink.Live, expanded: Boolean, onExpand: () -> Unit, onSetup: () -> Unit, onRefresh: () -> Unit, onCodes: () -> Unit,
+                                 next: Garage.Due? = null, severe: Boolean = false, onLogFill: (Telemetry.PendingFill) -> Unit = {}, onDismissFill: () -> Unit = {}) {
     item { SectionHeader("From the car", action = "Car connection", onAction = onSetup) }
+    st.pendingFill?.let { f ->
+        item(key = "pending-fill") {
+            BlCard(Modifier.fillMaxWidth(), accent = Mint) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Rounded.LocalGasStation, null, tint = Mint.readable())
+                    Spacer(Modifier.size(10.dp))
+                    Column(Modifier.weight(1f)) {
+                        Text("Filled up? About %.1f gal".format(f.gallons), style = MaterialTheme.typography.titleSmall)
+                        Text("Fuel went from %.0f%% to %.0f%% · %s".format(f.fromPct, f.toPct, Telemetry.ago(f.time)) + (f.station.takeIf { it.isNotBlank() }?.let { " · $it" } ?: ""),
+                            style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(top = 6.dp)) {
+                    Button(onClick = { onLogFill(f) }) { Text("Log fill-up") }
+                    TextButton(onClick = onDismissFill) { Text("Not a fill-up") }
+                }
+            }
+        }
+    }
     item {
         val ctx = LocalContext.current
         BlCard(Modifier.fillMaxWidth(), accent = if (live.active) Mint else null) {
@@ -101,6 +121,7 @@ fun LazyListScope.liveCarSection(st: Telemetry.State, live: VehicleLink.Live, ex
                 Column(Modifier.weight(1f)) {
                     val car = st.link.carName.ifBlank { "your car" }
                     Text(when {
+                        live.sim && live.active -> "Simulated drive · %.1f mi".format(live.tripMiles) + (live.mph?.let { " · %.0f mph".format(it) } ?: "")
                         live.ending -> "Drive ending…"
                         live.active -> "Driving · %.1f mi".format(live.tripMiles) + (live.mph?.let { " · %.0f mph".format(it) } ?: "")
                         st.link.carAddress.isBlank() -> "Not connected to a car yet"
@@ -120,8 +141,26 @@ fun LazyListScope.liveCarSection(st: Telemetry.State, live: VehicleLink.Live, ex
             }
         }
     }
+    // Gauges: fuel and how much of the next service interval is used
+    val fuel = st["fuel_pct"]?.num
+    val used = next?.let { d ->
+        val miles = if (severe) d.item.severeMiles ?: d.item.miles else d.item.miles
+        val months = if (severe) d.item.severeMonths ?: d.item.months else d.item.months
+        when {
+            miles != null && d.milesLeft != null -> 1.0 - d.milesLeft.toDouble() / miles
+            months != null && d.daysLeft != null -> 1.0 - d.daysLeft / (months * 30.44)
+            else -> null
+        }
+    }
+    if (fuel != null || used != null) item(key = "gauges") {
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
+            if (fuel != null) FuelRing(fuel, "fuel", st["range"]?.let { "${Telemetry.format(it)} range" })
+            if (used != null && next != null) ServiceRing(used, next.item.name.substringBefore(" (").substringBefore(" &"), next.describe().substringBefore(" ("),
+                warn = next.status == Garage.Status.OVERDUE || next.status == Garage.Status.DUE_SOON)
+        }
+    }
     // Headline values, then everything else grouped
-    val headline = listOf("fuel_pct", "range", "battery_v", "coolant", "inst_mpg", "speed", "locked", "tire_warning").mapNotNull { st[it] }
+    val headline = listOf("fuel_pct", "range", "battery_v", "coolant", "inst_mpg", "speed", "locked", "tire_warning").filter { fuel == null || (it != "fuel_pct" && it != "range") }.mapNotNull { st[it] }
     if (headline.isNotEmpty()) item {
         androidx.compose.foundation.layout.FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
             headline.forEach { m -> MetricChip(m) }
@@ -159,7 +198,7 @@ fun LazyListScope.liveCarSection(st: Telemetry.State, live: VehicleLink.Live, ex
             }
         }
     }
-    val rest = st.snapshot.values.filter { it.key !in headline.map { h -> h.key } }
+    val rest = st.snapshot.values.filter { it.key !in headline.map { h -> h.key } && it.key != "fuel_pct" && it.key != "range" }
     if (rest.isNotEmpty()) {
         item { TextButton(onClick = onExpand) { Text(if (expanded) "Hide details" else "All vehicle data (${st.snapshot.size})") } }
         if (expanded) Telemetry.Group.entries.forEach { g ->
@@ -195,6 +234,7 @@ private fun MetricChip(m: Telemetry.Metric) {
 fun LazyListScope.tripsSection(st: Telemetry.State, tank: Double, onTrip: (Telemetry.Trip) -> Unit, onExport: () -> Unit) {
     item { SectionHeader("Trips", action = if (st.trips.any { it.end != null }) "Export CSV" else null, onAction = onExport) }
     val done = st.trips.filter { it.end != null }
+    val real = done.filter { !it.simulated }
     if (done.isEmpty()) {
         item { Text("Drives are logged automatically while the phone is connected to the car: distance, time, speed, fuel used, where you started and parked.",
             style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
@@ -214,6 +254,7 @@ fun LazyListScope.tripsSection(st: Telemetry.State, tank: Double, onTrip: (Telem
         if ((year.byPurpose[Telemetry.Purpose.BUSINESS] ?: 0.0) > 0) Text("About $%,.0f at $%.3f/mi this year — set your rate under Car connection.".format(year.deductible, rate),
             style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 6.dp))
     }
+    if (real.isNotEmpty()) item(key = "weekly-chart") { WeeklyMilesChart(remember(st.trips) { Telemetry.weeklyMiles(st.trips) }) }
     items(done.take(25), key = { "trip-" + it.id }) { t ->
         BlCard(Modifier.fillMaxWidth(), onClick = { onTrip(t) }) {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -224,7 +265,7 @@ fun LazyListScope.tripsSection(st: Telemetry.State, tank: Double, onTrip: (Telem
                         style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     if (t.note.isNotBlank()) Text(t.note, style = MaterialTheme.typography.bodySmall)
                 }
-                Pill(t.purpose.label, if (t.purpose == Telemetry.Purpose.BUSINESS) Amber else MaterialTheme.colorScheme.onSurfaceVariant)
+                if (t.simulated) Pill("Simulated", Cobalt) else Pill(t.purpose.label + if (t.rule.isNotBlank()) " · auto" else "", if (t.purpose == Telemetry.Purpose.BUSINESS) Amber else MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
     }
@@ -256,6 +297,20 @@ fun TripDialog(t: Telemetry.Trip, tank: Double, onDismiss: () -> Unit) {
             if (t.endLat != null && t.endLon != null) TextButton(onClick = {
                 runCatching { ctx.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("geo:0,0?q=${t.endLat},${t.endLon}")).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
             }) { Text("Show where it ended") }
+            if (t.endLat != null && t.endLon != null && !t.simulated) {
+                var weekdays by remember { mutableStateOf(purpose == Telemetry.Purpose.COMMUTE || purpose == Telemetry.Purpose.BUSINESS) }
+                var made by remember { mutableStateOf(false) }
+                HorizontalDivider()
+                Text("Tag automatically", style = MaterialTheme.typography.labelLarge)
+                Text("Future trips that start or end within about 250 m of ${t.endPlace.substringBefore(",").ifBlank { "this spot" }} get the purpose above.",
+                    style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                LabeledSwitchRow("Weekdays only", checked = weekdays) { weekdays = it }
+                OutlinedButton(enabled = !made, onClick = {
+                    VehicleLink.addRule(ctx, Telemetry.Rule(java.util.UUID.randomUUID().toString().take(8), t.endPlace.substringBefore(",").ifBlank { "Place %.4f, %.4f".format(t.endLat, t.endLon) },
+                        t.endLat, t.endLon, 250.0, purpose, weekdaysOnly = weekdays))
+                    made = true
+                }) { Text(if (made) "Rule added — see Car connection" else "Always tag trips here ${purpose.label}") }
+            }
             TextButton(onClick = { confirmDelete = true }) { Text("Delete this trip", color = Danger.readable()) }
         }
     }, confirmButton = {
@@ -349,6 +404,7 @@ fun CarConnectionDialog(shell: Shell, onDismiss: () -> Unit) {
             LabeledSwitchRow("Log drives automatically", checked = link.autoTrips) { v -> VehicleLink.setLink(ctx) { it.copy(autoTrips = v) } }
             LabeledSwitchRow("Save start and end places", "Addresses for the mileage log and where you parked. Only the endpoints are kept, not the route.", checked = link.recordPlaces) { v -> VehicleLink.setLink(ctx) { it.copy(recordPlaces = v) } }
             LabeledSwitchRow("Trip summary when you park", checked = link.tripSummary) { v -> VehicleLink.setLink(ctx) { it.copy(tripSummary = v) } }
+            LabeledSwitchRow("Notice fill-ups", "When the fuel level jumps, offer to log the fill-up with the gallons filled in.", checked = link.detectFills) { v -> VehicleLink.setLink(ctx) { it.copy(detectFills = v) } }
             when {
                 !locOk -> OutlinedButton(onClick = { perms.launch(arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION)) }) { Text("Allow location for trip distance") }
                 !bgOk -> OutlinedButton(onClick = { bgPerm.launch(Manifest.permission.ACCESS_BACKGROUND_LOCATION) }) { Text("Allow location all the time") }
@@ -362,6 +418,20 @@ fun CarConnectionDialog(shell: Shell, onDismiss: () -> Unit) {
                 Spacer(Modifier.size(8.dp))
                 DropdownField("New trips", Telemetry.Purpose.entries.map { it to it.label }, link.defaultPurpose, { p -> VehicleLink.setLink(ctx) { it.copy(defaultPurpose = p) } }, Modifier.weight(1f))
             }
+            // ---- automatic trip tags
+            Text("Trip rules", style = MaterialTheme.typography.labelLarge)
+            if (link.rules.isEmpty()) Text("Open any trip and use “Always tag trips here” to tag trips to work, clients or the doctor automatically.",
+                style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            link.rules.forEach { rule ->
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) {
+                        Text(rule.name, style = MaterialTheme.typography.bodyMedium)
+                        Text("${rule.purpose.label}${if (rule.weekdaysOnly) " · weekdays" else ""} · within ${rule.radiusM.toInt()} m", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    TextButton(onClick = { VehicleLink.deleteRule(ctx, rule.id) }) { Text("Remove", color = Danger.readable()) }
+                }
+            }
+            if (link.rules.isNotEmpty()) TextButton(onClick = { shell.toast("Tagged ${VehicleLink.applyRules(ctx)} earlier trip(s)") }) { Text("Apply rules to earlier trips") }
             HorizontalDivider()
 
             // ---- OBD-II
@@ -435,6 +505,18 @@ fun CarConnectionDialog(shell: Shell, onDismiss: () -> Unit) {
                 }
             }
             if (blStatus.isNotBlank()) Text(blStatus, style = MaterialTheme.typography.bodySmall)
+            HorizontalDivider()
+            Text("Practice drive (simulator)", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+            Text("A four-minute pretend drive through a pretend OBD-II adapter, to see trips, live values, MPG, alerts and the drive notification work without the car. " +
+                "It's marked Simulated, left out of totals and exports, and never changes your odometer or the car's real values.",
+                style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            var simCode by remember { mutableStateOf(false) }
+            LabeledSwitchRow("Include a check-engine code", "Adds a pretend P0420 so you can see the alert.", checked = simCode) { simCode = it }
+            OutlinedButton(enabled = !liveNow.active, onClick = {
+                if (!btOk && !locOk) { shell.toast("Allow Nearby devices or location first (Android needs one to run a drive)"); return@OutlinedButton }
+                runCatching { VehicleLink.simulate(ctx, simCode) }.onSuccess { shell.toast("Simulated drive started — watch the notification and From the car") }
+                    .onFailure { shell.toast("Couldn't start: ${it.message}") }
+            }) { Text(if (liveNow.active && liveNow.sim) "Simulating…" else "Start a practice drive") }
             HorizontalDivider()
             Text("Android Auto", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
             Text("While BlackLab is open on the car screen, it also reads what the head unit shares — model, fuel level, range and odometer on most Hyundai units, and speed.",

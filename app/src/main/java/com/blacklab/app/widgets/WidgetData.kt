@@ -111,7 +111,8 @@ object Widgets {
         app.appScope.launch {
             app.settings.state.map { listOf(it.activeProfile, it.widgetPrivacy, it.professionalName + it.personalName,
                 // colors and theme: widgets follow the app's palette and light/dark choice
-                it.themeMode, it.dynamicColor, it.accentPersonal, it.accentProfessional, it.secondaryPersonal, it.secondaryProfessional, it.themeDarkFrom, it.themeDarkTo) }
+                it.themeMode, it.dynamicColor, it.accentPersonal, it.accentProfessional, it.secondaryPersonal, it.secondaryProfessional, it.themeDarkFrom, it.themeDarkTo,
+                it.lightStyle, it.darkStyle, it.cornerStyle, it.highContrast) }
                 .distinctUntilChanged().drop(1).collect { refresh(app.context) }
         }
     }
@@ -130,6 +131,8 @@ object Widgets {
         runCatching { TodayWidget().updateAll(context) }
         runCatching { ChecklistWidget().updateAll(context) }
         runCatching { CaptureWidget().updateAll(context) }
+        CarWidget.version.value = CarWidget.version.value + 1
+        runCatching { CarWidget().updateAll(context) }
     }
 
     private fun hide(app: AppContainer, onLockScreen: Boolean) = onLockScreen || app.settings.current.widgetPrivacy == "COUNTS"

@@ -137,7 +137,10 @@ const Cloud = {
   get valid() { return !!S.google.token && Date.now() < S.google.exp; },
   init() {
     if (!window.google?.accounts?.oauth2 || !this.clientId) return false;
-    this.client = google.accounts.oauth2.initTokenClient({ client_id: this.clientId, scope: DRIVE_SCOPE, callback: (r) => this.onToken(r) });
+    this.client = google.accounts.oauth2.initTokenClient({ client_id: this.clientId, scope: DRIVE_SCOPE, callback: (r) => this.onToken(r),
+      // The popup itself failing (blocked, closed) never reaches callback
+      error_callback: (e) => toast(e?.type === 'popup_failed_to_open' ? 'Google sign-in: the browser blocked the pop-up — allow pop-ups for this site and try again'
+        : e?.type === 'popup_closed' ? 'Google sign-in was closed before it finished' : 'Google sign-in: ' + (e?.message || e?.type || 'failed'), 6000) });
     return true;
   },
   signIn(prompt = '') {
@@ -152,7 +155,13 @@ const Cloud = {
     renderGsi(); render();
   },
   async onToken(r) {
-    if (r.error) { toast('Google sign-in: ' + r.error); return; }
+    if (r.error) {
+      const why = { access_denied: 'access was denied — add your account as a test user on the OAuth consent screen (or publish the app)',
+        invalid_client: 'the OAuth client ID is wrong or deleted — check it under Connect',
+        unauthorized_client: 'this client ID isn’t a Web application client',
+        invalid_scope: 'the Google Drive API isn’t enabled in that Cloud project' }[r.error] || r.error;
+      toast('Google sign-in: ' + why, 8000); go('connect'); return;
+    }
     S.google.token = r.access_token; S.google.exp = Date.now() + (Number(r.expires_in || 3600) - 60) * 1000;
     try {
       const u = await fetch('https://openidconnect.googleapis.com/v1/userinfo', { headers: { Authorization: 'Bearer ' + r.access_token } }).then((x) => x.json());
@@ -385,6 +394,7 @@ const NAV = [
   { id: 'media', label: 'Recordings', ico: '◉' },
   { id: 'files', label: 'Phone files', ico: '▤' },
   { id: 'bh', label: 'Behavioral Health', ico: '✚' },
+  { id: 'garage', label: 'Garage', ico: '⛭' },
   { sep: true },
   { id: 'appearance', label: 'Appearance', ico: '◐' },
   { id: 'settings', label: 'Settings', ico: '⚙' },
@@ -447,6 +457,8 @@ Views.dashboard = () => {
       <div class="tile"><span class="k">Today</span><span class="v">${evToday.length}</span><span class="s">${next ? 'Next: ' + esc(next.title) + ' ' + relDay(next.start).toLowerCase() + ' ' + fmtTime(next.start) : 'Nothing upcoming'}</span></div>
       <div class="tile"><span class="k">Phone</span><span class="v">${i.battery >= 0 ? i.battery + '%' : '—'}</span><span class="s">${i.storageFree ? bytes(i.storageFree) + ' free' : 'not connected'}${i.charging ? ' · charging' : ''}</span></div>
       ${i.weather ? `<div class="tile"><span class="k">Weather${i.weather.place ? ' · ' + esc(i.weather.place) : ''}</span><span class="v">${Math.round(i.weather.temp)}°</span><span class="s">${esc(i.weather.condition)} · H ${Math.round(i.weather.high)}° L ${Math.round(i.weather.low)}°${(i.weather.alerts || []).length ? ` · <span style="color:var(--warn)">⚠ ${esc(i.weather.alerts[0].title)}</span>` : ''}</span></div>` : ''}
+      ${S.snap?.vehicle && !S.snap.vehicle.error ? (() => { const c = S.snap.vehicle; const n = (c.due || []).find((d) => d.status === 'OVERDUE' || d.status === 'DUE_SOON') || (c.due || []).find((d) => d.status === 'OK'); const f = (c.live || []).find((m) => m.key === 'fuel_pct');
+        return `<a class="tile" href="#/garage" style="text-decoration:none;color:inherit"><span class="k">Car</span><span class="v" style="font-size:20px">${c.odometerEstimated ? '≈ ' : ''}${mi(c.odometer)} mi</span><span class="s">${f ? esc(f.value) + ' fuel · ' : ''}${n ? esc(n.name) + ' ' + esc(n.text) : 'nothing due'}</span></a>`; })() : ''}
       <div class="tile"><span class="k">Assistant</span><span class="v" style="font-size:20px">${esc(i.assistant?.name || 'BlackLab')}</span><span class="s">${i.assistant?.nano === 'AVAILABLE' ? 'Gemini Nano ready' : 'Rules engine'} · voice ${i.assistant ? (i.assistant.elevenCharsUsed || 0) + '/' + (i.assistant.elevenBudget || 0) : '—'}</span></div>
     </div>
     ${whatsNew()}
@@ -506,6 +518,80 @@ function bindTaskChecks() {
     } catch (e) { toast(e.message); }
   });
 }
+
+// ---------------- garage (the car, from the phone's snapshot: profile, what's due, fuel, trips, live values, recalls)
+const mi = (n) => (n == null ? '—' : Math.round(n).toLocaleString());
+function svgBars(rows, opts) {
+  // rows: [{label, parts:[{v, cls}], title}] — stacked bars, 4px rounded tops, 2px gaps, one dashed gridline
+  const W = 560, H = 140, pad = 18, n = rows.length || 1, slot = (W - 8) / n, bw = slot * 0.56;
+  const max = Math.max(1, ...rows.map((r) => r.parts.reduce((a, p) => a + p.v, 0)));
+  const bars = rows.map((r, i) => {
+    let y = H - pad; const x = 4 + i * slot + (slot - bw) / 2;
+    const segs = r.parts.map((p, j) => {
+      const h = p.v / max * (H - pad - 8); if (h < 0.5) return '';
+      const top = j === r.parts.length - 1 || r.parts.slice(j + 1).every((q) => q.v <= 0);
+      y -= h; const rr = top ? Math.min(4, h, bw / 2) : 0;
+      const d = `M${x},${y + h} L${x},${y + rr} Q${x},${y} ${x + rr},${y} L${x + bw - rr},${y} Q${x + bw},${y} ${x + bw},${y + rr} L${x + bw},${y + h} Z`;
+      const out = `<path d="${d}" class="${p.cls}"/>`; y -= 2; return out;
+    }).join('');
+    return `<g class="bar-g"><title>${esc(r.title)}</title><rect x="${4 + i * slot}" y="0" width="${slot}" height="${H}" fill="transparent"/>${segs}
+      <text x="${4 + i * slot + slot / 2}" y="${H - 3}" text-anchor="middle" class="ax">${esc(i % 2 === (n - 1) % 2 ? r.label : '')}</text></g>`;
+  }).join('');
+  return `<svg viewBox="0 0 ${W} ${H}" class="chart" role="img" aria-label="${esc(opts.aria)}"><line x1="0" x2="${W}" y1="8" y2="8" class="grid" stroke-dasharray="4 4"/>
+    <line x1="0" x2="${W}" y1="${H - pad}" y2="${H - pad}" class="grid"/>${bars}</svg><div class="muted small">Top line: ${esc(opts.top(max))}</div>`;
+}
+function svgLine(pts, aria) {
+  const W = 560, H = 120; if (pts.length < 2) return '';
+  const lo = Math.min(...pts.map((p) => p[1])) - 2, hi = Math.max(...pts.map((p) => p[1])) + 2;
+  const x = (i) => 10 + i * (W - 20) / (pts.length - 1), y = (v) => H - 8 - (v - lo) / (hi - lo) * (H - 16);
+  const avg = pts.reduce((a, p) => a + p[1], 0) / pts.length;
+  return `<svg viewBox="0 0 ${W} ${H}" class="chart" role="img" aria-label="${esc(aria)}"><line x1="0" x2="${W}" y1="${y(avg)}" y2="${y(avg)}" class="grid" stroke-dasharray="4 4"/>
+    <polyline points="${pts.map((p, i) => x(i) + ',' + y(p[1])).join(' ')}" class="ln"/>
+    ${pts.map((p, i) => `<g><title>${esc(fmtDate(p[0]))}: ${p[1].toFixed(1)} mpg</title><circle cx="${x(i)}" cy="${y(p[1])}" r="12" fill="transparent"/><circle cx="${x(i)}" cy="${y(p[1])}" r="4" class="dot"/></g>`).join('')}</svg>
+    <div class="muted small">Average ${avg.toFixed(1)} mpg (dashed) · best ${Math.max(...pts.map((p) => p[1])).toFixed(1)} · lowest ${Math.min(...pts.map((p) => p[1])).toFixed(1)}</div>`;
+}
+Views.garage = () => {
+  const c = S.snap?.vehicle;
+  if (!c || c.error) return `<div class="view-inner"><div class="hero"><div><h1>Garage</h1></div></div>${needData()}${c?.error ? `<div class="notice">The phone couldn't share car data: ${esc(c.error)}</div>` : ''}
+    ${S.snap && !c ? '<div class="notice">Update the phone to BlackLab 5.8 to see your car here.</div>' : ''}</div>`;
+  const t = c.totals || {}; const fs = c.fuelStats || {};
+  const fuel = (c.live || []).find((m) => m.key === 'fuel_pct'); const range = (c.live || []).find((m) => m.key === 'range');
+  const due = (c.due || []).filter((d) => d.status !== 'UNKNOWN');
+  const tone = (st) => (st === 'OVERDUE' ? 'danger' : st === 'DUE_SOON' ? 'warn' : '');
+  const groups = {}; (c.live || []).forEach((m) => { (groups[m.group || 'Other'] = groups[m.group || 'Other'] || []).push(m); });
+  const openRecalls = (c.recalls || []).filter((r) => !r.resolved);
+  const weekly = (c.weekly || []).map(([d, b, o]) => ({ label: fmtDate(d, { month: 'short', day: 'numeric' }), parts: [{ v: o, cls: 'b1' }, { v: b, cls: 'b2' }], title: `Week of ${fmtDate(d, { month: 'short', day: 'numeric' })}: ${Math.round(b + o)} mi${b > 0 ? ' · ' + Math.round(b) + ' business' : ''}` }));
+  const hasBiz = (c.weekly || []).some((w) => w[1] > 0);
+  return `<div class="view-inner">
+    <div class="hero"><div><h1>${esc(c.name)}</h1><div class="muted">${[c.vin ? 'VIN ' + esc(c.vin) : '', c.engine ? esc(c.engine) : '', c.drive === 'FWD' ? 'Front-wheel drive' : c.drive === 'AWD' ? 'HTRAC AWD' : ''].filter(Boolean).join(' · ')}</div></div></div>
+    ${needData()}
+    <div class="grid g4" style="margin-bottom:16px;grid-template-columns:repeat(auto-fit,minmax(190px,1fr))">
+      <div class="tile"><span class="k">Odometer${c.odometerEstimated ? ' (est.)' : ''}</span><span class="v">${c.odometerEstimated ? '≈ ' : ''}${mi(c.odometer)}</span><span class="s">${c.odometerAt ? 'reading ' + ago(c.odometerAt) : 'no reading yet'}${c.milesPerDay ? ` · ~${Math.round(c.milesPerDay)} mi/day` : ''}</span></div>
+      <div class="tile"><span class="k">Fuel</span><span class="v">${fuel ? esc(fuel.value) : '—'}</span><span class="s">${range ? esc(range.value) + ' range' : 'from the car when connected'}</span>
+        ${fuel?.num != null ? `<div class="meter" role="meter" aria-valuenow="${Math.round(fuel.num)}" aria-valuemin="0" aria-valuemax="100"><span style="width:${Math.max(0, Math.min(100, fuel.num))}%;${fuel.num <= 12 ? 'background:var(--danger)' : ''}"></span></div>` : ''}</div>
+      <div class="tile"><span class="k">Avg MPG</span><span class="v">${fs.avgMpg ? fs.avgMpg.toFixed(1) : '—'}</span><span class="s">${fs.costPerMile ? (fs.costPerMile * 100).toFixed(1) + '¢ per mile in fuel' : 'log full fill-ups for MPG'}</span></div>
+      <div class="tile"><span class="k">Driven this month</span><span class="v">${mi(t.month?.miles)} mi</span><span class="s">${t.month?.trips || 0} trips · ${mi(t.year?.business)} business mi this year${t.year?.deductible ? ` (~$${Math.round(t.year.deductible).toLocaleString()})` : ''}</span></div>
+    </div>
+    ${c.pendingFill ? `<div class="notice" style="margin-bottom:16px">⛽ <b>Filled up?</b> About ${c.pendingFill.gallons.toFixed(1)} gal — the fuel gauge went from ${Math.round(c.pendingFill.from)}% to ${Math.round(c.pendingFill.to)}% ${ago(c.pendingFill.time)}. Log it on the phone (Garage) with the price.</div>` : ''}
+    <div class="grid g2">
+      <div class="card"><h2>What's due</h2>${due.length ? `<ul class="list">${due.slice(0, 10).map((d) => `<li><span class="t">${esc(d.name)}<br><span class="muted small">${esc(d.text)}</span></span>${d.expected ? `<span class="meta">${fmtDate(d.expected, { month: 'short', day: 'numeric' })}</span>` : ''}<span class="chip ${tone(d.status)}">${d.status === 'OVERDUE' ? 'Overdue' : d.status === 'DUE_SOON' ? 'Due soon' : 'OK'}</span></li>`).join('')}</ul>` : '<div class="empty">Set the odometer on the phone to see what’s due.</div>'}</div>
+      <div class="card"><h2>Recalls & safety<span class="spacer"></span>${c.vin ? `<a class="small" href="https://www.nhtsa.gov/recalls?vin=${encodeURIComponent(c.vin)}" target="_blank" rel="noopener">Check my VIN →</a>` : ''}</h2>
+        ${(c.recalls || []).length ? `<ul class="list">${c.recalls.map((r) => `<li><span class="t">${esc(r.component.charAt(0) + r.component.slice(1).toLowerCase())}<br><span class="muted small">${esc(r.campaign)} · ${esc(r.date)} — ${esc(r.summary.slice(0, 180))}${r.summary.length > 180 ? '…' : ''}</span></span><span class="chip ${r.resolved ? '' : r.parkIt ? 'danger' : 'warn'}">${r.resolved ? 'Done / n.a.' : r.parkIt ? 'Park it' : 'Open'}</span></li>`).join('')}</ul>`
+          : `<div class="empty">${c.recallsCheckedAt ? 'No recalls listed for this model year.' : 'Not checked yet — the phone checks NHTSA weekly.'}</div>`}
+        <div class="muted small" style="margin-top:8px">${openRecalls.length} open · listed by year, make and model, so mark any that don't apply on the phone.${c.recallsCheckedAt ? ' Checked ' + ago(c.recallsCheckedAt) + '.' : ''}</div></div>
+      <div class="card"><h2>Miles per week</h2>${hasBiz ? '<div class="legend"><span><i class="b1"></i>Personal & other</span><span><i class="b2"></i>Business</span></div>' : ''}
+        ${weekly.some((w) => w.parts.some((p) => p.v > 0)) ? svgBars(weekly, { aria: 'Miles per week for the last 12 weeks', top: (m) => Math.round(m) + ' mi' }) : '<div class="empty">Trips appear after the first drive with the phone connected to the car.</div>'}</div>
+      <div class="card"><h2>MPG per tank</h2>${(c.mpgSeries || []).length >= 2 ? svgLine(c.mpgSeries, 'MPG per full tank') : '<div class="empty">Two full fill-ups in a row give the first MPG.</div>'}</div>
+      <div class="card"><h2>Recent trips</h2>${(c.trips || []).length ? `<div class="table-wrap"><table class="tbl"><thead><tr><th>When</th><th>From → To</th><th>Miles</th><th>MPG</th><th>Purpose</th></tr></thead><tbody>
+        ${c.trips.slice(0, 15).map((x) => `<tr><td>${fmtDate(x.start, { month: 'short', day: 'numeric' })} ${fmtTime(x.start)}</td><td>${esc([x.from, x.to].filter(Boolean).map((p) => p.split(',')[0]).join(' → ') || '—')}</td><td class="mono">${x.miles.toFixed(1)}</td><td class="mono">${x.mpg ? x.mpg.toFixed(1) : '—'}</td><td>${x.sim ? '<span class="chip pro">Simulated</span>' : esc(x.purpose)}</td></tr>`).join('')}</tbody></table></div>` : '<div class="empty">No trips yet.</div>'}</div>
+      <div class="card"><h2>From the car</h2>
+        ${(c.codes || []).length ? `<div class="notice" style="border-color:var(--danger);margin-bottom:10px"><b style="color:var(--danger)">${c.codes.length} trouble code${c.codes.length > 1 ? 's' : ''}</b><br>${c.codes.map((d) => `${esc(d.code)} — ${esc(d.text)}`).join('<br>')}</div>` : ''}
+        ${c.parked ? `<div class="muted small" style="margin-bottom:8px">Parked${c.parked.place ? ' at ' + esc(c.parked.place) : ''} · ${ago(c.parked.time)}</div>` : ''}
+        ${Object.keys(groups).length ? Object.entries(groups).map(([g, ms]) => `<h3 class="small muted" style="margin:10px 0 4px">${esc(g)}</h3><ul class="list">${ms.map((m) => `<li><span class="t">${esc(m.label)}<br><span class="muted small">${esc(m.source)} · ${ago(m.time)}</span></span><span class="mono" style="${m.alert ? 'color:var(--danger)' : ''}">${esc(m.value)}</span></li>`).join('')}</ul>`).join('')
+          : '<div class="empty">Live values arrive when the phone connects to the car (Android Auto, OBD-II adapter or Bluelink).</div>'}</div>
+      ${(c.specs || []).length ? `<div class="card"><h2>From your VIN</h2><ul class="list">${c.specs.map(([k, v]) => `<li><span class="t muted">${esc(k)}</span><span>${esc(v)}</span></li>`).join('')}</ul><div class="muted small">Decoded by NHTSA.</div></div>` : ''}
+    </div></div>`;
+};
 
 Views.tasks = () => {
   const all = D.tasks; const lists = D.prof(S.snap?.lists);
@@ -893,7 +979,9 @@ Views.connect = () => {
       <details ${Cloud.clientId ? '' : 'open'}><summary class="small muted">OAuth client ID ${Cloud.clientId ? '(set)' : '(required once)'}</summary>
         <ol class="steps small"><li>Google Cloud Console › APIs &amp; Services › Credentials › <b>Create OAuth client ID › Web application</b> — in the same project as the phone's Android client.</li>
         <li>Authorized JavaScript origins: <code>${esc(location.origin)}</code>${onPages ? '' : ' and <code>https://paulmmoore3416.github.io</code>'}</li>
-        <li>Enable the <b>Google Drive API</b>; add yourself as a test user on the OAuth consent screen.</li></ol>
+        <li>Enable the <b>Google Drive API</b>; add yourself as a test user on the OAuth consent screen.</li>
+        <li>If Google's pop-up says <b>Error 400: origin_mismatch</b> or <b>redirect_uri_mismatch</b>, the origin in step 2 is missing from the client. If it says <b>access_denied</b> / “has not completed the Google verification process”, add your account under Test users.</li>
+        <li>The client ID is saved in this browser only; another browser or address (for example the companion at <code>127.0.0.1:8770</code>) needs it saved again, and its origin authorized.</li></ol>
         <div class="row" style="margin-top:8px"><input id="gCid" style="flex:1" placeholder="xxxxxxxx.apps.googleusercontent.com" value="${esc(LS.get('googleClientId', ''))}"><button class="ghost" id="gSave">Save</button></div></details>
     </div>
     <div class="card"><h2>3 · Desktop companion <span class="chip ${Companion.ok ? 'accent' : ''}">${Companion.ok ? 'running' : 'off'}</span></h2>
@@ -923,9 +1011,10 @@ Views.connect.bind = () => {
 
 
 // ---------------- appearance (writes the phone's color settings; the phone applies them on sync)
-const APP_KEYS = ['theme_mode', 'dynamic_color', 'accent_personal', 'accent_professional', 'secondary_personal', 'secondary_professional', 'light_style', 'high_contrast', 'visual_style', 'backdrop', 'backdrop_intensity', 'reduce_motion'];
+const APP_KEYS = ['theme_mode', 'dynamic_color', 'accent_personal', 'accent_professional', 'secondary_personal', 'secondary_professional', 'light_style', 'high_contrast', 'visual_style', 'backdrop', 'backdrop_intensity', 'reduce_motion',
+  'dark_style', 'corner_style', 'ui_scale', 'font_family', 'reading_font', 'reading_size'];
 Views.appearance = () => {
-  const V = S.values; const P = window.BL_DATA?.palettes || []; const L = window.BL_DATA?.lightStyles || [];
+  const V = S.values; const P = window.BL_DATA?.palettes || []; const L = window.BL_DATA?.lightStyles || []; const DS = window.BL_DATA?.darkStyles || [];
   const acct = S.ui.appAcct || (V.active_profile === 'PROFESSIONAL' ? 'professional' : 'personal');
   const cur = V['accent_' + acct] || (acct === 'professional' ? 'COBALT' : 'MINT');
   const sec = V['secondary_' + acct] || 'AUTO';
@@ -941,6 +1030,10 @@ Views.appearance = () => {
           ${seg('theme_mode', [['DARK', 'Dark'], ['LIGHT', 'Light'], ['SYSTEM', 'System'], ['AUTO', 'Sunset to sunrise']])}
           <div class="row wrap"><span class="muted small" style="width:110px">Visual style</span>${seg('visual_style', [['GLASS', 'Glass'], ['SOLID', 'Solid']])}</div>
           <div class="row wrap"><span class="muted small" style="width:110px">Backdrop</span>${seg('backdrop', [['AURORA', 'Aurora · moving'], ['GRADIENT', 'Gradient · still'], ['PLAIN', 'Plain']])}</div>
+          <div class="row wrap"><span class="muted small" style="width:110px">Corners</span>${seg('corner_style', [['ROUND', 'Round'], ['SOFT', 'Soft'], ['SQUARE', 'Square']])}</div>
+          <div class="row wrap"><span class="muted small" style="width:110px">Font</span>${seg('font_family', [['INTER', 'Inter'], ['SYSTEM', 'System'], ['SERIF', 'Serif']])}</div>
+          <div class="row wrap"><span class="muted small" style="width:110px">Phone size</span>${seg('ui_scale', [[100, 'Comfortable'], [92, 'Compact'], [85, 'Dense']])}</div>
+          <div class="row wrap"><span class="muted small" style="width:110px">Reading font</span>${seg('reading_font', [['SAME', 'Same'], ['SERIF', 'Serif'], ['SANS', 'Inter'], ['MONO', 'Mono']])}</div>
           <div class="row"><span class="muted small" style="width:110px">Intensity</span><input type="range" id="apInt" min="0" max="100" step="5" value="${V.backdrop_intensity ?? 60}" style="flex:1"><span class="mono" id="apIntV">${V.backdrop_intensity ?? 60}%</span></div>
           <label class="row"><label class="switch"><input type="checkbox" id="apHc" ${V.high_contrast ? 'checked' : ''}><span></span></label> Stronger contrast <span class="muted small">— WCAG AAA text and deeper accents</span></label>
           <label class="row"><label class="switch"><input type="checkbox" id="apRm" ${V.reduce_motion ? 'checked' : ''}><span></span></label> Reduce motion <span class="muted small">— the aurora holds still</span></label>
@@ -962,6 +1055,11 @@ Views.appearance = () => {
       <div class="swatches"><button class="swatch ${sec === 'AUTO' ? 'sel' : ''}" data-sec="AUTO"><span class="dot" style="background:${(P.find((p) => p.id === cur) || P[0])?.[dark ? 'dark' : 'light'][1]}"></span>Auto</button>
         ${P.filter((p) => p.id !== cur).map((p) => `<button class="swatch ${sec === p.id ? 'sel' : ''}" data-sec="${p.id}"><span class="dot" style="background:${dark ? p.dark[0] : p.light[0]}"></span>${esc(p.label)}</button>`).join('')}</div>
     </div>
+    <div class="card" style="margin-top:16px"><h2>Dark mode style</h2>
+      <div class="style-cards">${DS.map((st) => `<button class="style-card ${String(V.dark_style || 'GRAPHITE') === st.id ? 'sel' : ''}" data-dstyle="${st.id}">
+        <div class="page" style="background:${st.background}"><div class="mini" style="background:${st.card};border:1px solid ${st.line}"><span class="bar" style="background:#E9EBEF;width:80%"></span><span class="bar" style="background:#A6ADB8;width:55%"></span><span class="bar" style="background:var(--accent)"></span></div></div>
+        <div style="margin-top:8px;font-weight:650">${esc(st.label)}</div><div class="muted small">${esc(st.blurb)}</div></button>`).join('')}</div>
+    </div>
     <div class="card" style="margin-top:16px"><h2>Light mode style</h2>
       <div class="style-cards">${L.map((st) => `<button class="style-card ${String(V.light_style || 'CLEAN') === st.id ? 'sel' : ''}" data-style="${st.id}">
         <div class="page" style="background:${st.background}"><div class="mini" style="background:${st.card}"><span class="bar" style="background:${st.ink};width:80%"></span><span class="bar" style="background:${st.inkSoft};width:55%"></span><span class="bar" style="background:var(--accent)"></span></div></div>
@@ -971,11 +1069,12 @@ Views.appearance = () => {
 };
 Views.appearance.bind = () => {
   const acct = S.ui.appAcct || (S.values.active_profile === 'PROFESSIONAL' ? 'professional' : 'personal');
-  $$('[data-set]').forEach((b) => b.onclick = () => setMany({ [b.dataset.set]: b.dataset.val }, 'Appearance'));
+  $$('[data-set]').forEach((b) => b.onclick = () => setMany({ [b.dataset.set]: /^\d+$/.test(b.dataset.val) ? Number(b.dataset.val) : b.dataset.val }, 'Appearance'));
   $$('[data-acct]').forEach((b) => b.onclick = () => { S.ui.appAcct = b.dataset.acct; saveUi(); render(); });
   $$('[data-pal]').forEach((b) => b.onclick = () => setMany({ ['accent_' + acct]: b.dataset.pal, dynamic_color: false }, 'Palette'));
   $$('[data-sec]').forEach((b) => b.onclick = () => setMany({ ['secondary_' + acct]: b.dataset.sec, dynamic_color: false }, 'Secondary color'));
   $$('[data-style]').forEach((b) => b.onclick = () => setMany({ light_style: b.dataset.style }, 'Light style'));
+  $$('[data-dstyle]').forEach((b) => b.onclick = () => setMany({ dark_style: b.dataset.dstyle }, 'Dark style'));
   const r = $('#apInt'); r.oninput = () => { $('#apIntV').textContent = r.value + '%'; S.values.backdrop_intensity = Number(r.value); window.BLFX?.apply(S.values, S.ui); };
   r.onchange = () => setMany({ backdrop_intensity: Number(r.value) }, 'Backdrop');
   $('#apHc').onchange = (e) => setMany({ high_contrast: e.target.checked }, 'Contrast');

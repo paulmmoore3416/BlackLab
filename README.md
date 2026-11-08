@@ -7,13 +7,13 @@
 **A private, all-in-one personal & professional workspace for Android.**
 Pro camera & photo editor · dictation · audio recorder · Word-class documents · journal · to-do · calendar · education & certification tracking — in one app, with every file saved to a real folder on your phone.
 
-[![Version](https://img.shields.io/badge/version-5.7.0-2BD9A8)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-5.8.0-2BD9A8)](CHANGELOG.md)
 [![Android](https://img.shields.io/badge/Android-15%2B-3DDC84?logo=android&logoColor=white)](#requirements)
 [![Kotlin](https://img.shields.io/badge/Kotlin-2.1-7F52FF?logo=kotlin&logoColor=white)](https://kotlinlang.org)
 [![Jetpack Compose](https://img.shields.io/badge/Jetpack%20Compose-Material%203-4285F4?logo=jetpackcompose&logoColor=white)](https://developer.android.com/compose)
 [![Android CI](https://github.com/paulmmoore3416/BlackLab/actions/workflows/android.yml/badge.svg)](https://github.com/paulmmoore3416/BlackLab/actions/workflows/android.yml)
 
-[Download APK](releases/BlackLab-v5.7.0.apk) · [Features](#features) · [Install](#install) · [Build from source](#build-from-source) · [Architecture](docs/ARCHITECTURE.md)
+[Download APK](releases/BlackLab-v5.8.0.apk) · [Features](#features) · [Install](#install) · [Build from source](#build-from-source) · [Architecture](docs/ARCHITECTURE.md)
 
 </div>
 
@@ -81,6 +81,7 @@ An encrypted workspace for working on a behavioral health unit, using initials a
 ### 🔧 Garage
 - 2023 Santa Fe profile, editable maintenance schedule (normal or severe service) with what's due next, fuel log with MPG and cost per mile, service history
 - **Car link** (5.7): connect to the car's Bluetooth and a drive starts on its own. You get a trip log with a mileage-deduction CSV, the parking spot, and an odometer estimate between readings. It also pulls everything the car shares through **Android Auto**, a Bluetooth **OBD-II** adapter (VIN, check-engine codes, temperatures, voltage, fuel flow and real MPG) and **Hyundai Bluelink** (locks, doors, tire warnings, fluids, 12V battery, where it's parked). See [docs/ANDROID_AUTO.md](docs/ANDROID_AUTO.md#car-data)
+- **5.8**: recalls and build details from your VIN (NHTSA), fill-up detection, predicted service dates with To-Do reminders, automatic trip tags, a Car widget, a practice-drive simulator, Garage charts, and a Garage page on BlackLab Desktop. Appearance adds True black and other dark styles, corner and size options, font and reading-font choices, and an Android 16 Live Update for drives
 
 ### 🖥️ BlackLab Desktop
 - **`./daddyshome`** wakes the desktop brain: starts Ollama, loads and pins your desktop assistant model, starts the companion and links the phone both ways. The phone's assistant then **thinks with your computer's local AI** whenever it's linked (USB or Wireless debugging) and falls back to Gemini Nano when it isn't. See [docs/DESKTOP_AI.md](docs/DESKTOP_AI.md)
@@ -233,13 +234,13 @@ Internal storage/BlackLab/
 
 ## Install
 
-1. Download **[`BlackLab-v5.7.0.apk`](releases/BlackLab-v5.7.0.apk)** (also attached to the [v5.7.0 release](https://github.com/paulmmoore3416/BlackLab/releases/tag/v5.7.0)).
-   Verify it with the published SHA-256: [`BlackLab-v5.7.0.apk.sha256`](releases/BlackLab-v5.7.0.apk.sha256).
+1. Download **[`BlackLab-v5.8.0.apk`](releases/BlackLab-v5.8.0.apk)** (also attached to the [v5.8.0 release](https://github.com/paulmmoore3416/BlackLab/releases/tag/v5.8.0)).
+   Verify it with the published SHA-256: [`BlackLab-v5.8.0.apk.sha256`](releases/BlackLab-v5.8.0.apk.sha256).
 2. On the phone, allow your browser/Files app to **install unknown apps** when prompted.
 3. Open BlackLab and follow onboarding: name & title, account names, then grant
    **All-files access** (creates the BlackLab folder), **camera & microphone**, **notifications** and optionally **calendars**.
 
-Or with USB debugging: `adb install releases/BlackLab-v5.7.0.apk`
+Or with USB debugging: `adb install releases/BlackLab-v5.8.0.apk`
 
 From 4.3.0 on, BlackLab can update itself: **Settings › App updates › Check now**. Android asks once for permission to install updates.
 

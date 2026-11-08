@@ -169,6 +169,9 @@ class EditorBridge(private val c: EditorController) {
 @SuppressLint("SetJavaScriptEnabled")
 @Composable
 fun RichEditorView(controller: EditorController, lightDesk: Boolean, modifier: Modifier = Modifier) {
+    // Opens at the reading size from Appearance (you can still zoom per document)
+    val readingZoom = (com.blacklab.app.ui.theme.LocalReading.current.scale * 100).toInt()
+    androidx.compose.runtime.LaunchedEffect(controller) { if (controller.textZoom.value == 100 && readingZoom != 100) controller.textZoom.value = readingZoom }
     AndroidView(
         modifier = modifier,
         factory = { ctx ->

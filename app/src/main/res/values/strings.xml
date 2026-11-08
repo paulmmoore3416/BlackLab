@@ -10,5 +10,7 @@
     <string name="widget_checklist_label">BlackLab · Checklist</string>
     <string name="widget_checklist_desc">Pin a Brainstorm checklist or note and tick items from the home screen</string>
     <string name="widget_capture_label">BlackLab · Quick capture</string>
+    <string name="widget_car_label">BlackLab · Car</string>
+    <string name="widget_car_desc">Fuel and range, locks, where you parked and the next service for your car</string>
     <string name="widget_capture_desc">One tap to a new note, checklist, voice note, photo note or task</string>
 </resources>

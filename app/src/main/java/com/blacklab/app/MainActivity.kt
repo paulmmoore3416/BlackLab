@@ -86,7 +86,11 @@ class MainActivity : FragmentActivity() {
         val app = app
         com.blacklab.app.link.LinkService.sync(this)
         // Keys pushed by ./daddyshome while the app was already running: import them now and re-check the desktop
-        app.appScope.launch { if (app.secrets.importProvisioning(app.storage.root) > 0) com.blacklab.app.assistant.DesktopAi.probe() }
+        app.appScope.launch {
+            if (runCatching { com.blacklab.app.vehicle.Garage.importProvisioning(this@MainActivity, app.storage.root) }.getOrDefault(false))
+                com.blacklab.app.vehicle.Nhtsa.refreshSoon(this@MainActivity)
+            if (app.secrets.importProvisioning(app.storage.root) > 0) com.blacklab.app.assistant.DesktopAi.probe()
+        }
         // The wake word may only start while the app is in front (Android's rule for the microphone)
         com.blacklab.app.assistant.WakeWordService.sync(this)
         if (app.settings.current.cloudSync && System.currentTimeMillis() - com.blacklab.app.link.CloudSync.lastSync.value > 120_000) {

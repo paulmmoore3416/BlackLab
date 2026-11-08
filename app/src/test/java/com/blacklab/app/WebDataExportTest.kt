@@ -47,6 +47,11 @@ class WebDataExportTest {
                 linkedMapOf("id" to s.name, "label" to s.label, "blurb" to s.blurb, "background" to hex(s.background), "card" to hex(s.card),
                     "high" to hex(s.high), "ink" to hex(s.ink), "inkSoft" to hex(s.inkSoft), "wash" to s.wash.toDouble())
             },
+            "darkStyles" to com.blacklab.app.ui.theme.DarkStyle.entries.map { s ->
+                linkedMapOf("id" to s.name, "label" to s.label, "blurb" to s.blurb, "background" to hex(s.background), "low" to hex(s.low), "card" to hex(s.container),
+                    "high" to hex(s.high), "highest" to hex(s.highest), "line" to hex(s.outlineVariant), "wash" to s.wash.toDouble())
+            },
+            "corners" to com.blacklab.app.ui.theme.CornerStyle.entries.map { c -> linkedMapOf("id" to c.name, "label" to c.label, "card" to c.card, "small" to c.sm) },
             "bh" to linkedMapOf(
                 "phases" to Library.CRISIS_PHASES.map { linkedMapOf("name" to it.name, "looks" to it.looks, "respond" to it.respond, "say" to it.say, "avoid" to it.avoid) },
                 "tips" to Library.DEESCALATION_TIPS,

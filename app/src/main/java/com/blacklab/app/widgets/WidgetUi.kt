@@ -107,6 +107,9 @@ internal object WUi {
         }
     }
 
+    /** Widget corner radius from Appearance › Corners. */
+    fun corner(context: android.content.Context): Dp = com.blacklab.app.ui.theme.CornerStyle.of(context.app.settings.current.cornerStyle).widget.dp
+
     fun noteColor(index: Int): ColorProvider? {
         val c = com.blacklab.app.brainstorm.NoteStyle.colors.getOrNull(index) ?: return null
         if (index == 0) return null

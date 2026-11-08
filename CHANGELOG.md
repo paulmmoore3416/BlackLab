@@ -2,6 +2,29 @@
 
 All notable changes to BlackLab are documented here. The project follows [Semantic Versioning](https://semver.org/).
 
+## [5.8.0] — 2026-11-07
+
+Twelve improvements on top of the car link: six features and six looks.
+
+### Added
+- **Recalls & your VIN** (NHTSA, free, no account): the Garage decodes your VIN into the exact build (trim, engine, transmission, drivetrain, plant) and fills the profile from it. It lists safety recalls for your year, make and model with what, risk and fix, and links to NHTSA's open-recall check for your VIN. A weekly check notifies you of new recalls; mark any that are done or don't apply. Ask "any recalls?".
+- **Fill-up detection**: when the fuel level jumps after you park, a card and a notification offer to log the fill-up with the gallons already worked out from your tank size. You only add the price.
+- **Predicted service dates**: your usual miles per day (from trips, fill-ups, or a yearly estimate in the profile) turn "in 950 mi" into "around Dec 1". A daily check sends a heads-up a week before anything comes due, and any maintenance item can become a To-Do with a 9 AM reminder. Ask "when's my next oil change?".
+- **Trip rules**: open a trip and choose "Always tag trips here Business" (optionally weekdays only). Future trips that start or end within about 250 m are tagged automatically; "Apply rules to earlier trips" fixes the backlog. Your own tags are never changed.
+- **Car widget**: fuel bar and range, locked or not, odometer, where it's parked, warnings and the next service on the home or lock screen (the lock screen hides the place).
+- **Practice drive (simulator)**: a four-minute pretend drive through a pretend OBD-II adapter that runs the real parsing, trip log, MPG, alerts and drive notification. Optional pretend check-engine code. It's marked Simulated, left out of totals and exports, and never touches your odometer or the car's real values.
+- **Desktop Garage**: BlackLab Desktop gets a Garage page (odometer, fuel, MPG, miles this month, what's due with dates, recalls, weekly miles and MPG charts, recent trips, live values and codes, VIN details) and a Car tile on the dashboard.
+- **Vehicle provisioning**: details like the VIN and odometer can be pushed once with adb (`BlackLab/.provision/vehicle.json`) so they're never typed or stored in the repo.
+
+### Changed
+- **Charts in the Garage**: fuel and service-interval ring gauges, miles per week (business stacked), MPG per tank with your average, and fuel spend per month. Tap a bar or point for its value.
+- **Dark mode styles**: Graphite (the original), **True black** for OLED screens, Slate, and Accent wash.
+- **Corners and size**: Round, Soft or Square corners everywhere (widgets too), and Comfortable, Compact or Dense interface size.
+- **Live drive notification**: on Android 16 the drive asks to be a Live Update, with trip miles as a status-bar chip and a running clock. Car notifications use your account color.
+- **Widgets follow your theme**: light and dark styles, contrast and corners now reach every widget.
+- **Fonts**: Inter, the phone's own font (Google Sans Flex on Pixel) or Serif for the app, plus a separate reading font and size for Knowledge, Journal, Summaries, text files and the document editor's zoom. The desktop follows the corner, font and dark-style choices.
+- Google sign-in failures now say exactly what to fix (for error 10, the Android OAuth client's package and the app's real SHA-1, with a copy button). The desktop explains blocked pop-ups, origin mismatches and missing test users.
+
 ## [5.7.0] — 2026-11-07
 
 The car talks to BlackLab: connect to the Santa Fe's Bluetooth and everything the car can share lands in the Garage.

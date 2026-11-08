@@ -152,6 +152,10 @@ object Telemetry {
         val purpose: Purpose = Purpose.PERSONAL,
         val note: String = "",
         val sources: Set<Source> = emptySet(),
+        /** A practice drive from the simulator: shown in the log, left out of totals and exports. */
+        val simulated: Boolean = false,
+        /** The name of the rule that tagged this trip, if one did. */
+        val rule: String = "",
     ) {
         /** Odometer difference when the car reported both ends; otherwise GPS, then integrated road speed. */
         val miles: Double get() {
@@ -179,7 +183,7 @@ object Telemetry {
     data class Totals(val trips: Int, val miles: Double, val byPurpose: Map<Purpose, Double>, val driveSec: Long, val fuelGal: Double, val deductible: Double)
 
     fun totals(trips: List<Trip>, from: Long, to: Long, ratePerMile: Double): Totals {
-        val t = trips.filter { it.end != null && it.start in from until to }
+        val t = trips.filter { it.end != null && !it.simulated && it.start in from until to }
         val by = Purpose.entries.associateWith { p -> t.filter { it.purpose == p }.sumOf { it.miles } }
         val deductible = (by[Purpose.BUSINESS] ?: 0.0) * ratePerMile
         return Totals(t.size, t.sumOf { it.miles }, by, t.sumOf { it.durationSec }, t.sumOf { it.fuelGal ?: 0.0 }, deductible)
@@ -193,13 +197,67 @@ object Telemetry {
     /** A mileage log for taxes or reimbursement. */
     fun tripsCsv(trips: List<Trip>, zone: ZoneId = ZoneId.systemDefault()): String = buildString {
         appendLine("Date,Start,End,From,To,Miles,Purpose,Note,Odometer start,Odometer end,Minutes,Fuel (gal)")
-        trips.filter { it.end != null }.sortedBy { it.start }.forEach { t ->
+        trips.filter { it.end != null && !it.simulated }.sortedBy { it.start }.forEach { t ->
             val s = Instant.ofEpochMilli(t.start).atZone(zone); val e = Instant.ofEpochMilli(t.end!!).atZone(zone)
             fun q(v: String) = "\"" + v.replace("\"", "\"\"") + "\""
             appendLine(listOf(s.toLocalDate().toString(), "%02d:%02d".format(s.hour, s.minute), "%02d:%02d".format(e.hour, e.minute), q(t.startPlace), q(t.endPlace),
                 "%.1f".format(Locale.US, t.miles), t.purpose.label, q(t.note), t.odoStart?.toString().orEmpty(), t.odoEnd?.toString().orEmpty(),
                 (t.durationSec / 60).toString(), t.fuelGal?.let { "%.2f".format(Locale.US, it) }.orEmpty()).joinToString(","))
         }
+    }
+
+    /** Miles per week for the last [weeks] weeks (oldest first): (week start, business miles, other miles). */
+    fun weeklyMiles(trips: List<Trip>, weeks: Int = 8, today: LocalDate = LocalDate.now(), zone: ZoneId = ZoneId.systemDefault()): List<Triple<LocalDate, Double, Double>> {
+        val thisWeek = today.minusDays((today.dayOfWeek.value % 7).toLong())
+        return (weeks - 1 downTo 0).map { i ->
+            val from = thisWeek.minusWeeks(i.toLong())
+            val a = from.atStartOfDay(zone).toInstant().toEpochMilli(); val b = from.plusWeeks(1).atStartOfDay(zone).toInstant().toEpochMilli()
+            val t = trips.filter { it.end != null && !it.simulated && it.start in a until b }
+            Triple(from, t.filter { it.purpose == Purpose.BUSINESS }.sumOf { it.miles }, t.filter { it.purpose != Purpose.BUSINESS }.sumOf { it.miles })
+        }
+    }
+
+    // ---------------------------------------------------------------- automatic trip tags
+
+    /**
+     * "Trips that end (or start) near here are Business": a place with a radius, optionally weekdays
+     * only. The first rule that matches tags a finished trip; trips you tag yourself are never changed.
+     */
+    data class Rule(val id: String, val name: String, val lat: Double, val lon: Double, val radiusM: Double = 250.0, val purpose: Purpose,
+                    val weekdaysOnly: Boolean = false, val eitherEnd: Boolean = true)
+
+    fun distanceM(lat1: Double, lon1: Double, lat2: Double, lon2: Double): Double {
+        val r = 6_371_000.0
+        val dLat = Math.toRadians(lat2 - lat1); val dLon = Math.toRadians(lon2 - lon1)
+        val a = Math.sin(dLat / 2).let { it * it } + Math.cos(Math.toRadians(lat1)) * Math.cos(Math.toRadians(lat2)) * Math.sin(dLon / 2).let { it * it }
+        return 2 * r * Math.asin(Math.sqrt(a.coerceIn(0.0, 1.0)))
+    }
+
+    /** The rule that applies to [t], if any. */
+    fun matchRule(t: Trip, rules: List<Rule>, zone: ZoneId = ZoneId.systemDefault()): Rule? {
+        val dow = Instant.ofEpochMilli(t.start).atZone(zone).dayOfWeek.value
+        return rules.firstOrNull { r ->
+            if (r.weekdaysOnly && dow >= 6) return@firstOrNull false
+            fun near(lat: Double?, lon: Double?) = lat != null && lon != null && distanceM(lat, lon, r.lat, r.lon) <= r.radiusM
+            near(t.endLat, t.endLon) || (r.eitherEnd && near(t.startLat, t.startLon))
+        }
+    }
+
+    // ---------------------------------------------------------------- fill-up detection
+
+    /** The fuel gauge jumped: probably a fill-up you haven't logged yet. */
+    data class PendingFill(val time: Long, val fromPct: Double, val toPct: Double, val gallons: Double, val odometer: Int?, val station: String = "")
+
+    /**
+     * Compares two fuel-level readings. A rise of 15 points or more that adds at least 2.5 gallons is
+     * a fill-up (gauges wobble a few percent; nobody adds a gallon and a half). Returns the gallons added.
+     */
+    fun detectFill(prevPct: Double?, newPct: Double?, tankGallons: Double): Double? {
+        if (prevPct == null || newPct == null) return null
+        val rise = newPct - prevPct
+        if (rise < 15) return null
+        val gal = rise / 100.0 * tankGallons
+        return if (gal >= 2.5) Math.round(gal * 10) / 10.0 else null
     }
 
     // ---------------------------------------------------------------- diagnostics & parking
@@ -238,6 +296,8 @@ object Telemetry {
         val bluelinkVin: String = "",
         val ratePerMile: Double = 0.70,
         val defaultPurpose: Purpose = Purpose.PERSONAL,
+        val rules: List<Rule> = emptyList(),
+        val detectFills: Boolean = true,
     )
 
     data class State(
@@ -247,6 +307,7 @@ object Telemetry {
         val dtcs: List<Dtc> = emptyList(),
         val parked: Parked? = null,
         val lastSession: Long = 0,
+        val pendingFill: PendingFill? = null,
     ) {
         operator fun get(key: String): Metric? = snapshot[key]
         val activeDtcs: List<Dtc> get() = dtcs.filter { it.active }
@@ -300,7 +361,10 @@ object Telemetry {
         val l = s.link
         put("link", JSONObject().put("carAddress", l.carAddress).put("carName", l.carName).put("associationId", l.associationId).put("obdAddress", l.obdAddress)
             .put("obdName", l.obdName).put("obdBle", l.obdBle).put("autoTrips", l.autoTrips).put("recordPlaces", l.recordPlaces).put("tripSummary", l.tripSummary)
-            .put("bluelink", l.bluelink).put("bluelinkVin", l.bluelinkVin).put("ratePerMile", l.ratePerMile).put("defaultPurpose", l.defaultPurpose.name))
+            .put("bluelink", l.bluelink).put("bluelinkVin", l.bluelinkVin).put("ratePerMile", l.ratePerMile).put("defaultPurpose", l.defaultPurpose.name)
+            .put("detectFills", l.detectFills)
+            .put("rules", JSONArray().apply { l.rules.forEach { r -> put(JSONObject().put("id", r.id).put("name", r.name).put("lat", r.lat).put("lon", r.lon).put("radius", r.radiusM)
+                .put("purpose", r.purpose.name).put("weekdays", r.weekdaysOnly).put("either", r.eitherEnd)) } }))
         put("snapshot", JSONArray().apply { s.snapshot.values.forEach { m -> put(JSONObject().put("k", m.key).put("n", m.num.orNull()).put("t", m.text.orNull()).put("s", m.source.name).put("at", m.time)) } })
         put("trips", JSONArray().apply {
             s.trips.forEach { t ->
@@ -310,19 +374,24 @@ object Telemetry {
                     .put("gps", t.gpsMiles).put("spd", t.speedMiles).put("odoS", t.odoStart.orNull()).put("odoE", t.odoEnd.orNull()).put("max", t.maxMph)
                     .put("moving", t.movingSec).put("idle", t.idleSec).put("gal", t.fuelGal.orNull()).put("fS", t.fuelPctStart.orNull()).put("fE", t.fuelPctEnd.orNull())
                     .put("brakes", t.hardBrakes).put("accels", t.hardAccels).put("purpose", t.purpose.name).put("note", t.note)
-                    .put("sources", JSONArray(t.sources.map { it.name })))
+                    .put("sources", JSONArray(t.sources.map { it.name })).put("sim", t.simulated).put("rule", t.rule))
             }
         })
         put("dtcs", JSONArray().apply { s.dtcs.forEach { d -> put(JSONObject().put("code", d.code).put("kind", d.kind).put("first", d.firstSeen).put("last", d.lastSeen).put("active", d.active)) } })
         s.parked?.let { p -> put("parked", JSONObject().put("lat", p.lat).put("lon", p.lon).put("place", p.place).put("time", p.time).put("source", p.source.name)) }
         put("lastSession", s.lastSession)
+        s.pendingFill?.let { f -> put("pendingFill", JSONObject().put("time", f.time).put("from", f.fromPct).put("to", f.toPct).put("gal", f.gallons).put("odo", f.odometer.orNull()).put("station", f.station)) }
     }
 
     fun fromJson(o: JSONObject): State {
         val l = o.optJSONObject("link")?.let { j ->
             Link(j.optString("carAddress"), j.optString("carName"), j.optInt("associationId", -1), j.optString("obdAddress"), j.optString("obdName"), j.optBoolean("obdBle"),
                 j.optBoolean("autoTrips", true), j.optBoolean("recordPlaces", true), j.optBoolean("tripSummary", true), j.optBoolean("bluelink"), j.optString("bluelinkVin"),
-                j.optDouble("ratePerMile", 0.70).takeIf { it.isFinite() } ?: 0.70, Purpose.of(j.optString("defaultPurpose")))
+                j.optDouble("ratePerMile", 0.70).takeIf { it.isFinite() } ?: 0.70, Purpose.of(j.optString("defaultPurpose")),
+                j.optJSONArray("rules")?.let { a -> (0 until a.length()).mapNotNull { a.optJSONObject(it) }.map { r ->
+                    Rule(r.optString("id"), r.optString("name"), r.optDouble("lat"), r.optDouble("lon"), r.optDouble("radius", 250.0), Purpose.of(r.optString("purpose")),
+                        r.optBoolean("weekdays"), r.optBoolean("either", true)) } }.orEmpty(),
+                j.optBoolean("detectFills", true))
         } ?: Link()
         fun arr(k: String) = o.optJSONArray(k)?.let { a -> (0 until a.length()).mapNotNull { a.optJSONObject(it) } }.orEmpty()
         val snap = arr("snapshot").mapNotNull { j ->
@@ -335,11 +404,13 @@ object Telemetry {
                     j.dbl("sLat"), j.dbl("sLon"), j.optString("sPlace"), j.dbl("eLat"), j.dbl("eLon"), j.optString("ePlace"),
                     j.optDouble("gps", 0.0), j.optDouble("spd", 0.0), j.int("odoS"), j.int("odoE"), j.optDouble("max", 0.0), j.optLong("moving"), j.optLong("idle"),
                     j.dbl("gal"), j.dbl("fS"), j.dbl("fE"), j.optInt("brakes"), j.optInt("accels"), Purpose.of(j.optString("purpose")), j.optString("note"),
-                    j.optJSONArray("sources")?.let { a -> (0 until a.length()).map { Source.of(a.optString(it)) }.toSet() }.orEmpty())
+                    j.optJSONArray("sources")?.let { a -> (0 until a.length()).map { Source.of(a.optString(it)) }.toSet() }.orEmpty(),
+                    j.optBoolean("sim"), j.optString("rule"))
             }.getOrNull()
         }
         val dtcs = arr("dtcs").map { j -> Dtc(j.optString("code"), j.optString("kind", "stored"), j.optLong("first"), j.optLong("last"), j.optBoolean("active", true)) }
         val parked = o.optJSONObject("parked")?.let { j -> Parked(j.optDouble("lat"), j.optDouble("lon"), j.optString("place"), j.optLong("time"), Source.of(j.optString("source"))) }
-        return State(l, snap, trips, dtcs, parked, o.optLong("lastSession"))
+        val fill = o.optJSONObject("pendingFill")?.let { j -> PendingFill(j.optLong("time"), j.optDouble("from"), j.optDouble("to"), j.optDouble("gal"), j.int("odo"), j.optString("station")) }
+        return State(l, snap, trips, dtcs, parked, o.optLong("lastSession"), fill)
     }
 }

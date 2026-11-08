@@ -142,18 +142,22 @@ class BleObdPort private constructor(private val gatt: BluetoothGatt, private va
  */
 @SuppressLint("MissingPermission")
 class ObdReader(private val context: Context, private val link: Telemetry.Link, private val onStatus: (String) -> Unit, private val onMetrics: (List<Telemetry.Metric>) -> Unit,
-                private val onCodes: (stored: List<String>, pending: List<String>, permanent: List<String>) -> Unit) {
+                private val onCodes: (stored: List<String>, pending: List<String>, permanent: List<String>) -> Unit,
+                /** Talk to this instead of a Bluetooth adapter (the drive simulator). */
+                private val simPort: ObdPort? = null) {
 
     private var port: ObdPort? = null
     private val supported = HashSet<Int>()
 
     suspend fun connect(): Boolean {
-        val adapter: BluetoothAdapter = context.getSystemService(BluetoothManager::class.java)?.adapter ?: return false
-        if (link.obdAddress.isBlank() || !BluetoothAdapter.checkBluetoothAddress(link.obdAddress)) return false
-        val device = adapter.getRemoteDevice(link.obdAddress)
-        onStatus("Connecting to ${link.obdName.ifBlank { "OBD adapter" }}…")
-        port = runCatching { if (link.obdBle) BleObdPort.open(context, device) else ClassicObdPort.open(device) }
-            .onFailure { onStatus("OBD adapter not reachable — is it plugged in?") }.getOrNull() ?: return false
+        if (simPort != null) port = simPort else {
+            val adapter: BluetoothAdapter = context.getSystemService(BluetoothManager::class.java)?.adapter ?: return false
+            if (link.obdAddress.isBlank() || !BluetoothAdapter.checkBluetoothAddress(link.obdAddress)) return false
+            val device = adapter.getRemoteDevice(link.obdAddress)
+            onStatus("Connecting to ${link.obdName.ifBlank { "OBD adapter" }}…")
+            port = runCatching { if (link.obdBle) BleObdPort.open(context, device) else ClassicObdPort.open(device) }
+                .onFailure { onStatus("OBD adapter not reachable — is it plugged in?") }.getOrNull() ?: return false
+        }
         val p = port!!
         p.send("ATZ", 4000); delay(500)
         Obd.INIT.drop(1).forEach { p.send(it, 1500) }
@@ -164,7 +168,7 @@ class ObdReader(private val context: Context, private val link: Telemetry.Link, 
             if ((base) !in supported) break
             supported += Obd.supported(p.send("01%02X".format(base)), base)
         }
-        onStatus("OBD-II connected")
+        onStatus(if (simPort != null) "Simulator connected" else "OBD-II connected")
         return true
     }
 

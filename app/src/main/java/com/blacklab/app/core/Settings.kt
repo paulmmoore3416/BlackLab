@@ -168,6 +168,18 @@ data class Settings(
     val backdrop: String = "AURORA",
     /** 0–100: how strongly the palette shows in the backdrop. */
     val backdropIntensity: Int = 60,
+    /** ui/theme DarkStyle name: GRAPHITE, OLED (true black), SLATE, WASH. */
+    val darkStyle: String = "GRAPHITE",
+    /** ui/theme CornerStyle name: ROUND, SOFT, SQUARE. */
+    val cornerStyle: String = "ROUND",
+    /** Interface size in percent (100 = comfortable; 90 compact; 85 dense). */
+    val uiScale: Int = 100,
+    /** ui/theme FontChoice name: INTER, SYSTEM, SERIF. */
+    val fontFamily: String = "INTER",
+    /** Long reading: SAME (the app font), SERIF, SANS, MONO. */
+    val readingFont: String = "SAME",
+    /** Long reading size in percent. */
+    val readingSize: Int = 100,
     // signatures
     val sigConfirm: Boolean = true,
     // feel
@@ -311,6 +323,12 @@ object Keys {
     const val VISUAL_STYLE = "visual_style"
     const val BACKDROP = "backdrop"
     const val BACKDROP_INTENSITY = "backdrop_intensity"
+    const val DARK_STYLE = "dark_style"
+    const val CORNER_STYLE = "corner_style"
+    const val UI_SCALE = "ui_scale"
+    const val FONT_FAMILY = "font_family"
+    const val READING_FONT = "reading_font"
+    const val READING_SIZE = "reading_size"
     const val SIG_CONFIRM = "sig_confirm"
     const val HAPTICS = "haptics"
     const val REDUCE_MOTION = "reduce_motion"
@@ -472,6 +490,12 @@ class SettingsRepository(context: Context) {
             visualStyle = getString(Keys.VISUAL_STYLE, d.visualStyle) ?: d.visualStyle,
             backdrop = getString(Keys.BACKDROP, d.backdrop) ?: d.backdrop,
             backdropIntensity = getInt(Keys.BACKDROP_INTENSITY, d.backdropIntensity).coerceIn(0, 100),
+            darkStyle = getString(Keys.DARK_STYLE, d.darkStyle) ?: d.darkStyle,
+            cornerStyle = getString(Keys.CORNER_STYLE, d.cornerStyle) ?: d.cornerStyle,
+            uiScale = getInt(Keys.UI_SCALE, d.uiScale).coerceIn(80, 110),
+            fontFamily = getString(Keys.FONT_FAMILY, d.fontFamily) ?: d.fontFamily,
+            readingFont = getString(Keys.READING_FONT, d.readingFont) ?: d.readingFont,
+            readingSize = getInt(Keys.READING_SIZE, d.readingSize).coerceIn(80, 160),
             sigConfirm = getBoolean(Keys.SIG_CONFIRM, d.sigConfirm),
             haptics = getBoolean(Keys.HAPTICS, d.haptics),
             reduceMotion = getBoolean(Keys.REDUCE_MOTION, d.reduceMotion),
