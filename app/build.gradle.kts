@@ -175,7 +175,7 @@ dependencies {
     implementation("androidx.profileinstaller:profileinstaller:1.4.1")
 
     testImplementation("junit:junit:4.13.2")
-    testImplementation("org.json:json:20240303")
+    testImplementation("org.json:json:20260814")
 
     // On-device tests (run on the emulator locally and in CI)
     androidTestImplementation("androidx.test.ext:junit:1.2.1")
