@@ -159,12 +159,12 @@ dependencies {
     // Offline wake word ("Hey Todd" / built-ins) — needs a free Picovoice AccessKey entered in the app
     implementation("ai.picovoice:porcupine-android:4.0.2")
     implementation("com.google.android.gms:play-services-code-scanner:16.1.0")
-    implementation("com.google.android.gms:play-services-mlkit-text-recognition:19.0.1")
+    implementation("com.google.android.gms:play-services-mlkit-text-recognition:19.0.2")
     implementation("com.google.android.gms:play-services-mlkit-subject-segmentation:16.0.0-beta1")
 
     // Assistant: on-device Gemini Nano (AICore), Google sign-in for Gmail/Drive, background sync
-    implementation("com.google.mlkit:genai-prompt:1.0.0-beta2")
-    implementation("com.google.android.gms:play-services-auth:21.5.1")
+    implementation("com.google.mlkit:genai-prompt:1.0.0-beta5")
+    implementation("com.google.android.gms:play-services-auth:22.0.0")
     implementation("androidx.work:work-runtime-ktx:2.10.5")
     // Android Auto: templated car screens (assistant, agenda, tasks, Santa Fe garage, knowledge talk) and
     // car hardware info (model, fuel level, odometer) when the vehicle shares it
