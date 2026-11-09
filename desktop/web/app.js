@@ -407,6 +407,7 @@ const NAV = [
   { id: 'files', label: 'Phone files', ico: '▤' },
   { id: 'bh', label: 'Behavioral Health', ico: '✚' },
   { id: 'garage', label: 'Garage', ico: '⛭' },
+  { id: 'vault', label: 'Obsidian vault', ico: '◈' },
   { sep: true },
   { id: 'appearance', label: 'Appearance', ico: '◐' },
   { id: 'settings', label: 'Settings', ico: '⚙' },
@@ -1028,6 +1029,71 @@ Views.settings.bind = () => {
 };
 
 // ---------------- desktop tools (companion)
+// ---------------------------------------------------------------- Obsidian vault (the companion's second brain)
+Views.vault = () => {
+  const c = S.companion;
+  if (!c) return `<div class="view-inner"><h1>Obsidian vault</h1><div class="card" style="margin-top:16px"><p class="muted">The vault lives on this computer and is run by the desktop companion. Start it, then reload.</p></div></div>`;
+  const v = c.vault;
+  if (!v) return `<div class="view-inner"><h1>Obsidian vault</h1><div class="card" style="margin-top:16px"><p class="muted">The vault is turned off (config.json <span class="mono">"vault": false</span>).</p></div></div>`;
+  const nodes = S.vaultNodes || [];
+  const when = (t) => t ? new Date(t * 1000).toLocaleString() : 'not yet';
+  return `<div class="view-inner"><div class="hero"><h1>Obsidian vault</h1><span class="chip accent">${esc(v.name)}</span></div>
+    <div class="grid g3">
+      <div class="tile"><span class="k">Notes</span><span class="v">${v.notes}</span><span class="s">${v.today} logged today</span></div>
+      <div class="tile"><span class="k">Saved versions</span><span class="v">${v.commits}</span><span class="s">${v.remote ? 'pushed to ' + esc(v.remote) : 'local git (add a private remote to back up off-site)'}</span></div>
+      <div class="tile"><span class="k">AI registry</span><span class="v">${v.registry}</span><span class="s">${v.last_visitor ? esc(v.last_visitor.agent) + ' · ' + esc(v.last_visitor.when) : 'no visitors yet'}</span></div>
+    </div>
+    <div class="grid g2" style="margin-top:16px">
+      <div class="card"><h2>Run it</h2><div class="stack">
+        <button data-vact="open">Open in Obsidian</button>
+        <button class="ghost" data-vact="sync">Sync now (meetings, briefs, task logs, projects, files, nodes)</button>
+        <div class="small muted">Phone: last sync ${esc(when(v.last_sync?.phone))} · desktop pass ${esc(when(v.last_sync?.desktop))}</div>
+        <div class="small muted mono">${esc(v.path)}</div>
+        ${(v.errors || []).length ? `<div class="small" style="color:var(--danger)">${v.errors.map(esc).join('<br>')}</div>` : ''}</div></div>
+      <div class="card"><h2>Capture & search</h2><div class="stack">
+        <textarea id="vText" rows="3" placeholder="A note for 00 Inbox — or pick a node below to add knowledge to it"></textarea>
+        <div class="row"><select id="vNode"><option value="">00 Inbox</option>${nodes.map((n) => `<option value="${esc(n.id)}">◆ ${esc(n.name)}</option>`).join('')}</select>
+        <button data-vact="save">Save</button></div>
+        <div class="row"><input id="vQuery" placeholder="Search the vault or the offline library"><button class="ghost" data-vact="search">Vault</button><button class="ghost" data-vact="library">Library</button></div>
+        <div id="vOut" class="small"></div></div></div>
+    </div>
+    <div class="card" style="margin-top:16px"><h2>Offline library</h2>${S.libStatus ? `<div class="grid g3">
+      <div class="tile"><span class="k">On disk</span><span class="v" style="font-size:18px">${S.libStatus.gb_on_disk} / ${S.libStatus.gb_planned} GB</span><span class="s">${S.libStatus.books_ok} of ${S.libStatus.books_planned} books · ${S.libStatus.docs_ok} documents</span></div>
+      <div class="tile"><span class="k">Budget</span><span class="v" style="font-size:18px">${S.libStatus.nodes_gb} + ${S.libStatus.core_gb} GB</span><span class="s">nodes & subnodes + core (Wikipedia)</span></div>
+      <div class="tile"><span class="k">Reader</span><span class="v" style="font-size:18px">${S.libStatus.serving ? 'Running' : 'Not installed'}</span><span class="s">${S.libStatus.serving ? `<a href="http://127.0.0.1:${S.libStatus.port}" target="_blank" rel="noopener">open the library</a>` : 'install kiwix-tools to read & search offline'}</span></div></div>` : '<span class="muted">Loading…</span>'}</div>
+    <div class="card" style="margin-top:16px"><h2>The 13 nodes</h2><p class="muted small">Every node serves one function — turn what happens into better decisions and actions. Members are notes that belong to the node; signals are timeline entries from the last 14 days.</p>
+      <div class="grid g3">${nodes.map((n) => `<div class="tile"><span class="k">◆ ${esc(n.name)}</span><span class="v" style="font-size:18px">${n.members} notes</span><span class="s">${n.signals} signals · ${esc(n.mission.slice(0, 90))}…</span></div>`).join('') || '<span class="muted">Loading…</span>'}</div></div>
+    <div class="card" style="margin-top:16px"><h2>Recent versions</h2>${(v.recent_commits || []).map((h) => `<div class="small mono">${esc(h.hash)} · ${esc(h.when)} · ${esc(h.message)}</div>`).join('') || '<span class="muted">none yet</span>'}</div>
+  </div>`;
+};
+Views.vault.bind = () => {
+  if (!S.vaultNodes && Companion.ok) Companion.req('/local/vault/nodes', {}).then((r) => { S.vaultNodes = r.nodes; render(); }).catch(() => {});
+  if (!S.libStatus && Companion.ok) Companion.req('/local/vault/library_status', {}).then((r) => { S.libStatus = r; render(); }).catch(() => {});
+  const out = (h) => { const o = $('#vOut'); if (o) o.innerHTML = h; };
+  document.querySelectorAll('[data-vact]').forEach((b) => b.onclick = async () => {
+    const a = b.dataset.vact;
+    try {
+      if (a === 'open') { await Companion.req('/local/vault/open', {}); toast('Opening Obsidian'); }
+      if (a === 'sync') { await Companion.req('/local/vault/sync', {}); toast('Syncing the vault'); setTimeout(async () => { await Companion.detect(); S.vaultNodes = null; render(); }, 6000); }
+      if (a === 'save') {
+        const text = $('#vText').value.trim(); const node = $('#vNode').value; if (!text) return;
+        const r = node ? await Companion.req('/local/vault/node_add', { node, content: text, author: 'BlackLab Desktop' })
+                       : await Companion.req('/local/vault/capture', { text, source: 'BlackLab Desktop' });
+        out(r.ok === false ? esc(r.error || 'Not saved') : 'Saved ' + esc(r.path || ''));
+        if (r.ok !== false) $('#vText').value = '';
+      }
+      if (a === 'library') {
+        const r = await Companion.req('/local/vault/library', { query: $('#vQuery').value, limit: 8 });
+        out((r.results || []).map((h) => h.error ? esc(h.error) : `<div><a href="${esc(h.url)}" target="_blank" rel="noopener"><b>${esc(h.title)}</b></a> <span class="muted">${esc(h.book)}</span><br>${esc(h.snippet.slice(0, 220))}</div>`).join('<hr>') || 'No matches.');
+      }
+      if (a === 'search') {
+        const r = await Companion.req('/local/vault/search', { query: $('#vQuery').value, limit: 8 });
+        out((r.results || []).map((h) => `<div><b>${esc(h.title)}</b> <span class="muted">${esc(h.path)}</span><br>${esc(h.snippet.slice(0, 220))}</div>`).join('<hr>') || 'No matches.');
+      }
+    } catch (e) { out(esc(e.message)); }
+  });
+};
+
 Views.desktop = () => {
   const c = S.companion;
   if (!c) return `<div class="view-inner"><h1>Desktop tools</h1>

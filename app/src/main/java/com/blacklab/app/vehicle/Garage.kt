@@ -117,36 +117,17 @@ object Garage {
         ServiceItem("belt", "Drive belt (inspect)", 60_000, 72),
     )
 
-    private val _state = MutableStateFlow(State())
-    val state: StateFlow<State> = _state.asStateFlow()
-    private var loaded = false
-    private var file: File? = null
+    val store = com.blacklab.app.core.JsonStore("Garage", version = 1, empty = { State() }, decode = ::fromJson, encode = ::toJson)
+    val state: StateFlow<State> = store.state
 
-    fun load(context: Context): State {
-        if (loaded) return _state.value
-        synchronized(this) {
-            if (loaded) return _state.value
-            val f = File(context.filesDir, "garage/garage.json").also { file = it }
-            _state.value = runCatching { fromJson(JSONObject(f.readText())) }.getOrDefault(State())
-            loaded = true
-        }
-        return _state.value
-    }
+    fun file(context: Context) = File(context.filesDir, "garage/garage.json")
 
-    private fun commit(context: Context, s: State) {
-        load(context)
-        _state.value = s
-        runCatching {
-            val f = file ?: File(context.filesDir, "garage/garage.json")
-            f.parentFile?.mkdirs()
-            val tmp = File(f.parentFile, "garage.json.tmp")
-            tmp.writeText(toJson(s).toString())
-            tmp.renameTo(f)
-        }
+    fun load(context: Context): State = store.load(file(context))
+
+    fun update(context: Context, change: (State) -> State) {
+        store.update(file(context), change = change)
         com.blacklab.app.widgets.CarWidget.refreshSoon(context)
     }
-
-    fun update(context: Context, change: (State) -> State) = synchronized(this) { commit(context, change(load(context))) }
 
     fun setVehicle(context: Context, v: Vehicle) = update(context) { it.copy(vehicle = v) }
 

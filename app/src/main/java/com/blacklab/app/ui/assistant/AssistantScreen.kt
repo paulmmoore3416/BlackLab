@@ -246,6 +246,10 @@ fun AssistantScreen(startListening: Boolean = false) {
                 }
             }
             LazyColumn(Modifier.weight(1f).fillMaxWidth(), state = listState, contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                if (!online && !s.asstOfflineOnly) item {
+                    com.blacklab.app.ui.components.ProblemBanner(com.blacklab.app.core.Net.Problem.OFFLINE, "the internet",
+                        message = "You're offline. Commands, Ask my files and on-device AI still work; email, Drive and the web wait until you're back.")
+                }
                 if (messages.isEmpty()) item { Welcome(s.asstName, s.userName) }
                 items(messages, key = { it.id }) { m -> Bubble(m) { link ->
                     when {

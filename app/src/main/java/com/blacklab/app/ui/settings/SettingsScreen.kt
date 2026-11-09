@@ -129,6 +129,20 @@ fun SettingsScreen() {
                 }
             }
             item {
+                BlCard(Modifier.fillMaxWidth().padding(top = 8.dp), onClick = { shell.go("settings/health") }) {
+                    Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                        androidx.compose.material3.Icon(Icons.Rounded.MonitorHeart, null, tint = MaterialTheme.colorScheme.primary)
+                        Spacer(Modifier.padding(start = 12.dp))
+                        Column(Modifier.weight(1f)) {
+                            Text("Health", style = MaterialTheme.typography.titleSmall)
+                            Text("Backups, data files, desktop link, Obsidian vault, crashes, storage and on-device AI — on one page",
+                                style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                        androidx.compose.material3.Icon(Icons.Rounded.ChevronRight, null)
+                    }
+                }
+            }
+            item {
                 BlCard(Modifier.fillMaxWidth().padding(top = 8.dp), onClick = { shell.go("settings/dashboard") }) {
                     Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
                         androidx.compose.material3.Icon(Icons.Rounded.Dashboard, null, tint = MaterialTheme.colorScheme.primary)

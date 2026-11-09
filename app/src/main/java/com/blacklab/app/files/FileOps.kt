@@ -52,7 +52,7 @@ object FileOps {
         val tmp = File(target.parentFile, ".${target.name}.${System.nanoTime()}.tmp")
         try {
             write(tmp)
-            if (target.exists()) target.delete()
+            // rename(2) replaces the target atomically; deleting it first left a moment with no file at all
             if (!tmp.renameTo(target)) { tmp.copyTo(target, true); tmp.delete() }
         } finally { if (tmp.exists()) tmp.delete() }
     }

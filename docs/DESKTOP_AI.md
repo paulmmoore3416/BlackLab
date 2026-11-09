@@ -190,3 +190,10 @@ the same over Wi-Fi, so the phone keeps its desktop brain away from the cable.
 - Ask "desktop AI status", or send work to the computer: "on my computer open my downloads",
   "ask my desktop how much disk space is left".
 - Source labels show who answered: "Desktop AI · qwen3:8b" or "Gemini Nano · on-device".
+
+## Obsidian vault & MCP (companion 1.5.0)
+
+- The companion keeps `~/Obsidian/BlackLab` current (every 10 minutes, and whenever the phone sends its feed) and commits each change.
+- Desktop AI tools: `vault_search` (reads content → counts as tainted for `open_url`) and `vault_write` (only when the request asks to save/note/log).
+- MCP server for agents: `claude mcp add --scope user blacklab-vault -- python3 desktop/companion/vault_mcp.py`. Tools: `vault_checkin`, `vault_status`, `vault_search`, `vault_read`, `vault_write`, `vault_log`, `vault_capture`, `vault_recent`, `vault_nodes`, `vault_node_add`. It goes through the companion when it runs (one writer), otherwise writes directly.
+- Claude Code hooks: `vault_hook.py start|end` (SessionStart / SessionEnd) — sign-in reminder, then a session note with files changed and commits. Prompts are never copied.

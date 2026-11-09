@@ -2,6 +2,41 @@
 
 All notable changes to BlackLab are documented here. The project follows [Semantic Versioning](https://semver.org/).
 
+## [5.11.0] — 2026-11-08
+
+BlackLab gets a second brain: everything flows into an Obsidian vault on your computer, organized into 13 knowledge nodes your AIs can read and grow. Plus work-order intake, a daily timeline with ops handoff, and a Health page.
+
+### Added
+- **Obsidian vault** (Settings › Obsidian vault): BlackLab mirrors Facility, Garage, tasks and calendar, notes and notebooks, learning and recordings (journal only if you turn it on) into `~/Obsidian/BlackLab` on the computer, every 15 minutes while the desktop link is up. Behavioral Health, keys, the VIN and plate, trip places and locked notebook sections never go.
+  - **13 main nodes + the Nexus**: Facility Operations · Life Safety & Compliance · Peer Support & Milieu Safety · Leadership & Team · Vendors & Contracts · Finance & Budget · Projects & Engineering · AI & Automation · Learning & Credentials · Knowledge Library · Vehicles & Travel · Home, Family & Health · Time, Goals & Planning. Each starts with a detailed primer and grows on every sync (members, signals, mentions); every note links up to its node, and a Neural Map canvas shows the network.
+  - Daily notes with a **timeline** of everything that happened, an **AI Registry** every AI signs, version history (git), and your own writing is never overwritten.
+  - Assistant: “save this to Obsidian: …”, “add to the facility node: …”, “log to the vault: …”, “search the vault for …”, “what's new in the vault?”, “open Obsidian on my computer”, “sync the vault”.
+- **Offline library** (~50 GB, on the computer): 76 openly licensed knowledge packs (Stack Exchange, LibreTexts, Wikibooks, iFixit, MedlinePlus, Ready.gov, the USDA canning guide, field-medicine and post-disaster libraries, Wikipedia's best 50,000 articles plus 1 million article introductions) and public-domain government documents (DOE O&M guide, OSHA 29 CFR 1910/1926, the FAR, SAMHSA peer competencies, EPA water disinfection, the NWS spotter guide). Each source is a card in `95 Library/` linked to its node; the assistant answers from it offline: “look it up in the library: …”.
+- **Self-Reliance & Survival** — 17 subnodes under Home, Family & Health, each with a primer and its own library shelf: off-grid survival, plant knowledge & foraging, sourdough & bread, water filtration & purification, field dressing & game care, first aid & wilderness medicine, food preservation & canning, emergency communications, land navigation, shelter & fire, knots, off-grid power, gardening & seed saving, disaster preparedness, tools & repair, weather reading, fermentation.
+- **Work-order intake**: say or type “work order: leak under the sink in room 214, B-wing” (or Facility › 🔧). BlackLab picks the trade, priority (P1–P4, with the reason), location and matching asset, files it in To-Do › Work Orders with a safety-first checklist, and logs it on the asset.
+- **Timeline & ops handoff** (side menu): one timeline per day — inspections, work orders, tasks, meetings, recordings, notes, drives, and Behavioral Health as counts only. **Ops handoff** writes the day's summary (open work orders by urgency, inspections needing attention, tomorrow) to share, copy or send to the vault; it never includes Behavioral Health. Assistant: “ops handoff”, “what happened today”.
+- **Settings › Health**: backups, data files, desktop link, vault, crashes, storage and on-device AI on one page, each with a fix.
+- **Ask my files** now searches Facility (assets, inspections, work orders) and Garage service history (Settings › Assistant knowledge › Facility & Garage). The VIN and plate are never indexed.
+
+### Changed
+- Facility, Garage, the drive log and recalls save through one crash-safe store: a last-good copy is kept, a damaged file is set aside instead of being overwritten, and files carry a format version so future updates migrate them.
+- Weather and recall lookups retry briefly when the network blips; the assistant shows a clear offline banner.
+- The assistant's command grammar is one ordered, tested table with a phrasing corpus. Fixed: “what were the action items from the meeting” and “what did we decide in the budget meeting” were read as calendar questions.
+- Faster cold start: a generated Baseline Profile precompiles startup and Home.
+- Updated: Kotlin 2.3, Android Gradle Plugin 8.13, Compose BOM 2026.06, Room 2.8, Lifecycle 2.10, Navigation 2.9.8, WorkManager 2.12, Glance 1.2.
+
+### Desktop (companion 1.5.0)
+- The vault engine, a **vault MCP server** (`desktop/companion/vault_mcp.py`: checkin, search, read, write, log, capture, recent, nodes, node_add) so Claude Code and other agents can work in the vault, and Claude Code session hooks (`vault_hook.py`).
+- BlackLab Desktop › **Obsidian vault**: status, the 13 nodes, capture and search (vault or offline library), sync, open in Obsidian.
+- `library.py` (downloads with SHA-256 verification, cards, search through kiwix-serve on 127.0.0.1:8780) and the MCP tool `vault_library_search`; an optional, quarantined **external guest book** (`guestbook.py`, off until a public repo is configured).
+- The desktop AI can search and save to the vault; every non-private conversation lands on the day's timeline.
+- All safety rules (HTTP, protected paths, privacy, tool calls) moved into `guards.py` with unit tests. Fixed: a path like `/home/paulx/…` passed the home-folder check.
+
+### Project
+- `scripts/release.sh X.Y.Z [--install] [--publish]`: version bump, changelog check, secret + privacy scans, tests, lint, signed APK + `.sha256`, tag and GitHub Release.
+- `scripts/privacy-scan.sh` (also in CI): real VINs, personal e-mails and phone numbers, precise coordinates, SSNs and your private denylist (`~/.config/blacklab/privacy-denylist.txt`).
+- Desktop companion tests run in CI. Dependabot skips AGP major versions.
+
 ## [5.10.0] — 2026-11-08
 
 Facility gets its own section, backups are encrypted, and the desktop link is locked down.

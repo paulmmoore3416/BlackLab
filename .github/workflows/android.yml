@@ -16,7 +16,7 @@ concurrency:
 
 jobs:
   secrets:
-    name: Secret scan
+    name: Secret & privacy scan
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
@@ -24,6 +24,20 @@ jobs:
       # The repository is public: fail fast if a key, token, keystore or signing password is tracked
       - name: Scan tracked files for credentials
         run: scripts/secret-scan.sh
+      # …and for personal data: real VINs, personal e-mails / phone numbers, precise coordinates, SSNs
+      - name: Scan tracked files for personal data
+        run: scripts/privacy-scan.sh
+
+  desktop:
+    name: Desktop companion tests
+    needs: secrets
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      # Standard library only: the safety rules (HTTP, paths, privacy, tool calls) and the Obsidian vault writer
+      - name: Unit tests
+        run: python3 -m unittest discover -s desktop/companion/tests -v
 
   build:
     name: Build & unit tests

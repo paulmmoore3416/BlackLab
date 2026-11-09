@@ -108,6 +108,7 @@ object DesktopJobs {
                 runCatching { sendOutbox(app) }.onFailure { android.util.Log.w(TAG, "outbox", it) }
                 runCatching { sendContext(app) }.onFailure { android.util.Log.w(TAG, "context", it) }
                 runCatching { collect(app) }.onFailure { android.util.Log.w(TAG, "collect", it) }
+                runCatching { com.blacklab.app.link.VaultFeed.sync(app) }.onFailure { android.util.Log.w(TAG, "vault", it) }
             }
         }
     }

@@ -150,7 +150,7 @@ class TelemetryTest {
 
 class BluelinkTest {
     private val enrollment = JSONObject("""
-        {"enrolledVehicleDetails":[{"vehicleDetails":{"regid":"H00001","vin":"5NMS1234567890123","nickName":"Santa Fe","modelCode":"SANTA FE","modelYear":"2023",
+        {"enrolledVehicleDetails":[{"vehicleDetails":{"regid":"H00001","vin":"5NMS1234X67890123","nickName":"Santa Fe","modelCode":"SANTA FE","modelYear":"2023",
          "vehicleGeneration":"3","odometer":"31250"}}]}""")
     private val status = JSONObject("""
         {"dateTime":"2026-11-07T18:30:00Z","fuelLevel":42,"lowFuelLight":false,"dte":{"value":215,"unit":3},"engine":false,"doorLock":false,

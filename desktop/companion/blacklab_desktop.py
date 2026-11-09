@@ -46,8 +46,10 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import agents  # noqa: E402  (background jobs, recordings, equipment, briefs)
+import guards  # noqa: E402  (every safety rule: HTTP, paths, privacy, tool calls — unit tested)
+import vault as vaultlib  # noqa: E402  (the Obsidian vault: notes, timeline, AI registry, git)
 
-VERSION = "1.4.1"
+VERSION = "1.5.0"
 HOST, PORT = "127.0.0.1", int(os.environ.get("BLACKLAB_DESKTOP_PORT", "8770"))
 HOME = Path.home()
 WEB_DIR = Path(__file__).resolve().parent.parent / "web"
@@ -56,12 +58,8 @@ CACHE_DIR = HOME / ".cache" / "blacklab-desktop"
 OLLAMA = os.environ.get("OLLAMA_HOST", "127.0.0.1:11434").rstrip("/")
 if not OLLAMA.startswith("http"):  # Ollama's own convention allows "host:port"
     OLLAMA = "http://" + OLLAMA.replace("0.0.0.0", "127.0.0.1")
-ALLOWED_ORIGINS = {
-    f"http://{HOST}:{PORT}", f"http://localhost:{PORT}", "https://paulmmoore3416.github.io",
-}
-# A web page can point its own domain name at 127.0.0.1 ("DNS rebinding") and then talk to this
-# port as if it were same-origin. Browsers always send the name they used in Host, so only accept ours.
-ALLOWED_HOSTS = {f"{HOST}:{PORT}", f"localhost:{PORT}"}
+ALLOWED_ORIGINS = guards.allowed_origins(HOST, PORT)
+ALLOWED_HOSTS = guards.allowed_hosts(HOST, PORT)
 PREFERRED_MODELS = ["qwen3:8b", "granite4:tiny-h", "paul-assistant:latest", "qwen2.5:14b"]
 
 
@@ -89,6 +87,8 @@ DOCS_DIR = _cfg_dir("documents_dir", AI_DIR / "Documents")
 CHAT_DIR = _cfg_dir("chat_history_dir", AI_DIR / "Chat History")
 TASK_LOG_DIR = _cfg_dir("task_log_dir", AI_DIR / "Task Logs")
 OUT_DIR = DOWNLOADS_DIR  # the name companion 1.2 and earlier used
+VAULT_ON = CONFIG.get("vault", True) is not False
+VAULT = vaultlib.Vault(_cfg_dir("vault_dir", "~/Obsidian/BlackLab"), CACHE_DIR / "vault", CONFIG.get("timezone", "America/Chicago"))
 
 
 def ensure_phone_token() -> str:
@@ -208,29 +208,16 @@ def xdg_open(target: str):
 
 # Never readable, openable or searchable by the AI, whatever a request (or a document it reads) asks:
 # wallet keys and recovery phrases, SSH/GPG keys, browser profiles, and the keys of BlackLab itself.
-PROTECTED = [HOME / p for p in (
-    "Desktop/mining/wallet-backup", "Desktop/mining/config", ".ssh", ".gnupg", ".password-store", ".local/share/keyrings",
-    ".config/blacklab-desktop", ".config/blacklab-crypto", "Desktop/BlackLab/keystore", ".mozilla", ".config/google-chrome",
-    ".config/chromium", ".electrum", ".bitcoin", ".monero", ".aws", ".kube", ".docker/config.json", ".netrc", ".git-credentials")]
-PROTECTED += [HOME / p for p in CONFIG.get("protected_paths", [])]
-PROTECTED_NAME_RE = re.compile(r"(seed|mnemonic|recovery[ _-]?phrase|private[ _-]?key|wallet\.(dat|json)|keystore|\.jks$|\.pem$|id_rsa|id_ed25519|secrets?\.json)", re.I)
+PROTECTED = guards.protected_paths(HOME, CONFIG.get("protected_paths", []))
+PROTECTED_NAME_RE = guards.PROTECTED_NAME_RE
 
 
 def is_protected(path: Path) -> bool:
-    try:
-        rp = path.resolve()
-    except OSError:
-        return True
-    return any(rp == p or p in rp.parents for p in (x.resolve() for x in PROTECTED)) or bool(PROTECTED_NAME_RE.search(rp.name))
+    return guards.is_protected(path, PROTECTED)
 
 
 def safe_home_path(p: str) -> Path | None:
-    # models often invent /home/user/…: map any other home onto this one (it can only ever point inside HOME)
-    p = re.sub(r"^/(?:home|Users)/[^/]+(?=/|$)", lambda m: str(HOME), os.path.expanduser(str(p or "").strip()))
-    path = Path(p).resolve()
-    if not str(path).startswith(str(HOME)) or is_protected(path):
-        return None
-    return path
+    return guards.safe_home_path(p, HOME, PROTECTED)
 
 
 # ---------------------------------------------------------------- privacy
@@ -239,34 +226,16 @@ def safe_home_path(p: str) -> Path | None:
 # "privately: …" / "off the record …" is answered normally but never written to the chat history,
 # the memory or the content of a task log. Identifiers are scrubbed from everything that is saved.
 
-OFF_RECORD_RE = re.compile(r"^\s*(?:(?:privately|off the record|don'?t (?:save|log|remember) (?:this|that))\b[\s,:.-]*"
-                           r"|(?:private|confidential)\s*[:,-]\s*)", re.I)
-CLINICAL_RE = re.compile(r"\b(patients?|clients?|diagnos\w*|medications?|meds|dosages?|prescri\w*|sbar|peer notes?|behavioral health|"
-                         r"therap(?:y|ist)|psychiatr\w*|psycholog\w*|suicid\w*|self[- ]harm|overdose|q ?15s?|mrn|hipaa|phi|"
-                         r"date of birth|dob|ssn|social security)\b", re.I)
-REDACTIONS = [
-    (re.compile(r"\b\d{3}-\d{2}-\d{4}\b"), "[SSN removed]"),
-    (re.compile(r"\b\d(?:[ -]?\d){12,15}\b"), "[card number removed]"),
-    (re.compile(r"\b(mrn|medical record(?: number)?|patient id|member id)([:#\s]+)[\w-]+", re.I), r"\1\2[removed]"),
-]
+OFF_RECORD_RE = guards.OFF_RECORD_RE
+CLINICAL_RE = guards.CLINICAL_RE
 
 
 def privacy_check(text: str, flagged=False) -> tuple[bool, str]:
     """(private?, text without an "off the record" prefix)."""
-    m = OFF_RECORD_RE.match(text or "")
-    if m and text[m.end():].strip():
-        return True, text[m.end():].strip()
-    if flagged or CONFIG.get("private_by_default"):
-        return True, text
-    if CONFIG.get("clinical_guard", True) is not False and CLINICAL_RE.search(text or ""):
-        return True, text
-    return False, text
+    return guards.privacy_check(text, flagged, CONFIG)
 
 
-def redact(text: str) -> str:
-    for rx, rep in REDACTIONS:
-        text = rx.sub(rep, text or "")
-    return text
+redact = guards.redact
 
 
 # ---------------------------------------------------------------- task logs
@@ -475,6 +444,12 @@ def archive_chat(request: str, reply: str, origin: str, source: str, when: dt.da
         _append_private(CHAT_DIR / "chat-history.jsonl", json.dumps(
             {"at": when.isoformat(timespec="seconds"), "from": origin, "you": request.strip(), "blacklab": reply, "by": source, "tools": tools},
             ensure_ascii=False) + "\n")
+    if VAULT_ON:  # private turns never reach archive_chat, so they never reach the vault either
+        try:
+            VAULT.log("ai", request.strip().splitlines()[0][:140], reply.strip()[:600], source=f"Desktop AI · {origin.split(' (')[0]}",
+                      links=[f"{when:%Y-%m-%d}"], at=when.astimezone(VAULT.tz) if VAULT.tz else when)
+        except Exception as e:
+            print(f"vault log skipped: {e}", file=sys.stderr, flush=True)
 
 
 @logged_tool("recall_chats")
@@ -1036,14 +1011,48 @@ def pull(kind: str, phone) -> str:
 # ---------------------------------------------------------------- assistant
 
 PRONOUNS = {"it", "that", "this", "them", "those", "these", "one", "the first one", "the last one", "that one", "the file", "the folder"}
-PHONE_WORDS = re.compile(r"\b(task|tasks|to-?do|remind|reminder|calendar|schedule|meeting|event|agenda|brief|due|overdue|journal|note|notes|dictat\w*|record\w*|"
-                         r"email|gmail|inbox|drive|keep|ceu|gpa|course|class|exam|focus|pomodoro|my files|work order|nameplate|photo|camera|"
-                         r"personal|professional)\b", re.I)
+PHONE_WORDS = guards.PHONE_WORDS
+
+
+@logged_tool("vault_search")
+def tool_vault_search(args):
+    hits = VAULT.search(args.get("query", "") if isinstance(args, dict) else str(args), 6)
+    if not hits:
+        return "Nothing in the vault matches that."
+    return "\n\n".join(f"• {h['path']}\n  {h['snippet'][:300]}" for h in hits)
+
+
+@logged_tool("vault_write")
+def tool_vault_write(args):
+    a = args if isinstance(args, dict) else {"text": str(args)}
+    folder = (a.get("folder") or vaultlib.FOLDERS["inbox"]).strip("/")
+    title = VAULT.safe_name(a.get("title") or a.get("text", "").split("\n")[0][:60], "Note")
+    r = VAULT.write_note(f"{folder}/{title}.md", a.get("text", ""), "append", author="Desktop AI")
+    if r.get("ok"):
+        task_file("created", VAULT.path(r["path"]))
+        VAULT.commit(min_gap=0)
+        return f"Saved to the vault: {r['path']}"
+    return r.get("error", "Couldn't save that.")
+
+
+VAULT_SAVE_RE = re.compile(r"^(?:save|add|put|capture|log|note)(?: this| that)? (?:to|in|into|on) (?:my |the )?(?:obsidian|vault)(?: vault)?[:,\s-]+(.{3,})$", re.I | re.S)
+VAULT_FIND_RE = re.compile(r"^(?:search|find|look (?:up|for)|what(?:'s| is| do i have)) (?:in )?(?:my |the )?(?:obsidian|vault)(?: vault)?(?: for| about)?[:\s]+(.+)$", re.I)
 
 
 def desktop_rules(text: str, phone):
     t = text.strip()
     low = t.lower()
+    if VAULT_ON:
+        m = VAULT_SAVE_RE.match(t)
+        if m:
+            return tool_vault_write({"text": m.group(1)}), "Desktop · vault"
+        m = VAULT_FIND_RE.match(t)
+        if m:
+            return tool_vault_search({"query": m.group(1)}), "Desktop · vault"
+        if re.search(r"what'?s new in (?:my |the )?(?:obsidian|vault)|vault status", low):
+            st = VAULT.status()
+            return (f"Your vault has {st['notes']} notes and {st['commits']} saved versions; {st['today']} things logged today. "
+                    + (f"Last AI visitor: {st['last_visitor']['agent']} ({st['last_visitor']['when']})." if st.get("last_visitor") else "")), "Desktop · vault"
     if re.search(r"\b(system|computer|pc|desktop) (status|health|info)\b|^status$|how('s| is) (my )?(computer|pc|system)", low):
         return tool_system_status(), "Desktop · rules"
     if re.search(r"(disk|storage) (space|usage|hogs?)|using (my )?(disk|storage)|what('s| is) taking (up )?space", low):
@@ -1131,6 +1140,12 @@ TOOLS = [
                                       "parameters": {"type": "object", "properties": {"query": {"type": "string"}}, "required": ["query"]}}},
     {"type": "function", "function": {"name": "equipment", "description": "Look up the user's equipment registry: a unit's nameplate data and history (work orders, meetings, photos, repeat issues), or list units matching words like a type, make, location or refrigerant.",
                                       "parameters": {"type": "object", "properties": {"query": {"type": "string", "description": "A tag like RTU-4, a serial, or words like 'R-22' or 'chiller'; 'all' lists everything"}}, "required": ["query"]}}},
+    {"type": "function", "function": {"name": "vault_search", "description": "Search the user's Obsidian vault (their second brain: facility assets and logs, projects, meetings, daily timelines, notes).",
+                                      "parameters": {"type": "object", "properties": {"query": {"type": "string"}}, "required": ["query"]}}},
+    {"type": "function", "function": {"name": "vault_write", "description": "Save a note into the user's Obsidian vault (00 Inbox unless a folder is named). Only when the user asks to save, note or log something there.",
+                                      "parameters": {"type": "object", "properties": {"title": {"type": "string"}, "text": {"type": "string"}, "folder": {"type": "string"}}, "required": ["text"]}}},
+    {"type": "function", "function": {"name": "library_search", "description": "Search the offline reference library (~50 GB: Wikipedia, Stack Exchange, LibreTexts, Wikibooks, iFixit, MedlinePlus, Ready.gov, USDA canning, survival and field manuals) for facts and how-tos.",
+                                      "parameters": {"type": "object", "properties": {"query": {"type": "string"}}, "required": ["query"]}}},
     {"type": "function", "function": {"name": "dev_docs", "description": "Search Google's official Android/Firebase/Cloud developer documentation (needs internet).", "parameters": {"type": "object", "properties": {"query": {"type": "string"}}, "required": ["query"]}}},
 ]
 
@@ -1138,47 +1153,17 @@ TOOLS = [
 TOOL_NAMES = {t["function"]["name"] for t in TOOLS}
 
 
-# A tool that changes something (opens a window, writes a file, adds a phone task) only runs when the request
-# itself asks for that kind of thing. Small models otherwise "try things" with side effects (see docs/DESKTOP_AI.md).
-SIDE_EFFECT_ASKS = {
-    "phone_command": PHONE_WORDS,
-    "desktop_note": re.compile(r"\b(notes?|save|write|document|doc|draft|jot|memo|checklist|report|record|log)\b", re.I),
-    "open_url": re.compile(r"\b(open|browse|go to|visit|web ?site|web ?page|link|url|pull up)\b|https?://", re.I),
-    "launch_app": re.compile(r"\b(open|launch|start|run|fire up)\b", re.I),
-    "open_path": re.compile(r"\b(open|show|pull up|browse)\b", re.I),
-}
-
-
-# Tools whose results carry text the user didn't write (files, documents, old chats, web docs, phone data).
-# Text like that can contain instructions aimed at the model ("open https://…?q=<your notes>").
-READS_CONTENT = {"read_file", "search_documents", "recall_chats", "dev_docs", "phone_command", "find_files", "equipment"}
-
-
-def _url_host(u: str) -> str:
-    u = (u or "").strip()
-    if not re.match(r"^https?://", u, re.I):
-        u = "https://" + u
-    return (urllib.parse.urlsplit(u).hostname or "").lower().removeprefix("www.")
-
-
-def tool_guard(name: str, request: str, args=None, tainted: bool = False) -> str | None:
-    rx = SIDE_EFFECT_ASKS.get(name)
-    if rx and not rx.search(request):
-        return f"Not run: the user didn't ask for {name}. Answer from what you already have, without more tools."
-    if tainted and name == "open_url":
-        # After reading content, only open sites the user named themselves, so a document can't send data out
-        url = args.get("url") if isinstance(args, dict) else str(args or "")
-        host = _url_host(url)
-        if not host or host not in request.lower():
-            return ("Not run: after reading files or documents I only open links the user typed. "
-                    "Tell the user the link instead of opening it.")
-    return None
+SIDE_EFFECT_ASKS = guards.SIDE_EFFECT_ASKS
+READS_CONTENT = guards.READS_CONTENT
+_url_host = guards.url_host
+tool_guard = guards.tool_guard
 
 
 def run_tool(name, args, phone):
     fns = {"system_status": tool_system_status, "find_files": tool_find_files, "read_file": tool_read_file, "open_path": tool_open_path,
            "open_url": tool_open_url, "launch_app": tool_launch_app, "desktop_note": tool_desktop_note, "dev_docs": tool_dev_docs,
-           "recall_chats": tool_recall_chats, "search_documents": tool_search_documents, "equipment": tool_equipment}
+           "recall_chats": tool_recall_chats, "search_documents": tool_search_documents, "equipment": tool_equipment,
+           "vault_search": tool_vault_search, "vault_write": tool_vault_write, "library_search": tool_library_search}
     try:
         if name == "phone_command":
             return tool_phone(args, phone)
@@ -1397,17 +1382,15 @@ class Handler(SimpleHTTPRequestHandler):
         return (self.headers.get("Host") or "").lower() in ALLOWED_HOSTS
 
     def guard(self) -> bool:
-        origin = self.headers.get("Origin")
-        if not self.host_ok() or self.headers.get("X-BlackLab") != "1" or (origin and origin not in ALLOWED_ORIGINS):
+        if not guards.ui_request_ok(self.headers.get("Host"), self.headers.get("Origin"), self.headers.get("X-BlackLab"), ALLOWED_HOSTS, ALLOWED_ORIGINS):
             self.reply(403, {"error": "forbidden"})
             return False
         return True
 
     def phone_guard(self) -> bool:
         """/phone/* is for the BlackLab app only: our Host, no browser Origin, and the shared key."""
-        auth = self.headers.get("Authorization") or ""
-        tok = SECRETS.get("phone_ai_token") or ""
-        if not self.host_ok() or self.headers.get("Origin") or not tok or not hmac.compare_digest(auth, "Bearer " + tok):
+        if not guards.phone_request_ok(self.headers.get("Host"), self.headers.get("Origin"), self.headers.get("Authorization"),
+                                       SECRETS.get("phone_ai_token") or "", ALLOWED_HOSTS):
             self.reply(401, {"error": "unauthorized"})
             return False
         if self.headers.get("X-BlackLab-Phone"):  # the app identifies itself; health checks from this computer don't count
@@ -1452,12 +1435,25 @@ class Handler(SimpleHTTPRequestHandler):
                                         "folders": {"ai": str(AI_DIR), "downloads": str(DOWNLOADS_DIR), "documents": str(DOCS_DIR),
                                                     "chat_history": str(CHAT_DIR) if CONFIG.get("chat_history", True) is not False else None},
                                         "task_logs": str(TASK_LOG_DIR) if CONFIG.get("task_logs", True) is not False else None,
-                                        "agents": agents.status()})
+                                        "agents": agents.status(), "vault": VAULT.status() if VAULT_ON else None})
             return self.reply(404, {"error": "unknown"})
         return super().do_GET()
 
     def do_POST(self):
         route = urllib.parse.urlsplit(self.path).path
+        if route.startswith("/phone/vault"):
+            if not self.phone_guard():
+                return
+            try:
+                length = int(self.headers.get("Content-Length") or 0)
+                if length > 12_000_000:
+                    return self.reply(413, {"error": "too large"})
+                body = json.loads(self.rfile.read(length) or b"{}")
+                return self.reply(200, vault_op(route.removeprefix("/phone/vault").strip("/") or "feed", body, "Phone"))
+            except ValueError as e:
+                return self.reply(400, {"error": str(e)})
+            except Exception as e:
+                return self.reply(500, {"error": str(e)})
         if route in ("/phone/upload", "/phone/jobs", "/phone/jobs/ack", "/phone/context"):
             if not self.phone_guard():
                 return
@@ -1527,6 +1523,8 @@ class Handler(SimpleHTTPRequestHandler):
                 j = agents.submit(body.get("kind", ""), body.get("title", "") or (Path(body["path"]).name if body.get("path") else ""),
                                   body.get("params") or {}, upload, private=bool(body.get("private")))
                 return self.reply(200, agents.public(j))
+            if self.path.startswith("/local/vault/"):
+                return self.reply(200, vault_op(self.path.removeprefix("/local/vault/"), body, "This computer"))
             if self.path == "/local/open":
                 return self.reply(200, {"message": tool_open_path({"path": body.get("path", "~")})})
             return self.reply(404, {"error": "unknown"})
@@ -1536,12 +1534,187 @@ class Handler(SimpleHTTPRequestHandler):
             return self.reply(500, {"error": str(e)})
 
 
-def keep_usb_link():
-    """Re-establish `adb forward` whenever the phone is plugged in, so the UI reconnects on its own."""
+def vault_op(op: str, body: dict, who: str) -> dict:
+    """Every vault action from the phone, this computer's UI and the MCP server."""
+    if not VAULT_ON:
+        return {"ok": False, "error": "The vault is turned off (config.json \"vault\": false)."}
+    v = VAULT
+    if op == "feed":
+        counts = v.apply_feed(body)
+        v.commit(f"Phone sync · " + ", ".join(f"{k} {n}" for k, n in counts.items()), min_gap=0)
+        return {"ok": True, "counts": counts, "status": v.status()}
+    if op == "status":
+        return dict(v.status(), ok=True, phone_mirror=PHONE_VAULT)
+    if op == "checkin":
+        r = v.checkin(body.get("agent", ""), body.get("model", ""), body.get("purpose", ""), body.get("note", ""), where=body.get("where") or who)
+    elif op == "search":
+        return {"ok": True, "results": v.search(body.get("query", ""), int(body.get("limit") or 8))}
+    elif op == "read":
+        return {"ok": True, "text": v.read(body.get("path", ""))}
+    elif op == "recent":
+        import vault_mcp
+        return {"ok": True, "text": vault_mcp.recent_text(v, int(body.get("days") or 2))}
+    elif op == "write":
+        r = v.write_note(body.get("path", ""), body.get("content", ""), body.get("mode") or "append", body.get("author") or who)
+    elif op == "log":
+        r = {"ok": v.log(body.get("kind") or "note", body.get("title", ""), body.get("detail", ""), body.get("source") or who, body.get("links") or [])}
+    elif op in ("capture", "note"):
+        r = v.capture(body.get("text", ""), body.get("title", ""), body.get("source") or who)
+    elif op == "sync":
+        threading.Thread(target=vault_pass, kwargs={"force": True}, daemon=True).start()
+        return {"ok": True, "message": "Syncing the vault now."}
+    elif op == "open":
+        xdg_open(v.status()["open_url"])
+        return {"ok": True, "message": "Opening the vault in Obsidian."}
+    elif op == "nodes":
+        import vault_nodes
+        return {"ok": True, "nodes": vault_nodes.overview(v), "nexus": vault_nodes.NEXUS, "function": vault_nodes.FUNCTION}
+    elif op == "node_add":
+        import vault_nodes
+        r = vault_nodes.add(v, body.get("node", ""), body.get("content", ""), body.get("author") or who)
+        if r.get("ok"):
+            v.log("note", f"{body.get('author') or who} added to ◆ {r['node']}", "", source=body.get("author") or who, links=[f"◆ {r['node']}"])
+    elif op == "library":
+        import library
+        return {"ok": True, "results": library.search(body.get("query", ""), library.books_for(body.get("node"), body.get("subnode")) or None, int(body.get("limit") or 8))}
+    elif op == "library_status":
+        import library
+        return dict(library.status(), ok=True)
+    elif op == "phone_mirror":
+        devs = [d for d in adb_devices()["devices"] if d["state"] == "device" and not d["emulator"]]
+        if not devs:
+            return {"ok": False, "error": "The phone isn't linked (plug it in or turn on Wireless debugging)."}
+        threading.Thread(target=phone_vault_pass, args=(devs[0]["serial"], True), daemon=True).start()
+        return {"ok": True, "message": "Copying the vault to the phone now."}
+    elif op == "history":
+        return {"ok": True, "commits": v.history(int(body.get("n") or 20))}
+    else:
+        raise ValueError(f"unknown vault action: {op}")
+    v.commit(min_gap=0)
+    return r
+
+
+VAULT_PROJECTS = [Path(os.path.expanduser(p)) for p in CONFIG.get("vault_projects", ["~/Desktop/BlackLab"])]
+VAULT_WATCH = [Path(os.path.expanduser(p)) for p in CONFIG.get("vault_watch", ["~/Desktop", "~/Documents", "~/Downloads"])]
+
+
+def vault_pass(force=False):
+    """One full desktop pass: meetings, briefs, task logs, conversations, projects, new files, Home, a commit."""
+    v = VAULT
+    with v.lock:
+        v.ensure()
+        f = vaultlib.FOLDERS
+        n = v.mirror_folder(DOCS_DIR / "Meetings", f"{f['meetings']}/Minutes", "meeting")
+        n += v.mirror_folder(DOCS_DIR / "Briefs", f"{f['meetings']}/Briefs", "brief")
+        n += v.mirror_folder(TASK_LOG_DIR, f"{f['ai']}/Task Logs", "task-log", since_days=60)
+        if CONFIG.get("chat_history", True) is not False:
+            n += v.mirror_folder(CHAT_DIR, f"{f['ai']}/Conversations", "conversation", since_days=60)
+        n += v.projects([p for p in VAULT_PROJECTS if p.is_dir()])
+        if CONFIG.get("vault_file_activity", True) is not False:
+            v.file_activity([p for p in VAULT_WATCH if p.is_dir()], PROTECTED + [AI_DIR / "Crypto Desk", HOME / "Desktop" / "mining"])
+        if CONFIG.get("guestbook_repo"):
+            try:
+                import guestbook
+                guestbook.render(v, guestbook.fetch(CONFIG["guestbook_repo"]), CONFIG["guestbook_repo"])
+            except Exception as e:
+                v.errors = (v.errors + [f"guest book: {e}"])[-20:]
+        try:
+            import library
+            library.write_cards(v)
+        except Exception as e:
+            v.errors = (v.errors + [f"library cards: {e}"])[-20:]
+        v.render_nodes()
+        v.render_home()
+        v.last_sync["desktop"] = time.time()
+        v.commit(min_gap=0 if force else 300)
+    return n
+
+
+def vault_keeper():
+    """Keeps the vault current: a pass at start, then every 10 minutes (and a new day note at midnight)."""
+    time.sleep(5)
+    first = True
     while True:
         try:
-            if any(d["state"] == "device" and not d["emulator"] for d in adb_devices()["devices"]):
+            vault_pass(force=first)
+            first = False
+            v = VAULT
+            today = v.now().date()
+            if not v.path(v.day_rel(today)).exists():
+                v.render_day(today)
+        except Exception as e:
+            print(f"vault pass failed: {e}", file=sys.stderr, flush=True)
+            VAULT.errors = (VAULT.errors + [str(e)[:200]])[-20:]
+        time.sleep(int(CONFIG.get("vault_every_s", 600)))
+
+
+_KIWIX = {"proc": None}
+
+
+def library_keeper():
+    """Runs kiwix-serve (127.0.0.1 only) once the reader is installed and books are registered; restarts it if it stops."""
+    import library
+    while True:
+        try:
+            cmd = library.serve_cmd()
+            p = _KIWIX["proc"]
+            import socket
+            with socket.socket() as sk:
+                sk.settimeout(1)
+                up = sk.connect_ex(("127.0.0.1", library.PORT)) == 0  # one that survived a companion restart still serves
+            if cmd and not up and (p is None or p.poll() is not None):
+                _KIWIX["proc"] = subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
+        except Exception as e:
+            print(f"library server: {e}", file=sys.stderr, flush=True)
+        time.sleep(60)
+
+
+@logged_tool("library_search")
+def tool_library_search(args):
+    import library
+    q = args.get("query", "") if isinstance(args, dict) else str(args)
+    hits = library.search(q, None, 6)
+    if hits and "error" in hits[0]:
+        return hits[0]["error"]
+    return "\n\n".join(f"• {h['title']} — {h['book']}\n  {h['snippet'][:300]}\n  {h['url']}" for h in hits) or "Nothing in the offline library matches that."
+
+
+PHONE_VAULT = {"at": 0.0, "last": None, "error": None}
+
+
+def phone_vault_pass(serial: str, force=False):
+    """Mirror the Obsidian vault to the phone (Documents/BlackLab) and bring back notes edited there."""
+    if not VAULT_ON or CONFIG.get("phone_vault", True) is False:
+        return
+    if not force and time.time() - PHONE_VAULT["at"] < int(CONFIG.get("phone_vault_every_s", 300)):
+        return
+    import phone_vault
+    PHONE_VAULT["at"] = time.time()
+
+    def pulled(paths):
+        VAULT.dirty.update(paths)
+        VAULT.log("note", f"{len(paths)} note{'s' if len(paths) != 1 else ''} edited in Obsidian on the phone", ", ".join(paths[:5]), source="Phone · Obsidian",
+                  links=[Path(p).stem for p in paths[:5]])
+    try:
+        with VAULT.lock:
+            PHONE_VAULT["last"] = phone_vault.sync(adb_path(), serial, VAULT.root, CONFIG.get("phone_vault_dir", "/sdcard/Documents/BlackLab"),
+                                                   CACHE_DIR / "phone-vault.json", on_pull=pulled)
+            VAULT.commit("Phone sync (Obsidian on the phone)" if PHONE_VAULT["last"]["pulled"] else "", min_gap=0 if PHONE_VAULT["last"]["pulled"] else 300)
+        PHONE_VAULT["error"] = None
+    except Exception as e:
+        PHONE_VAULT["error"] = str(e)[:200]
+        print(f"phone vault mirror: {e}", file=sys.stderr, flush=True)
+
+
+def keep_usb_link():
+    """Re-establish `adb forward` whenever the phone is plugged in, so the UI reconnects on its own — and keep
+    the phone's copy of the Obsidian vault current while it's linked."""
+    while True:
+        try:
+            phones = [d for d in adb_devices()["devices"] if d["state"] == "device" and not d["emulator"]]
+            if phones:
                 adb_forward(8765)  # desktop → phone link, and adb reverse so the phone can reach this companion's AI
+                threading.Thread(target=phone_vault_pass, args=(phones[0]["serial"],), daemon=True).start()
         except Exception:
             pass
         time.sleep(15)
@@ -1566,6 +1739,10 @@ def main():
     ensure_phone_token()
     threading.Thread(target=keep_usb_link, daemon=True).start()
     threading.Thread(target=memory_keeper, daemon=True).start()
+    if VAULT_ON:
+        threading.Thread(target=vault_keeper, daemon=True, name="vault").start()
+    if CONFIG.get("library", True) is not False:
+        threading.Thread(target=library_keeper, daemon=True, name="library").start()
     agents.setup(sys.modules[__name__])
     global OPEN_FOLDER_RE
     OPEN_FOLDER_RE = build_open_folder_re()  # agents.setup adds Equipment, Business Intelligence, Crypto Desk

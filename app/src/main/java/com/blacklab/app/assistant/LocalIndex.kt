@@ -93,6 +93,13 @@ class LocalIndex(private val app: AppContainer) {
                         "education?tab=Certifications", c.profile, 0)
                 }
             }
+            if (s.asstIndexOps) {
+                out += opsPassages(
+                    com.blacklab.app.facility.Facility.load(app.context),
+                    com.blacklab.app.vehicle.Garage.load(app.context),
+                )
+            }
+            // Behavioral Health is never indexed: it describes other people and stays inside its encrypted store.
             val post = HashMap<String, MutableList<Pair<Int, Int>>>()
             val lens = IntArray(out.size)
             out.forEachIndexed { i, p ->
@@ -130,6 +137,56 @@ class LocalIndex(private val app: AppContainer) {
     }
 
     companion object {
+        /**
+         * Facility assets (with their PM schedules), the inspection / work-order log and the Garage's service
+         * history as passages — "when did we last inspect AHU-2?", "who replaced the water heater?". The VIN and
+         * plate are left out on purpose. Pure, so it is unit tested.
+         */
+        fun opsPassages(f: com.blacklab.app.facility.Facility.State, g: com.blacklab.app.vehicle.Garage.State): List<Passage> {
+            val pro = Profile.PROFESSIONAL.name
+            val out = ArrayList<Passage>()
+            val byId = f.assets.associateBy { it.id }
+            f.assets.forEach { a ->
+                val pms = a.pms.joinToString(". ") { p ->
+                    listOfNotNull(p.title, "every ${p.everyDays} days", p.standard.ifBlank { null },
+                        p.lastDay?.let { "last done " + Time.date(LocalDate.ofEpochDay(it)) }).joinToString(", ")
+                }
+                val text = listOf(a.name, a.kind, a.tag.ifBlank { "" }.let { if (it.isBlank()) "" else "tag $it" }, a.location,
+                    listOf(a.make, a.model).filter { it.isNotBlank() }.joinToString(" "),
+                    a.serial.let { if (it.isBlank()) "" else "serial $it" }, a.notes, pms)
+                    .filter { it.isNotBlank() }.joinToString(". ")
+                out += Passage("Facility asset", a.name, text, "facility/asset/${a.id}", pro, a.createdAt)
+            }
+            f.log.sortedByDescending { it.day }.take(2000).forEach { e ->
+                val asset = byId[e.assetId]
+                val pm = asset?.pms?.firstOrNull { it.id == e.pmId }
+                val title = listOfNotNull(e.kind.label, pm?.title ?: asset?.name).joinToString(" · ")
+                val text = listOf(
+                    e.kind.label, asset?.name.orEmpty(), asset?.location.orEmpty(), pm?.title.orEmpty(), pm?.standard.orEmpty(),
+                    e.result.label.let { if (it.isBlank()) "" else "result $it" }, e.text,
+                    if (e.by.isBlank()) "" else "by ${e.by}", "on " + Time.date(LocalDate.ofEpochDay(e.day)),
+                ).filter { it.isNotBlank() }.joinToString(". ")
+                out += Passage("Facility log", title, text, asset?.let { "facility/asset/${it.id}" } ?: "facility", pro, e.time)
+            }
+            g.services.forEach { r ->
+                val names = r.items.mapNotNull { id -> g.items.firstOrNull { it.id == id }?.name }
+                val text = listOf(r.title, names.joinToString(", "), r.miles?.let { "at $it miles" }.orEmpty(),
+                    r.cost?.let { "cost $" + "%.2f".format(it) }.orEmpty(), r.shop, r.notes, "on " + Time.date(LocalDate.ofEpochDay(r.day)),
+                    g.vehicle.name).filter { it.isNotBlank() }.joinToString(". ")
+                out += Passage("Vehicle service", r.title.ifBlank { names.firstOrNull() ?: "Service" }, text, "garage", Profile.PERSONAL.name,
+                    LocalDate.ofEpochDay(r.day).atStartOfDay(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli())
+            }
+            if (g.vehicle.odometer > 0 || g.vehicle.dealer.isNotBlank() || g.vehicle.insurance.isNotBlank()) {
+                val v = g.vehicle
+                val text = listOf(v.name, v.trim, v.engine, v.drive, if (v.odometerNow > 0) "odometer about ${v.odometerNow} miles" else "",
+                    v.tirePsi.let { if (it.isBlank()) "" else "tire pressure $it" }, v.oil.let { if (it.isBlank()) "" else "oil $it" },
+                    v.dealer.let { if (it.isBlank()) "" else "dealer $it" }, v.insurance.let { if (it.isBlank()) "" else "insurance $it" })
+                    .filter { it.isNotBlank() }.joinToString(". ")
+                out += Passage("Vehicle", v.name, text, "garage", Profile.PERSONAL.name, v.odometerAt)
+            }
+            return out
+        }
+
         private val stop = setOf(
             "the", "a", "an", "and", "or", "of", "to", "in", "on", "for", "is", "are", "was", "were", "be", "it", "that", "this", "with", "as", "at", "by",
             "from", "my", "me", "i", "you", "your", "what", "when", "where", "who", "how", "did", "do", "does", "about", "any", "have", "has", "had", "we",

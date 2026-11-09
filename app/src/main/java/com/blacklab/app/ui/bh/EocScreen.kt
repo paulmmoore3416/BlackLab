@@ -209,7 +209,7 @@ private fun AreaCard(a: Bh.AreaCheck, onChange: (Bh.AreaCheck) -> Unit, onRemove
                 Text("${a.results.size}/${items.size} checked · ${a.issueCount} issue${if (a.issueCount == 1) "" else "s"}" + (a.taskId?.let { " · work order entered" } ?: ""),
                     style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
-            IconButton(onClick = { open = !open }) { Icon(if (open) Icons.Rounded.ExpandLess else Icons.Rounded.ExpandMore, null) }
+            IconButton(onClick = { open = !open }) { Icon(if (open) Icons.Rounded.ExpandLess else Icons.Rounded.ExpandMore, if (open) "Collapse" else "Expand") }
         }
         AnimatedVisibility(open) {
             Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
