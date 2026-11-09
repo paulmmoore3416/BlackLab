@@ -47,9 +47,10 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import agents  # noqa: E402  (background jobs, recordings, equipment, briefs)
 import guards  # noqa: E402  (every safety rule: HTTP, paths, privacy, tool calls — unit tested)
+import reverse  # noqa: E402  (reverse engineering with REA + Ghidra, read-only — unit tested)
 import vault as vaultlib  # noqa: E402  (the Obsidian vault: notes, timeline, AI registry, git)
 
-VERSION = "1.5.0"
+VERSION = "1.6.0"
 HOST, PORT = "127.0.0.1", int(os.environ.get("BLACKLAB_DESKTOP_PORT", "8770"))
 HOME = Path.home()
 WEB_DIR = Path(__file__).resolve().parent.parent / "web"
@@ -1035,6 +1036,27 @@ def tool_vault_write(args):
     return r.get("error", "Couldn't save that.")
 
 
+RE_HOWTO_RE = re.compile(r"^(?:how (?:do|can|would|should) (?:i|we|you)|how to|what(?:'s| is) the (?:command|way)|can (?:rea|ghidra)|does rea|which rea|"
+                         r"what rea command)\b.*\b(?:rea|ghidra|reverse[- ]engineer\w*|decompil\w*)\b", re.I)
+RE_CODE_FOR_RE = re.compile(r"^(?:please )?(?:decompile|show(?: me)?|find|where(?:'s| is))\s+(?:the |all )?(?:function|code|routine|logic)s?\s+(?:that|which|where it)?\s*"
+                            r"(?:prints?|shows?|uses?|handles?|checks?|reads?|writes?|sends?|opens?|parses?|builds?|validates?|for)\s+(?:the |a |an )?(.+?)\s+(?:in|of|inside)\s+(.+)$", re.I)
+RE_REPORT_RE = re.compile(r"^(?:please )?(?:reverse[- ]?engineer|triage|(?:do|run|write) (?:a |an )?(?:full )?(?:reverse[- ]engineering|re) (?:report|pass|triage) (?:on|of|for))\s+(?:the |this |my )?(?:file |binary |program |app |apk |executable |firmware )?(.+)$", re.I | re.S)
+VAULT_SHOW_RE = re.compile(r"^(?:show|open|pull up|find)\s+(?:me\s+)?(?:(.+?)\s+(?:in|on)\s+(?:my |the )?(?:obsidian |vault |knowledge )?graph|(?:my |the )?(?:obsidian |vault |knowledge )?graph)\s*$", re.I)
+
+
+def show_in_graph(query: str) -> str:
+    """Opens Obsidian on this computer at a note's local graph (or the whole graph) through Advanced URI."""
+    import vault_graph
+    if not query.strip():
+        xdg_open(vault_graph.graph_uri(VAULT.name))
+        return "Opening your whole graph in Obsidian."
+    rel = vault_graph.find_note(VAULT, query)
+    if not rel:
+        return f"Nothing in the vault matches “{query}”."
+    xdg_open(vault_graph.local_graph_uri(VAULT.name, rel))
+    return f"Opening {Path(rel).stem} in Obsidian with its local graph."
+
+
 VAULT_SAVE_RE = re.compile(r"^(?:save|add|put|capture|log|note)(?: this| that)? (?:to|in|into|on) (?:my |the )?(?:obsidian|vault)(?: vault)?[:,\s-]+(.{3,})$", re.I | re.S)
 VAULT_FIND_RE = re.compile(r"^(?:search|find|look (?:up|for)|what(?:'s| is| do i have)) (?:in )?(?:my |the )?(?:obsidian|vault)(?: vault)?(?: for| about)?[:\s]+(.+)$", re.I)
 
@@ -1049,10 +1071,34 @@ def desktop_rules(text: str, phone):
         m = VAULT_FIND_RE.match(t)
         if m:
             return tool_vault_search({"query": m.group(1)}), "Desktop · vault"
+        m = VAULT_SHOW_RE.match(t)
+        if m:
+            return show_in_graph(m.group(1) or ""), "Desktop · vault graph"
         if re.search(r"what'?s new in (?:my |the )?(?:obsidian|vault)|vault status", low):
             st = VAULT.status()
             return (f"Your vault has {st['notes']} notes and {st['commits']} saved versions; {st['today']} things logged today. "
                     + (f"Last AI visitor: {st['last_visitor']['agent']} ({st['last_visitor']['when']})." if st.get("last_visitor") else "")), "Desktop · vault"
+    if re.search(r"^(?:rea|reverse[- ]engineering|ghidra|decompiler) (?:status|doctor|check)\??$|^is (?:rea|ghidra|reverse engineering) (?:installed|ready|working)\??$", low):
+        return reverse.status_text(), "Desktop · reverse engineering"
+    if RE_HOWTO_RE.search(low) and not reverse.path_in(t):
+        return reverse.answer_howto(t), "Desktop · REA docs"
+    m = RE_CODE_FOR_RE.match(t)
+    if m and reverse.path_in(m.group(2)):
+        target, why = reverse.resolve_target(reverse.path_in(m.group(2)))
+        if not target:
+            return why, "Desktop · reverse engineering"
+        return reverse.find_code(target, m.group(1).strip(" \"'")), "Desktop · reverse engineering (REA + Ghidra)"
+    m = RE_REPORT_RE.match(t)
+    if m:
+        path = reverse.path_in(m.group(1))
+        if path:
+            target, why = reverse.resolve_target(path)
+            if not target:
+                return why, "Desktop · reverse engineering"
+            goal = re.sub(r"^\s*(?:and|to|then)\s+", "", m.group(1).replace(path, "").strip(" \"',.;:"), flags=re.I)
+            j = reverse.submit_job(target, goal)
+            return (f"On it — a full reverse-engineering pass on {target.name} is running in the background (job {j['id']})"
+                    + (f", aimed at: {goal}" if goal else "") + f". The report lands in {_home_rel(reverse.RE_DIR)}."), "Desktop · reverse engineering"
     if re.search(r"\b(system|computer|pc|desktop) (status|health|info)\b|^status$|how('s| is) (my )?(computer|pc|system)", low):
         return tool_system_status(), "Desktop · rules"
     if re.search(r"(disk|storage) (space|usage|hogs?)|using (my )?(disk|storage)|what('s| is) taking (up )?space", low):
@@ -1146,6 +1192,19 @@ TOOLS = [
                                       "parameters": {"type": "object", "properties": {"title": {"type": "string"}, "text": {"type": "string"}, "folder": {"type": "string"}}, "required": ["text"]}}},
     {"type": "function", "function": {"name": "library_search", "description": "Search the offline reference library (~50 GB: Wikipedia, Stack Exchange, LibreTexts, Wikibooks, iFixit, MedlinePlus, Ready.gov, USDA canning, survival and field manuals) for facts and how-tos.",
                                       "parameters": {"type": "object", "properties": {"query": {"type": "string"}}, "required": ["query"]}}},
+    {"type": "function", "function": {"name": "reverse_engineer", "description": (
+        "Reverse-engineer a program or file on this computer with REA and Ghidra (read-only: it never runs the target). "
+        "To see the code behind a message, option or feature, use 'find_code' with that text as query (it finds the string, follows the "
+        "references and decompiles them in one step). 'overview' summarizes a file; 'strings' / 'functions' list them; 'decompile' / 'xrefs' / "
+        "'disassemble' need an address you got from an earlier result (never invent one). "
+        "'inspect' runs the format parsers (APK, .NET, Python .pyc, WASM, Go/Rust build info, kernel modules, model files). "
+        "'report' writes a full report in the background. 'help' answers how-to questions about REA from its docs; 'status' says what's installed."),
+        "parameters": {"type": "object", "properties": {
+            "action": {"type": "string", "enum": list(reverse.ACTIONS)},
+            "path": {"type": "string", "description": "The file or app folder, e.g. ~/Downloads/tool.bin (not needed for help/status)"},
+            "query": {"type": "string", "description": "Address (0x401000) or function name for decompile/xrefs/disassemble; text for search; the question for report/help"},
+            "kind": {"type": "string", "enum": ["strings", "procedures"], "description": "What 'search' looks through"}},
+            "required": ["action"]}}},
     {"type": "function", "function": {"name": "dev_docs", "description": "Search Google's official Android/Firebase/Cloud developer documentation (needs internet).", "parameters": {"type": "object", "properties": {"query": {"type": "string"}}, "required": ["query"]}}},
 ]
 
@@ -1163,7 +1222,8 @@ def run_tool(name, args, phone):
     fns = {"system_status": tool_system_status, "find_files": tool_find_files, "read_file": tool_read_file, "open_path": tool_open_path,
            "open_url": tool_open_url, "launch_app": tool_launch_app, "desktop_note": tool_desktop_note, "dev_docs": tool_dev_docs,
            "recall_chats": tool_recall_chats, "search_documents": tool_search_documents, "equipment": tool_equipment,
-           "vault_search": tool_vault_search, "vault_write": tool_vault_write, "library_search": tool_library_search}
+           "vault_search": tool_vault_search, "vault_write": tool_vault_write, "library_search": tool_library_search,
+           "reverse_engineer": tool_reverse_engineer}
     try:
         if name == "phone_command":
             return tool_phone(args, phone)
@@ -1172,7 +1232,7 @@ def run_tool(name, args, phone):
         return f"{name} failed: {e}"
 
 
-def ollama_chat(text, model, phone, history=(), use_memory=True, rounds=4):
+def ollama_chat(text, model, phone, history=(), use_memory=True, rounds=4, seed=()):
     tools = [t for t in TOOLS if phone or t["function"]["name"] != "phone_command"]
     system = ("You are BlackLab, the user's laid-back, funny but sharp personal assistant, running offline on their Linux desktop. "
               "The user is a Director of Facility Operations who is also a student. "
@@ -1181,6 +1241,9 @@ def ollama_chat(text, model, phone, history=(), use_memory=True, rounds=4):
               "Answer arithmetic, unit conversions and general questions directly, with no tools. "
               + ("Use phone_command only for things in the BlackLab phone app the user asked about (tasks, calendar, notes, journal, recordings, email, Drive). " if phone else "")
               + "Use search_documents for questions about the user's own documents or files, and recall_chats when they refer to an earlier conversation. "
+              "For reverse engineering (binaries, apps, APKs, firmware, decompiling, 'what does this program do') use reverse_engineer: one step at a time, "
+              "reusing addresses from earlier results, and say which evidence each claim comes from. Never write, rewrite or 'simplify' code yourself: "
+              "quote only code a tool returned; if you haven't seen the code, call find_code or say you haven't. Only analyze software the user owns or may examine. "
               "Keep replies short. Today is " + dt.datetime.now().strftime("%A, %B %d %Y, %I:%M %p") + "."
               + (memory_prompt() if use_memory else ""))
     msgs = [{"role": "system", "content": system}]
@@ -1189,6 +1252,13 @@ def ollama_chat(text, model, phone, history=(), use_memory=True, rounds=4):
     msgs.append({"role": "user", "content": text})
     used = []
     tainted = False
+    outputs: list[str] = []
+    for name, args, result in seed:  # results the model starts with (as if it had called the tool)
+        msgs += [{"role": "assistant", "content": "", "tool_calls": [{"function": {"name": name, "arguments": args}}]},
+                 {"role": "tool", "content": result[:4000], "tool_name": name}]
+        used.append(name)
+        outputs.append(result)
+        tainted = tainted or name in READS_CONTENT
     task_step("model", f"Asked {model}", f"system prompt + {len(history or ())} earlier turn(s) + request; tools offered: {', '.join(t['function']['name'] for t in tools)}")
     for _ in range(rounds):
         r = http_json(f"{OLLAMA}/api/chat", {"model": model, "messages": msgs, "tools": tools, "stream": False, "think": False, "keep_alive": keep_alive(),
@@ -1197,6 +1267,8 @@ def ollama_chat(text, model, phone, history=(), use_memory=True, rounds=4):
         calls = msg.get("tool_calls") or []
         if not calls:
             content = re.sub(r"<think>.*?</think>", "", msg.get("content", ""), flags=re.S).strip()
+            if "reverse_engineer" in used or guards.RE_WORDS.search(text):
+                content = reverse.check_code(content, outputs)  # no invented "decompiled" code
             return content or "Done.", f"Desktop AI · {model} (offline)" + (f" · used {', '.join(used)}" if used else "")
         msgs.append(msg)
         for c in calls:
@@ -1215,7 +1287,9 @@ def ollama_chat(text, model, phone, history=(), use_memory=True, rounds=4):
                 task_step("guard", f"Blocked {name}: {blocked}", args)
             elif name in READS_CONTENT:
                 tainted = True
-            msgs.append({"role": "tool", "content": blocked or str(run_tool(name, args, phone))[:4000], "tool_name": name})
+            result = blocked or str(run_tool(name, args, phone))
+            outputs.append(result)
+            msgs.append({"role": "tool", "content": result[:4000], "tool_name": name})
     return "I went in circles on that one — try rephrasing?", f"Desktop AI · {model}"
 
 
@@ -1260,8 +1334,14 @@ def _assistant(body):
     models = ollama_models()
     if models:
         model = body.get("model") if body.get("model") in models else default_model(models)
+        rounds, seed = int(body.get("rounds") or 4), []
+        if guards.RE_WORDS.search(text):
+            rounds = max(rounds, 7)  # overview → strings → xrefs → decompile → answer
+            if reverse.path_in(text):  # start from facts about the file, not from what the model imagines it is
+                args = {"action": "overview", "path": reverse.path_in(text)}
+                seed = [("reverse_engineer", args, str(tool_reverse_engineer(args)))]
         text_out, source = ollama_chat(text, model, phone, body.get("history") or (), use_memory=not body.get("private"),
-                                       rounds=min(int(body.get("rounds") or 4), 10))
+                                       rounds=min(rounds, 10), seed=seed)
         return {"text": text_out, "source": source}
     if phone:
         task_step("relay", "Ollama is offline: sent to the phone's assistant")
@@ -1435,7 +1515,7 @@ class Handler(SimpleHTTPRequestHandler):
                                         "folders": {"ai": str(AI_DIR), "downloads": str(DOWNLOADS_DIR), "documents": str(DOCS_DIR),
                                                     "chat_history": str(CHAT_DIR) if CONFIG.get("chat_history", True) is not False else None},
                                         "task_logs": str(TASK_LOG_DIR) if CONFIG.get("task_logs", True) is not False else None,
-                                        "agents": agents.status(), "vault": VAULT.status() if VAULT_ON else None})
+                                        "agents": agents.status(), "vault": VAULT.status() if VAULT_ON else None, "reverse": reverse.status()})
             return self.reply(404, {"error": "unknown"})
         return super().do_GET()
 
@@ -1566,6 +1646,16 @@ def vault_op(op: str, body: dict, who: str) -> dict:
     elif op == "open":
         xdg_open(v.status()["open_url"])
         return {"ok": True, "message": "Opening the vault in Obsidian."}
+    elif op == "show":
+        return {"ok": True, "message": show_in_graph(body.get("query", ""))}
+    elif op == "graph":
+        import vault_graph
+        st = v._state("graph.json", {})
+        h = vault_graph.graph_health(vault_graph.scan(v))
+        plugins = {pid: (v.path(f".obsidian/plugins/{pid}/main.js").exists(), tag) for pid, (_, tag, _f) in vault_graph.PLUGINS.items()}
+        return {"ok": True, "notes": h["notes"], "edges": h["edges"], "orphans": len(h["orphans"]), "unresolved": len(h["unresolved"]),
+                "with_up": h["with_up"], "hubs": [t for _, t in h["hubs"][:6]], "related": st.get("related"), "profile": st.get("profile"),
+                "plugins": [{"id": k, "installed": ok, "version": tag} for k, (ok, tag) in plugins.items()]}
     elif op == "nodes":
         import vault_nodes
         return {"ok": True, "nodes": vault_nodes.overview(v), "nexus": vault_nodes.NEXUS, "function": vault_nodes.FUNCTION}
@@ -1624,6 +1714,14 @@ def vault_pass(force=False):
         except Exception as e:
             v.errors = (v.errors + [f"library cards: {e}"])[-20:]
         v.render_nodes()
+        try:
+            import vault_graph
+            r = vault_graph.apply(v, embed=embed if embed_model() else None, mining=agents.mining_active)
+            for k in ("plugins_error", "related_error"):
+                if r.get(k):
+                    v.errors = (v.errors + [f"graph: {r[k]}"])[-20:]
+        except Exception as e:
+            v.errors = (v.errors + [f"graph: {e}"])[-20:]
         v.render_home()
         v.last_sync["desktop"] = time.time()
         v.commit(min_gap=0 if force else 300)
@@ -1667,6 +1765,11 @@ def library_keeper():
         except Exception as e:
             print(f"library server: {e}", file=sys.stderr, flush=True)
         time.sleep(60)
+
+
+@logged_tool("reverse_engineer")
+def tool_reverse_engineer(args):
+    return reverse.tool(args if isinstance(args, dict) else {"action": "help", "query": str(args)})
 
 
 @logged_tool("library_search")
@@ -1744,6 +1847,7 @@ def main():
     if CONFIG.get("library", True) is not False:
         threading.Thread(target=library_keeper, daemon=True, name="library").start()
     agents.setup(sys.modules[__name__])
+    reverse.setup(sys.modules[__name__])
     global OPEN_FOLDER_RE
     OPEN_FOLDER_RE = build_open_folder_re()  # agents.setup adds Equipment, Business Intelligence, Crypto Desk
     srv = ThreadingHTTPServer((HOST, PORT), Handler)

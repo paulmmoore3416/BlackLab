@@ -485,6 +485,7 @@ def render(v) -> dict:
         growth = sum(1 for x in members if x["mtime"] >= week_ago)
         lines = [f"# {n['emoji']} {n['name']}", "", f"> [!abstract] Mission", f"> {n['mission']}", "",
                  f"**Part of** [[{NEXUS}]] · **Synapses:** " + " · ".join(link(BY_ID[s]) for s in n["synapses"]), "",
+                 _graph_buttons(v, rel(n)), "",
                  "## Vital signs", "", "| Members | Mentions elsewhere | Signals (14 days) | Changed this week | Updated |", "|---|---|---|---|---|",
                  f"| {len(members)} | {len(mentions)} | {len(signals)} | {growth} | {v.now().strftime('%Y-%m-%d %H:%M')} |", ""]
         if signals:
@@ -522,7 +523,8 @@ def render(v) -> dict:
                   "Add knowledge under **## Knowledge** below (it's yours and your AIs' — BlackLab never rewrites it). AIs: `vault_node_add` with "
                   f"node `{n['id']}`. Link new notes here with `up: \"{link(n)}\"`."]
         v.write_managed(rel(n), {"type": "node", "node": n["id"], "aliases": [n["name"]], "members": len(members), "mentions": len(mentions),
-                                 "signals": len(signals), "up": [f"[[{NEXUS}]]"], "tags": ["node", f"node/{n['id']}"], "cssclasses": ["blacklab-node"]},
+                                 "signals": len(signals), "up": [f"[[{NEXUS}]]"], "synapses": [link(BY_ID[x]) for x in n["synapses"]],
+                                 "tags": ["node", f"node/{n['id']}"], "cssclasses": ["blacklab-node"]},
                         "\n".join(lines), user_tail="\n" + n["primer"] + "\n\n## Growth log\n\n")
         summary[n["id"]] = {"members": len(members), "mentions": len(mentions), "signals": len(signals), "growth": growth}
     for sn in SUBNODES:
@@ -534,7 +536,8 @@ def render(v) -> dict:
         ment = [(x, h) for x, h in ment if h >= 2][:25]
         lines = [f"# {sn['emoji']} {sn['name']}", "", "> [!abstract] Mission", f"> {sn['mission']}", "",
                  f"**Part of** {link(parent)} · {SUB_GROUP} · **Related:** " + " · ".join(
-                     link(BY_ID[r]) if r in BY_ID else sublink(SUB_BY_ID[r]) for r in sn["related"] if r in BY_ID or r in SUB_BY_ID), ""]
+                     link(BY_ID[r]) if r in BY_ID else sublink(SUB_BY_ID[r]) for r in sn["related"] if r in BY_ID or r in SUB_BY_ID), "",
+                 _graph_buttons(v, subrel(sn)), ""]
         srcs = [x for x in mine if str(x["props"].get("type", "")).strip('"') == "source"]
         if srcs:
             lines += [f"## Library ({len(srcs)} sources)", ""] + [f"- [[{x['title']}]]" + ("" if str(x["props"].get("status", "")).strip('"') == "ok" else " · ⏳") for x in sorted(srcs, key=lambda x: x["title"])] + [""]
@@ -546,12 +549,18 @@ def render(v) -> dict:
         lines += ["## Grow this subnode", "", f"Add knowledge under **## Knowledge** below; AIs: `vault_node_add` with node `{sn['id']}`. "
                   "Ask the library: *“look it up in the library: …”*."]
         v.write_managed(subrel(sn), {"type": "subnode", "node": sn["parent"], "subnode": sn["id"], "aliases": [sn["name"]], "members": len(mine),
-                                     "up": [link(parent)], "tags": ["subnode", f"node/{sn['parent']}", f"subnode/{sn['id']}"]},
+                                     "up": [link(parent)], "synapses": [link(BY_ID[r]) if r in BY_ID else sublink(SUB_BY_ID[r]) for r in sn["related"] if r in BY_ID or r in SUB_BY_ID],
+                                     "tags": ["subnode", f"node/{sn['parent']}", f"subnode/{sn['id']}"]},
                         "\n".join(lines), user_tail="\n" + sn["primer"] + "\n\n## Growth log\n\n")
     _nexus(v, summary, len(notes))
     _canvas(v, summary)
-    _graph_colors(v)
-    return summary
+    return summary  # graph colors, views and plugins: vault_graph.apply (run by the companion after this)
+
+
+def _graph_buttons(v, rel_path: str) -> str:
+    import vault_graph
+    return (f"🕸️ [Open local graph]({vault_graph.local_graph_uri(v.name, rel_path)}) · [Whole graph]({vault_graph.graph_uri(v.name)}) · "
+            "Bookmarks › *Graph views* · [[Graph Health]]")
 
 
 def _nexus(v, summary, total):

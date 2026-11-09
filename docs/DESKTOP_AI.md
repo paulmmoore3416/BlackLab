@@ -197,3 +197,49 @@ the same over Wi-Fi, so the phone keeps its desktop brain away from the cable.
 - Desktop AI tools: `vault_search` (reads content → counts as tainted for `open_url`) and `vault_write` (only when the request asks to save/note/log).
 - MCP server for agents: `claude mcp add --scope user blacklab-vault -- python3 desktop/companion/vault_mcp.py`. Tools: `vault_checkin`, `vault_status`, `vault_search`, `vault_read`, `vault_write`, `vault_log`, `vault_capture`, `vault_recent`, `vault_nodes`, `vault_node_add`. It goes through the companion when it runs (one writer), otherwise writes directly.
 - Claude Code hooks: `vault_hook.py start|end` (SessionStart / SessionEnd) — sign-in reminder, then a session note with files changed and commits. Prompts are never copied.
+
+## Reverse engineering with REA (companion 1.6.0)
+
+`desktop/companion/reverse.py` gives the desktop AI (qwen3:8b) and the phone [REA](https://github.com/morluto/rea)
+("Reverse Engineer Anything", MIT, npm `rea-agents`, pinned 6.8.0) with Ghidra 12.1.x as the decompiler.
+
+- **Toolchain (user space):** Node 24 + JDK 21 + Ghidra in `~/.local/blacklab-toolchain/`, REA in
+  `~/.local/share/blacklab-desktop/rea` (`python3 desktop/companion/reverse.py install`; `python3 reverse.py` prints status).
+  REA 6.8 needs Node ≥ 22.23.4 / 24.22.1. The system Node is too old, so the toolchain Node is used.
+- **Tool `reverse_engineer`:** actions `overview`, `find_code` (text → string → xrefs → decompiled functions in one step;
+  small models do this badly on their own), `strings`, `functions`, `search`, `decompile`, `function`, `xrefs`,
+  `disassemble`, `inspect` (format parsers), `objdump`, `report`, `help`, `status`.
+- **Job `reverse`:** a full triage of one file → `~/Desktop/BlackLab AI/Reverse Engineering/<date> <name>/`
+  (`report.md`, `evidence/*.json`, `strings.txt`, `functions.txt`, `code/*.c`). For a stripped ELF it follows `entry` to
+  `main`, follows strings that match the user's question, and has the model write the report from that evidence only.
+- **Rules (no model):** `reverse engineer <path> [and <question>]`, `decompile the function that prints <text> in <path>`,
+  `rea status`, `how do I … with rea` (answered from REA's own docs, copied into `Reverse Engineering/REA reference/`).
+- **Safety (tests/test_reverse.py):** an allowlist of read-only commands. Nothing that runs, debugs, instruments or captures
+  the target, touches a device, installs or updates, or writes outside the workspace. Targets pass the path guard (home, or
+  /usr, /opt; never protected paths). Values can't inject flags. Only one Ghidra runs at a time, and none while mining.
+  Results count as untrusted content (`READS_CONTENT`). Any code block in a reply that isn't in the tool output gets a
+  warning, because the 8B model will "simplify" (invent) code.
+- **Phone:** `ReverseEngineering.route` (ReverseEngineeringTest). "reverse engineer <file>" starts a report job, and a phone
+  file is uploaded. Ghidra questions run as background `ask` jobs (they outlast the 180 s chat timeout). Status and how-to
+  questions are answered right away. Any program-like file has ⋮ › **Reverse-engineer on computer**. Reports arrive as
+  documents in *Reverse Engineering*.
+- Only analyze software you own or are allowed to examine.
+
+## The vault graph (companion 1.6.0)
+
+`desktop/companion/vault_graph.py` runs on every vault pass (tests: `tests/test_vault_graph.py`).
+
+- **Profile** (`PROFILE`): graph forces (link strength was 0, so nodes never clustered), one color group per node by `up:`
+  or folder, tags hidden, and a *Graph views* bookmark group with a saved graph per node. It's applied once per profile
+  bump, so your later tweaks are kept until the next bump.
+- **Typed links:** node and subnode notes carry `synapses:`. `related:` comes from local embeddings: cosine against an adaptive
+  bar (this vault's 95th-percentile pair similarity, clamped to 0.72–0.90), at most 3 per note, mutual, skipping pairs
+  that are already linked. A pair stays while it's within 0.03 of the bar. Only notes that changed are re-embedded, and a pass
+  with no changes does no work. Your own `related:` entries are kept.
+- **Graph Health** (`90 System/Graph Health.md`): orphans with a suggested node, unresolved links, hubs, related stats.
+- **Plugins:** Breadcrumbs 4.22.3 (michaelpporter), Extended Graph 2.7.7 (elsatam) and Advanced URI 2.2.1 (vinzent03).
+  They're downloaded from GitHub releases and verified against pinned SHA-256 before writing. Only installed plugins are
+  enabled. Their settings (`data.json`) are deep-merged, and their code is git-ignored in the vault. Obsidian asks once to
+  turn on community plugins.
+- **Advanced URI:** `show <note> in my graph` (desktop rule `VAULT_SHOW_RE`, phone intent `VAULT_SHOW`, `/phone/vault/show`)
+  opens `obsidian://adv-uri?…&commandid=graph:open-local`. `/local/vault/graph` returns the numbers shown in the desktop UI.

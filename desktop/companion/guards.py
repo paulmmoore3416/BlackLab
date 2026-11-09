@@ -141,11 +141,18 @@ SIDE_EFFECT_ASKS = {
     "launch_app": re.compile(r"\b(open|launch|start|run|fire up)\b", re.I),
     "open_path": re.compile(r"\b(open|show|pull up|browse)\b", re.I),
     "vault_write": re.compile(r"\b(obsidian|vault|save|write|note|log|record|capture|add|remember)\b", re.I),
+    # Starts Ghidra (every core for a while), so only for reverse-engineering requests
+    "reverse_engineer": None,  # set below from RE_WORDS
 }
+RE_WORDS = re.compile(r"\b(reverse[- ]?engineer\w*|decompil\w*|disassembl\w*|ghidra|rea|binary|binaries|executable|elf|exe|dll|apk|dex|firmware|"
+                      r"xrefs?|cross[- ]?references?|strings|functions?|symbols?|imports|exports|pseudo-?code|source code|the code|malware|triage|"
+                      r"what does .{1,120} do|how does .{1,120} work|\.(?:so|bin|exe|dll|apk|elf|ko|pyc|wasm|jar|dex))\b|\.(?:so|bin|exe|dll|apk|elf|ko|pyc|wasm|jar|dex)\b", re.I)
+SIDE_EFFECT_ASKS["reverse_engineer"] = RE_WORDS
 
 # Tools whose results carry text the user didn't write (files, documents, old chats, web docs, phone data, the vault).
 # Text like that can contain instructions aimed at the model ("open https://…?q=<your notes>").
-READS_CONTENT = {"read_file", "search_documents", "recall_chats", "dev_docs", "phone_command", "find_files", "equipment", "vault_search", "library_search"}
+READS_CONTENT = {"read_file", "search_documents", "recall_chats", "dev_docs", "phone_command", "find_files", "equipment", "vault_search", "library_search",
+                 "reverse_engineer"}  # strings inside a binary are attacker-chosen text
 
 
 def url_host(u: str) -> str:

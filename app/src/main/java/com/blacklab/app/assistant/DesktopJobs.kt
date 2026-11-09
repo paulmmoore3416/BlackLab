@@ -204,6 +204,10 @@ object DesktopJobs {
                 }
                 Notifications.big(c, nid, Notifications.CH_DESKTOP, nTitle, nText, r.optLong("task_id").takeIf { it > 0 }?.let { "task/$it" })
             }
+            "reverse" -> {
+                val docId = saveDoc(app, Profile.PROFESSIONAL, r.optString("title", job.title), "Reverse Engineering", r.optString("text"), "reverse")
+                Notifications.big(c, nid, Notifications.CH_DESKTOP, nTitle, nText, "doc/$docId")
+            }
             "brief", "weekly" -> {
                 val docId = saveDoc(app, Profile.PROFESSIONAL, r.optString("title", job.title), "Briefs", r.optString("text"), "brief")
                 Notifications.big(c, nid, Notifications.CH_AGENDA, nTitle, nText, "doc/$docId")
@@ -220,15 +224,22 @@ object DesktopJobs {
             preview = ContentStore.preview(text), wordCount = ContentStore.wordCount(text), tags = "$tag, desktop"))
     }
 
-    /** Just enough Markdown for minutes and briefs: headings, lists, checkboxes, bold, paragraphs. */
+    /** Just enough Markdown for minutes, briefs and reverse-engineering reports: headings, lists, checkboxes, bold, code, paragraphs. */
     fun markdownToHtml(md: String): String {
         val e = ContentStore::escape
-        fun inline(s: String) = e(s).replace(Regex("\\*\\*(.+?)\\*\\*"), "<b>$1</b>").replace(Regex("(?<![*\\w])_(.+?)_(?![\\w])"), "<i>$1</i>")
+        fun inline(s: String) = e(s).replace(Regex("`([^`]+)`"), "<code>$1</code>").replace(Regex("\\*\\*(.+?)\\*\\*"), "<b>$1</b>")
+            .replace(Regex("(?<![*\\w])_(.+?)_(?![\\w])"), "<i>$1</i>")
         val out = StringBuilder()
         var list: String? = null
+        var code: StringBuilder? = null
         fun close() { list?.let { out.append(if (it == "cl") "</ul>" else "</$it>") }; list = null }
         md.lines().forEach { raw ->
             val l = raw.trimEnd()
+            if (l.trimStart().startsWith("```")) {
+                code = if (code == null) { close(); StringBuilder() } else { out.append("<pre><code>").append(e(code.toString().trimEnd('\n'))).append("</code></pre>"); null }
+                return@forEach
+            }
+            code?.let { it.append(raw).append('\n'); return@forEach }
             when {
                 l.startsWith("# ") -> { close(); out.append("<h1 class=\"title\">${inline(l.drop(2))}</h1>") }
                 l.startsWith("## ") -> { close(); out.append("<h2>${inline(l.drop(3))}</h2>") }
@@ -245,6 +256,7 @@ object DesktopJobs {
             }
         }
         close()
+        code?.let { out.append("<pre><code>").append(e(it.toString().trimEnd('\n'))).append("</code></pre>") }
         return out.toString()
     }
 

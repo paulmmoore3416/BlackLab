@@ -52,7 +52,7 @@ def sync(adb: str, serial: str, root: Path, dest: str, state_file: Path, on_pull
     pulled = []
     # 1. pull what changed on the phone since the last pass
     if _sh(adb, serial, f"[ -f {dq}/{MARKER} ] && echo yes").strip() == "yes":
-        changed = _sh(adb, serial, f"cd {dq} && find . -type f -newer {MARKER} \\( -name '*.md' -o -name '*.canvas' \\) ! -path './.obsidian/*'")
+        changed = _sh(adb, serial, f"cd {dq} && find . -type f -newer {MARKER} \\( -name '*.md' -o -name '*.canvas' \\) ! -path '*/.obsidian/*'")
         for line in changed.splitlines():
             rel = line.strip().removeprefix("./")
             if not rel or rel.startswith("."):

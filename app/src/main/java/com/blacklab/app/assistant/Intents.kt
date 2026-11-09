@@ -22,7 +22,7 @@ object Intents {
         HELP, THANKS, GREETING, TIME, DATE, BRIEFING, CREATE_EVENT, AGENDA,
         DICTATE_START, RECORD_START, RECORD_STOP, RECORD_PAUSE, MARKER,
         // LATE: everything after the domain routers
-        WORK_ORDER_NEW, OPS_HANDOFF, TIMELINE, LIBRARY_SEARCH, VAULT_SAVE, VAULT_NODE_ADD, VAULT_LOG, VAULT_SEARCH, VAULT_STATUS, VAULT_OPEN, VAULT_SYNC,
+        WORK_ORDER_NEW, OPS_HANDOFF, TIMELINE, LIBRARY_SEARCH, VAULT_SAVE, VAULT_NODE_ADD, VAULT_LOG, VAULT_SEARCH, VAULT_STATUS, VAULT_SHOW, VAULT_OPEN, VAULT_SYNC,
         WEATHER, REMIND, ADD_TASK, ADD_TO_LIST, TODO_PREFIX, COMPLETE_TASK, LIST_TASKS, SUMMARIZE, MEETING_ACTIONS, NAMEPLATE,
         NAV_NEXT, NAV_NEARBY, NAV_TO, CALL, TALK_ABOUT, KEEP, NOTE, TEMPLATE, JOURNAL_WRITE, JOURNAL_OPEN,
         SCAN_DOCUMENT, SCAN_CODE, PHOTO, VIDEO, PANORAMA, FOCUS, LOG_CEU, GPA, SWITCH_PROFILE, THEME, SET_SETTING, TOGGLE_SETTING,
@@ -86,6 +86,8 @@ object Intents {
         Rule(Id.VAULT_LOG, Phase.LATE, "^log (?:this |that )?(?:to|in|on) (?:my |the )?(?:obsidian|vault|timeline)[:,\\s-]+(.{3,})$", onText = true),
         Rule(Id.VAULT_SEARCH, Phase.LATE, "^(?:search|find|look (?:up|for)|what(?:'s| is| do i have)) (?:in )?(?:my |the )?(?:obsidian|vault)(?: vault)?(?: for| about)?[:\\s]+(.+)$", onText = true),
         Rule(Id.VAULT_STATUS, Phase.LATE, "what'?s new in (?:my |the )?(?:obsidian|vault)|^(?:obsidian|vault) status|how(?:'s| is) (?:my |the )?(?:obsidian|vault)"),
+        // "show RTU-4 in my graph", "open the graph" — Obsidian on the computer, at that note's local graph (Advanced URI)
+        Rule(Id.VAULT_SHOW, Phase.LATE, "^(?:show|open|pull up|find)(?: me)? (?:(.+?) (?:in|on) (?:my |the )?(?:obsidian |vault |knowledge )?graph|(?:my |the )?(?:obsidian |vault |knowledge )?graph)$", onText = true),
         Rule(Id.VAULT_OPEN, Phase.LATE, "^open (?:my |the )?(?:obsidian|vault)(?: vault)?(?: on (?:my |the )?(?:computer|desktop|pc))?$"),
         Rule(Id.VAULT_SYNC, Phase.LATE, "^(?:sync|update|refresh) (?:my |the )?(?:obsidian|vault)(?: vault)?(?: now)?$"),
         Rule(Id.WEATHER, Phase.LATE, "\\b(weather|forecast|temperature outside|how (hot|cold) is it|will it (freeze|rain|snow|storm)|freeze warning|weather alerts?)\\b",

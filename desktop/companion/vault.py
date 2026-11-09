@@ -796,6 +796,7 @@ class Vault:
         lines = [f"# BlackLab", "", f"> [!abstract] {self.now().strftime('%A, %B')} {today.day} · {md_count} notes · " +
                  (f"phone synced {dt.datetime.fromtimestamp(last_phone, self.tz).strftime('%b %d %H:%M')}" if last_phone else "waiting for the phone's first sync"),
                  "", f"**Brain:** [[◉ Nexus]] · [[Neural Map.canvas|Neural Map]] · **Today:** [[{today.isoformat()}]] · **Start here:** [[README]] · **AIs:** [[AI Registry]] · [[AI Protocol]] · **Map:** [[BlackLab Map.canvas|System map]]", "",
+                 f"**Graph:** 🕸️ [Open the graph]({self._graph_uri()}) · [[Graph Health]] · Bookmarks › *Graph views* · say *“show RTU-4 in my graph”*", "",
                  "## Today so far", ""]
         lines += [f"- `{e['t']}` {self.KIND_ICON.get(e['kind'], '•')} {e['title']}" for e in sorted(tl, key=lambda x: x["ts"])[-12:]] or ["- _Nothing yet._"]
         lines += ["", "## Areas", "",
@@ -813,6 +814,10 @@ class Vault:
         lines += [f"- **{r['agent']}** — {r['when']}: {r.get('note', '')[:120]}" for r in reversed(regs[-5:])] or ["- _No one has signed in yet._"]
         self.write_managed("Home.md", {"type": "home", "notes": md_count, "cssclasses": ["blacklab-home"], "tags": ["system/home"]}, "\n".join(lines),
                            user_tail="\n## Pinned\n\n")
+
+    def _graph_uri(self) -> str:
+        import vault_graph
+        return vault_graph.graph_uri(self.name)
 
     # ------------------------------------------------------------------ search / read / write (assistant, MCP)
 

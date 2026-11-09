@@ -166,6 +166,9 @@ class Assistant(private val app: AppContainer) {
         // ---- commands from the grammar (Intents.kt): small talk, briefing, calendar, recorder
         Intents.matches(t, Intents.Phase.EARLY).forEach { m -> perform(m, t, l, origin)?.let { return it } }
 
+        // ---- Reverse engineering (REA + Ghidra on the computer) — before Facility so "inspect the apk" isn't an inspection
+        reverse(t)?.let { return it }
+
         // ---- Facility: inspections & PMs — before tasks so "what inspections are due" lands here
         facility(l)?.let { return it }
         // ---- Garage: the Santa Fe (fuel, service, odometer, what's due) — before tasks so "what's due on the car" lands here
@@ -229,7 +232,7 @@ class Assistant(private val app: AppContainer) {
                 listOf(Link("Timeline", "timeline")), route = "timeline", source = "Timeline")
         }
         Intents.Id.VAULT_SAVE, Intents.Id.VAULT_NODE_ADD, Intents.Id.VAULT_LOG, Intents.Id.VAULT_SEARCH, Intents.Id.VAULT_STATUS,
-        Intents.Id.VAULT_OPEN, Intents.Id.VAULT_SYNC -> vault(m)
+        Intents.Id.VAULT_SHOW, Intents.Id.VAULT_OPEN, Intents.Id.VAULT_SYNC -> vault(m)
         Intents.Id.WEATHER -> weather(l)
         Intents.Id.REMIND -> addTask(m[1], remind = true)
         Intents.Id.ADD_TASK, Intents.Id.TODO_PREFIX -> addTask(m[1], remind = false)
@@ -316,6 +319,7 @@ class Assistant(private val app: AppContainer) {
             Intents.Id.VAULT_SAVE -> V.capture(text)
             Intents.Id.VAULT_NODE_ADD -> V.addToNode(m[1], m[2])
             Intents.Id.VAULT_LOG -> V.log(text)
+            Intents.Id.VAULT_SHOW -> V.showInGraph(m.firstGroup)
             Intents.Id.VAULT_OPEN -> V.openOnComputer()
             Intents.Id.VAULT_SYNC -> V.sync(app, force = true)
             Intents.Id.VAULT_SEARCH -> V.search(text).let { st ->
@@ -364,6 +368,7 @@ summarize <today/tomorrow/this week/my recent notes/my open tasks/my journal> as
 log fuel <gallons> gallons <dollars> dollars at <miles> miles | log <service> at <miles> miles | what's due on the car |
 navigate to my next meeting | find a gas station | navigate to <place> |
 desktop <request for the user's computer: open a folder or app, find files on the computer, system status, disk space, save a desktop note>.
+reverse engineer <file> [and <question>] — analyze a program, APK, library or firmware on the computer (REA + Ghidra).
 
 If the user's message is a request one of these commands can do, reply with exactly one line: COMMAND: <the command>
 Otherwise answer the user directly in 1-4 sentences, starting with: ANSWER:
@@ -399,6 +404,7 @@ User: $text"""
 • Knowledge — “what is retrieval-augmented generation?”, “explain GitHub Actions caching”, “let's talk about system design”
 • Weather — “what's the weather”, “will it freeze tonight?”, “weather alerts” (facility prep checklists)
 • Desktop — “on my computer open my downloads”, “ask my desktop how much disk space is left”, “desktop AI status”
+• Reverse engineering (on the computer) — “reverse engineer ~/Downloads/tool.bin and find the license check”, “decompile 0x401000 in tool.bin”, “how do I inspect an APK with REA?”, or any file › ⋮ › Reverse-engineer on computer
 • Behavioral Health — “start rounds”, “when are rounds due?”, “start my shift”, “new peer note”, “SBAR handoff”, “crisis lines”, “grounding”
 • Facility — “what inspections are due?”, “any PMs overdue?”
 • Garage — “log fuel 13.2 gallons $48 at 31,250 miles”, “I got an oil change at 31,000”, “what's due on the car?”
@@ -836,6 +842,39 @@ User: $text"""
         val req = m.groupValues[1].trim()
         val r = DesktopAi.ask(req) ?: return Reply("I can't reach the computer right now. Plug in the phone (or use Wireless debugging) and run ./daddyshome on the computer.", source = "Desktop AI")
         return Reply(r.text.ifBlank { "Done." }, source = r.source.ifBlank { "Desktop" })
+    }
+
+    /**
+     * Reverse engineering runs on the computer (see [ReverseEngineering]). A file named here that's on the phone (in
+     * BlackLab's folders) is uploaded with the job; anything else is a path on the computer.
+     */
+    private suspend fun reverse(t: String): Reply? {
+        val route = ReverseEngineering.route(t) ?: return null
+        val off = "Reverse engineering runs on your computer, and I can't reach it right now (or hand-off is off in Assistant settings). Plug in the phone or use Wireless debugging, then run ./daddyshome."
+        if (!DesktopAi.usable && DesktopAi.probe().state != DesktopAi.State.ONLINE) return Reply(off, source = "Reverse engineering")
+        return when (route) {
+            is ReverseEngineering.Route.Quick -> {
+                val r = DesktopAi.ask(t) ?: return Reply(off, source = "Reverse engineering")
+                Reply(r.text.ifBlank { "No answer." }, source = r.source.ifBlank { "Desktop · REA" })
+            }
+            is ReverseEngineering.Route.Background -> Reply(
+                if (DesktopJobs.start(app, "ask", t.take(80), org.json.JSONObject().put("text", t))) "Working on it on your computer — Ghidra takes a minute or two. I'll notify you with the answer." else off,
+                source = "Reverse engineering")
+            is ReverseEngineering.Route.Report -> {
+                val name = route.target.substringAfterLast('/')
+                val onPhone = if (route.target.startsWith("/") || route.target.startsWith("~")) null else withContext(Dispatchers.IO) {
+                    app.storage.root.walkTopDown().maxDepth(6).firstOrNull { it.isFile && it.name.equals(name, ignoreCase = true) }
+                }
+                val params = org.json.JSONObject().put("goal", route.goal)
+                if (onPhone != null) {
+                    DesktopJobs.enqueue(app, "reverse", onPhone, "Reverse-engineer $name", params)
+                    Reply("Sending $name to your computer for a reverse-engineering report. It shows up in Documents › Reverse Engineering when it's done.", source = "Reverse engineering")
+                } else Reply(
+                    if (DesktopJobs.start(app, "reverse", "Reverse-engineer $name", params.put("path", route.target)))
+                        "Your computer is reverse-engineering $name" + (if (route.goal.isNotBlank()) ", aimed at: ${route.goal}" else "") + ". I'll notify you when the report is ready."
+                    else off, source = "Reverse engineering")
+            }
+        }
     }
 
     /** Hand-off jobs and the equipment registry, both on the computer. */

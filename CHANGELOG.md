@@ -2,6 +2,35 @@
 
 All notable changes to BlackLab are documented here. The project follows [Semantic Versioning](https://semver.org/).
 
+## [5.12.0] — 2026-11-09
+
+Your computer can now reverse engineer software for you. Point it at a program, APK, library or firmware image and the desktop AI decompiles it with Ghidra and explains it, citing the evidence.
+
+### Added
+- **Reverse engineering on the computer** with [REA](https://github.com/morluto/rea) and Ghidra:
+  - Say “reverse engineer ~/Downloads/tool.bin and find how it checks the license” and the report lands in Documents › Reverse Engineering.
+  - Ask “decompile the function that prints the usage message in …”, “what strings are in …”, “who calls 0x4012a0 in …” or “how do I inspect an APK with REA?”.
+  - Any program-like file (APK, .so, .exe, .dll, firmware, .pyc, .wasm, models…) has ⋮ › **Reverse-engineer on computer**.
+  - Only read-only analysis runs. BlackLab never runs, debugs or instruments the target, and keystores, wallets and keys can't be targets.
+- Reports show decompiled code in code blocks.
+
+- **A living Obsidian graph:**
+  - Links now pull notes together, so the 13 nodes form clusters. Each node has its own color, and tags no longer clutter the graph.
+  - Typed links: `synapses:` between nodes and `related:` between notes about the same thing. Related links are found by a local AI (nomic-embed-text, offline) and your own entries are kept.
+  - **Bookmarks › Graph views** has a saved graph per node, plus the brain, the AI layer, what needs attention, and the related-links web.
+  - **Graph Health** lists orphans with a suggested node, unresolved links and hubs.
+  - Plugins, pinned and checksum-verified: **Breadcrumbs** (a trail on every note, prev/next across daily notes, a relations matrix), **Extended Graph** (link types in their own colors, hubs sized by links, the open note highlighted) and **Advanced URI**.
+  - “Show RTU-4 in my graph” (phone or desktop) opens Obsidian on that note's local graph, and every node note has *Open local graph* buttons.
+- BlackLab Desktop › Obsidian vault › **Graph**: link and orphan counts, related pairs, plugin status, *Open the graph* and *Show in graph*.
+
+### Changed
+- Updated: ZXing 3.5.4, jsoup 1.24.1, ML Kit text recognition 19.0.2, ML Kit GenAI Prompt 1.0.0-beta5, Play services auth 22.0.0, and the CI actions. The AndroidX 2026.09 and AGP 9 updates wait for the planned AGP 9 migration.
+- The phone's Obsidian mirror no longer pulls Obsidian's own settings back from nested `.obsidian` folders.
+
+### Desktop (companion 1.6.0)
+- `reverse.py` adds the `reverse_engineer` tool for the desktop AI, the `reverse` background job and a reverse-engineering workspace in `~/Desktop/BlackLab AI/Reverse Engineering`. REA's own guides are indexed for search.
+- Guards for the small local model: one-step `find_code`, automatic facts about the file before it answers, repair for paths typed in the wrong case, and a warning on any code it wrote itself instead of quoting the decompiler.
+
 ## [5.11.0] — 2026-11-08
 
 BlackLab gets a second brain: everything flows into an Obsidian vault on your computer, organized into 13 knowledge nodes your AIs can read and grow. Plus work-order intake, a daily timeline with ops handoff, and a Health page.

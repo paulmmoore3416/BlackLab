@@ -22,8 +22,8 @@ android {
         applicationId = "com.blacklab.app"
         minSdk = 35
         targetSdk = 36
-        versionCode = 24
-        versionName = "5.11.0"
+        versionCode = 25
+        versionName = "5.12.0"
         vectorDrawables { useSupportLibrary = true }
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -151,23 +151,23 @@ dependencies {
     implementation("androidx.glance:glance-material3:1.2.0") // widgets in your palette colors
 
     // QR codes for Brainstorm Live Share links
-    implementation("com.google.zxing:core:3.5.3")
+    implementation("com.google.zxing:core:3.5.4")
 
     implementation("io.coil-kt:coil-compose:2.7.0")
     implementation("io.coil-kt:coil-video:2.7.0")
-    implementation("org.jsoup:jsoup:1.21.1")
+    implementation("org.jsoup:jsoup:1.24.1")
     implementation("androidx.exifinterface:exifinterface:1.4.1")
 
     implementation("com.google.android.gms:play-services-mlkit-document-scanner:16.0.0")
     // Offline wake word ("Hey Todd" / built-ins) — needs a free Picovoice AccessKey entered in the app
     implementation("ai.picovoice:porcupine-android:4.0.2")
     implementation("com.google.android.gms:play-services-code-scanner:16.1.0")
-    implementation("com.google.android.gms:play-services-mlkit-text-recognition:19.0.1")
+    implementation("com.google.android.gms:play-services-mlkit-text-recognition:19.0.2")
     implementation("com.google.android.gms:play-services-mlkit-subject-segmentation:16.0.0-beta1")
 
     // Assistant: on-device Gemini Nano (AICore), Google sign-in for Gmail/Drive, background sync
-    implementation("com.google.mlkit:genai-prompt:1.0.0-beta2")
-    implementation("com.google.android.gms:play-services-auth:21.5.1")
+    implementation("com.google.mlkit:genai-prompt:1.0.0-beta5")
+    implementation("com.google.android.gms:play-services-auth:22.0.0")
     implementation("androidx.work:work-runtime-ktx:2.12.0")
     // Android Auto: templated car screens (assistant, agenda, tasks, Santa Fe garage, knowledge talk) and
     // car hardware info (model, fuel level, odometer) when the vehicle shares it
@@ -179,7 +179,7 @@ dependencies {
     baselineProfile(project(":baselineprofile"))
 
     testImplementation("junit:junit:4.13.2")
-    testImplementation("org.json:json:20240303")
+    testImplementation("org.json:json:20260814")
 
     // On-device tests (run on the emulator locally and in CI)
     androidTestImplementation("androidx.test.ext:junit:1.2.1")

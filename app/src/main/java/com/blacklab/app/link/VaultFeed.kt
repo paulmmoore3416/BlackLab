@@ -96,6 +96,12 @@ object VaultFeed {
             .fold({ j -> Status(true, "", j) }, { Status(false, "Couldn't reach the vault: ${it.message}") })
     }
 
+    /** Opens Obsidian on the computer at a note's local graph (or the whole graph when [query] is blank). */
+    suspend fun showInGraph(query: String): Status = withContext(Dispatchers.IO) {
+        runCatching { DesktopAi.request("POST", "/phone/vault/show", JSONObject().put("query", query.trim()), 20_000) }
+            .fold({ j -> Status(true, j.optString("message", "Opening the graph on your computer."), j) }, { Status(false, "Couldn't reach the vault: ${it.message}") })
+    }
+
     suspend fun openOnComputer(): Status = withContext(Dispatchers.IO) {
         runCatching { DesktopAi.request("POST", "/phone/vault/open", JSONObject(), 15_000) }
             .fold({ Status(true, "Opening your vault in Obsidian on the computer.") }, { Status(false, "Couldn't reach the computer: ${it.message}") })

@@ -1061,20 +1061,33 @@ Views.vault = () => {
       <div class="tile"><span class="k">On disk</span><span class="v" style="font-size:18px">${S.libStatus.gb_on_disk} / ${S.libStatus.gb_planned} GB</span><span class="s">${S.libStatus.books_ok} of ${S.libStatus.books_planned} books · ${S.libStatus.docs_ok} documents</span></div>
       <div class="tile"><span class="k">Budget</span><span class="v" style="font-size:18px">${S.libStatus.nodes_gb} + ${S.libStatus.core_gb} GB</span><span class="s">nodes & subnodes + core (Wikipedia)</span></div>
       <div class="tile"><span class="k">Reader</span><span class="v" style="font-size:18px">${S.libStatus.serving ? 'Running' : 'Not installed'}</span><span class="s">${S.libStatus.serving ? `<a href="http://127.0.0.1:${S.libStatus.port}" target="_blank" rel="noopener">open the library</a>` : 'install kiwix-tools to read & search offline'}</span></div></div>` : '<span class="muted">Loading…</span>'}</div>
+    <div class="card" style="margin-top:16px"><h2>Graph</h2>${S.vaultGraph ? `<div class="grid g3">
+      <div class="tile"><span class="k">Links</span><span class="v" style="font-size:18px">${S.vaultGraph.edges}</span><span class="s">${S.vaultGraph.with_up} of ${S.vaultGraph.notes} notes wired to a node · ${S.vaultGraph.orphans} orphans · ${S.vaultGraph.unresolved} unresolved</span></div>
+      <div class="tile"><span class="k">Related (local AI)</span><span class="v" style="font-size:18px">${S.vaultGraph.related ? S.vaultGraph.related.pairs + ' pairs' : '—'}</span><span class="s">${S.vaultGraph.related ? 'between ' + S.vaultGraph.related.notes + ' notes · bar ' + S.vaultGraph.related.threshold + ' · ' + esc(S.vaultGraph.related.at) : 'computed on the next sync'}</span></div>
+      <div class="tile"><span class="k">Plugins</span><span class="v" style="font-size:18px">${S.vaultGraph.plugins.filter((p) => p.installed).length} / ${S.vaultGraph.plugins.length}</span><span class="s">${S.vaultGraph.plugins.map((p) => esc(p.id) + ' ' + esc(p.version) + (p.installed ? ' ✓' : ' ✗')).join(' · ')}</span></div></div>
+      <div class="row" style="margin-top:12px"><button data-vact="graph">Open the graph</button><input id="vShow" placeholder="Show a note in the graph — e.g. RTU-4, Facility"><button class="ghost" data-vact="show">Show</button></div>
+      <div class="small muted" style="margin-top:6px">Hubs: ${S.vaultGraph.hubs.map(esc).join(' · ')} · Bookmarks › Graph views has a saved graph per node · 90 System/Graph Health lists orphans with suggested homes.</div>` : '<span class="muted">Loading…</span>'}</div>
     <div class="card" style="margin-top:16px"><h2>The 13 nodes</h2><p class="muted small">Every node serves one function — turn what happens into better decisions and actions. Members are notes that belong to the node; signals are timeline entries from the last 14 days.</p>
-      <div class="grid g3">${nodes.map((n) => `<div class="tile"><span class="k">◆ ${esc(n.name)}</span><span class="v" style="font-size:18px">${n.members} notes</span><span class="s">${n.signals} signals · ${esc(n.mission.slice(0, 90))}…</span></div>`).join('') || '<span class="muted">Loading…</span>'}</div></div>
+      <div class="grid g3">${nodes.map((n) => `<div class="tile"><span class="k">◆ ${esc(n.name)}</span><span class="v" style="font-size:18px">${n.members} notes</span><span class="s">${n.signals} signals · ${esc(n.mission.slice(0, 90))}… <a href="#" data-vshow="${esc(n.name)}">graph ↗</a></span></div>`).join('') || '<span class="muted">Loading…</span>'}</div></div>
     <div class="card" style="margin-top:16px"><h2>Recent versions</h2>${(v.recent_commits || []).map((h) => `<div class="small mono">${esc(h.hash)} · ${esc(h.when)} · ${esc(h.message)}</div>`).join('') || '<span class="muted">none yet</span>'}</div>
   </div>`;
 };
 Views.vault.bind = () => {
   if (!S.vaultNodes && Companion.ok) Companion.req('/local/vault/nodes', {}).then((r) => { S.vaultNodes = r.nodes; render(); }).catch(() => {});
   if (!S.libStatus && Companion.ok) Companion.req('/local/vault/library_status', {}).then((r) => { S.libStatus = r; render(); }).catch(() => {});
+  if (!S.vaultGraph && Companion.ok) Companion.req('/local/vault/graph', {}).then((r) => { S.vaultGraph = r; render(); }).catch(() => {});
+  document.querySelectorAll('[data-vshow]').forEach((a) => a.onclick = async (e) => {
+    e.preventDefault();
+    try { const r = await Companion.req('/local/vault/show', { query: a.dataset.vshow }); toast(r.message || 'Opening'); } catch (err) { toast(err.message); }
+  });
   const out = (h) => { const o = $('#vOut'); if (o) o.innerHTML = h; };
   document.querySelectorAll('[data-vact]').forEach((b) => b.onclick = async () => {
     const a = b.dataset.vact;
     try {
       if (a === 'open') { await Companion.req('/local/vault/open', {}); toast('Opening Obsidian'); }
-      if (a === 'sync') { await Companion.req('/local/vault/sync', {}); toast('Syncing the vault'); setTimeout(async () => { await Companion.detect(); S.vaultNodes = null; render(); }, 6000); }
+      if (a === 'graph') { const r = await Companion.req('/local/vault/show', { query: '' }); toast(r.message || 'Opening the graph'); }
+      if (a === 'show') { const q = $('#vShow').value.trim(); if (q) { const r = await Companion.req('/local/vault/show', { query: q }); out(esc(r.message || '')); } }
+      if (a === 'sync') { await Companion.req('/local/vault/sync', {}); toast('Syncing the vault'); setTimeout(async () => { await Companion.detect(); S.vaultNodes = null; S.vaultGraph = null; render(); }, 6000); }
       if (a === 'save') {
         const text = $('#vText').value.trim(); const node = $('#vNode').value; if (!text) return;
         const r = node ? await Companion.req('/local/vault/node_add', { node, content: text, author: 'BlackLab Desktop' })

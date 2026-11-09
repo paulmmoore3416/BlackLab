@@ -9,6 +9,7 @@
     with a history of photos, work orders, meetings and chats for every unit, and repeat-issue flags.
   * brief / weekly: the overnight operations analyst, from the phone's context snapshot (/phone/context).
   * ask: any desktop-assistant request, run in the background with a bigger tool budget.
+  * reverse: a reverse-engineering report on one file (REA + Ghidra, read-only; see reverse.py).
 
 Every job is a task in the task log, and the privacy guard applies to everything stored.
 """
@@ -30,7 +31,7 @@ import uuid
 from pathlib import Path
 
 C = None  # the companion module (set by setup)
-JOB_KINDS = ("transcribe", "equipment", "brief", "weekly", "ask")
+JOB_KINDS = ("transcribe", "equipment", "brief", "weekly", "ask", "reverse")
 _LOCK = threading.RLock()
 _Q: "queue.Queue[str]" = queue.Queue()
 JOBS: dict[str, dict] = {}
@@ -190,7 +191,7 @@ def _worker():
         _progress(j, "Starting")
         try:
             with C.task_log(f"Background job ({j['kind']}): {j['title']}", j["origin"], j["private"]) as log:
-                if j["kind"] in ("brief", "weekly", "ask"):
+                if j["kind"] in ("brief", "weekly", "ask", "reverse"):
                     rebalance()  # text jobs want the main model whole
                 j["result"] = RUNNERS[j["kind"]](j)
                 if j["kind"] in ("equipment", "transcribe"):
@@ -827,7 +828,12 @@ def run_ask(j: dict) -> dict:
     return {"text": r.get("text", ""), "source": r.get("source", ""), "notify": {"title": "Your computer finished: " + text[:60], "text": r.get("text", "")[:300]}}
 
 
-RUNNERS = {"transcribe": run_transcribe, "equipment": run_equipment, "brief": run_brief, "weekly": run_weekly, "ask": run_ask}
+def run_reverse(j: dict) -> dict:
+    import reverse
+    return reverse.run_job(j)
+
+
+RUNNERS = {"transcribe": run_transcribe, "equipment": run_equipment, "brief": run_brief, "weekly": run_weekly, "ask": run_ask, "reverse": run_reverse}
 
 
 def _scheduler():
