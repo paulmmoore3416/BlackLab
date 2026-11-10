@@ -53,3 +53,6 @@ Thumbs.db
 # Python
 __pycache__/
 *.pyc
+
+# Obsidian (this folder is also opened as a vault on the desktop; its settings are personal)
+.obsidian/

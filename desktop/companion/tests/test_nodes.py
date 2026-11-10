@@ -21,9 +21,9 @@ class NodesTest(unittest.TestCase):
     def tearDown(self):
         shutil.rmtree(self.tmp)
 
-    def test_thirteen_nodes_and_a_nexus(self):
-        self.assertEqual(13, len(VN.NODES))
-        self.assertEqual(13, len({n["id"] for n in VN.NODES}))
+    def test_built_in_nodes_and_a_nexus(self):
+        self.assertEqual(18, len(VN.BUILTIN))
+        self.assertEqual(len(VN.NODES), len({n["id"] for n in VN.NODES}))
         for n in VN.NODES:
             for s in n["synapses"]:
                 self.assertIn(s, VN.BY_ID, f"{n['id']} → {s}")
@@ -33,9 +33,9 @@ class NodesTest(unittest.TestCase):
             self.assertTrue(self.v.path(VN.rel(n)).exists(), n["name"])
         nexus = self.v.path(f"{VN.NEXUS}.md").read_text()
         import re
-        self.assertEqual(13, len(set(re.findall(r"\[\[(◆ [^\]|]+)", nexus))))
+        self.assertEqual(18, len(set(re.findall(r"\[\[(◆ [^\]|]+)", nexus))))
         canvas = json.loads(self.v.path("90 System/Neural Map.canvas").read_text())
-        self.assertEqual(1 + 13 + len(VN.SUBNODES), len(canvas["nodes"]))
+        self.assertEqual(1 + 18 + len(VN.SUBNODES), len(canvas["nodes"]))
 
     def test_notes_wire_themselves_into_nodes(self):
         self.v.apply_feed(FEED)
@@ -82,3 +82,50 @@ class SubnodesTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class RegistryTest(unittest.TestCase):
+    """Nodes beyond the built-in ones: no fixed limit, stored in the vault, safe text only."""
+    def setUp(self):
+        self.tmp = Path(tempfile.mkdtemp())
+        self.v = V.Vault(self.tmp / "BlackLab", self.tmp / "state")
+        self.v.ensure()
+
+    def tearDown(self):
+        shutil.rmtree(self.tmp)
+        VN.reload(self.v)  # back to the built-ins for the other tests
+
+    def test_create_many_nodes_and_render_them(self):
+        for i in range(25):
+            r = VN.create(self.v, f"Topic Area {i}", f"Mission {i}", "✳️", synapses=["facility", "Learning & Credentials"], keywords=[f"kw{i}"], author="Test")
+            self.assertTrue(r["ok"], r)
+        self.assertEqual(18 + 25, len(VN.NODES))
+        self.assertEqual(["facility", "learning"], VN.BY_ID["topic-area-3"]["synapses"])
+        self.assertFalse(VN.create(self.v, "Topic Area 3", "dup")["ok"])
+        VN.render(self.v)
+        self.assertTrue(self.v.path("Nodes/◆ Topic Area 24.md").exists())
+        nexus = self.v.path(f"{VN.NEXUS}.md").read_text()
+        self.assertIn("## The 43 nodes", nexus)
+        canvas = json.loads(self.v.path("90 System/Neural Map.canvas").read_text())
+        self.assertEqual(1 + 43 + len(VN.SUBNODES), len(canvas["nodes"]))
+        # a fresh process sees the same nodes (the registry lives in the vault)
+        VN.NODES[:] = VN.BUILTIN
+        VN.reload(self.v)
+        self.assertIn("topic-area-24", VN.BY_ID)
+        self.assertTrue(VN.add(self.v, "Topic Area 7", "Some knowledge.", author="Test")["ok"])
+
+    def test_refuses_clinical_text_and_honours_the_cap(self):
+        self.assertFalse(VN.create(self.v, "Patient tracking", "track patients")["ok"])
+        self.v.config = {"vault_max_nodes": 19}
+        self.assertTrue(VN.create(self.v, "One more", "ok")["ok"])
+        self.assertFalse(VN.create(self.v, "Too many", "no")["ok"])
+
+    def test_up_link_makes_membership_and_local_notes_are_counted_not_named(self):
+        self.v.write_note("00 Inbox/Shared idea.md", "---\nup: [\"[[◆ Media Library]]\"]\n---\nA synced note.\n", mode="replace")
+        self.v._write("85 Atlas/Videos/Secret Movie.mkv.md", "---\ntype: media\nup: [\"[[◆ Media Library]]\"]\n---\nlocal card\n")
+        VN.render(self.v)
+        node = self.v.path("Nodes/◆ Media Library.md").read_text()
+        self.assertIn("[[Shared idea]]", node)
+        self.assertNotIn("Secret Movie", node)
+        self.assertIn("## On this computer", node)
+        self.assertIn("local: 1", node)

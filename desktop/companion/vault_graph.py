@@ -37,7 +37,7 @@ from pathlib import Path
 
 import vault_nodes as VN
 
-PROFILE = 3  # bump to re-apply BlackLab's graph and plugin settings once (your later changes are kept until the next bump)
+PROFILE = 5  # bump to re-apply BlackLab's graph and plugin settings once (your later changes are kept until the next bump)
 
 # ---------------------------------------------------------------- plugins (pinned + verified)
 
@@ -183,13 +183,22 @@ def _rgb(hex_color: str) -> int:
 
 
 def color_groups() -> list[dict]:
-    """Most specific first (Obsidian colors a note with the first group it matches)."""
+    """Most specific first (Obsidian colors a note with the first group it matches). vault_colors has the full set."""
+    import vault_colors
+    return vault_colors.graph_groups()
+
+
+def _old_color_groups() -> list[dict]:
     groups = [{"query": f'file:"{VN.NEXUS}"', "color": {"a": 1, "rgb": 0xFFFFFF}},
-              {"query": f'path:"{VN.NODES_DIR}/{VN.SUB_GROUP}"', "color": {"a": 1, "rgb": 0xC8E6C9}}]
+              {"query": f'path:"{VN.NODES_DIR}/{VN.SUB_GROUP}"', "color": {"a": 1, "rgb": 0xC8E6C9}},
+              {"query": 'path:"87 Entities/People"', "color": {"a": 1, "rgb": 0xFFE082}},
+              {"query": 'path:"87 Entities"', "color": {"a": 1, "rgb": 0xFFF59D}},
+              {"query": 'file:"🖥️ This Computer" OR [type:folder]', "color": {"a": 1, "rgb": 0x78909C}}]
     for n in VN.NODES:
         parts = [f'file:"{VN.title(n)}"', f'[up:"{VN.title(n)}"]'] + [f'path:"{f}"' for f in n["folders"]]
         groups.append({"query": " OR ".join(parts), "color": {"a": 1, "rgb": _rgb(n["color"])}})
-    groups += [{"query": 'path:"70 AI"', "color": {"a": 1, "rgb": 0x2BD9A8}},
+    groups += [{"query": 'path:"86 Imported"', "color": {"a": 1, "rgb": 0xB39DDB}},
+               {"query": 'path:"70 AI"', "color": {"a": 1, "rgb": 0x2BD9A8}},
                {"query": 'path:"01 Daily"', "color": {"a": 1, "rgb": 0x90A4AE}},
                {"query": 'path:"90 System"', "color": {"a": 1, "rgb": 0x546E7A}}]
     return groups
@@ -198,7 +207,7 @@ def color_groups() -> list[dict]:
 def graph_config(current: dict) -> dict:
     g = dict(current)
     g.update(FORCES)
-    g["search"] = '-path:"99 Archive" -path:"95 Library"'
+    g["search"] = '-path:"99 Archive" -path:"95 Library" -path:"85 Atlas/Guides/Installed software docs"'
     g["colorGroups"] = color_groups()
     return g
 
@@ -219,7 +228,11 @@ def graph_views() -> dict:
              _graph_bookmark("🕸️ Everything (no archive)", '-path:"99 Archive" -path:"95 Library" -path:"01 Daily"'),
              _graph_bookmark("🤖 AI layer", 'path:"70 AI" OR [up:"◆ AI & Automation"]'),
              _graph_bookmark("⚠️ Needs attention", '[status:overdue] OR [status:due] OR [status:open] OR [priority:P1] OR [priority:P2]'),
-             _graph_bookmark("🧠 Related (semantic links)", '[related:]', {"linkDistance": 120})]
+             _graph_bookmark("🧠 Related (semantic links)", '[related:]', {"linkDistance": 120}),
+             _graph_bookmark("🖥️ This computer (Atlas)", 'path:"85 Atlas" -path:"85 Atlas/Guides/Installed software docs"', {"linkDistance": 140}),
+             _graph_bookmark("👥 People & topics", 'path:"87 Entities" OR path:"85 Atlas" -[type:folder]', {"linkDistance": 160}),
+             _graph_bookmark("📘 Guides", '[type:guide] OR file:"📘 Guides" OR path:"80 Knowledge"'),
+             _graph_bookmark("📥 Imported vaults", 'path:"86 Imported"')]
     for n in VN.NODES:
         items.append(_graph_bookmark(f"{n['emoji']} {n['name']}", " OR ".join([f'file:"{VN.title(n)}"', f'[up:"{VN.title(n)}"]'] + [f'path:"{f}"' for f in n["folders"]])))
     return {"type": "group", "title": "🕸️ Graph views", "items": items}
@@ -305,8 +318,18 @@ def suggest_home(note: dict) -> str | None:
 
 def render_health(v, notes: dict, related_stats: dict | None = None):
     h = graph_health(notes, v.root)
+    # this note is synced: it names only synced notes (local ones — Atlas, imports, people & topics — are counted, never listed)
+    sync = {r: n for r, n in notes.items() if not VN.is_local(r)}
+    sync_titles = {n["title"] for n in sync.values()}
+    local_orphans = [o for o in h["orphans"] if VN.is_local(o)]
+    h["orphans"] = [o for o in h["orphans"] if not VN.is_local(o)]
+    h["hubs"] = [(k, t) for k, t in h["hubs"] if t in sync_titles]
+    h["unresolved"] = graph_health(sync, v.root)["unresolved"]
+    h["local"] = len(notes) - len(sync)
     lines = ["# 🩺 Graph health", "", f"> [!info] {h['notes']} notes · {h['edges']} links · {h['with_up']} wired to a node with `up:` · "
              f"{len(h['orphans'])} orphans · {len(h['unresolved'])} unresolved targets · {h['future_days']} agenda days ahead", "",
+             f"**On this computer:** {h['local']} local notes (Atlas, imported vaults, people & topics) · {len(local_orphans)} of them unlinked — "
+             "they're counted here, never named, because this note is synced.", "",
              "Bookmarks › **🕸️ Graph views** has a saved graph per node. In any note: Breadcrumbs' trail at the top, its matrix in the "
              "side bar, and *Open local graph* (Advanced URI) on every node note.", ""]
     if related_stats:
@@ -401,11 +424,12 @@ def pick_related(names: list[str], vecs: list[list[float]], linked: dict[str, se
     return out
 
 
-def update_related(v, notes: dict, embed, state: dict, k=3) -> dict:
+def update_related(v, notes: dict, embed, state: dict, k=3, exclude=None, only=None) -> dict:
     """Writes `related:` on notes (only that property; text and other keys untouched). Keeps links you added yourself.
     Notes are keyed by path, so notes that share a title ("Untitled page") are never confused: a shared title is linked
     by path, and two notes with the same title aren't paired (they're usually copies of one template)."""
-    pool = {r: n for r, n in notes.items() if not r.startswith(RELATED_EXCLUDE) and len(n["body"]) >= MIN_BODY}
+    exclude = RELATED_EXCLUDE + VN.LOCAL_PREFIXES if exclude is None else exclude
+    pool = {r: n for r, n in notes.items() if not r.startswith(exclude) and (only is None or only(r, n)) and len(n["body"]) >= MIN_BODY}
     cache = state.setdefault("vectors", {})
     todo = []
     for r, n in pool.items():
@@ -528,12 +552,23 @@ def apply(v, embed=None, fetch=None, mining=lambda: False) -> dict:
         report["plugins"] = install_plugins(v, fetch, force_settings=fresh)
     except Exception as e:  # offline or GitHub down: try again next pass
         report["plugins_error"] = str(e)[:200]
+    try:  # every pass: node colors everywhere, graph color groups restored if Obsidian on the phone dropped them, Graph FX
+        import vault_colors
+        report["colors"] = vault_colors.apply(v)
+    except Exception as e:
+        report["colors_error"] = str(e)[:200]
     notes = scan(v)
     rel_state = v._state("related.json", {})
     if embed and not mining():
         try:
             report["related"] = update_related(v, notes, embed, rel_state)
             v._save_state("related.json", rel_state)
+            # a second, local-only pass: related links among Atlas cards and imported notes (written only on those)
+            local_state = v._state("related_local.json", {})
+            local = {r: n for r, n in notes.items() if VN.is_local(r)}
+            report["related_local"] = update_related(v, local, embed, local_state, exclude=(VN.LOCAL_PREFIXES[2],),
+                                                     only=lambda r, n: n["props"].get("type", "").strip('"') not in ("folder", "entity-index", "imported-vault", "media-collection", "media", "machine", "guide-index"))
+            v._save_state("related_local.json", local_state)
             notes = scan(v)
         except Exception as e:
             report["related_error"] = str(e)[:200]

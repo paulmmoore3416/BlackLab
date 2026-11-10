@@ -49,8 +49,9 @@ import agents  # noqa: E402  (background jobs, recordings, equipment, briefs)
 import guards  # noqa: E402  (every safety rule: HTTP, paths, privacy, tool calls — unit tested)
 import reverse  # noqa: E402  (reverse engineering with REA + Ghidra, read-only — unit tested)
 import vault as vaultlib  # noqa: E402  (the Obsidian vault: notes, timeline, AI registry, git)
+import audit  # noqa: E402  (the hash-chained activity ledger — unit tested)
 
-VERSION = "1.6.0"
+VERSION = "1.7.0"
 HOST, PORT = "127.0.0.1", int(os.environ.get("BLACKLAB_DESKTOP_PORT", "8770"))
 HOME = Path.home()
 WEB_DIR = Path(__file__).resolve().parent.parent / "web"
@@ -90,6 +91,8 @@ TASK_LOG_DIR = _cfg_dir("task_log_dir", AI_DIR / "Task Logs")
 OUT_DIR = DOWNLOADS_DIR  # the name companion 1.2 and earlier used
 VAULT_ON = CONFIG.get("vault", True) is not False
 VAULT = vaultlib.Vault(_cfg_dir("vault_dir", "~/Obsidian/BlackLab"), CACHE_DIR / "vault", CONFIG.get("timezone", "America/Chicago"))
+LEDGER = audit.Ledger(CACHE_DIR / "vault" / "ledger.jsonl")
+VAULT.ledger = LEDGER
 
 
 def ensure_phone_token() -> str:
@@ -395,6 +398,7 @@ def logged_tool(name: str):
                 task_step("tool", name, f"args: {_short(args, 400)}\nfailed: {e}", time.time() - t0)
                 raise
             task_step("tool", name, f"args: {_short(args, 400)}\nresult: {_short(out)}" if args else f"result: {_short(out)}", time.time() - t0)
+            LEDGER.record("Desktop AI", f"tool:{name}", source="desktop assistant", duration_ms=int((time.time() - t0) * 1000))
             return out
         return wrapper
     return deco
@@ -1017,10 +1021,26 @@ PHONE_WORDS = guards.PHONE_WORDS
 
 @logged_tool("vault_search")
 def tool_vault_search(args):
-    hits = VAULT.search(args.get("query", "") if isinstance(args, dict) else str(args), 6)
+    import vault_recall
+    r = vault_recall.ask(VAULT, args.get("query", "") if isinstance(args, dict) else str(args), 6, local=True, config=CONFIG)
+    hits = r.get("results") or []
     if not hits:
         return "Nothing in the vault matches that."
-    return "\n\n".join(f"• {h['path']}\n  {h['snippet'][:300]}" for h in hits)
+    return f"(search: {r.get('engine')})\n\n" + "\n\n".join(f"• {h['path']}" + (f" (relevance {h['score']})" if h.get("score") is not None else "")
+                                                     + f"\n  {h['text'][:400]}" for h in hits)
+
+
+@logged_tool("skills_search")
+def tool_skills_search(args):
+    import agent_skills
+    hits = agent_skills.search(args.get("query", "") if isinstance(args, dict) else str(args), 6)
+    return "\n".join(f"• {h['name']} ({h['library']}): {h['description'][:220]}" for h in hits) or "No agent skill matches that."
+
+
+@logged_tool("skill_use")
+def tool_skill_use(args):
+    import agent_skills
+    return agent_skills.load(args.get("name", "") if isinstance(args, dict) else str(args))
 
 
 @logged_tool("vault_write")
@@ -1061,9 +1081,19 @@ VAULT_SAVE_RE = re.compile(r"^(?:save|add|put|capture|log|note)(?: this| that)? 
 VAULT_FIND_RE = re.compile(r"^(?:search|find|look (?:up|for)|what(?:'s| is| do i have)) (?:in )?(?:my |the )?(?:obsidian|vault)(?: vault)?(?: for| about)?[:\s]+(.+)$", re.I)
 
 
+def private_drive():
+    import drive_private
+    return drive_private.PrivateDrive(VAULT if VAULT_ON else None, CONFIG)
+
+
 def desktop_rules(text: str, phone):
     t = text.strip()
     low = t.lower()
+    import drive_private
+    parsed = drive_private.parse(t)
+    if parsed:
+        r = private_drive().save(parsed[1], parsed[0], source="BlackLab · " + ("phone" if phone else "desktop"))
+        return (r.get("message") or r.get("error")), "Desktop · private drive"
     if VAULT_ON:
         m = VAULT_SAVE_RE.match(t)
         if m:
@@ -1205,6 +1235,10 @@ TOOLS = [
             "query": {"type": "string", "description": "Address (0x401000) or function name for decompile/xrefs/disassemble; text for search; the question for report/help"},
             "kind": {"type": "string", "enum": ["strings", "procedures"], "description": "What 'search' looks through"}},
             "required": ["action"]}}},
+    {"type": "function", "function": {"name": "skills_search", "description": "Find agent skills (expert playbooks from Anthropic, Vercel, OpenAI, Google and Hugging Face) for a task: documents (PDF, Word, Excel, PowerPoint), web/app design, React/Next.js, Google Cloud, Vercel, Hugging Face models and datasets, MCP servers, writing.",
+                                      "parameters": {"type": "object", "properties": {"query": {"type": "string"}}, "required": ["query"]}}},
+    {"type": "function", "function": {"name": "skill_use", "description": "Load one agent skill's instructions (by name from skills_search) and follow them for the user's request. Never run a skill's scripts; show the commands instead.",
+                                      "parameters": {"type": "object", "properties": {"name": {"type": "string"}}, "required": ["name"]}}},
     {"type": "function", "function": {"name": "dev_docs", "description": "Search Google's official Android/Firebase/Cloud developer documentation (needs internet).", "parameters": {"type": "object", "properties": {"query": {"type": "string"}}, "required": ["query"]}}},
 ]
 
@@ -1223,7 +1257,7 @@ def run_tool(name, args, phone):
            "open_url": tool_open_url, "launch_app": tool_launch_app, "desktop_note": tool_desktop_note, "dev_docs": tool_dev_docs,
            "recall_chats": tool_recall_chats, "search_documents": tool_search_documents, "equipment": tool_equipment,
            "vault_search": tool_vault_search, "vault_write": tool_vault_write, "library_search": tool_library_search,
-           "reverse_engineer": tool_reverse_engineer}
+           "reverse_engineer": tool_reverse_engineer, "skills_search": tool_skills_search, "skill_use": tool_skill_use}
     try:
         if name == "phone_command":
             return tool_phone(args, phone)
@@ -1232,7 +1266,26 @@ def run_tool(name, args, phone):
         return f"{name} failed: {e}"
 
 
+def _skill_hint(text: str) -> str:
+    try:
+        import agent_skills
+        return agent_skills.hint(text)
+    except Exception:
+        return ""
+
+
+def _skill_seed(text: str) -> tuple:
+    """'use the pdf skill to …' — the model starts with that skill loaded, as if it had called skill_use."""
+    try:
+        import agent_skills
+        s = agent_skills.named_in(text)
+        return (("skill_use", {"name": s["name"]}, agent_skills.load(s["name"])),) if s else ()
+    except Exception:
+        return ()
+
+
 def ollama_chat(text, model, phone, history=(), use_memory=True, rounds=4, seed=()):
+    seed = tuple(seed) + _skill_seed(text)
     tools = [t for t in TOOLS if phone or t["function"]["name"] != "phone_command"]
     system = ("You are BlackLab, the user's laid-back, funny but sharp personal assistant, running offline on their Linux desktop. "
               "The user is a Director of Facility Operations who is also a student. "
@@ -1244,7 +1297,8 @@ def ollama_chat(text, model, phone, history=(), use_memory=True, rounds=4, seed=
               "For reverse engineering (binaries, apps, APKs, firmware, decompiling, 'what does this program do') use reverse_engineer: one step at a time, "
               "reusing addresses from earlier results, and say which evidence each claim comes from. Never write, rewrite or 'simplify' code yourself: "
               "quote only code a tool returned; if you haven't seen the code, call find_code or say you haven't. Only analyze software the user owns or may examine. "
-              "Keep replies short. Today is " + dt.datetime.now().strftime("%A, %B %d %Y, %I:%M %p") + "."
+              "When a request matches an agent skill, load it with skill_use and follow it. "
+              "Keep replies short. Today is " + dt.datetime.now().strftime("%A, %B %d %Y, %I:%M %p") + "." + _skill_hint(text)
               + (memory_prompt() if use_memory else ""))
     msgs = [{"role": "system", "content": system}]
     for u, a in history or ():
@@ -1549,6 +1603,7 @@ class Handler(SimpleHTTPRequestHandler):
                     who = PHONE.get("model") or "phone"
                     j = agents.submit(body.get("kind", ""), body.get("title", ""), body.get("params") or {}, body.get("upload"),
                                       origin=f"Phone ({who})", private=bool(body.get("private")))
+                    LEDGER.record("Phone", f"job:{body.get('kind', '')}", source=who, metadata={"private": bool(body.get("private"))})
                     return self.reply(200, agents.public(j))
                 if route == "/phone/jobs/ack":
                     agents.ack([str(i) for i in body.get("ids", [])][:200])
@@ -1602,6 +1657,7 @@ class Handler(SimpleHTTPRequestHandler):
                     agents.UPLOADS[upload] = str(f)
                 j = agents.submit(body.get("kind", ""), body.get("title", "") or (Path(body["path"]).name if body.get("path") else ""),
                                   body.get("params") or {}, upload, private=bool(body.get("private")))
+                LEDGER.record("This computer", f"job:{body.get('kind', '')}", source="desktop UI", metadata={"private": bool(body.get("private"))})
                 return self.reply(200, agents.public(j))
             if self.path.startswith("/local/vault/"):
                 return self.reply(200, vault_op(self.path.removeprefix("/local/vault/"), body, "This computer"))
@@ -1614,8 +1670,38 @@ class Handler(SimpleHTTPRequestHandler):
             return self.reply(500, {"error": str(e)})
 
 
+# Vault actions that only read: recorded in the ledger too, but they never commit
+READ_OPS = {"skills", "status", "search", "read", "recent", "graph", "nodes", "atlas", "library", "library_status", "history", "drive_status", "ask",
+            "panel", "sds", "shift_prep", "credentials", "ledger", "recall_status"}
+
+
 def vault_op(op: str, body: dict, who: str) -> dict:
-    """Every vault action from the phone, this computer's UI and the MCP server."""
+    """Every vault action from the phone, this computer's UI and the MCP server — each one a line in the activity ledger."""
+    t0 = time.time()
+    actor = str(body.get("actor") or body.get("author") or body.get("source") or who)[:60] if isinstance(body, dict) else who
+    ok = None
+    try:
+        r = _vault_op(op, body, who)
+        ok = not (isinstance(r, dict) and r.get("ok") is False)
+        return r
+    finally:
+        if op != "checkin" and (op != "feed" or ok):  # check-ins record themselves; the phone's feed only when it worked
+            target = str(body.get("path") or body.get("node") or "")[:200] if isinstance(body, dict) else ""
+            LEDGER.record(actor, f"vault:{op}", target=target, source=who, duration_ms=int((time.time() - t0) * 1000),
+                          metadata={"ok": ok, "read_only": op in READ_OPS})
+
+
+def local_generate(prompt: str, max_tokens: int = 360) -> str:
+    """Local model only (answers from the vault never go to a cloud model)."""
+    models = ollama_models()
+    if not models:
+        raise RuntimeError("the local model (Ollama) isn't running")
+    r = http_json(f"{OLLAMA}/api/generate", {"model": default_model(models), "prompt": prompt[:24000], "stream": False, "think": False,
+                                             "keep_alive": keep_alive(), "options": {"temperature": 0.2, "num_predict": max_tokens, "num_ctx": num_ctx()}}, timeout=170)
+    return re.sub(r"<think>.*?</think>", "", r.get("response", ""), flags=re.S).strip()
+
+
+def _vault_op(op: str, body: dict, who: str) -> dict:
     if not VAULT_ON:
         return {"ok": False, "error": "The vault is turned off (config.json \"vault\": false)."}
     v = VAULT
@@ -1664,6 +1750,28 @@ def vault_op(op: str, body: dict, who: str) -> dict:
         r = vault_nodes.add(v, body.get("node", ""), body.get("content", ""), body.get("author") or who)
         if r.get("ok"):
             v.log("note", f"{body.get('author') or who} added to ◆ {r['node']}", "", source=body.get("author") or who, links=[f"◆ {r['node']}"])
+    elif op == "drive_save":
+        import drive_private
+        text, folder = body.get("text", ""), body.get("folder") or None
+        if body.get("say"):  # the phone sends the sentence as spoken: "save to my private drive under taxes: …"
+            parsed = drive_private.parse(body["say"])
+            if not parsed:
+                return {"ok": False, "error": "Say it like “save to my private drive: …” (optionally “… under taxes: …”)."}
+            folder, text = parsed
+        return private_drive().save(text, folder, source=body.get("source") or who)
+    elif op == "drive_status":
+        return dict(private_drive().status(), ok=True)
+    elif op == "node_create":
+        import vault_nodes
+        r = vault_nodes.create(v, body.get("name", ""), body.get("mission", ""), body.get("emoji") or "◆", body.get("color") or "", body.get("synapses") or [],
+                               body.get("keywords") or [], body.get("tags") or [], author=body.get("author") or who, primer=body.get("primer") or "")
+        if r.get("ok"):
+            v.render_nodes()
+    elif op == "atlas":
+        import vault_atlas
+        if body.get("rescan"):
+            threading.Thread(target=atlas_pass, kwargs={"force": True}, daemon=True).start()
+        return dict(vault_atlas.summary(v), ok=True, running=ATLAS_RUN["running"], last=ATLAS_RUN["last"], error=ATLAS_RUN["error"])
     elif op == "library":
         import library
         return {"ok": True, "results": library.search(body.get("query", ""), library.books_for(body.get("node"), body.get("subnode")) or None, int(body.get("limit") or 8))}
@@ -1678,6 +1786,49 @@ def vault_op(op: str, body: dict, who: str) -> dict:
         return {"ok": True, "message": "Copying the vault to the phone now."}
     elif op == "history":
         return {"ok": True, "commits": v.history(int(body.get("n") or 20))}
+    elif op == "ask":  # "what do my notes say about …": semantic recall through kb-core, an answer from the local model
+        import vault_recall
+        local = who != "Phone" or CONFIG.get("phone_recall_local", False) is True
+        if body.get("answer"):
+            return vault_recall.answer(v, body.get("query", ""), local_generate, local=local, config=CONFIG, limit=int(body.get("limit") or 5))
+        return vault_recall.ask(v, body.get("query", ""), int(body.get("limit") or 6), local=local, config=CONFIG)
+    elif op == "recall_status":
+        import vault_recall
+        return dict(vault_recall.status(v, CONFIG), ok=True)
+    elif op == "round":  # "start EOC rounds" — a dated checklist from Paul's template
+        import facility_ops
+        r = facility_ops.new_round(v, body.get("kind") or body.get("say") or "", by=body.get("source") or who)
+    elif op == "panel":
+        import facility_ops
+        return facility_ops.panel(v, body.get("query", ""))
+    elif op == "sds":
+        import facility_ops
+        return facility_ops.sds(v, body.get("query", ""))
+    elif op == "shift_prep":
+        import facility_ops
+        import vault_credentials
+        return facility_ops.shift_prep(v, vault_credentials.due_soon(v))
+    elif op == "credentials":
+        import vault_credentials
+        rows = vault_credentials.merged(v)
+        today = v.now().date()
+        soon = vault_credentials.due_soon(v, today)
+        q = (body.get("query") or "").lower().strip()
+        if q:
+            hit = [r for r in rows if q in r["name"].lower()]
+            if hit:
+                r = hit[0]
+                return {"ok": True, "message": f"{r['name']}: {vault_credentials.state(r, today)[1].split(' ', 1)[1]}" +
+                        (f" (renew by {r['renew'].isoformat()})." if r.get("renew") else ".")}
+        return {"ok": True, "count": len(rows), "due_soon": soon,
+                "message": (f"{len(rows)} credentials on file. " + ("Needs attention: " + "; ".join(soon) + "." if soon else "Nothing expires in the next 90 days."))}
+    elif op == "skills":  # "what skills do you have" / "find a skill for …" / MCP vault_skills
+        import agent_skills
+        if body.get("action") == "read":
+            return {"ok": True, "text": agent_skills.load(body.get("name") or body.get("query") or "", max_chars=40000)}
+        return agent_skills.describe(body.get("query") or "")
+    elif op == "ledger":
+        return dict(LEDGER.verify(), summary={k: x for k, x in LEDGER.summary(int(body.get("days") or 7)).items() if k != "recent"})
     else:
         raise ValueError(f"unknown vault action: {op}")
     v.commit(min_gap=0)
@@ -1722,10 +1873,53 @@ def vault_pass(force=False):
                     v.errors = (v.errors + [f"graph: {r[k]}"])[-20:]
         except Exception as e:
             v.errors = (v.errors + [f"graph: {e}"])[-20:]
+        try:
+            import drive_private
+            m = drive_private.load_map()
+            if m.get("private"):
+                v.write_managed("90 System/Private Drive.md", {"type": "system", "tags": ["system/drive"], "up": ["[[◉ Nexus]]"]},
+                                drive_private.layout_markdown(m), user_tail="\n## Notes\n\n")
+                threading.Thread(target=private_drive().flush, daemon=True).start()  # retry anything that waited
+        except Exception as e:
+            v.errors = (v.errors + [f"private drive: {e}"])[-20:]
+        for label, fn in (("facility", lambda: __import__("facility_ops").render_all(v)),
+                          ("skills", lambda: __import__("agent_skills").render(v)),
+                          ("credentials", lambda: __import__("vault_credentials").render(v)),
+                          ("ledger", lambda: audit.render(v, LEDGER))):
+            try:
+                fn()
+            except Exception as e:
+                v.errors = (v.errors + [f"{label}: {e}"])[-20:]
+        v.render_registry()
         v.render_home()
         v.last_sync["desktop"] = time.time()
         v.commit(min_gap=0 if force else 300)
+    if CONFIG.get("skills", True) is not False:  # weekly: pull the skill libraries (git, read-only; nothing in them runs)
+        threading.Thread(target=lambda: __import__("agent_skills").sync(), daemon=True, name="skills").start()
+    if CONFIG.get("recall", True) is not False and not RECALL_RUN["running"]:
+        threading.Thread(target=recall_pass, daemon=True, name="recall").start()
     return n
+
+
+RECALL_RUN = {"running": False, "last": None}
+
+
+def recall_pass():
+    """Keep kb-core's copy of the vault current (outside the vault lock: it only reads notes). Paused while mining."""
+    if agents.mining_active():
+        return
+    RECALL_RUN["running"] = True
+    try:
+        import vault_recall
+        t0 = time.time()
+        RECALL_RUN["last"] = r = vault_recall.index(VAULT, CONFIG, budget_s=float(CONFIG.get("recall_budget_s", 240)))
+        if r.get("sent") or r.get("removed"):
+            LEDGER.record("BlackLab", "recall:index", target="kb-core", source="companion", duration_ms=int((time.time() - t0) * 1000),
+                          metadata={"sent": r.get("sent", 0), "removed": r.get("removed", 0), "pending": r.get("pending", 0)})
+    except Exception as e:
+        RECALL_RUN["last"] = {"ok": False, "error": str(e)[:200]}
+    finally:
+        RECALL_RUN["running"] = False
 
 
 def vault_keeper():
@@ -1744,6 +1938,73 @@ def vault_keeper():
             print(f"vault pass failed: {e}", file=sys.stderr, flush=True)
             VAULT.errors = (VAULT.errors + [str(e)[:200]])[-20:]
         time.sleep(int(CONFIG.get("vault_every_s", 600)))
+
+
+ATLAS_RUN = {"running": False, "last": None, "error": None, "at": 0.0}
+
+
+def atlas_pass(force=False):
+    """The Atlas (vault_atlas): new/changed files on this computer → cards, guides, imported vaults; then people & topics
+    (vault_entities, local model, paused while mining). Reads files outside the vault lock; writes inside it."""
+    if not VAULT_ON or CONFIG.get("atlas", True) is False or ATLAS_RUN["running"]:
+        return
+    if not force and agents.mining_active():
+        return
+    ATLAS_RUN["running"] = True
+    try:
+        import vault_atlas
+        import vault_entities
+        a = vault_atlas.Atlas(VAULT, CONFIG, PROTECTED)
+        r = {"scan": a.scan()}
+        with VAULT.lock:
+            r["import"] = a.import_vaults()
+            r["write"] = a.write()
+        if CONFIG.get("entities", True) is not False:
+            r["entities"] = vault_entities.locked_run(VAULT, CONFIG, a, llm=True, host=OLLAMA, mining=agents.mining_active, lock=VAULT.lock)
+            if r["entities"]:
+                with VAULT.lock:
+                    a.write()  # cards show their people & topics
+        # the linked phone (◆ Mobile Device): at most every mobile_every_s (6 h), only while it's plugged in / paired
+        if CONFIG.get("mobile", True) is not False and time.time() - ATLAS_RUN.get("mobile_at", 0) > int(CONFIG.get("mobile_every_s", 21600)):
+            devs = [d for d in adb_devices()["devices"] if d["state"] == "device" and not d["emulator"]]
+            if devs:
+                import vault_mobile
+                m = vault_mobile.Mobile(VAULT, adb_path(), devs[0]["serial"], CONFIG)
+                with VAULT.lock:
+                    r["mobile"] = m.run()
+                ATLAS_RUN["mobile_at"] = time.time()
+        try:
+            import vault_drive
+            pages = Path(CONFIG.get("drive_pages_dir", str(CACHE_DIR / "drive-pages")))
+            if pages.is_dir():
+                with VAULT.lock:
+                    r["drive"] = vault_drive.DriveImport(VAULT, CONFIG).run(str(pages), _drive_folder_names(pages))
+        except Exception as e:
+            VAULT.errors = (VAULT.errors + [f"drive: {e}"])[-20:]
+        ATLAS_RUN.update(last=r, error=None, at=time.time())
+    except Exception as e:
+        ATLAS_RUN["error"] = str(e)[:300]
+        VAULT.errors = (VAULT.errors + [f"atlas: {e}"])[-20:]
+        print(f"atlas pass failed: {e}", file=sys.stderr, flush=True)
+    finally:
+        ATLAS_RUN["running"] = False
+
+
+def _drive_folder_names(pages: Path) -> dict:
+    names = {}
+    for f in pages.glob("folders*.json"):
+        try:
+            names.update({k: v for k, v in json.loads(f.read_text()).items() if v})
+        except Exception:
+            pass
+    return names
+
+
+def atlas_keeper():
+    time.sleep(60)  # after the first vault pass
+    while True:
+        atlas_pass()
+        time.sleep(int(CONFIG.get("atlas_every_s", 1800)))
 
 
 _KIWIX = {"proc": None}
@@ -1801,7 +2062,8 @@ def phone_vault_pass(serial: str, force=False):
     try:
         with VAULT.lock:
             PHONE_VAULT["last"] = phone_vault.sync(adb_path(), serial, VAULT.root, CONFIG.get("phone_vault_dir", "/sdcard/Documents/BlackLab"),
-                                                   CACHE_DIR / "phone-vault.json", on_pull=pulled)
+                                                   CACHE_DIR / "phone-vault.json", on_pull=pulled,
+                                                   include_local=CONFIG.get("phone_vault_local", False) is True)
             VAULT.commit("Phone sync (Obsidian on the phone)" if PHONE_VAULT["last"]["pulled"] else "", min_gap=0 if PHONE_VAULT["last"]["pulled"] else 300)
         PHONE_VAULT["error"] = None
     except Exception as e:
@@ -1844,6 +2106,8 @@ def main():
     threading.Thread(target=memory_keeper, daemon=True).start()
     if VAULT_ON:
         threading.Thread(target=vault_keeper, daemon=True, name="vault").start()
+        if CONFIG.get("atlas", True) is not False:
+            threading.Thread(target=atlas_keeper, daemon=True, name="atlas").start()
     if CONFIG.get("library", True) is not False:
         threading.Thread(target=library_keeper, daemon=True, name="library").start()
     agents.setup(sys.modules[__name__])

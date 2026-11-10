@@ -23,7 +23,9 @@ def _obsidian() -> dict[str, str]:
     core = {k: True for k in ("file-explorer", "global-search", "switcher", "graph", "backlink", "outgoing-link", "tag-pane", "properties",
                               "page-preview", "daily-notes", "templates", "note-composer", "command-palette", "editor-status", "bookmarks",
                               "outline", "word-count", "file-recovery", "canvas", "bases", "slash-command", "random-note", "workspaces")}
-    core.update({"sync": False, "publish": False, "audio-recorder": False, "markdown-importer": False, "zk-prefixer": False, "slides": False})
+    # every core plugin on, except the two paid Obsidian services that would send the vault off this machine
+    core.update({"audio-recorder": True, "markdown-importer": True, "zk-prefixer": True, "slides": True, "footnotes": True, "webviewer": True,
+                 "sync": False, "publish": False})
     return {
         ".obsidian/app.json": j({"newFileLocation": "folder", "newFileFolderPath": FOLDERS["inbox"], "attachmentFolderPath": FOLDERS["attachments"],
                                  "useMarkdownLinks": False, "alwaysUpdateLinks": True, "showLineNumber": True, "readableLineLength": True,
@@ -158,6 +160,172 @@ views:
       - type
       - agent
       - date
+""",
+        f"{b}/Atlas.base": """filters:
+  and:
+    - file.inFolder("85 Atlas")
+views:
+  - type: table
+    name: Everything on this computer
+    order:
+      - file.name
+      - type
+      - format
+      - size
+      - modified
+      - nodes
+  - type: table
+    name: Documents
+    filters:
+      and:
+        - type == "document"
+    order:
+      - file.name
+      - format
+      - pages
+      - modified
+      - nodes
+  - type: table
+    name: Projects
+    filters:
+      and:
+        - type == "project"
+    order:
+      - file.name
+      - branch
+      - release
+      - repo
+  - type: table
+    name: Media
+    filters:
+      or:
+        - type == "media"
+        - type == "media-collection"
+    order:
+      - file.name
+      - media
+      - year
+      - resolution
+      - size
+  - type: table
+    name: Folders
+    filters:
+      and:
+        - type == "folder"
+    order:
+      - file.name
+      - cards
+      - files
+      - source
+""",
+        f"{b}/Entities.base": """filters:
+  and:
+    - type == "entity"
+views:
+  - type: table
+    name: All people & topics
+    order:
+      - file.name
+      - entity
+      - mentions
+      - nodes
+  - type: table
+    name: People
+    filters:
+      and:
+        - entity == "person"
+    order:
+      - file.name
+      - mentions
+      - nodes
+  - type: table
+    name: Organizations
+    filters:
+      and:
+        - entity == "organization"
+    order:
+      - file.name
+      - mentions
+  - type: table
+    name: Equipment
+    filters:
+      and:
+        - entity == "equipment"
+    order:
+      - file.name
+      - mentions
+  - type: table
+    name: Credentials
+    filters:
+      and:
+        - entity == "credential"
+    order:
+      - file.name
+      - mentions
+  - type: table
+    name: Topics
+    filters:
+      and:
+        - entity == "topic"
+    order:
+      - file.name
+      - mentions
+      - nodes
+  - type: table
+    name: Places
+    filters:
+      and:
+        - entity == "place"
+    order:
+      - file.name
+      - mentions
+""",
+        f"{b}/Guides.base": """filters:
+  and:
+    - type == "guide"
+views:
+  - type: table
+    name: All guides
+    order:
+      - file.name
+      - guide_kind
+      - format
+      - pages
+      - nodes
+      - source
+  - type: table
+    name: User guides
+    filters:
+      and:
+        - guide_kind == "user"
+    order:
+      - file.name
+      - source
+  - type: table
+    name: Technical guides
+    filters:
+      and:
+        - guide_kind == "technical"
+    order:
+      - file.name
+      - source
+  - type: table
+    name: How-to guides
+    filters:
+      and:
+        - guide_kind == "how-to"
+    order:
+      - file.name
+      - source
+  - type: table
+    name: Training & study
+    filters:
+      and:
+        - guide_kind == "training"
+    order:
+      - file.name
+      - pages
+      - source
 """,
         f"{b}/Learning.base": """filters:
   or:
@@ -307,4 +475,200 @@ def files(v) -> dict[str, str]:
 
 def always(v) -> dict[str, str]:
     """BlackLab-owned: refreshed on every start."""
-    return {}
+    return guides()
+
+
+# ---------------------------------------------------------------- BlackLab's own guides (refreshed with the code)
+
+def _guide(title: str, kind: str, body: str) -> str:
+    return (f"---\ntype: guide\nguide_kind: {kind}\nsource: BlackLab\nup: [\"[[◆ Knowledge Library]]\", \"[[◆ AI & Automation]]\"]\n"
+            f"tags: [guide, guide/{kind}, system/guide]\nmanaged_by: blacklab\n---\n"
+            f"%% This guide is refreshed by BlackLab with every companion update — write your own notes in another note and link it here. %%\n"
+            f"# {title}\n\n{body.strip()}\n\n---\n**All BlackLab guides:** [[BlackLab User Guide]] · [[BlackLab Technical Guide]] · [[BlackLab How-to Guides]] · "
+            f"[[BlackLab Training Guide]] · every other guide on this computer: [[85 Atlas/📘 Guides|📘 Guides]]\n")
+
+
+USER_GUIDE = """
+> [!abstract] Your living graph
+> This vault is the second brain behind BlackLab: everything the phone, the desktop AI, your AI agents and **this computer** know, linked into one graph that grows on its own. You read and write it in Obsidian (here and on the phone); BlackLab keeps it current every 10 minutes.
+
+## Where to start
+- **[[Home]]** — today so far, areas, dashboards, recent AI visitors.
+- **[[◉ Nexus]]** — the brain: every node, how many notes it holds, what's active.
+- **[[85 Atlas/🖥️ This Computer|🖥️ This Computer]]** — this machine: hardware, disks, services, toolchains, local AI models, and every folder, document, guide, project and media file, one card each.
+- **[[85 Atlas/📘 Guides|📘 Guides]]** — every user, technical, how-to and training guide on the computer.
+- **Bookmarks › 🕸️ Graph views** — saved graphs: the brain, everything, each node, *This computer*, *People & topics*, *Guides*, *Imported vaults*.
+
+## The parts of the vault
+| Folder | What's in it | Synced to GitHub? |
+|---|---|---|
+| `00 Inbox` | Quick captures from you, the phone and AIs | yes |
+| `01 Daily` | One note per day: agenda + timeline of what happened | yes |
+| `02 Projects` … `80 Knowledge` | Facility, garage, work, learning, notes, meetings, AI, your knowledge | yes |
+| `Nodes/` | The nodes (◆) and subnodes (◇) — the graph's hubs | yes |
+| `85 Atlas` | Cards for everything on this computer | **no — this computer only** |
+| `86 Imported` | Your other Obsidian vaults, note for note, kept in sync | **no** |
+| `87 Entities` | People, organizations, equipment, credentials, projects, places, topics | **no** |
+| `90 System` | Bases (dashboards), templates, graph health, these guides | yes |
+| `95 Library` | Offline reference library cards | yes (files no) |
+| `99 Archive` | Anything whose source disappeared — nothing is ever deleted | yes |
+
+## Nodes — no fixed number
+Seventeen nodes are built in (Facility Operations, Life Safety & Compliance, Peer Support & Milieu Safety, Leadership & Team, Vendors & Contracts, Finance & Budget, Projects & Engineering, AI & Automation, Learning & Credentials, Knowledge Library, Vehicles & Travel, Home Family & Health, Time Goals & Planning, IT Networking & Systems, Media Library, Mining & Crypto, People & Relationships). You or an AI can add as many more as your life needs — see [[BlackLab How-to Guides#Add a new node]]. A note joins a node when it has `up:` pointing at the node (e.g. `up: "[[◆ Facility Operations]]"`), lives in the node's folder, has its type or tag, or mentions its keywords.
+
+## People & topics
+Every document, imported note and vault note is read for the people, organizations, equipment, credentials, projects, places and topics it's about. Each gets a note in `87 Entities`, linked to everything that mentions it, so documents that share a vendor, a standard or a person are connected even if you never linked them. Add what you know about a person *below* the managed part of their note (role, last contact, next step) — never health information.
+
+## Talking to it
+On the phone or the desktop assistant:
+- *“save this to Obsidian: …”* — quick capture into the inbox.
+- *“search my vault for chiller”* — full-text search (includes the Atlas and every guide).
+- *“show RTU-4 in my graph”* — opens that note's local graph in Obsidian.
+- *“look it up in the library: Legionella water management”* — the offline library.
+
+## Privacy, in one paragraph
+Nothing clinical, no patient or Behavioral Health information, no keys, passwords, tokens or VINs are ever written — documents that mention them get the passage left out and the card says so. Protected folders (wallets, keys, browser profiles, the Crypto Desk) are never opened. Everything about this computer stays on this computer: the Atlas, imported vaults and people notes are git-ignored, and synced notes only count them.
+"""
+
+TECH_GUIDE = """
+## Architecture
+The BlackLab desktop companion (`desktop/companion/`, systemd user service, port 8770) owns the vault engine:
+
+| Module | Job |
+|---|---|
+| `vault.py` | The engine: managed blocks (`%% blacklab:begin/end %%`), frontmatter merge, timeline, archive-not-delete, search, git commit + push |
+| `vault_nodes.py` | Nodes, subnodes, the Nexus and the Neural Map canvas; the **node registry** (`90 System/Node Registry.json`, unlimited) |
+| `vault_atlas.py` | **The Atlas**: walks this computer, cards documents/guides/media/projects, folder notes, 🖥️ This Computer, 📘 Guides, imports other vaults |
+| `vault_entities.py` | **People & topics**: known lists + the local model (Ollama) → `87 Entities`, links on cards |
+| `vault_graph.py` | Graph colors, forces, saved views, Graph Health, related links (nomic embeddings), pinned plugins |
+| `vault_mcp.py` | The MCP server every AI agent uses (`blacklab-vault`) |
+| `guards.py` | Every safety rule (protected paths, clinical guard, secret scrubbing, `vault_safe_passages`) |
+
+## Schedule
+- **Vault pass** every 10 min (`vault_every_s`): phone feed, meetings, briefs, task logs, conversations, projects, file activity, library cards, nodes, graph, Home, commit + push.
+- **Atlas pass** every 30 min (`atlas_every_s`): scan (size + mtime, only changed files are read) → import vaults → cards → people & topics (up to `entities_llm_per_pass` documents through the model; paused while night mining runs).
+- **Phone mirror** every 5 min while the phone is linked (adb).
+
+## Configuration (`~/.config/blacklab-desktop/config.json`)
+| Key | Default | Meaning |
+|---|---|---|
+| `atlas` | true | Turn the Atlas on/off |
+| `atlas_roots` | `["~"]` | Folders to map |
+| `atlas_exclude` | `[]` | Paths to skip (prefixes, `~` allowed) |
+| `atlas_exclude_names` | `[]` | Folder names to skip anywhere |
+| `atlas_guide_roots` | toolchain docs | Extra folders whose documents are all guides (globs) |
+| `atlas_system_guides` | true | Guide-named manuals from installed software (`/usr/share/doc`) |
+| `atlas_text_chars` | 12000 | Text shown on a card |
+| `vault_import` / `vault_import_skip` | registered vaults | Extra vaults to import / folders to leave out per vault |
+| `entities`, `entities_llm`, `entities_model`, `entities_llm_per_pass` | true, true, the chat model, 60 | People & topics |
+| `vault_max_nodes` | 500 | Safety cap for agent-created nodes |
+| `atlas_path_rules` | `[]` | Your own folder → node rules, e.g. `[["Desktop/Certs", ["learning"], 25]]` |
+| `phone_vault_local` | false | Also copy the Atlas, imported vaults and people & topics to the phone (its shared storage) |
+
+## State (`~/.cache/blacklab-desktop/vault/`)
+`atlas.json` (one record per file: signature, sha256, kind, nodes, guide kind) · `atlas_text/` (safe extracted text) · `entities.json` · `related.json` + `related_local.json` · `collections.json` (what each writer wrote, for archiving) · `timeline/`.
+
+## Privacy mechanics
+1. `.gitignore` holds `85 Atlas/`, `86 Imported/`, `87 Entities/`; `vault_nodes.LOCAL_PREFIXES` makes synced notes (nodes, Nexus, Graph Health) count local notes without naming them; related links never cross from synced to local notes.
+2. `guards.is_protected` + `PROTECTED_NAME_RE` (keys, wallets, `client_secret*`, `.env`, keystores) — never opened. Hidden folders are never walked.
+3. `guards.vault_safe_passages` drops clinical / off-the-record paragraphs and scrubs keys, tokens, passwords, card numbers, VINs.
+4. Entities are verified word-for-word against the text; software manuals don't go through the model.
+
+## MCP tools
+`vault_checkin` · `vault_status` · `vault_search` · `vault_read` · `vault_write` · `vault_log` · `vault_capture` · `vault_recent` · `vault_nodes` · `vault_node_add` · **`vault_node_create`** · **`vault_atlas`** · `vault_library_search`.
+
+## Tests
+`python3 -m unittest discover -s desktop/companion/tests` (guards, vault, nodes, graph, atlas, entities, library, reverse).
+
+## Troubleshooting
+- *A file isn't showing up* — is it hidden, protected, in a skipped folder (`node_modules`, `build`, `Android`, `go`, `snap`), or a format the Atlas lists but doesn't read (code, JSON)? Folder notes list every file they don't card.
+- *“N private passages left out”* — the clinical guard matched a paragraph; by design.
+- *People & topics are behind* — `vault_atlas` shows `entity_llm_pending`; the model only runs outside night mining.
+- *Obsidian feels slow on the full graph* — use a saved view; installed-software manuals are filtered out of the default graph.
+"""
+
+HOWTO_GUIDE = """
+## Add a new node
+- **Ask an AI:** “create a vault node for *Grant Writing* — mission: win funding for facility projects; related to finance and projects.” (MCP `vault_node_create`)
+- **By hand:** add an entry to `90 System/Node Registry.json`:
+  ```json
+  {"id": "grants", "name": "Grant Writing", "emoji": "✍️", "mission": "Win funding for facility projects.",
+   "synapses": ["finance", "projects"], "keywords": ["grant", "rfp", "funding", "proposal"], "tags": ["grants"]}
+  ```
+  The next pass creates `Nodes/◆ Grant Writing.md`, its color group, its saved graph view and its place on the Nexus and the Neural Map.
+
+## Make a note join a node
+Add to its properties: `up: "[[◆ Facility Operations]]"` (several are fine). Or give it the node's tag, or put it in the node's folder.
+
+## Add knowledge to a node
+Write under the node's **## Knowledge** heading (below the managed part) — or ask an AI: “add to the Life Safety node: …”.
+
+## Find every guide
+Open [[85 Atlas/📘 Guides|📘 Guides]] or Bases › *Guides*, or search `tag:#guide/how-to` (also `guide/user`, `guide/technical`, `guide/training`).
+
+## Rescan the computer now
+Ask an AI to call `vault_atlas` with `rescan: true`, or run `python3 desktop/companion/vault_atlas.py`.
+
+## Leave a folder out of the Atlas
+Add it to `atlas_exclude` in the companion config (e.g. `"~/Downloads/old"`) and restart the companion; its cards move to `99 Archive` on the next pass.
+
+## Add another folder of guides
+Add a glob to `atlas_guide_roots` (e.g. `"~/Manuals"`); every document under it becomes a guide card.
+
+## Import another Obsidian vault
+Open it once in Obsidian (so it's registered) or add its path to `vault_import`. It appears under `86 Imported/<name>` on the next Atlas pass and stays in sync; the original is never changed.
+
+## Fill in a person
+Open the person in `87 Entities/People`, write below the managed part: role, organization, how you know them, last contact, next step.
+
+## See what something is connected to
+Open the note → *Open local graph* (or say “show *X* in my graph”). Breadcrumbs' trail at the top shows where it sits (card → folder → … → This Computer → Nexus).
+
+## Get something back
+Nothing is deleted: look in `99 Archive/`, or use the git history (*Obsidian Git* or `git log` in the vault).
+"""
+
+TRAINING_GUIDE = """
+> [!info] Five short sessions (about 30 minutes each). Do them in order; each ends with a check.
+
+## Session 1 — Orientation
+1. Open [[Home]], then [[◉ Nexus]]. Read the node table: which nodes are busiest?
+2. Open Bookmarks › 🕸️ Graph views › *◉ The brain*. Drag a node; notice the synapses (orange) between nodes.
+3. Open today's daily note from Home.
+- **Check:** you can name three nodes and say what their mission is.
+
+## Session 2 — Your computer in the graph
+1. Open [[85 Atlas/🖥️ This Computer|🖥️ This Computer]]. Read the hardware, disks and services.
+2. Follow *Home folder* → *Desktop* → a folder you use. Open a document card: summary, file link, nodes, text.
+3. Open the graph view *🖥️ This computer (Atlas)*.
+- **Check:** find the card of a PDF you care about and open the original from it.
+
+## Session 3 — Guides and learning
+1. Open [[85 Atlas/📘 Guides|📘 Guides]]. Pick one training guide and one how-to guide.
+2. Search `tag:#guide/training`. Open [[◆ Learning & Credentials]] and see its *On this computer* count.
+3. Link a guide from a course note: type two square brackets and start typing the guide's name.
+- **Check:** you can find every guide for a project in under 30 seconds.
+
+## Session 4 — People & topics
+1. Open `87 Entities` › *🎓 Credentials* and *💡 Topics*. Open a topic: which documents mention it, what does it keep company with?
+2. Open a person; add role and last contact below the managed part.
+3. Open the graph view *👥 People & topics*.
+- **Check:** pick a standard (e.g. NFPA 101) and list three documents that mention it.
+
+## Session 5 — Growing it with AI
+1. Ask your assistant: “save this to Obsidian: idea for the PM program …”.
+2. Ask Claude (MCP): “add to the Facility node: AHU filter change every 90 days, MERV 13”.
+3. Ask: “create a node for *<something new in your life>*”. Watch it appear on the Nexus.
+- **Check:** the new node shows on the Neural Map and has its own graph view.
+
+## Keep it healthy (monthly, 10 minutes)
+[[Graph Health]] (orphans, unresolved links) · inbox to zero · skim `99 Archive` · add one primer section to a quiet node.
+"""
+
+
+def guides() -> dict[str, str]:
+    g = f"{FOLDERS['system']}/Guides"
+    return {f"{g}/BlackLab User Guide.md": _guide("📗 BlackLab User Guide", "user", USER_GUIDE),
+            f"{g}/BlackLab Technical Guide.md": _guide("🛠️ BlackLab Technical Guide", "technical", TECH_GUIDE),
+            f"{g}/BlackLab How-to Guides.md": _guide("🧭 BlackLab How-to Guides", "how-to", HOWTO_GUIDE),
+            f"{g}/BlackLab Training Guide.md": _guide("🎓 BlackLab Training Guide", "training", TRAINING_GUIDE)}

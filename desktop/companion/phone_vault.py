@@ -19,6 +19,9 @@ import time
 from pathlib import Path
 
 SKIP_TOP = {".git", ".trash"}
+# The Atlas, imported vaults and people & topics stay on the computer (phone shared storage is readable by other apps);
+# config "phone_vault_local": true copies them too.
+LOCAL_TOP = {"85 Atlas", "86 Imported", "87 Entities", "88 Drive", "89 Mobile"}
 PHONE_LOCAL = ("workspace", "workspace-mobile", "cache")  # .obsidian files the phone keeps for itself
 MARKER = ".blacklab-sync"
 
@@ -31,13 +34,13 @@ def _sh(adb, serial, cmd: str, timeout=120) -> str:
     return _adb(adb, serial, "shell", cmd, timeout=timeout).stdout
 
 
-def local_files(root: Path) -> list[str]:
+def local_files(root: Path, include_local: bool = False) -> list[str]:
     out = []
     for p in root.rglob("*"):
         if not p.is_file():
             continue
         rel = p.relative_to(root)
-        if rel.parts[0] in SKIP_TOP or p.name.startswith(".") and p.name != ".gitignore":
+        if rel.parts[0] in SKIP_TOP or (rel.parts[0] in LOCAL_TOP and not include_local) or p.name.startswith(".") and p.name != ".gitignore":
             continue
         if rel.parts[0] == ".obsidian" and any(p.stem.startswith(x) for x in PHONE_LOCAL):
             continue
@@ -45,7 +48,7 @@ def local_files(root: Path) -> list[str]:
     return sorted(out)
 
 
-def sync(adb: str, serial: str, root: Path, dest: str, state_file: Path, on_pull=None) -> dict:
+def sync(adb: str, serial: str, root: Path, dest: str, state_file: Path, on_pull=None, include_local: bool = False) -> dict:
     state = json.loads(state_file.read_text()) if state_file.exists() else {}
     dq = shlex.quote(dest)
     _sh(adb, serial, f"mkdir -p {dq}")
@@ -55,7 +58,7 @@ def sync(adb: str, serial: str, root: Path, dest: str, state_file: Path, on_pull
         changed = _sh(adb, serial, f"cd {dq} && find . -type f -newer {MARKER} \\( -name '*.md' -o -name '*.canvas' \\) ! -path '*/.obsidian/*'")
         for line in changed.splitlines():
             rel = line.strip().removeprefix("./")
-            if not rel or rel.startswith("."):
+            if not rel or rel.startswith(".") or (rel.split("/")[0] in LOCAL_TOP and not include_local):
                 continue
             target = root / rel
             target.parent.mkdir(parents=True, exist_ok=True)
@@ -69,7 +72,7 @@ def sync(adb: str, serial: str, root: Path, dest: str, state_file: Path, on_pull
     if pulled and on_pull:
         on_pull(pulled)
     # 2. push the desktop's changes (newer files only)
-    files = local_files(root)
+    files = local_files(root, include_local)
     tops = sorted({f.split("/")[0] for f in files if "/" in f and not f.startswith(".obsidian/")})
     for t in tops:
         _adb(adb, serial, "push", "--sync", str(root / t), f"{dest}/", timeout=1800)

@@ -2,6 +2,48 @@
 
 All notable changes to BlackLab are documented here. The project follows [Semantic Versioning](https://semver.org/).
 
+## [5.13.0] — 2026-11-10 (companion 1.7.0)
+
+Your whole computer is now part of the living graph, your AI has 283 expert skills, and you can ask your notes questions in plain words.
+
+### Added
+- **Agent skills** (`agent_skills.py`): 283 skills from five open libraries — [Anthropic](https://github.com/anthropics/skills), [Vercel](https://github.com/vercel-labs/agent-skills), [OpenAI](https://github.com/openai/skills), [Google](https://github.com/google/skills) and [Hugging Face](https://github.com/huggingface/skills). They cover PDF, Word, Excel and PowerPoint, web and app design, React and Next.js, Google Cloud, Vercel, Hugging Face models and datasets, MCP servers and writing.
+  - The desktop AI can use them through the new `skills_search` and `skill_use` tools. A request that names a skill starts with it already loaded, and close matches are suggested to the model.
+  - On the phone, ask *"what skills do you have"*, *"find a skill for …"* or *"use the xlsx skill to …"*. MCP agents use `vault_skills`.
+  - Each skill gets a card in `70 AI/Skills/`, linked to its library and to the node it serves.
+  - The libraries are shallow clones on this computer, updated weekly. Their scripts never run, and the clones are never copied into this repository.
+- **Ask my notes** (`vault_recall.py`): semantic recall over the whole vault through kb-core, from the OMNIX project.
+  - It combines keyword and vector search (nomic-embed-text) with a calibrated relevance score, so it can answer "nothing relevant".
+  - The local model answers from your notes and cites them. On the phone: *"what do my notes say about …"*. MCP: `vault_ask`. The desktop AI's vault search uses it too.
+  - Phone requests search only synced notes. If kb-core isn't running, it falls back to keyword search.
+- **Facility operations** (`facility_ops.py`):
+  - Templates you can edit: EOC rounds, fire & life-safety audit, daily ops report, PM calendar, CMS-2567 plan of correction and facility incident report. *"Start EOC rounds"* creates a dated checklist.
+  - A **panel directory**: *"which breaker feeds room 214"* (panel-schedule notes → a room-to-circuit index).
+  - An **SDS binder** with storage-conflict checks (oxidizers with flammables, acids with bases, bleach with ammonia or acids) and revisions older than 3 years flagged.
+  - *"Shift prep"*: what's overdue, open work orders, rounds, SDS and credential renewals.
+- **Credentials & renewals** (`vault_credentials.py`): your own table plus the app's certifications. It shows what's expired or due within 90 days, and accepts renewal rules like `10/2028` or `+12m`.
+- **Activity ledger** (`audit.py`): every vault change, job and AI tool call is one line in MemResort's observation schema, hash-chained like OMNIX's audit log. Editing or removing a past line shows up in **90 System/Activity Ledger**, and the AI Registry shows what each agent did. MCP: `vault_ledger`.
+- **Color everywhere** (`vault_colors.py`):
+  - Every node, and everything belonging to it, wears the node's color: graph groups, a shade per subnode and per skill library, note titles and headings, folders in the explorer, tags, and `> [!facility]`-style callouts.
+  - Extended Graph adds folder hulls and tag arcs.
+  - Graph colors are restored on every pass, because Obsidian on the phone was writing them back empty.
+- **Graph FX** (`desktop/obsidian/blacklab-graph-fx`), BlackLab's own Obsidian plugin with three new graph animations:
+  - ⚡ synapse signals travel the links in their note's color, and busy notes fire more;
+  - 💓 a live pulse ripples from any note that changes (you, the phone, an AI) and bursts signals to its neighbors;
+  - 🎞️ a time-lapse replays the vault being built, note by note, with the date running.
+- **Web UI:** the Obsidian vault page has *Ask*, *Skills*, shift prep, EOC rounds, a breaker lookup, credentials, and recall and ledger status.
+- **The Atlas** (`vault_atlas.py`): a card for every document, guide, photo, video and project on the computer, a folder note for every folder on the way, and **🖥️ This Computer** (hardware, disks, services, toolchains, local AI models, apps). Only changed files are re-read, every 30 minutes. Cards stay on this computer: `85 Atlas/` is git-ignored.
+- **The Atlas** (`vault_atlas.py`): a card for every document, guide, photo, video and project on the computer, a folder note for every folder on the way, and **🖥️ This Computer** (hardware, disks, services, toolchains, local AI models, apps). Only changed files are re-read, every 30 minutes. Cards stay on this computer: `85 Atlas/` is git-ignored.
+- **Every guide in one place:** user, technical, how-to and training guides (yours, your projects', your toolchains' and installed software's) are `type: guide` cards gathered in **📘 Guides** and Bases › *Guides*. BlackLab now ships its own User, Technical, How-to and Training guides in `90 System/Guides`.
+- **Other vaults imported:** every Obsidian vault on the machine is brought into `86 Imported/` note for note and kept in sync. The originals are never changed.
+- **People & topics** (`vault_entities.py`): people, organizations, equipment, credentials, projects, places and topics found across your documents become linked notes in `87 Entities/`, using known lists plus the local model. A name is kept only if it appears word for word in the text.
+- **Unlimited nodes:** four new built-in nodes (IT, Networking & Systems · Media Library · Mining & Crypto · People & Relationships) and a node registry (`90 System/Node Registry.json`) for as many more as you need. A note now joins a node through its `up:` link too.
+- MCP tools `vault_node_create` and `vault_atlas`. New graph views: *This computer*, *People & topics*, *Guides*, *Imported vaults*.
+
+### Privacy
+- `guards.vault_safe_passages` leaves out only the clinical or off-the-record paragraphs of a long document, so the rest of it can still be indexed. More secret patterns are scrubbed (OAuth client secrets, AWS keys, bearer tokens, JWTs, `key = value` secrets), and files such as `client_secret*.json`, `.env` and `token.json` are never opened.
+- Synced notes (nodes, Nexus, Graph Health) count local notes without naming them. Related links never point from a synced note to a local one.
+
 ## [5.12.0] — 2026-11-09
 
 Your computer can now reverse engineer software for you. Point it at a program, APK, library or firmware image and the desktop AI decompiles it with Ghidra and explains it, citing the evidence.

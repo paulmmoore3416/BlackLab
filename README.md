@@ -48,6 +48,15 @@ Optimized for the **Google Pixel 10 Pro XL** and newer (Android 15+).
 - Online extras: Gmail, Google Drive, Google Keep, Google developer docs; ElevenLabs voice with an offline fallback
 - Keys are encrypted with a hardware-backed Keystore key and never backed up or synced
 
+### 🕸️ Second brain: Obsidian vault, agent skills & facility ops
+- **Living Obsidian vault** on your computer: everything you do on the phone and desktop (tasks, work orders, facility logs, meetings, journal, recordings) becomes linked notes. Nodes for every area of your life and work, a living graph, an offline reference library, and an Atlas of every file on the computer. Any AI with the vault MCP server can read and write it, under the same privacy rules
+- **Ask my notes:** *"what do my notes say about the boiler vendor?"* — semantic recall (kb-core) answered by your local model, with the notes it used
+- **283 agent skills** from Anthropic, Vercel, OpenAI, Google and Hugging Face: *"use the xlsx skill to build a PM tracker"*, *"find a skill for filling out a PDF form"*. Scripts never run on their own
+- **Facility ops:** *"shift prep"*, *"start EOC rounds"*, *"which breaker feeds room 214"*, *"SDS for isopropyl alcohol"*, *"when does my BLS expire"*. Templates for EOC rounds, fire & life-safety audits, daily ops reports, PM calendars, CMS-2567 plans of correction and incident reports
+- **Color everywhere and a graph that moves:** each node's color on its notes, folders, tags and callouts. **Graph FX** adds signals traveling the links, a live pulse when a note changes, and a time-lapse of the vault being built
+- **Activity ledger:** a tamper-evident, hash-chained record of every change, job and AI tool call
+- **Reverse engineering** on the computer with REA + Ghidra (read-only)
+
 ### 🚗 Android Auto — built for the 2023 Hyundai Santa Fe
 - **Ask BlackLab** hands-free through the car's microphone, with spoken replies — tasks, calendar, notes, email, summaries, knowledge questions, “navigate to my next meeting”
 - **Brief me** (daily briefing and spoken summaries), **Agenda** with Navigate and Call, **Tasks** with check-off and voice add, **Voice notes**

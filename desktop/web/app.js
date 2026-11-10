@@ -1054,9 +1054,15 @@ Views.vault = () => {
         <textarea id="vText" rows="3" placeholder="A note for 00 Inbox — or pick a node below to add knowledge to it"></textarea>
         <div class="row"><select id="vNode"><option value="">00 Inbox</option>${nodes.map((n) => `<option value="${esc(n.id)}">◆ ${esc(n.name)}</option>`).join('')}</select>
         <button data-vact="save">Save</button></div>
-        <div class="row"><input id="vQuery" placeholder="Search the vault or the offline library"><button class="ghost" data-vact="search">Vault</button><button class="ghost" data-vact="library">Library</button></div>
+        <div class="row"><input id="vQuery" placeholder="Ask your notes, find a skill, or search the vault or library"><button data-vact="ask">Ask</button><button class="ghost" data-vact="search">Vault</button><button class="ghost" data-vact="skills">Skills</button><button class="ghost" data-vact="library">Library</button></div>
         <div id="vOut" class="small"></div></div></div>
     </div>
+    <div class="card" style="margin-top:16px"><h2>Recall, skills & facility</h2><div class="grid g3">
+      <div class="tile"><span class="k">Ask my notes</span><span class="v" style="font-size:18px">${S.recall ? (S.recall.kb_core ? S.recall.indexed + ' notes' : 'keyword only') : '…'}</span><span class="s">${S.recall ? (S.recall.kb_core ? 'kb-core · ' + esc(S.recall.embed_model || '') + (S.recall.pending ? ' · ' + S.recall.pending + ' waiting' : '') : 'start kb-core for semantic recall') : 'Loading…'}</span></div>
+      <div class="tile"><span class="k">Agent skills</span><span class="v" style="font-size:18px">${S.skills && S.skills.skills ? S.skills.skills : '…'}</span><span class="s">${S.skills && S.skills.libraries ? Object.entries(S.skills.libraries).map(([k, n]) => esc(k) + ' ' + n).join(' · ') : 'Anthropic · Vercel · OpenAI · Google · Hugging Face'}</span></div>
+      <div class="tile"><span class="k">Activity ledger</span><span class="v" style="font-size:18px">${S.ledger ? (S.ledger.ok ? 'Intact' : 'Broken') : '…'}</span><span class="s">${S.ledger ? S.ledger.entries + ' hash-chained entries' + (S.ledger.ok ? '' : ' · broken at ' + S.ledger.broken_at) : 'Loading…'}</span></div></div>
+      <div class="row" style="margin-top:12px"><button class="ghost" data-vact="shift">Shift prep</button><button class="ghost" data-vact="round">Start EOC rounds</button><input id="vPanel" placeholder="Room, load or panel — e.g. 214, AHU-5"><button class="ghost" data-vact="panel">Breaker</button><button class="ghost" data-vact="creds">Credentials</button></div>
+      <div id="vOps" class="small" style="margin-top:8px"></div></div>
     <div class="card" style="margin-top:16px"><h2>Offline library</h2>${S.libStatus ? `<div class="grid g3">
       <div class="tile"><span class="k">On disk</span><span class="v" style="font-size:18px">${S.libStatus.gb_on_disk} / ${S.libStatus.gb_planned} GB</span><span class="s">${S.libStatus.books_ok} of ${S.libStatus.books_planned} books · ${S.libStatus.docs_ok} documents</span></div>
       <div class="tile"><span class="k">Budget</span><span class="v" style="font-size:18px">${S.libStatus.nodes_gb} + ${S.libStatus.core_gb} GB</span><span class="s">nodes & subnodes + core (Wikipedia)</span></div>
@@ -1076,6 +1082,9 @@ Views.vault.bind = () => {
   if (!S.vaultNodes && Companion.ok) Companion.req('/local/vault/nodes', {}).then((r) => { S.vaultNodes = r.nodes; render(); }).catch(() => {});
   if (!S.libStatus && Companion.ok) Companion.req('/local/vault/library_status', {}).then((r) => { S.libStatus = r; render(); }).catch(() => {});
   if (!S.vaultGraph && Companion.ok) Companion.req('/local/vault/graph', {}).then((r) => { S.vaultGraph = r; render(); }).catch(() => {});
+  if (!S.recall && Companion.ok) Companion.req('/local/vault/recall_status', {}).then((r) => { S.recall = r; render(); }).catch(() => {});
+  if (!S.skills && Companion.ok) Companion.req('/local/vault/skills', {}).then((r) => { S.skills = r; render(); }).catch(() => {});
+  if (!S.ledger && Companion.ok) Companion.req('/local/vault/ledger', {}).then((r) => { S.ledger = r; render(); }).catch(() => {});
   document.querySelectorAll('[data-vshow]').forEach((a) => a.onclick = async (e) => {
     e.preventDefault();
     try { const r = await Companion.req('/local/vault/show', { query: a.dataset.vshow }); toast(r.message || 'Opening'); } catch (err) { toast(err.message); }
@@ -1099,6 +1108,20 @@ Views.vault.bind = () => {
         const r = await Companion.req('/local/vault/library', { query: $('#vQuery').value, limit: 8 });
         out((r.results || []).map((h) => h.error ? esc(h.error) : `<div><a href="${esc(h.url)}" target="_blank" rel="noopener"><b>${esc(h.title)}</b></a> <span class="muted">${esc(h.book)}</span><br>${esc(h.snippet.slice(0, 220))}</div>`).join('<hr>') || 'No matches.');
       }
+      const ops = (html) => { const el = $('#vOps'); if (el) el.innerHTML = html; };
+      if (a === 'ask') {
+        out('<span class="muted">Thinking with your notes…</span>');
+        const r = await Companion.req('/local/vault/ask', { query: $('#vQuery').value, answer: true });
+        out(r.ok === false ? esc(r.error || 'No answer') : `<div style="white-space:pre-wrap">${esc(r.answer || '')}</div><div class="muted" style="margin-top:6px">${esc(r.engine || '')} · ${(r.sources || []).map(esc).join(' · ')}</div>`);
+      }
+      if (a === 'skills') {
+        const r = await Companion.req('/local/vault/skills', { query: $('#vQuery').value });
+        out((r.results || []).map((h) => `<div><a href="${esc(h.url)}" target="_blank" rel="noopener"><b>${esc(h.name)}</b></a> <span class="muted">${esc(h.library)}</span><br>${esc(h.description.slice(0, 220))}</div>`).join('<hr>') || esc(r.message || r.error || 'No skills match.'));
+      }
+      if (a === 'shift') { const r = await Companion.req('/local/vault/shift_prep', {}); ops(`<div style="white-space:pre-wrap">${esc(r.message || r.error || '')}</div>`); }
+      if (a === 'round') { const r = await Companion.req('/local/vault/round', { kind: 'eoc', source: 'BlackLab Desktop' }); ops(esc(r.message || r.error || '')); }
+      if (a === 'panel') { const r = await Companion.req('/local/vault/panel', { query: $('#vPanel').value }); ops(esc(r.message || r.error || '')); }
+      if (a === 'creds') { const r = await Companion.req('/local/vault/credentials', {}); ops(esc(r.message || r.error || '')); }
       if (a === 'search') {
         const r = await Companion.req('/local/vault/search', { query: $('#vQuery').value, limit: 8 });
         out((r.results || []).map((h) => `<div><b>${esc(h.title)}</b> <span class="muted">${esc(h.path)}</span><br>${esc(h.snippet.slice(0, 220))}</div>`).join('<hr>') || 'No matches.');

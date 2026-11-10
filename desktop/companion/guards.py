@@ -53,7 +53,8 @@ PROTECTED_DEFAULT = (
     ".config/chromium", ".electrum", ".bitcoin", ".monero", ".aws", ".kube", ".docker/config.json", ".netrc", ".git-credentials",
 )
 PROTECTED_NAME_RE = re.compile(r"(seed|mnemonic|recovery[ _-]?phrase|private[ _-]?key|wallet\.(dat|json)|keystore|\.jks$|\.pem$|id_rsa|"
-                               r"id_ed25519|secrets?\.json)", re.I)
+                               r"id_ed25519|secrets?\.json|client_secret|credentials?\.json|\.env$|\.env\.|token\.json|\.kdbx$|\.p12$|\.pfx$|\.key$|passwords?|passwd|passcodes?|credentials?|\blogins?\b|🔐|🔑|"
+                               r"\bkeys?\W{0,3}(?:information|info|list|codes?|vault)\b|recovery codes?|backup codes?|2fa|authenticator)", re.I)
 
 
 def protected_paths(home: Path, extra=()) -> list[Path]:
@@ -97,6 +98,13 @@ REDACTIONS = [
     # Secrets that sometimes get pasted into a chat
     (re.compile(r"\b(AIza[0-9A-Za-z_-]{35}|sk-ant-[A-Za-z0-9_-]{20,}|gh[pousr]_[A-Za-z0-9]{36,}|sk_[a-f0-9]{48})\b"), "[key removed]"),
     (re.compile(r"(?i)\b(password|passwd|passphrase|pin)\s*(?:is|=|:)\s*\S+"), r"\1 [removed]"),
+    # Secrets inside files the Atlas reads (config, notes, exports)
+    (re.compile(r"-----BEGIN [A-Z ]*PRIVATE KEY-----.*?(?:-----END [A-Z ]*PRIVATE KEY-----|\Z)", re.S), "[private key removed]"),
+    (re.compile(r"\b(GOCSPX-[A-Za-z0-9_-]{20,}|AKIA[0-9A-Z]{16}|xox[abpr]-[A-Za-z0-9-]{10,}|AQ\.[A-Za-z0-9_-]{30,}|ya29\.[A-Za-z0-9_-]{20,}|"
+                r"eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,})\b"), "[key removed]"),
+    (re.compile(r"(?i)\b(bearer)\s+[A-Za-z0-9._~+/=-]{16,}"), r"\1 [removed]"),
+    (re.compile(r"(?i)([\"']?\b(?:api[_-]?key|apikey|secret|client[_-]?secret|access[_-]?token|refresh[_-]?token|auth[_-]?token|token|private[_-]?key|seed|mnemonic)\b[\"']?\s*[:=]\s*)[\"']?[^\s\"',}]{8,}[\"']?"),
+     r"\1[removed]"),
 ]
 VIN_RE = re.compile(r"(?<![A-Z0-9])[A-HJ-NPR-Z0-9]{17}(?![A-Z0-9])")
 
@@ -118,6 +126,20 @@ def redact(text: str) -> str:
     for rx, rep in REDACTIONS:
         text = rx.sub(rep, text or "")
     return text
+
+
+def vault_safe_passages(text: str) -> tuple[str, int]:
+    """For long documents (the Atlas, imported vaults): drops each paragraph that looks clinical or off the record and
+    scrubs the rest, so a handbook that mentions patients once still gets indexed — without that passage. Returns
+    (safe text, passages withheld)."""
+    keep, dropped = [], 0
+    for para in re.split(r"\n\s*\n", text or ""):
+        ok, clean = vault_safe(para)
+        if ok:
+            keep.append(clean)
+        elif para.strip():
+            dropped += 1
+    return "\n\n".join(keep), dropped
 
 
 def vault_safe(text: str) -> tuple[bool, str]:
@@ -152,7 +174,8 @@ SIDE_EFFECT_ASKS["reverse_engineer"] = RE_WORDS
 # Tools whose results carry text the user didn't write (files, documents, old chats, web docs, phone data, the vault).
 # Text like that can contain instructions aimed at the model ("open https://…?q=<your notes>").
 READS_CONTENT = {"read_file", "search_documents", "recall_chats", "dev_docs", "phone_command", "find_files", "equipment", "vault_search", "library_search",
-                 "reverse_engineer"}  # strings inside a binary are attacker-chosen text
+                 "reverse_engineer",  # strings inside a binary are attacker-chosen text
+                 "skill_use", "skills_search"}  # agent skills are third-party text
 
 
 def url_host(u: str) -> str:

@@ -71,6 +71,13 @@ object VaultFeed {
                 { Status(false, "Couldn't reach the vault: ${it.message}") })
     }
 
+    /** "save to my private drive (under taxes): …" — the computer files it into Google Drive › BlackLab › Paul's Private. */
+    suspend fun privateDrive(said: String): Status = withContext(Dispatchers.IO) {
+        runCatching { DesktopAi.request("POST", "/phone/vault/drive_save", JSONObject().put("say", said).put("source", "Phone"), 30_000) }
+            .fold({ j -> if (j.optBoolean("ok")) Status(true, j.optString("message").ifBlank { "Saved to your private drive." }, j) else Status(false, j.optString("error").ifBlank { "The private drive didn't take that." }) },
+                { Status(false, "Couldn't reach your computer to save to the private drive: ${it.message}") })
+    }
+
     /** "log to the vault: …" — a line on today's timeline. */
     suspend fun log(title: String, detail: String = ""): Status = withContext(Dispatchers.IO) {
         runCatching { DesktopAi.request("POST", "/phone/vault/log", JSONObject().put("title", title).put("detail", detail).put("kind", "note").put("source", "Phone"), 20_000) }
@@ -89,6 +96,20 @@ object VaultFeed {
     suspend fun library(query: String): Status = withContext(Dispatchers.IO) {
         runCatching { DesktopAi.request("POST", "/phone/vault/library", JSONObject().put("query", query).put("limit", 4), 30_000) }
             .fold({ j -> Status(true, "", j) }, { Status(false, "Couldn't reach the library on your computer: ${it.message}") })
+    }
+
+    /** "what do my notes say about …": kb-core recall on the computer + an answer from its local model, with the notes it used. */
+    suspend fun ask(query: String): Status = withContext(Dispatchers.IO) {
+        runCatching { DesktopAi.request("POST", "/phone/vault/ask", JSONObject().put("query", query).put("answer", true).put("limit", 5), 120_000) }
+            .fold({ j -> if (j.optBoolean("ok")) Status(true, j.optString("answer"), j) else Status(false, j.optString("error").ifBlank { "Your notes didn't answer." }) },
+                { Status(false, "Couldn't reach your computer to ask your notes: ${it.message}") })
+    }
+
+    /** Facility ops on the computer (shift_prep, round, panel, sds, credentials): the computer writes the sentence. */
+    suspend fun facility(op: String, body: JSONObject): Status = withContext(Dispatchers.IO) {
+        runCatching { DesktopAi.request("POST", "/phone/vault/$op", body.put("source", "Phone"), 30_000) }
+            .fold({ j -> if (j.optBoolean("ok", true)) Status(true, j.optString("message"), j) else Status(false, j.optString("error").ifBlank { "The computer didn't take that." }) },
+                { Status(false, "Couldn't reach your computer: ${it.message}") })
     }
 
     suspend fun search(query: String): Status = withContext(Dispatchers.IO) {

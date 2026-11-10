@@ -22,7 +22,7 @@ object Intents {
         HELP, THANKS, GREETING, TIME, DATE, BRIEFING, CREATE_EVENT, AGENDA,
         DICTATE_START, RECORD_START, RECORD_STOP, RECORD_PAUSE, MARKER,
         // LATE: everything after the domain routers
-        WORK_ORDER_NEW, OPS_HANDOFF, TIMELINE, LIBRARY_SEARCH, VAULT_SAVE, VAULT_NODE_ADD, VAULT_LOG, VAULT_SEARCH, VAULT_STATUS, VAULT_SHOW, VAULT_OPEN, VAULT_SYNC,
+        WORK_ORDER_NEW, OPS_HANDOFF, TIMELINE, LIBRARY_SEARCH, SKILL_USE, SKILLS, VAULT_ASK, SHIFT_PREP, ROUNDS_START, PANEL_LOOKUP, SDS_LOOKUP, CREDENTIALS, PRIVATE_DRIVE_SAVE, VAULT_SAVE, VAULT_NODE_ADD, VAULT_LOG, VAULT_SEARCH, VAULT_STATUS, VAULT_SHOW, VAULT_OPEN, VAULT_SYNC,
         WEATHER, REMIND, ADD_TASK, ADD_TO_LIST, TODO_PREFIX, COMPLETE_TASK, LIST_TASKS, SUMMARIZE, MEETING_ACTIONS, NAMEPLATE,
         NAV_NEXT, NAV_NEARBY, NAV_TO, CALL, TALK_ABOUT, KEEP, NOTE, TEMPLATE, JOURNAL_WRITE, JOURNAL_OPEN,
         SCAN_DOCUMENT, SCAN_CODE, PHOTO, VIDEO, PANORAMA, FOCUS, LOG_CEU, GPA, SWITCH_PROFILE, THEME, SET_SETTING, TOGGLE_SETTING,
@@ -78,8 +78,22 @@ object Intents {
         Rule(Id.WORK_ORDER_NEW, Phase.LATE, "^(?:new |create |open |write up |submit |file |put in )?(?:a |an )?(?:work order|wo|maintenance request|service request)(?: for| about)?[:,\\s-]+(.{4,})$|^report (?:a |an )?((?:leak|problem|issue|outage|broken|clog).{3,})$",
             onText = true, guard = { l, _ -> !Regex("name ?plate|data ?plate").containsMatchIn(l) }),
         Rule(Id.LIBRARY_SEARCH, Phase.LATE, "^(?:look (?:it |that )?up|search|check|find)(?: it| that)? in (?:the |my )?(?:offline )?library(?: for)?[:,\\s-]+(.{3,})$|^(?:search|ask) (?:the |my )?(?:offline )?library(?: for| about)?[:,\\s-]+(.{3,})$", onText = true),
+        // Agent skills on the computer (Anthropic, Vercel, OpenAI, Google, Hugging Face): "use the xlsx skill to …", "find a skill for …"
+        Rule(Id.SKILL_USE, Phase.LATE, "^(?:use|apply|with|using) (?:the |my )?([\\w .+/-]{2,60}?) skill\\b[,:]?\\s*(?:to |and |for )?(.+)$", onText = true),
+        Rule(Id.SKILLS, Phase.LATE, "^(?:what|which) (?:agent )?skills (?:do you have|can you use|are (?:installed|available))\\??$|^(?:list|show)(?: me)? (?:your |my |the )?(?:agent )?skills$|^(?:find|is there|do you have|search for) (?:a |an |any )?(?:agent )?skills? (?:for|that|to|about) (.+?)\\??$|^(?:which|what) skill (?:should i use |can help |helps |is best )?(?:for|with|to) (.+?)\\??$", onText = true),
+        // The computer's vault: "what do my notes say about …" (semantic recall through kb-core, answered by the local model)
+        Rule(Id.VAULT_ASK, Phase.LATE, "^(?:ask (?:my |the )?(?:notes|vault|obsidian|second brain)|what (?:do|does) (?:my |the )?(?:notes|vault|second brain) (?:say|know) about|according to my (?:notes|vault),?|check my (?:notes|vault) (?:for|about))[:,\\s-]+(.{3,})$", onText = true),
+        // Facility ops on the computer: shift prep, rounds from templates, the panel directory, the SDS binder
+        Rule(Id.SHIFT_PREP, Phase.LATE, "^(?:shift prep|prep (?:me )?for (?:my |the )?shift|start of shift(?: brief(?:ing)?)?|shift (?:brief(?:ing)?|prep))\\b"),
+        Rule(Id.ROUNDS_START, Phase.LATE, "^(?:start|begin|new|open|do) (?:an? |the |my |today's )?(eoc|environment of care|safety|life[- ]safety|fire(?: (?:and|&) life[- ]safety)?|daily (?:facility |ops )?|facility incident|plan of correction|poc)\\s*(rounds?|audit|walk(?:through)?|report|checklist)?\\b(?: for today)?$", onText = true,
+            guard = { l, m -> m.groupValues[2].isNotBlank() || Regex("plan of correction|poc|incident").containsMatchIn(l) }),
+        Rule(Id.PANEL_LOOKUP, Phase.LATE, "^(?:which|what) (?:breakers?|circuits?|panels?) (?:feeds?|serves?|is|are|controls?|powers?|for)(?: on)? (?:the )?(?:room |rm\\.? ?|#)?(.+?)(?: on)?\\??$|^(?:find|look up|where'?s|where is) (?:the )?(?:breaker|circuit) (?:for |on )?(?:room |rm\\.? ?)?(.+?)\\??$|^(?:panel|circuit) (?:directory|schedule|lookup) (?:for )?(.+)$", onText = true),
+        Rule(Id.SDS_LOOKUP, Phase.LATE, "^(?:pull up |show(?: me)? |find |open |look up )?(?:the )?(?:sds|msds|safety data sheet)s?(?: for| on)?[:\\s]+(.+)$", onText = true),
+        Rule(Id.CREDENTIALS, Phase.LATE, "^(?:when (?:does|do) my (.+?) (?:cert(?:ification)?s? |card |license |credential )?(?:expire|run out|need renew\\w*)\\??$|(?:what|which|any|are|show|list|check)\\b.*\\b(?:certs?|certifications?|credentials?|licen[cs]es)\\b.*\\b(?:expir\\w*|due|renew\\w*|status|current)\\b.*)", onText = true),
         Rule(Id.OPS_HANDOFF, Phase.LATE, "\\b(ops|operations|facility|maintenance) hand ?off\\b|^hand ?off (report|summary)|^end of (the )?day (report|summary|handoff)"),
         Rule(Id.TIMELINE, Phase.LATE, "^(?:show |open )?(?:my |the |today's )?(?:day )?timeline$|^what (?:all )?happened today"),
+        // "save to my private drive: …" — filed into Google Drive › BlackLab › Paul's Private by the computer (before Drive upload)
+        Rule(Id.PRIVATE_DRIVE_SAVE, Phase.LATE, "^(?:please )?(?:save|put|store|add|file|keep|send|upload|back ?up)(?: this| that| it| the following)? (?:to|in|into|on|onto) (?:my |the )?private (?:google )?drive\\b(.*)$", onText = true),
         // Obsidian vault on the computer (first, so "note to the vault: …" isn't a phone note)
         Rule(Id.VAULT_SAVE, Phase.LATE, "^(?:save|add|put|capture|send|note|write)(?: this| that| a note)? (?:to|in|into|on) (?:my |the )?(?:obsidian|vault)(?: vault)?[:,\\s-]+(.{3,})$", onText = true),
         Rule(Id.VAULT_NODE_ADD, Phase.LATE, "^(?:add|save|put)(?: this| that)? (?:to|in|into) (?:the |my )?(.+?) node[:,\\s-]+(.{3,})$", onText = true),

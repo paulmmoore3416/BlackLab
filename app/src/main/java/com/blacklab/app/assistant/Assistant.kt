@@ -225,12 +225,19 @@ class Assistant(private val app: AppContainer) {
         }
         Intents.Id.WORK_ORDER_NEW -> workOrder(m.firstGroup)
         Intents.Id.LIBRARY_SEARCH -> library(m.firstGroup)
+        Intents.Id.SKILLS -> facilityOps(m, t)
+        Intents.Id.SKILL_USE -> {
+            val r = DesktopAi.ask(t) ?: return Reply("Skills run on your computer, and I can't reach it right now. Plug in the phone or use Wireless debugging, then run ./daddyshome.", source = "Agent skills")
+            Reply(r.text.ifBlank { "Done." }, source = r.source.ifBlank { "Desktop · agent skill" })
+        }
+        Intents.Id.VAULT_ASK, Intents.Id.SHIFT_PREP, Intents.Id.ROUNDS_START, Intents.Id.PANEL_LOOKUP, Intents.Id.SDS_LOOKUP, Intents.Id.CREDENTIALS -> facilityOps(m, t)
         Intents.Id.OPS_HANDOFF -> Reply(com.blacklab.app.ui.home.DayTimelineData.handoff(app), listOf(Link("Timeline", "timeline")), source = "Timeline")
         Intents.Id.TIMELINE -> com.blacklab.app.ui.home.DayTimelineData.inputs(app, java.time.LocalDate.now()).let { i ->
             val items = com.blacklab.app.core.DayTimeline.build(i).filter { it.kind != com.blacklab.app.core.DayTimeline.Kind.BH }
             Reply(if (items.isEmpty()) "Nothing logged today yet." else "Today so far: " + items.takeLast(8).joinToString("; ") { "${com.blacklab.app.core.DayTimeline.clock(it.time, i.zone)} ${it.kind.label.lowercase()} — ${it.title}" } + ".",
                 listOf(Link("Timeline", "timeline")), route = "timeline", source = "Timeline")
         }
+        Intents.Id.PRIVATE_DRIVE_SAVE -> privateDrive(t)
         Intents.Id.VAULT_SAVE, Intents.Id.VAULT_NODE_ADD, Intents.Id.VAULT_LOG, Intents.Id.VAULT_SEARCH, Intents.Id.VAULT_STATUS,
         Intents.Id.VAULT_SHOW, Intents.Id.VAULT_OPEN, Intents.Id.VAULT_SYNC -> vault(m)
         Intents.Id.WEATHER -> weather(l)
@@ -307,6 +314,39 @@ class Assistant(private val app: AppContainer) {
     }
 
     // ------------------------------------------------------------------ Obsidian vault (on the computer)
+
+    /** Ask my notes, shift prep, rounds, panels, SDS and credentials — all answered by the computer from the vault. */
+    private suspend fun facilityOps(m: Intents.Match, t: String): Reply {
+        val V = com.blacklab.app.link.VaultFeed
+        if (!s.vaultEnabled) return Reply("The Obsidian vault is off. Turn it on in Settings › Obsidian vault.", route = "settings")
+        if (!DesktopAi.usable) return Reply("I can't reach your computer right now, and your vault lives there. Plug in the phone or check the desktop link.")
+        val q = m.firstGroup.trim()
+        if (Intents.CLINICAL.containsMatchIn(t))
+            return Reply("That sounds like someone's care information — it stays on the phone. Use the Behavioral Health workspace instead.")
+        val r = when (m.id) {
+            Intents.Id.VAULT_ASK -> V.ask(q).let { st ->
+                val src = st.json?.optJSONArray("sources")
+                if (!st.ok || src == null || src.length() == 0) st
+                else com.blacklab.app.link.VaultFeed.Status(true, st.message + "\n\nFrom: " + (0 until minOf(3, src.length())).joinToString(", ") { src.getString(it).substringAfterLast('/').removeSuffix(".md") }, st.json)
+            }
+            Intents.Id.SHIFT_PREP -> V.facility("shift_prep", org.json.JSONObject())
+            Intents.Id.ROUNDS_START -> V.facility("round", org.json.JSONObject().put("say", t))
+            Intents.Id.PANEL_LOOKUP -> V.facility("panel", org.json.JSONObject().put("query", q))
+            Intents.Id.SDS_LOOKUP -> V.facility("sds", org.json.JSONObject().put("query", q))
+            Intents.Id.SKILLS -> V.facility("skills", org.json.JSONObject().put("query", q))
+            else -> V.facility("credentials", org.json.JSONObject().put("query", q))
+        }
+        return Reply(r.message.ifBlank { "Your computer didn't have an answer for that." }, listOf(Link("Facility", "facility")), source = "Vault", speak = true)
+    }
+
+    /** "save to my private drive: …" — the computer files it into Google Drive › BlackLab › Paul's Private. */
+    private suspend fun privateDrive(said: String): Reply {
+        if (!DesktopAi.usable) return Reply("I can't reach your computer right now — it's the one that saves to your private drive. Plug in the phone or check the desktop link.")
+        if (Intents.CLINICAL.containsMatchIn(said))
+            return Reply("That sounds like someone's care information — it stays in the Behavioral Health workspace on the phone, not in Drive.")
+        val r = com.blacklab.app.link.VaultFeed.privateDrive(said)
+        return Reply(r.message, source = "Private drive")
+    }
 
     private suspend fun vault(m: Intents.Match): Reply {
         val V = com.blacklab.app.link.VaultFeed

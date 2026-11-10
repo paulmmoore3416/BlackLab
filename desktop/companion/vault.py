@@ -65,6 +65,7 @@ class Vault:
         self.last_commit = 0.0
         self.last_sync: dict[str, float] = {}
         self.errors: list[str] = []
+        self.ledger = None  # audit.Ledger, set by the companion and the MCP server: who did what, hash-chained
         try:
             from zoneinfo import ZoneInfo
             self.tz = ZoneInfo(tz)
@@ -169,6 +170,14 @@ class Vault:
             ups = vault_nodes.up_links(rel, props)
             if ups:
                 props["up"] = ups
+        if "cssclasses" not in props or rel.startswith("Nodes/"):  # the node's color on its notes (yours are kept)
+            import vault_colors
+            ours = vault_colors.classes_for(rel, props)
+            existing = next((l.split(":", 1)[1] for l in fm if l.startswith("cssclasses:")), "")
+            extra = [c for c in props.get("cssclasses") or [] if isinstance(props.get("cssclasses"), list)]
+            merged = vault_colors.merge_classes(existing, extra + ours)
+            if merged:
+                props["cssclasses"] = merged
         return self._write(rel, self.frontmatter(props, fm) + new_rest)
 
     def user_text(self, rel: str) -> str:
@@ -291,6 +300,8 @@ class Vault:
             self._save_state("registry.json", regs[-2000:])
             self.render_registry(regs)
             self.log("registry", f"{entry['agent']} signed the AI Registry", purpose, source=entry["agent"], links=["AI Registry"], at=at)
+        if self.ledger is not None:
+            self.ledger.record(entry["agent"], "checkin", "AI Registry", source=where[:60], model=model[:80], metadata={"signature": entry["signature"]})
         return {"ok": True, "signature": entry["signature"], "when": entry["when"]}
 
     def render_registry(self, regs: list[dict] | None = None):
@@ -309,6 +320,14 @@ class Vault:
             lines.append(f"| **{name}** | {a['model'] or '—'} | {a['visits']} | {a['first']} | {a['last']} |")
         if not agents:
             lines.append("| — | — | 0 | — | — |")
+        if self.ledger is not None:  # what each one actually did (the activity ledger, 30 days)
+            import audit
+            did = audit.by_agent(self.ledger, 30)
+            if did:
+                lines += ["", "## What they did (last 30 days)", "", "_From the hash-chained [[Activity Ledger]] — metadata only._", "",
+                          "| Who | Actions | Most common |", "|---|---|---|"]
+                for who, c in sorted(did.items(), key=lambda kv: -sum(kv[1].values()))[:20]:
+                    lines.append(f"| {who} | {sum(c.values())} | " + ", ".join(f"`{a}` ×{n}" for a, n in c.most_common(4)) + " |")
         lines += ["", "## Signatures (newest first)", ""]
         for r in reversed(regs[-300:]):
             lines.append(f"> [!quote] {r['agent']}" + (f" · {r['model']}" if r['model'] else "") + f" — {r['when']}")
@@ -796,6 +815,8 @@ class Vault:
         lines = [f"# BlackLab", "", f"> [!abstract] {self.now().strftime('%A, %B')} {today.day} · {md_count} notes · " +
                  (f"phone synced {dt.datetime.fromtimestamp(last_phone, self.tz).strftime('%b %d %H:%M')}" if last_phone else "waiting for the phone's first sync"),
                  "", f"**Brain:** [[◉ Nexus]] · [[Neural Map.canvas|Neural Map]] · **Today:** [[{today.isoformat()}]] · **Start here:** [[README]] · **AIs:** [[AI Registry]] · [[AI Protocol]] · **Map:** [[BlackLab Map.canvas|System map]]", "",
+                 "**This computer:** [[85 Atlas/🖥️ This Computer|🖥️ This Computer]] · [[85 Atlas/📘 Guides|📘 Guides]] · [[87 Entities/👤 People|👤 People]] · "
+                 "[[87 Entities/💡 Topics|💡 Topics]] · [[Atlas.base]] · **How to use this vault:** [[BlackLab User Guide]] · [[BlackLab Training Guide]]", "",
                  f"**Graph:** 🕸️ [Open the graph]({self._graph_uri()}) · [[Graph Health]] · Bookmarks › *Graph views* · say *“show RTU-4 in my graph”*", "",
                  "## Today so far", ""]
         lines += [f"- `{e['t']}` {self.KIND_ICON.get(e['kind'], '•')} {e['title']}" for e in sorted(tl, key=lambda x: x["ts"])[-12:]] or ["- _Nothing yet._"]

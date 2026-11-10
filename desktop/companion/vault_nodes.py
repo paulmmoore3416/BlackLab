@@ -1,4 +1,4 @@
-"""The vault's neural network: one Nexus and 13 main nodes that grow as BlackLab, you and your AIs add information.
+"""The vault's neural network: one Nexus and its main nodes (17 built in, any number more from the registry) that grow as BlackLab, you and your AIs add information.
 
 Every note BlackLab writes carries `up: [[◆ Node]]` (so the graph wires itself), every node links the Nexus and its
 related nodes ("synapses"), and on each sync every node rebuilds its live part — members, vital signs, recent
@@ -373,9 +373,198 @@ Inbox to zero · review last week's daily notes · open work orders and overdue 
 ### The daily note
 Every day in `01 Daily` gets an agenda and a timeline automatically. Add your focus at the top and your notes at the bottom — that's your log.
 """.strip()),
-]
 
+    N("systems", "IT, Networking & Systems", "🖧", "#7E57C2",
+      "Know and run every machine and network you depend on: this computer, its services and toolchains, the phone link, and the networking skills behind them.",
+      ["projects", "ai", "learning", "mining"],
+      types=["machine", "system-profile"], tags=["systems", "atlas/machine"],
+      keywords=["linux", "ubuntu", "systemd", "kernel", "gpu", "cuda", "rocm", "nvidia", "ollama", "docker", "proxmox", "vmware", "terraform",
+                "network", "cisco", "router", "switch", "vlan", "subnet", "tcp/ip", "dns", "dhcp", "firewall", "vpn", "ssh", "server", "backup",
+                "ccna", "wi-fi", "ethernet", "bash", "shell", "adb", "nextcloud", "kubernetes"],
+      primer="""## Knowledge
+
+### This computer, at a glance
+The Atlas writes **🖥️ This Computer** (hardware, OS, disks, services, toolchains, local AI models) on every pass — start there. Every file, project and guide on the machine has a card under `85 Atlas/` (local only, never pushed).
+
+### Networking fundamentals (CCNA level)
+- **OSI ↔ TCP/IP:** physical · data link (MAC, switches, VLANs, 802.1Q trunks, STP) · network (IP, routers, OSPF/static routes) · transport (TCP 3-way handshake, UDP) · application (DNS 53, DHCP 67/68, HTTP(S) 80/443, SSH 22).
+- **Subnetting:** /24 = 256 addresses (254 hosts) · /25 = 128 · /26 = 64 · /27 = 32 · /28 = 16 · /30 = 4 (point-to-point). Private ranges 10/8 · 172.16/12 · 192.168/16.
+- **Troubleshoot bottom-up:** link light → IP/mask/gateway (`ip a`, `ip r`) → ping gateway → ping 1.1.1.1 → DNS (`resolvectl query`) → port (`ss -tlnp`, `nc -zv host port`).
+
+### Linux operations
+- Services: `systemctl --user status <unit>` · logs `journalctl --user -u <unit> -f` · timers `systemctl --user list-timers`.
+- Disk: `df -h`, `du -sh * | sort -h` · memory `free -h` · GPUs `nvidia-smi`, `rocm-smi` · processes `htop`.
+- Backups: 3-2-1 rule (3 copies, 2 media, 1 off-site); test restores, not just backups.
+
+### Security habits
+Least privilege, updates weekly, unique passwords in a manager, SSH keys not passwords, secrets never in git (BlackLab's `scripts/secret-scan.sh`), and nothing exposed to the internet that doesn't need to be (the vault MCP stays local).
+""".strip()),
+    N("media", "Media Library", "🎬", "#EC407A",
+      "Know what's in the family media library — movies, shows, kids' titles, music, photos and screencasts — and keep it organized and backed up.",
+      ["home", "systems", "time"],
+      types=["media", "media-collection"], tags=["media", "atlas/media"],
+      keywords=["movie", "film", "episode", "season", "tv show", "series", "anime", "kids", "music", "album", "song", "photo", "picture",
+                "screencast", "video", "1080p", "2160p", "4k", "trailer", "playlist", "kodi", "plex", "jellyfin"],
+      primer="""## Knowledge
+
+### How the library is organized
+The Atlas gives every movie its own card and every show, season pack or photo folder a **collection** card (one note instead of hundreds), under `85 Atlas/Videos`, `Pictures` and `Music`. Sizes, resolution and counts are on each card; the files stay where they are.
+
+### Naming that media servers understand (Kodi, Plex, Jellyfin)
+- Movies: `Movies/Title (Year)/Title (Year).mkv`
+- Shows: `TV Shows/Show Name/Season 01/Show Name - S01E01 - Episode Title.mkv`
+- Extras: subtitles next to the video with the same name (`Title (Year).en.srt`).
+
+### Keeping it healthy
+- **Storage:** video is the bulk of this machine's disk — watch free space before big downloads; prefer H.265/AV1 for archives.
+- **Backups:** irreplaceable things first (family photos and home videos), then purchased media; 3-2-1 rule.
+- **Kids' profiles:** keep kids' titles in their own folder so a media server can give them a separate, rated library.
+- **Photos:** BlackLab strips GPS from what it reads; keep originals with their dates, sort by `YYYY/YYYY-MM-DD event`.
+""".strip()),
+    N("mining", "Mining & Crypto", "⛏️", "#FFA726",
+      "Run night mining safely and profitably on spare GPU/CPU time, and understand the crypto it earns — without ever exposing a wallet key.",
+      ["systems", "finance", "ai"],
+      types=["mining"], tags=["mining", "crypto"],
+      keywords=["mining", "miner", "hashrate", "hash rate", "srbminer", "xmrig", "pool", "monero", "xmr", "bitcoin", "btc", "ethereum", "wallet",
+                "crypto", "blockchain", "difficulty", "payout", "kh/s", "mh/s", "rig", "overclock", "undervolt"],
+      primer="""## Knowledge
+
+> 🔒 **Wallet keys, seeds and mining configs are never read or written by any AI.** `Desktop/mining/wallet-backup` and `config` are protected paths; the Crypto Desk folder is excluded from the Atlas.
+
+### How night mining runs here
+Systemd user units mine 23:00–07:00 on both GPUs and all CPU cores; Ollama is unloaded from the GTX 1060 while it runs, and companion jobs wait for it (the morning brief runs 07:10).
+
+### Is it worth it? (do the math monthly)
+**Profit/day = coins/day × price − (watts × 24 h ÷ 1000 × $/kWh)**. Include wear (fans, thermal paste), and heat in summer (AC cost) vs. winter (free heat). Stop when profit < 0.
+
+### Running it safely
+- Temperatures: GPU core < 75 °C, memory junction < 95 °C; CPU < 85 °C. Undervolt first, overclock second.
+- Power: stay under 80 % of the PSU's rating continuously; never daisy-chain PCIe power splitters.
+- Software: only miners from their official releases, checksums verified; expect antivirus flags.
+- Taxes (US): mined coins are income at fair value when received; keep a log (date, amount, price).
+""".strip()),
+    N("people", "People & Relationships", "👥", "#26A69A",
+      "Remember the people in your work and life — who they are, how you know them, what you're working on together — and follow through.",
+      ["leadership", "vendors", "home", "learning"],
+      types=["person"], tags=["people", "entity/person"],
+      keywords=["met with", "call with", "spoke with", "contact", "colleague", "coworker", "manager", "supervisor", "mentor", "instructor", "family",
+                "friend", "neighbor", "team member", "introduc", "follow up with", "1:1", "one-on-one"],
+      primer="""## Knowledge
+
+> 🔒 People notes live under `87 Entities/People` on this computer only (never pushed). Never record anyone's health, clinical or patient information — names and work context only.
+
+### A good person note
+Role and organization · how you know them · what you're working on together · last contact and next step · preferences that make working together easier (channel, time of day). Link the meetings, projects and vendors they appear in.
+
+### Relationship habits
+- **Follow through:** every meeting ends with owner + date for each action; log it on the person note.
+- **Cadence:** direct reports 1:1 weekly or biweekly · key vendors monthly · mentors quarterly.
+- **Recognition:** specific, timely, public for wins and private for coaching (SBI: situation → behavior → impact).
+- **Network:** for each credential or course, note the instructors and peers worth staying in touch with.
+""".strip()),
+
+    N("mobile", "Mobile Device", "📱", "#5C6BC0",
+      "Know the phone that runs your day: what's on it, how full it is, what it captures — photos, music, documents, downloads — and keep it backed up.",
+      ["systems", "media", "time", "home"],
+      types=["mobile-device", "mobile-file", "mobile-collection"], tags=["mobile", "mobile/device"],
+      keywords=["pixel", "android", "phone", "smartphone", "mobile", "sim", "esim", "app install", "adb", "screenshot", "dcim", "camera roll",
+                "storage full", "backup the phone", "google photos"],
+      primer="""## Knowledge
+
+### What's here
+The phone's map lives under `89 Mobile/` (on this computer only): **📱 the device** (model, Android version, storage, battery, apps), every document from Documents and Download with its text, and one collection card per photo month, music folder and video folder — counts, sizes and dates, never the photos themselves and never their location.
+
+### Keeping the phone healthy
+- **Storage:** stay under ~85 % full; Android slows down and updates fail when it's nearly full. Photos and music are the bulk — Google Photos backup + "Free up space", or move music to the computer.
+- **Backups:** BlackLab's encrypted backup (`.blbackup`) for app data; Google One / Photos for media; anything irreplaceable in two places.
+- **Updates:** install monthly security updates; Pixel devices get them on the first Monday of the month.
+- **Security:** screen lock + biometric, Find My Device on, unknown-source installs off except when sideloading BlackLab, review app permissions quarterly (Settings › Security & privacy › Privacy dashboard).
+- **Battery:** keep between 20–80 % when you can (Adaptive charging), avoid heat; replace when health drops below ~80 %.
+""".strip()),
+]
+BUILTIN = list(NODES)  # the built-in nodes; NODES grows with the registry (no fixed limit)
 BY_ID = {n["id"]: n for n in NODES}
+
+# ---------------------------------------------------------------- the node registry (unlimited nodes)
+#
+# New nodes are created by you, an AI (vault_node_create) or the Atlas, and stored in the vault itself so they're
+# versioned: 90 System/Node Registry.json. NODES and BY_ID are updated in place so every module sees them.
+REGISTRY = "90 System/Node Registry.json"
+MAX_NODES = 500  # a guard against a runaway agent, not a design limit
+_loaded_from: list = [None]
+
+
+def _slug(s: str) -> str:
+    return re.sub(r"[^a-z0-9]+", "-", (s or "").lower()).strip("-")[:40]
+
+
+def custom_nodes(v) -> list[dict]:
+    try:
+        data = json.loads(v.path(REGISTRY).read_text(encoding="utf-8"))
+    except Exception:
+        return []
+    out = []
+    for d in data.get("nodes", []):
+        if not d.get("id") or not d.get("name") or d["id"] in {b["id"] for b in BUILTIN}:
+            continue
+        out.append(N(d["id"], d["name"], d.get("emoji", "◆"), d.get("color", "#9E9E9E"), d.get("mission", ""), d.get("synapses", []),
+                     d.get("folders", ()), d.get("types", ()), d.get("tags", ()), (), d.get("kinds", ()), d.get("keywords", ()),
+                     d.get("primer") or f"## Knowledge\n\n_{d.get('mission', '')}_\n"))
+    return out
+
+
+def reload(v) -> list[dict]:
+    """Built-in + registry nodes, synapses to unknown nodes dropped. Cheap; called before every render and lookup."""
+    nodes = BUILTIN + custom_nodes(v)
+    ids = {n["id"] for n in nodes}
+    for n in nodes:
+        n["synapses"] = [s for s in n["synapses"] if s in ids and s != n["id"]]
+    NODES[:] = nodes
+    BY_ID.clear()
+    BY_ID.update({n["id"]: n for n in nodes})
+    return NODES
+
+
+def create(v, name: str, mission: str, emoji: str = "◆", color: str = "", synapses=(), keywords=(), tags=(), folders=(),
+           author: str = "AI", primer: str = "") -> dict:
+    """Adds a node to the network (any number of them). Text is checked like everything else written to the vault."""
+    import guards
+    reload(v)
+    name = re.sub(r"\s+", " ", (name or "").strip().lstrip("◆ ").strip())[:60]
+    nid = _slug(name)
+    if not name or not nid:
+        return {"ok": False, "error": "A node needs a name."}
+    for t in (name, mission or "", primer or "", " ".join(keywords)):
+        ok, _ = guards.vault_safe(t)
+        if not ok:
+            return {"ok": False, "error": "Refused: that looks clinical or private, and the vault never stores it."}
+    if nid in BY_ID or any(n["name"].lower() == name.lower() for n in NODES):
+        return {"ok": False, "error": f"A node named {name} already exists ({nid})."}
+    if len(NODES) >= int((getattr(v, "config", {}) or {}).get("vault_max_nodes", MAX_NODES)):
+        return {"ok": False, "error": f"The network already has {len(NODES)} nodes (vault_max_nodes)."}
+    palette = ["#5C6BC0", "#29B6F6", "#9CCC65", "#FFCA28", "#8D6E63", "#78909C", "#D4E157", "#26C6DA", "#AB47BC", "#FF7043"]
+    syn = []
+    for s_ in synapses or ():
+        key = _slug(str(s_).lstrip("◆ "))
+        hit = BY_ID.get(key) or next((n for n in NODES if _slug(n["name"]) == key or key in _slug(n["name"])), None)
+        if hit:
+            syn.append(hit["id"])
+    try:
+        data = json.loads(v.path(REGISTRY).read_text(encoding="utf-8"))
+    except Exception:
+        data = {"about": "Nodes added to BlackLab's network (beyond the built-in ones). Edit freely; BlackLab reads this on every pass.", "nodes": []}
+    entry = {"id": nid, "name": name, "emoji": (emoji or "◆")[:4], "color": color if re.match(r"^#[0-9A-Fa-f]{6}$", color or "") else palette[len(data["nodes"]) % len(palette)],
+             "mission": (mission or "").strip()[:400], "synapses": syn, "keywords": [k.lower().strip() for k in keywords if k.strip()][:60],
+             "tags": [t.strip().lstrip("#") for t in tags if t.strip()] or [f"node/{nid}"], "folders": list(folders), "created_by": author,
+             "created": dt.date.today().isoformat()}
+    if primer:
+        entry["primer"] = primer.strip()
+    data["nodes"].append(entry)
+    v._write(REGISTRY, json.dumps(data, indent=2, ensure_ascii=False) + "\n")
+    reload(v)
+    # the new node's synapses are mutual: add it to its partners in the registry where we can (built-ins via the note only)
+    v.log("node", f"New node: {emoji} {name}", mission or "", source=author, links=[title(BY_ID[nid])])
+    return {"ok": True, "id": nid, "name": name, "note": rel(BY_ID[nid]), "nodes": len(NODES)}
 
 from vault_subnodes import GROUP as SUB_GROUP, SUBNODES, SUB_BY_ID  # noqa: E402
 
@@ -418,10 +607,11 @@ def primary(rel_path: str, props: dict) -> list[dict]:
     typ = str(props.get("type", "")).strip('"')
     tags = _tags(props)
     kind = str(props.get("asset_kind", "")).strip('"')
+    ups = str(props.get("up", "")) + " " + str(props.get("nodes", ""))
     out = []
     for n in NODES:
         if (any(rel_path.startswith(f + "/") or rel_path == f for f in n["folders"]) or typ in n["types"] or kind in n["asset_kinds"]
-                or any(t == nt or t.startswith(nt + "/") for t in tags for nt in n["tags"])):
+                or any(t == nt or t.startswith(nt + "/") for t in tags for nt in n["tags"]) or f"[[{title(n)}]]" in ups):
             out.append(n)
     return out
 
@@ -445,8 +635,17 @@ def _keyword_hits(n, text: str) -> int:
     return sum(text.count(k) for k in n["keywords"])
 
 
+# Folders that stay on this computer (git-ignored): synced notes count what's in them but never list it by name.
+LOCAL_PREFIXES = ("85 Atlas/", "86 Imported/", "87 Entities/", "88 Drive/", "89 Mobile/")
+
+
+def is_local(rel_path: str) -> bool:
+    return rel_path.startswith(LOCAL_PREFIXES)
+
+
 def render(v) -> dict:
     """Rebuilds every node, the Nexus and the Neural Map canvas. Returns {node id: members}."""
+    reload(v)
     root = v.root
     notes = []
     for p in root.rglob("*.md"):
@@ -468,9 +667,11 @@ def render(v) -> dict:
     signals_by_day = [(today - dt.timedelta(days=i), v._state(f"timeline/{(today - dt.timedelta(days=i)).isoformat()}.json", [])) for i in range(14)]
     summary = {}
     for n in NODES:
-        members = [x for x in notes if n in primary(x["rel"], x["props"])]
-        member_set = {x["rel"] for x in members}
-        mentions = sorted(((x, _keyword_hits(n, x["low"])) for x in notes if x["rel"] not in member_set), key=lambda t: -t[1])
+        all_members = [x for x in notes if n in primary(x["rel"], x["props"])]
+        local = [x for x in all_members if is_local(x["rel"])]
+        members = [x for x in all_members if not is_local(x["rel"])]
+        member_set = {x["rel"] for x in all_members}
+        mentions = sorted(((x, _keyword_hits(n, x["low"])) for x in notes if x["rel"] not in member_set and not is_local(x["rel"])), key=lambda t: -t[1])
         mentions = [(x, h) for x, h in mentions if h >= 2][:40]
         signals = []
         for d, items in signals_by_day:
@@ -488,6 +689,15 @@ def render(v) -> dict:
                  _graph_buttons(v, rel(n)), "",
                  "## Vital signs", "", "| Members | Mentions elsewhere | Signals (14 days) | Changed this week | Updated |", "|---|---|---|---|---|",
                  f"| {len(members)} | {len(mentions)} | {len(signals)} | {growth} | {v.now().strftime('%Y-%m-%d %H:%M')} |", ""]
+        if local:
+            kinds: dict[str, int] = {}
+            for x in local:
+                k = str(x["props"].get("type", "note")).strip('"') or "note"
+                kinds[k] = kinds.get(k, 0) + 1
+            lines += ["## On this computer", "",
+                      f"**{len(local)}** local notes (Atlas cards, imported vaults, people & topics) belong here: " +
+                      " · ".join(f"{k.replace('-', ' ')} ×{c}" for k, c in sorted(kinds.items(), key=lambda kv: -kv[1])) +
+                      ". They stay on this machine — open the **Backlinks** pane or the local graph to see them, or [[Atlas.base]] · [[Entities.base]].", ""]
         if signals:
             lines += ["## Recent signals", ""]
             for d, e in sorted(signals, key=lambda t: -t[1].get("ts", 0))[:25]:
@@ -523,10 +733,10 @@ def render(v) -> dict:
                   "Add knowledge under **## Knowledge** below (it's yours and your AIs' — BlackLab never rewrites it). AIs: `vault_node_add` with "
                   f"node `{n['id']}`. Link new notes here with `up: \"{link(n)}\"`."]
         v.write_managed(rel(n), {"type": "node", "node": n["id"], "aliases": [n["name"]], "members": len(members), "mentions": len(mentions),
-                                 "signals": len(signals), "up": [f"[[{NEXUS}]]"], "synapses": [link(BY_ID[x]) for x in n["synapses"]],
+                                 "signals": len(signals), "local": len(local), "up": [f"[[{NEXUS}]]"], "synapses": [link(BY_ID[x]) for x in n["synapses"]],
                                  "tags": ["node", f"node/{n['id']}"], "cssclasses": ["blacklab-node"]},
                         "\n".join(lines), user_tail="\n" + n["primer"] + "\n\n## Growth log\n\n")
-        summary[n["id"]] = {"members": len(members), "mentions": len(mentions), "signals": len(signals), "growth": growth}
+        summary[n["id"]] = {"members": len(members), "local": len(local), "mentions": len(mentions), "signals": len(signals), "growth": growth}
     for sn in SUBNODES:
         parent = BY_ID[sn["parent"]]
         mine = [x for x in notes if subtitle(sn) in str(x["props"].get("up", "")) or f"{sn['id']}" in str(x["props"].get("subnodes", "")).replace('"', "").replace(" ", "").split(",")
@@ -565,13 +775,13 @@ def _graph_buttons(v, rel_path: str) -> str:
 
 def _nexus(v, summary, total):
     lines = [f"# ◉ Nexus", "", f"> [!tip] The one function", f"> {FUNCTION}", "",
-             "## The 13 nodes", "", "| | Node | Mission | Members | Signals (14 d) | This week |", "|---|---|---|---|---|---|"]
+             f"## The {len(NODES)} nodes", "", "| | Node | Mission | Members | On this computer | Signals (14 d) | This week |", "|---|---|---|---|---|---|---|"]
     for n in NODES:
         s = summary.get(n["id"], {})
-        lines.append(f"| {n['emoji']} | {link(n)} | {n['mission'].split(':')[0][:90]} | {s.get('members', 0)} | {s.get('signals', 0)} | +{s.get('growth', 0)} |")
+        lines.append(f"| {n['emoji']} | {link(n)} | {n['mission'].split(':')[0][:90]} | {s.get('members', 0)} | {s.get('local', 0)} | {s.get('signals', 0)} | +{s.get('growth', 0)} |")
     strongest = sorted(NODES, key=lambda n: -summary.get(n["id"], {}).get("signals", 0))[:3]
-    quiet = [n for n in NODES if summary.get(n["id"], {}).get("members", 0) == 0]
-    lines += ["", "## Network health", "", f"- **Notes in the network:** {total}",
+    quiet = [n for n in NODES if summary.get(n["id"], {}).get("members", 0) + summary.get(n["id"], {}).get("local", 0) == 0]
+    lines += ["", "## Network health", "", f"- **Notes in the network:** {total}", f"- **Nodes:** {len(NODES)} ({len(BUILTIN)} built in + {len(NODES) - len(BUILTIN)} from the `90 System/Node Registry.json`) — no fixed limit; AIs add one with `vault_node_create`",
               "- **Most active:** " + ", ".join(link(n) for n in strongest),
               ("- **Waiting for their first notes:** " + ", ".join(link(n) for n in quiet)) if quiet else "- Every node has members.",
               "- **Map:** [[Neural Map.canvas|Neural Map]] · **Start:** [[Home]] · **AIs:** [[AI Registry]] · [[AI Protocol]]", "",
@@ -588,7 +798,7 @@ def _canvas(v, summary):
     import math
     nodes, edges = [], []
     nodes.append({"id": "nexus", "type": "file", "file": f"{NEXUS}.md", "x": -200, "y": -120, "width": 400, "height": 240, "color": "6"})
-    R = 900
+    R = max(900, 75 * len(NODES))
     pos = {}
     for i, n in enumerate(NODES):
         a = 2 * math.pi * i / len(NODES) - math.pi / 2
@@ -631,6 +841,7 @@ def _graph_colors(v):
 
 def add(v, node: str, content: str, author: str = "AI") -> dict:
     """Adds knowledge to a node (its user part, under the Knowledge it already has). [node] is an id or a name."""
+    reload(v)
     key = (node or "").strip().lower().lstrip("◆ ").strip()
     n = BY_ID.get(key) or next((x for x in NODES if x["name"].lower() == key or key in x["name"].lower()), None)
     sn = None if n else (SUB_BY_ID.get(key) or next((x for x in SUBNODES if x["name"].lower() == key or key in x["name"].lower()), None))
@@ -653,11 +864,12 @@ def add(v, node: str, content: str, author: str = "AI") -> dict:
 
 
 def overview(v) -> list[dict]:
+    reload(v)
     out = []
     for n in NODES:
         p = v.path(rel(n))
         props = _parse_props(v.split_frontmatter(p.read_text(encoding="utf-8", errors="replace"))[0]) if p.exists() else {}
         out.append({"id": n["id"], "name": n["name"], "note": rel(n), "mission": n["mission"], "synapses": n["synapses"],
-                    "members": int(props.get("members", 0) or 0), "signals": int(props.get("signals", 0) or 0),
+                    "members": int(props.get("members", 0) or 0), "local": int(props.get("local", 0) or 0), "signals": int(props.get("signals", 0) or 0),
                     "subnodes": [{"id": s["id"], "name": s["name"], "note": subrel(s)} for s in SUBNODES if s["parent"] == n["id"]]})
     return out

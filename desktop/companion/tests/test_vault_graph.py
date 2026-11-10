@@ -42,7 +42,7 @@ class GraphTest(unittest.TestCase):
             self.assertTrue(any(VN.title(n) in q for q in queries), n["name"])
         views = G.graph_views()
         self.assertEqual("group", views["type"])
-        self.assertEqual(len(VN.NODES) + 5, len(views["items"]))
+        self.assertEqual(len(VN.NODES) + 9, len(views["items"]))
         self.assertTrue(all(i["type"] == "graph" and i["options"]["search"] for i in views["items"]))
 
     def test_bookmarks_keep_the_users_own(self):
@@ -58,7 +58,9 @@ class GraphTest(unittest.TestCase):
             G.fetch_plugin("breadcrumbs", lambda url: b"tampered")
         r = G.apply(self.v, fetch=lambda url: b"tampered")
         self.assertIn("checksum", r["plugins_error"])
-        self.assertEqual([], json.loads(self.v.path(".obsidian/community-plugins.json").read_text()), "nothing enabled that isn't installed")
+        # only BlackLab's own Graph FX (bundled in the repo, no download) — no downloaded plugin that failed its checksum
+        self.assertEqual(["blacklab-graph-fx"], json.loads(self.v.path(".obsidian/community-plugins.json").read_text()), "nothing enabled that isn't installed")
+        self.assertTrue(self.v.path(".obsidian/plugins/blacklab-graph-fx/main.js").exists())
         self.assertFalse(self.v.path(".obsidian/plugins/breadcrumbs/main.js").exists())
         for pid, (repo, tag, files) in G.PLUGINS.items():
             self.assertRegex(repo, r"^[\w.-]+/[\w.-]+$")

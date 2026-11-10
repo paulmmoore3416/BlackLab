@@ -243,3 +243,35 @@ the same over Wi-Fi, so the phone keeps its desktop brain away from the cable.
   turn on community plugins.
 - **Advanced URI:** `show <note> in my graph` (desktop rule `VAULT_SHOW_RE`, phone intent `VAULT_SHOW`, `/phone/vault/show`)
   opens `obsidian://adv-uri?…&commandid=graph:open-local`. `/local/vault/graph` returns the numbers shown in the desktop UI.
+
+## Agent skills, Ask my notes, facility ops and the ledger (companion 1.7.0)
+
+**Agent skills.** 283 skills from Anthropic, Vercel, OpenAI, Google and Hugging Face live in
+`~/.local/share/blacklab-desktop/skills`: shallow clones, updated weekly, never committed here.
+- The desktop AI finds them with `skills_search` and loads one with `skill_use`. Naming a skill ("use the pdf skill to …") loads it up front.
+- Skill text is third-party guidance. The AI never runs a skill's scripts (it has no shell); it shows you the commands. Like any other read content, skill text marks the request as tainted, so only links you typed get opened.
+- Cards live in `70 AI/Skills/`.
+- Phone: "what skills do you have", "find a skill for …", "use the … skill to …". MCP: `vault_skills`.
+
+**Ask my notes.** [kb-core](https://github.com/paulmmoore3416/omnix-ai-desktop) (loopback, `http://127.0.0.1:8100`, or `kb_core_url` in config.json) indexes the vault.
+- Synced notes go into the `blacklab-vault` collection; this computer's own folders (85–89) go into `blacklab-local`.
+- Each pass sends only changed notes, and spends at most `recall_budget_s` seconds doing it.
+- Answers come from the local model only. Vault text never goes to a cloud model.
+- Phone requests search synced notes only, unless config.json sets `"phone_recall_local": true`.
+
+**Facility ops.**
+- `10 Facility/Templates` (yours to edit) and `10 Facility/Rounds`.
+- `10 Facility/Panels`: one note per panel with a `| Ckt | Load |` table. **⚡ Panel Directory** is the room index.
+- `10 Facility/SDS Binder`: one note per product. **🧪 SDS Binder** shows conflicts and stale SDSs.
+- `40 Learning/🏅 Credentials.md`.
+- Endpoints: `/local/vault/{round,panel,sds,shift_prep,credentials}`, and the same under `/phone/vault/`.
+
+**Activity ledger.** `~/.cache/blacklab-desktop/vault/ledger.jsonl` holds one hash-chained line per action, using MemResort's fields (`ts, actor, action, source, target, model, provider, duration_ms, metadata`).
+- Metadata only: never note text, queries or answers.
+- `vault_ledger` (MCP) and `/local/vault/ledger` verify the chain.
+
+**Colors and Graph FX.**
+- `vault_colors.py` writes `.obsidian/snippets/blacklab-colors.css` from the node registry and restores the graph's color groups on every pass.
+- `desktop/obsidian/blacklab-graph-fx` is copied into the vault and enabled once. If you turn it off, it stays off.
+- Graph FX settings: signals, pulse, intensity, what counts as recent, time-lapse length, and respecting "reduce motion".
+
