@@ -32,6 +32,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -66,12 +67,21 @@ fun FileMenu(file: File, items: List<MenuItem> = emptyList()) {
     val ctx = LocalContext.current
     var open by remember { mutableStateOf(false) }
     var info by remember { mutableStateOf(false) }
+    val desk by com.blacklab.app.assistant.DesktopAi.status.collectAsStateWithLifecycle()
     IconButton(onClick = { open = true }) { Icon(Icons.Rounded.MoreVert, "More") }
     DropdownMenu(open, { open = false }) {
         items.forEach { m -> DropdownMenuItem(text = { Text(m.label) }, leadingIcon = { Icon(m.icon, null) }, onClick = { open = false; m.onClick() }) }
         if (items.isNotEmpty()) HorizontalDivider()
         DropdownMenuItem(text = { Text("Share") }, leadingIcon = { Icon(Icons.Rounded.Share, null) }, onClick = { open = false; Files.share(ctx, listOf(file)) })
         DropdownMenuItem(text = { Text("Open with…") }, leadingIcon = { Icon(Icons.Rounded.OpenInNew, null) }, onClick = { open = false; Files.open(ctx, file) })
+        // Programs, APKs, libraries, firmware: REA + Ghidra on the computer write a report that comes back as a document
+        if (com.blacklab.app.assistant.ReverseEngineering.canSend(file) && app.settings.current.asstDesktopJobs &&
+            desk.state == com.blacklab.app.assistant.DesktopAi.State.ONLINE)
+            DropdownMenuItem(text = { Text("Reverse-engineer on computer") }, leadingIcon = { Icon(Icons.Rounded.Memory, null) }, onClick = {
+                open = false
+                com.blacklab.app.assistant.DesktopJobs.enqueue(app, "reverse", file, "Reverse-engineer ${file.name}")
+                shell.toast("Sent to your computer. The report comes back in Documents › Reverse Engineering.")
+            })
         if (!app.storage.contains(file)) DropdownMenuItem(text = { Text("Save to BlackLab") }, leadingIcon = { Icon(Icons.Rounded.SaveAlt, null) }, onClick = {
             open = false
             app.io {

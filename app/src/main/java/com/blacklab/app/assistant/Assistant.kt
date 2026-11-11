@@ -159,52 +159,15 @@ class Assistant(private val app: AppContainer) {
 
         // Confirmation of a pending action
         pending.value?.let { p ->
-            if (Regex("^(yes|yeah|yep|sure|confirm|do it|send it|go ahead|ok|okay|absolutely)\\b").containsMatchIn(l)) { pending.value = null; return p.run() }
-            if (Regex("^(no|nope|cancel|stop|never ?mind|don't)\\b").containsMatchIn(l)) { pending.value = null; return Reply("Cancelled. " + casual("No worries.", "All good.", "")) }
+            if (Intents.YES.containsMatchIn(l)) { pending.value = null; return p.run() }
+            if (Intents.NO.containsMatchIn(l)) { pending.value = null; return Reply("Cancelled. " + casual("No worries.", "All good.", "")) }
         }
 
-        fun m(re: String) = Regex(re, RegexOption.IGNORE_CASE).find(t)
+        // ---- commands from the grammar (Intents.kt): small talk, briefing, calendar, recorder
+        Intents.matches(t, Intents.Phase.EARLY).forEach { m -> perform(m, t, l, origin)?.let { return it } }
 
-        // ---- help & small talk
-        if (Regex("^(help|what can you do|commands|what do you do|how do you work)").containsMatchIn(l)) return help()
-        if (Regex("^(thanks|thank you|thx|cheers|appreciate)").containsMatchIn(l)) return Reply(casual("Anytime, man.", "You got it.", "Happy to help.").ifBlank { "You're welcome." }, speak = true)
-        if (Regex("^(hi|hello|hey|yo|sup|what's up|good (afternoon|evening))$").containsMatchIn(l)) return Reply("${Time.greeting()}${s.userName.substringBefore(' ').takeIf { it.isNotBlank() }?.let { ", $it" } ?: ""}. " +
-            casual("What are we getting into?", "What's the plan?", "What do you need?").ifBlank { "How can I help?" })
-        if (Regex("what time is it|current time|time is it").containsMatchIn(l)) return Reply("It's ${Time.time(Time.now())}.")
-        if (Regex("what('s| is) (the |today's )?date|what day is (it|today)").containsMatchIn(l)) return Reply("Today is ${Time.longDate(Time.today())}, ${Time.today().year}.")
-
-        // ---- briefing & agenda
-        if (Regex("^(brief me|briefing|(daily|morning) brief(ing)?|give me (my |the |a )?(daily |morning )?brief(ing)?)|good morning|morning report|how does my day look|what's my day|daily summary|catch me up").containsMatchIn(l))
-            return Reply(Briefing.build(app, s.asstPersona), listOf(Link("Schedule", "schedule"), Link("To-Do", "tasks")))
-
-        // ---- create event (before agenda so "schedule a meeting" isn't read as a question)
-        m("^(?:schedule|book|set up|add|create|put|plan)\\s+(?:an?\\s+)?(?:new\\s+)?(meeting|event|appointment|call|lunch|session|interview|inspection|walkthrough|class)?\\s*(.*)$")
-            ?.takeIf { it.groupValues[1].isNotBlank() || Regex("on (my )?calendar|^schedule|^book").containsMatchIn(l) }
-            ?.let { return createEvent(it.groupValues[1], it.groupValues[2]) }
-
-        if (Regex("(agenda|calendar|schedule|meetings?|events?|appointments?)").containsMatchIn(l) &&
-            Regex("^(what|what's|whats|show|read|list|do i have|anything|any|how|am i|is there|tell)").containsMatchIn(l))
-            return agenda(l)
-
-        // ---- recorder & dictation
-        if (Regex("^(start|begin) (dictation|dictating)|^dictate").containsMatchIn(l)) { DictationService.send(app.context, DictationService.ACTION_START); return Reply(done("dictation's rolling. Say “stop recording” when you're done."), route = "dictation") }
-        if (Regex("^(start|begin) (an? )?(audio )?(recording|recorder)|^record (audio|this|the meeting|a meeting|a voice memo)").containsMatchIn(l)) {
-            RecorderService.send(app.context, RecorderService.ACTION_START); return Reply(done("recording started."), route = "recorder")
-        }
-        if (Regex("^(stop|end|finish|save) (the )?(recording|recorder|dictation|dictating)").containsMatchIn(l)) {
-            val wasDict = DictationService.state.value.active
-            if (wasDict) DictationService.send(app.context, DictationService.ACTION_STOP)
-            if (RecorderService.state.value.status != RecState.Status.IDLE) RecorderService.send(app.context, RecorderService.ACTION_STOP)
-            return Reply(done("stopped and saved."), route = if (wasDict) "dictation" else "recorder")
-        }
-        if (Regex("^(pause) (the )?(recording|recorder|dictation)").containsMatchIn(l)) {
-            if (DictationService.state.value.active) DictationService.send(app.context, DictationService.ACTION_PAUSE) else RecorderService.send(app.context, RecorderService.ACTION_PAUSE)
-            return Reply("Paused.")
-        }
-        if (Regex("^(add a |drop a |set a )?(marker|bookmark|mark that)").containsMatchIn(l)) {
-            if (DictationService.state.value.active) DictationService.send(app.context, DictationService.ACTION_MARK) else RecorderService.send(app.context, RecorderService.ACTION_MARK)
-            return Reply("Marked.")
-        }
+        // ---- Reverse engineering (REA + Ghidra on the computer) — before Facility so "inspect the apk" isn't an inspection
+        reverse(t)?.let { return it }
 
         // ---- Facility: inspections & PMs — before tasks so "what inspections are due" lands here
         facility(l)?.let { return it }
@@ -217,115 +180,8 @@ class Assistant(private val app: AppContainer) {
         // ---- the desktop: its local AI and its own assistant (files, apps, system status on the computer)
         desktop(t, l)?.let { return it }
 
-        // ---- weather & facility weather prep (OpenWeatherMap)
-        if (Regex("\\b(weather|forecast|temperature outside|how (hot|cold) is it|will it (freeze|rain|snow|storm)|freeze warning|weather alerts?)\\b").containsMatchIn(l) &&
-            !Regex("^(add|create|remind|schedule)").containsMatchIn(l)) return weather(l)
-
-        // ---- tasks
-        m("^(?:remind me(?: to)?|don't let me forget(?: to)?)\\s+(.+)$")?.let { return addTask(it.groupValues[1], remind = true) }
-        m("^(?:add|create|new|make)(?: a| an)?(?: new)? (?:task|to-?do|todo|reminder)(?: to| for| called| named)?[:\\s]+(.+)$")?.let { return addTask(it.groupValues[1], remind = false) }
-        m("^(?:add|put) (.+?) (?:to|on) (?:my )?(?:to-?do|todo|tasks|task list|list|my day)$")?.let { return addTask(it.groupValues[1], remind = false, myDay = l.endsWith("my day")) }
-        m("^(?:to-?do|todo|task)[:\\s]+(.+)$")?.let { return addTask(it.groupValues[1], remind = false) }
-        m("^(?:complete|finish|mark|check off|tick off|close|i (?:finished|completed|did))(?: the)?(?: task)? (.+?)(?: as)?(?: done| complete| completed| finished)?$")
-            ?.let { return completeTask(it.groupValues[1]) }
-        if (Regex("(tasks?|to-?dos?|to do list|what's due|whats due|overdue|my day)").containsMatchIn(l) &&
-            Regex("^(what|what's|whats|show|read|list|do i have|any|how many|tell|my|tasks)").containsMatchIn(l))
-            return listTasks(l)
-
-        // ---- Summaries of your own stuff, in the style you ask for ("summarize this week as action items")
-        m("^(?:summari[sz]e|sum up|recap|give me (?:a |the )?(?:summary|recap|rundown) of|what's the rundown on)\\b\\s*(?:my |the |all |of )*(.*)$")?.let { r ->
-            summarize(r.groupValues[1], origin)?.let { return it }
-        }
-
-        // ---- feature: Meeting → Actions
-        if (Regex("(action items?|actions|minutes|summar(y|ize|ise)|follow[- ]?ups?)").containsMatchIn(l) && Regex("(meeting|dictation|recording|call|transcript)").containsMatchIn(l))
-            return meetingActions()
-
-        // ---- feature: Snap-to-Work-Order
-        if (Regex("(name ?plate|data ?plate|equipment (label|tag)|work order from|snap .*work order|scan (the |this |an? )?(equipment|unit|motor|boiler|chiller|rtu|pump))").containsMatchIn(l))
-            return if (origin == Origin.PHONE) Reply("Point the camera at the nameplate — I'll read it and write up the work order.", ui = UiAction.NAMEPLATE)
-            else Reply("That one needs the phone camera. Open BlackLab on your phone and say “nameplate”.")
-
-        // ---- Drive somewhere / call (Android Auto hands these to the car's navigation & dialer)
-        m("^(?:navigate|directions|take me|drive|get me) to (?:my )?next (?:meeting|event|appointment|class)$")?.let { return navigateNext() }
-        m("^(?:find|navigate to|take me to|where'?s|directions to)(?: me)? (?:a |the |an )?(?:nearest |closest |nearby )?(gas station|gas|fuel|hyundai (?:dealer(?:ship)?|service(?: center)?)|car wash|coffee|ev charger|charging station|tire shop|auto parts|hardware store|home depot|lowe'?s|pharmacy|urgent care|parking)$")
-            ?.let { r -> val q = r.groupValues[1].let { if (it == "gas" || it == "fuel") "gas station" else it }; return Reply("Finding the nearest $q.", nav = q) }
-        m("^(?:navigate|directions|drive|get me) to (.+)$")?.let { r -> return Reply("Heading to ${r.groupValues[1]}.", nav = r.groupValues[1]) }
-        m("^(?:call|dial) (?:the )?(?:number )?([+\\d][\\d\\s().-]{6,})$")?.let { r -> return Reply("Calling ${r.groupValues[1].trim()}.", dial = r.groupValues[1].filter { it.isDigit() || it == '+' }) }
-
-        // ---- Knowledge: start a conversation ("let's talk about RAG", "talk to me about retirement")
-        m("^(?:let'?s talk(?: about)?|talk to me about|can we talk about|i want to talk about|let'?s chat about|let'?s discuss|start (?:a |an |the )?(.+?) (?:conversation|chat|talk))\\s*(.*)$")
-            ?.let { r -> return startConversation(r.groupValues.drop(1).filter { it.isNotBlank() }.joinToString(" "), origin) }
-
-        // ---- Google Keep (via the Keep app)
-        m("^(?:save|add|put|make|create|take)?\\s*(?:a )?(?:note )?(?:to|in|on) (?:google )?keep[:\\s]*(.*)$|^keep note[:\\s]+(.+)$|^(?:note|remember) (.+?) (?:in|to|on) (?:google )?keep$")
-            ?.let { r -> return keep(r.groupValues.drop(1).firstOrNull { it.isNotBlank() }.orEmpty(), origin) }
-
-        // ---- notes & documents
-        m("^(?:take a note|make a note|note to self|note|jot(?: down)?|write down|save (?:a )?note|new note|create (?:a )?(?:note|document|doc))(?: that| about| saying)?[:\\s]+(.+)$")
-            ?.let { return note(it.groupValues[1]) }
-        m("^(?:create|new|start|write|draft) (?:an? )?(memo|work order|incident report|meeting minutes|sop|inspection|pm log|project brief|vendor evaluation|budget request|weekly status|status report|shift handover|letter|checklist|cornell notes|travel plan)\\b")
-            ?.let { return template(it.groupValues[1]) }
-
-        // ---- journal
-        m("^(?:journal|dear diary|diary|log (?:in|to) (?:my )?journal|add (?:a )?journal entry|new journal entry)(?: that| about)?[:,\\s]+(.+)$")?.let { return journal(it.groupValues[1]) }
-        if (Regex("^(open|new|start) (a |my )?journal").containsMatchIn(l)) return Reply("Opening a fresh journal page.", route = "journal/0")
-
-        // ---- camera & scanners
-        if (Regex("^(scan|digitize) (a |this |the )?(document|page|paper|receipt|form)").containsMatchIn(l)) return if (origin == Origin.PHONE) Reply("Opening the document scanner.", ui = UiAction.SCAN_DOCUMENT) else Reply("Scanning needs the phone.")
-        if (Regex("^(scan) (a |the |this )?(qr|barcode|code|asset tag)").containsMatchIn(l)) return if (origin == Origin.PHONE) Reply("Opening the code scanner.", ui = UiAction.SCAN_CODE) else Reply("Scanning needs the phone.")
-        if (Regex("(take|snap|grab) (a |an )?(photo|picture|pic|shot)|open (the )?camera").containsMatchIn(l)) return Reply("Camera's up.", route = "camera?mode=photo")
-        if (Regex("(record|shoot|take) (a )?video").containsMatchIn(l)) return Reply("Video mode.", route = "camera?mode=video")
-        if (Regex("panorama|pano\\b").containsMatchIn(l)) return Reply("Panorama mode — sweep slow and steady.", route = "camera?mode=pano")
-
-        // ---- education
-        if (Regex("^(start|begin) (a )?(focus|pomodoro|study)( session| timer)?").containsMatchIn(l)) {
-            StudyTimer.get(app.context).start(profile.name)
-            return Reply(done("${s.pomodoroWork}-minute focus timer started. " + casual("Phone down, brain on.", "Lock in.", "")), route = "education?tab=Study")
-        }
-        m("^log (\\d+(?:\\.\\d+)?) (?:ceus?|pdhs?|hours?|credit hours?)(?: of (.+?))? (?:for|toward|towards|to) (.+)$")?.let { return logCeu(it.groupValues[1].toDouble(), it.groupValues[2], it.groupValues[3]) }
-        if (Regex("\\b(gpa|grade point|my grades?)\\b").containsMatchIn(l)) return gpa()
-
-        // ---- account / appearance / settings
-        m("^(?:switch|change|go) to (?:my )?(personal|professional|work)(?: account| profile| mode)?$")?.let {
-            val p = if (it.groupValues[1].lowercase() == "personal") Profile.PERSONAL else Profile.PROFESSIONAL
-            if (p == Profile.PROFESSIONAL && s.lockProfessional && origin == Origin.PHONE) return Reply("Switch accounts from the drawer — that one's locked.")
-            app.settings.setProfile(p); return Reply(done("you're in ${app.settings.profileName(p)}."))
-        }
-        m("^(?:turn on |switch to |use |enable )?(dark|light|system) (?:mode|theme)$")?.let {
-            app.settings.update { putString(Keys.THEME_MODE, it.groupValues[1].uppercase()) }; return Reply(done("${it.groupValues[1]} mode on."))
-        }
-        m("^(?:set|change|make)\\s+(?:the |my )?(.+?)\\s+(?:to|=)\\s+(.+)$")?.let { r -> setting(r.groupValues[1], r.groupValues[2], origin)?.let { return it } }
-        m("^(turn on|turn off|enable|disable|switch on|switch off)\\s+(?:the |my )?(.+)$")?.let { r ->
-            setting(r.groupValues[2], if (r.groupValues[1].lowercase().let { it.endsWith("on") || it == "enable" }) "on" else "off", origin)?.let { return it }
-        }
-
-        // ---- Gmail
-        if (Regex("(check|read|any|summari[sz]e|what's in|whats in|new|unread).*(e-?mails?|inbox|gmail|mail)|^(e-?mails?|inbox|gmail)$").containsMatchIn(l) &&
-            !Regex("^(send|write|draft)").containsMatchIn(l))
-            return gmailSearch("is:unread in:inbox", "unread")
-        m("^(?:search|find|look for|look up|show)(?: my)? (?:e-?mails?|gmail|mail|inbox)(?: for| about| from)? (.+)$|^(?:e-?mails?|mail) from (.+)$")
-            ?.let { r -> val q = r.groupValues.drop(1).first { it.isNotBlank() }; return gmailSearch(if (l.contains(" from ")) "from:($q)" else q, q) }
-        m("^(send|write|draft|compose)(?: an?)?(?: e-?mail| message)? to (\\S+@\\S+)(?: (?:about|subject|re|regarding)[:\\s]+(.+?))?(?: (?:saying|that says|body|message)[:\\s]+(.+))?$")
-            ?.let { r -> return email(r.groupValues[1].lowercase(), r.groupValues[2].trimEnd(',', '.'), r.groupValues[3], r.groupValues[4]) }
-
-        // ---- Google Drive
-        m("^(?:search|find|look for|look up)(?: for)? (.+?) (?:in|on) (?:my )?(?:google )?drive$|^(?:google )?drive (?:search )?(?:for )?(.+)$")
-            ?.let { r -> return driveSearch(r.groupValues.drop(1).first { it.isNotBlank() }) }
-        if (Regex("(upload|back ?up|save|send|copy) .*(to|on|in) (my )?(google )?drive").containsMatchIn(l)) return driveUpload(l)
-
-        // ---- Developer docs (Developer Knowledge API)
-        m("^(?:search |look up |check )?(?:the )?(?:android|kotlin|compose|jetpack|firebase|google cloud|gcp|developer|dev) docs?(?: for| about| on)?[:\\s]+(.+)$|^how do i (.+) in (?:android|kotlin|jetpack compose|compose|firebase)$")
-            ?.let { r -> return devDocs(r.groupValues.drop(1).first { it.isNotBlank() }) }
-
-        // ---- navigation
-        m("^(?:open|go to|show(?: me)?|launch|take me to|pull up)(?: the| my)? (home|dashboard|tasks|to-?do|todos|schedule|calendar|education|learn|courses|certifications|library|files|photos|videos|recordings|scans|documents|docs|journal|notes|keep|brainstorm|recorder|dictation|settings|camera|assistant)$")
-            ?.let { r -> return navigate(r.groupValues[1].lowercase()) }
-
-        // ---- feature: Ask my files
-        m("^(?:search|find|look up|look for|ask my files|search my (?:files|notes|docs|documents))(?: for| about)?[:\\s]+(.+)$")?.let { return askFiles(it.groupValues[1]) }
-        if (Regex("^(what|when|where|who|which|did|how)\\b.*\\b(i|my|we|our)\\b.*\\b(write|wrote|say|said|note|noted|record|recorded|mention|mentioned|decide|decided|discuss|discussed|journal|meeting)").containsMatchIn(l))
-            return askFiles(t)
+        // ---- everything else in the grammar: tasks, notes, camera, settings, Google, navigation, Ask my files
+        Intents.matches(t, Intents.Phase.LATE).forEach { m -> perform(m, t, l, origin)?.let { return it } }
 
         // ---- Expert knowledge bases (software, AI, GitHub, everyday topics) — offline, grounded
         knowledgeAnswer(t)?.let { return it }
@@ -338,6 +194,185 @@ class Assistant(private val app: AppContainer) {
             "I didn't catch a command in that. " + (if (Nano.status.value != Nano.Status.AVAILABLE && s.asstUseNano) "On-device AI is ${Nano.status.value.label.lowercase()}, so I'm on rules only right now. " else "") +
                 "Try “add task…”, “what's on my calendar”, “brief me”, “search my files for…”, or say “help”.",
         )
+    }
+
+    /** Carries out one matched command. Null means "not mine after all" and the next match is tried. */
+    private suspend fun perform(m: Intents.Match, t: String, l: String, origin: Origin): Reply? = when (m.id) {
+        Intents.Id.HELP -> help()
+        Intents.Id.THANKS -> Reply(casual("Anytime, man.", "You got it.", "Happy to help.").ifBlank { "You're welcome." }, speak = true)
+        Intents.Id.GREETING -> Reply("${Time.greeting()}${s.userName.substringBefore(' ').takeIf { it.isNotBlank() }?.let { ", $it" } ?: ""}. " +
+            casual("What are we getting into?", "What's the plan?", "What do you need?").ifBlank { "How can I help?" })
+        Intents.Id.TIME -> Reply("It's ${Time.time(Time.now())}.")
+        Intents.Id.DATE -> Reply("Today is ${Time.longDate(Time.today())}, ${Time.today().year}.")
+        Intents.Id.BRIEFING -> Reply(Briefing.build(app, s.asstPersona), listOf(Link("Schedule", "schedule"), Link("To-Do", "tasks")))
+        Intents.Id.CREATE_EVENT -> createEvent(m[1], m[2])
+        Intents.Id.AGENDA -> agenda(l)
+        Intents.Id.DICTATE_START -> { DictationService.send(app.context, DictationService.ACTION_START); Reply(done("dictation's rolling. Say “stop recording” when you're done."), route = "dictation") }
+        Intents.Id.RECORD_START -> { RecorderService.send(app.context, RecorderService.ACTION_START); Reply(done("recording started."), route = "recorder") }
+        Intents.Id.RECORD_STOP -> {
+            val wasDict = DictationService.state.value.active
+            if (wasDict) DictationService.send(app.context, DictationService.ACTION_STOP)
+            if (RecorderService.state.value.status != RecState.Status.IDLE) RecorderService.send(app.context, RecorderService.ACTION_STOP)
+            Reply(done("stopped and saved."), route = if (wasDict) "dictation" else "recorder")
+        }
+        Intents.Id.RECORD_PAUSE -> {
+            if (DictationService.state.value.active) DictationService.send(app.context, DictationService.ACTION_PAUSE) else RecorderService.send(app.context, RecorderService.ACTION_PAUSE)
+            Reply("Paused.")
+        }
+        Intents.Id.MARKER -> {
+            if (DictationService.state.value.active) DictationService.send(app.context, DictationService.ACTION_MARK) else RecorderService.send(app.context, RecorderService.ACTION_MARK)
+            Reply("Marked.")
+        }
+        Intents.Id.WORK_ORDER_NEW -> workOrder(m.firstGroup)
+        Intents.Id.LIBRARY_SEARCH -> library(m.firstGroup)
+        Intents.Id.SKILLS -> facilityOps(m, t)
+        Intents.Id.SKILL_USE -> {
+            val r = DesktopAi.ask(t) ?: return Reply("Skills run on your computer, and I can't reach it right now. Plug in the phone or use Wireless debugging, then run ./daddyshome.", source = "Agent skills")
+            Reply(r.text.ifBlank { "Done." }, source = r.source.ifBlank { "Desktop · agent skill" })
+        }
+        Intents.Id.VAULT_ASK, Intents.Id.SHIFT_PREP, Intents.Id.ROUNDS_START, Intents.Id.PANEL_LOOKUP, Intents.Id.SDS_LOOKUP, Intents.Id.CREDENTIALS -> facilityOps(m, t)
+        Intents.Id.OPS_HANDOFF -> Reply(com.blacklab.app.ui.home.DayTimelineData.handoff(app), listOf(Link("Timeline", "timeline")), source = "Timeline")
+        Intents.Id.TIMELINE -> com.blacklab.app.ui.home.DayTimelineData.inputs(app, java.time.LocalDate.now()).let { i ->
+            val items = com.blacklab.app.core.DayTimeline.build(i).filter { it.kind != com.blacklab.app.core.DayTimeline.Kind.BH }
+            Reply(if (items.isEmpty()) "Nothing logged today yet." else "Today so far: " + items.takeLast(8).joinToString("; ") { "${com.blacklab.app.core.DayTimeline.clock(it.time, i.zone)} ${it.kind.label.lowercase()} — ${it.title}" } + ".",
+                listOf(Link("Timeline", "timeline")), route = "timeline", source = "Timeline")
+        }
+        Intents.Id.PRIVATE_DRIVE_SAVE -> privateDrive(t)
+        Intents.Id.VAULT_SAVE, Intents.Id.VAULT_NODE_ADD, Intents.Id.VAULT_LOG, Intents.Id.VAULT_SEARCH, Intents.Id.VAULT_STATUS,
+        Intents.Id.VAULT_SHOW, Intents.Id.VAULT_OPEN, Intents.Id.VAULT_SYNC -> vault(m)
+        Intents.Id.WEATHER -> weather(l)
+        Intents.Id.REMIND -> addTask(m[1], remind = true)
+        Intents.Id.ADD_TASK, Intents.Id.TODO_PREFIX -> addTask(m[1], remind = false)
+        Intents.Id.ADD_TO_LIST -> addTask(m[1], remind = false, myDay = l.endsWith("my day"))
+        Intents.Id.COMPLETE_TASK -> completeTask(m[1])
+        Intents.Id.LIST_TASKS -> listTasks(l)
+        Intents.Id.SUMMARIZE -> summarize(m[1], origin)
+        Intents.Id.MEETING_ACTIONS -> meetingActions()
+        Intents.Id.NAMEPLATE -> if (origin == Origin.PHONE) Reply("Point the camera at the nameplate — I'll read it and write up the work order.", ui = UiAction.NAMEPLATE)
+            else Reply("That one needs the phone camera. Open BlackLab on your phone and say “nameplate”.")
+        Intents.Id.NAV_NEXT -> navigateNext()
+        Intents.Id.NAV_NEARBY -> m[1].let { q0 -> val q = if (q0 == "gas" || q0 == "fuel") "gas station" else q0; Reply("Finding the nearest $q.", nav = q) }
+        Intents.Id.NAV_TO -> Reply("Heading to ${m[1]}.", nav = m[1])
+        Intents.Id.CALL -> Reply("Calling ${m[1].trim()}.", dial = m[1].filter { it.isDigit() || it == '+' })
+        Intents.Id.TALK_ABOUT -> startConversation(m.groups.drop(1).filter { it.isNotBlank() }.joinToString(" "), origin)
+        Intents.Id.KEEP -> keep(m.firstGroup, origin)
+        Intents.Id.NOTE -> note(m[1])
+        Intents.Id.TEMPLATE -> template(m[1])
+        Intents.Id.JOURNAL_WRITE -> journal(m[1])
+        Intents.Id.JOURNAL_OPEN -> Reply("Opening a fresh journal page.", route = "journal/0")
+        Intents.Id.SCAN_DOCUMENT -> if (origin == Origin.PHONE) Reply("Opening the document scanner.", ui = UiAction.SCAN_DOCUMENT) else Reply("Scanning needs the phone.")
+        Intents.Id.SCAN_CODE -> if (origin == Origin.PHONE) Reply("Opening the code scanner.", ui = UiAction.SCAN_CODE) else Reply("Scanning needs the phone.")
+        Intents.Id.PHOTO -> Reply("Camera's up.", route = "camera?mode=photo")
+        Intents.Id.VIDEO -> Reply("Video mode.", route = "camera?mode=video")
+        Intents.Id.PANORAMA -> Reply("Panorama mode — sweep slow and steady.", route = "camera?mode=pano")
+        Intents.Id.FOCUS -> {
+            StudyTimer.get(app.context).start(profile.name)
+            Reply(done("${s.pomodoroWork}-minute focus timer started. " + casual("Phone down, brain on.", "Lock in.", "")), route = "education?tab=Study")
+        }
+        Intents.Id.LOG_CEU -> logCeu(m[1].toDouble(), m[2], m[3])
+        Intents.Id.GPA -> gpa()
+        Intents.Id.SWITCH_PROFILE -> {
+            val p = if (m[1].lowercase() == "personal") Profile.PERSONAL else Profile.PROFESSIONAL
+            if (p == Profile.PROFESSIONAL && s.lockProfessional && origin == Origin.PHONE) Reply("Switch accounts from the drawer — that one's locked.")
+            else { app.settings.setProfile(p); Reply(done("you're in ${app.settings.profileName(p)}.")) }
+        }
+        Intents.Id.THEME -> { app.settings.update { putString(Keys.THEME_MODE, m[1].uppercase()) }; Reply(done("${m[1]} mode on.")) }
+        Intents.Id.SET_SETTING -> setting(m[1], m[2], origin)
+        Intents.Id.TOGGLE_SETTING -> setting(m[2], if (m[1].lowercase().let { it.endsWith("on") || it == "enable" }) "on" else "off", origin)
+        Intents.Id.GMAIL_UNREAD -> gmailSearch("is:unread in:inbox", "unread")
+        Intents.Id.GMAIL_SEARCH -> m.firstGroup.let { q -> gmailSearch(if (l.contains(" from ")) "from:($q)" else q, q) }
+        Intents.Id.EMAIL -> email(m[1].lowercase(), m[2].trimEnd(',', '.'), m[3], m[4])
+        Intents.Id.DRIVE_SEARCH -> driveSearch(m.firstGroup)
+        Intents.Id.DRIVE_UPLOAD -> driveUpload(l)
+        Intents.Id.DEV_DOCS -> devDocs(m.firstGroup)
+        Intents.Id.NAVIGATE -> navigate(m[1].lowercase())
+        Intents.Id.ASK_FILES -> askFiles(m[1])
+        Intents.Id.ASK_FILES_QUESTION -> askFiles(t)
+    }
+
+    // ------------------------------------------------------------------ work-order intake
+
+    private suspend fun workOrder(text: String): Reply {
+        val ctx = app.context
+        val d = com.blacklab.app.facility.Intake.parse(text, com.blacklab.app.facility.Facility.load(ctx))
+        val id = com.blacklab.app.facility.FacilityReminders.addIntake(ctx, d, s.userName)
+        val where = listOfNotNull(d.location.ifBlank { null }, d.asset?.name).joinToString(" · ")
+        return Reply(done("work order filed — ${d.priority.name}, ${d.priority.label.substringBefore(" ·").lowercase()}: ${d.title}" +
+            (if (where.isNotBlank()) " ($where)" else "") + ". First: ${d.checklist.first()}"),
+            listOf(Link("Open work order", "task/$id"), Link("Facility", "facility")), source = "Facility", speak = true)
+    }
+
+    private suspend fun library(q: String): Reply {
+        if (!DesktopAi.usable) return Reply("The offline library lives on your computer, and I can't reach it right now.")
+        val r = com.blacklab.app.link.VaultFeed.library(q)
+        val hits = r.json?.optJSONArray("results")
+        if (!r.ok || hits == null) return Reply(r.message.ifBlank { "The library didn't answer." })
+        if (hits.length() == 0) return Reply("Nothing in the offline library for “$q”.")
+        hits.optJSONObject(0)?.optString("error")?.takeIf { it.isNotBlank() }?.let { return Reply(it) }
+        val lines = (0 until minOf(4, hits.length())).map { hits.getJSONObject(it) }.joinToString("\n") { h -> "• ${h.optString("title")} (${h.optString("book")}) — ${h.optString("snippet").take(160)}" }
+        return Reply("From your offline library:\n$lines", source = "Library")
+    }
+
+    // ------------------------------------------------------------------ Obsidian vault (on the computer)
+
+    /** Ask my notes, shift prep, rounds, panels, SDS and credentials — all answered by the computer from the vault. */
+    private suspend fun facilityOps(m: Intents.Match, t: String): Reply {
+        val V = com.blacklab.app.link.VaultFeed
+        if (!s.vaultEnabled) return Reply("The Obsidian vault is off. Turn it on in Settings › Obsidian vault.", route = "settings")
+        if (!DesktopAi.usable) return Reply("I can't reach your computer right now, and your vault lives there. Plug in the phone or check the desktop link.")
+        val q = m.firstGroup.trim()
+        if (Intents.CLINICAL.containsMatchIn(t))
+            return Reply("That sounds like someone's care information — it stays on the phone. Use the Behavioral Health workspace instead.")
+        val r = when (m.id) {
+            Intents.Id.VAULT_ASK -> V.ask(q).let { st ->
+                val src = st.json?.optJSONArray("sources")
+                if (!st.ok || src == null || src.length() == 0) st
+                else com.blacklab.app.link.VaultFeed.Status(true, st.message + "\n\nFrom: " + (0 until minOf(3, src.length())).joinToString(", ") { src.getString(it).substringAfterLast('/').removeSuffix(".md") }, st.json)
+            }
+            Intents.Id.SHIFT_PREP -> V.facility("shift_prep", org.json.JSONObject())
+            Intents.Id.ROUNDS_START -> V.facility("round", org.json.JSONObject().put("say", t))
+            Intents.Id.PANEL_LOOKUP -> V.facility("panel", org.json.JSONObject().put("query", q))
+            Intents.Id.SDS_LOOKUP -> V.facility("sds", org.json.JSONObject().put("query", q))
+            Intents.Id.SKILLS -> V.facility("skills", org.json.JSONObject().put("query", q))
+            else -> V.facility("credentials", org.json.JSONObject().put("query", q))
+        }
+        return Reply(r.message.ifBlank { "Your computer didn't have an answer for that." }, listOf(Link("Facility", "facility")), source = "Vault", speak = true)
+    }
+
+    /** "save to my private drive: …" — the computer files it into Google Drive › BlackLab › Paul's Private. */
+    private suspend fun privateDrive(said: String): Reply {
+        if (!DesktopAi.usable) return Reply("I can't reach your computer right now — it's the one that saves to your private drive. Plug in the phone or check the desktop link.")
+        if (Intents.CLINICAL.containsMatchIn(said))
+            return Reply("That sounds like someone's care information — it stays in the Behavioral Health workspace on the phone, not in Drive.")
+        val r = com.blacklab.app.link.VaultFeed.privateDrive(said)
+        return Reply(r.message, source = "Private drive")
+    }
+
+    private suspend fun vault(m: Intents.Match): Reply {
+        val V = com.blacklab.app.link.VaultFeed
+        if (!s.vaultEnabled) return Reply("The Obsidian vault is off. Turn it on in Settings › Obsidian vault.", route = "settings")
+        if (!DesktopAi.usable) return Reply("I can't reach your computer right now, and the vault lives there. Plug in the phone or check the desktop link.")
+        val text = m.groups.drop(1).lastOrNull { it.isNotBlank() }.orEmpty()
+        if (m.id in setOf(Intents.Id.VAULT_SAVE, Intents.Id.VAULT_NODE_ADD, Intents.Id.VAULT_LOG) && Intents.CLINICAL.containsMatchIn(text))
+            return Reply("That sounds like someone's care information — it stays on the phone and never goes to the vault. Use the Behavioral Health workspace instead.")
+        val r = when (m.id) {
+            Intents.Id.VAULT_SAVE -> V.capture(text)
+            Intents.Id.VAULT_NODE_ADD -> V.addToNode(m[1], m[2])
+            Intents.Id.VAULT_LOG -> V.log(text)
+            Intents.Id.VAULT_SHOW -> V.showInGraph(m.firstGroup)
+            Intents.Id.VAULT_OPEN -> V.openOnComputer()
+            Intents.Id.VAULT_SYNC -> V.sync(app, force = true)
+            Intents.Id.VAULT_SEARCH -> V.search(text).let { st ->
+                val hits = st.json?.optJSONArray("results")
+                if (!st.ok || hits == null) st else com.blacklab.app.link.VaultFeed.Status(true, if (hits.length() == 0) "Nothing in the vault matches “$text”." else
+                    "From your vault:\n" + (0 until minOf(5, hits.length())).joinToString("\n") { i -> hits.getJSONObject(i).let { h -> "• ${h.optString("title")} — ${h.optString("snippet").take(140)}" } })
+            }
+            else -> V.status()?.let { j ->
+                val who = j.optJSONObject("last_visitor")?.let { " Last AI visitor: ${it.optString("agent")} (${it.optString("when")})." } ?: ""
+                com.blacklab.app.link.VaultFeed.Status(true, "Your vault has ${j.optInt("notes")} notes, ${j.optInt("commits")} saved versions and ${j.optInt("today")} things logged today.$who")
+            } ?: com.blacklab.app.link.VaultFeed.Status(false, "Couldn't reach the vault.")
+        }
+        return Reply(done(r.message), speak = true)
     }
 
     // ------------------------------------------------------------------ Gemini Nano
@@ -373,6 +408,7 @@ summarize <today/tomorrow/this week/my recent notes/my open tasks/my journal> as
 log fuel <gallons> gallons <dollars> dollars at <miles> miles | log <service> at <miles> miles | what's due on the car |
 navigate to my next meeting | find a gas station | navigate to <place> |
 desktop <request for the user's computer: open a folder or app, find files on the computer, system status, disk space, save a desktop note>.
+reverse engineer <file> [and <question>] — analyze a program, APK, library or firmware on the computer (REA + Ghidra).
 
 If the user's message is a request one of these commands can do, reply with exactly one line: COMMAND: <the command>
 Otherwise answer the user directly in 1-4 sentences, starting with: ANSWER:
@@ -408,6 +444,7 @@ User: $text"""
 • Knowledge — “what is retrieval-augmented generation?”, “explain GitHub Actions caching”, “let's talk about system design”
 • Weather — “what's the weather”, “will it freeze tonight?”, “weather alerts” (facility prep checklists)
 • Desktop — “on my computer open my downloads”, “ask my desktop how much disk space is left”, “desktop AI status”
+• Reverse engineering (on the computer) — “reverse engineer ~/Downloads/tool.bin and find the license check”, “decompile 0x401000 in tool.bin”, “how do I inspect an APK with REA?”, or any file › ⋮ › Reverse-engineer on computer
 • Behavioral Health — “start rounds”, “when are rounds due?”, “start my shift”, “new peer note”, “SBAR handoff”, “crisis lines”, “grounding”
 • Facility — “what inspections are due?”, “any PMs overdue?”
 • Garage — “log fuel 13.2 gallons $48 at 31,250 miles”, “I got an oil change at 31,000”, “what's due on the car?”
@@ -845,6 +882,39 @@ User: $text"""
         val req = m.groupValues[1].trim()
         val r = DesktopAi.ask(req) ?: return Reply("I can't reach the computer right now. Plug in the phone (or use Wireless debugging) and run ./daddyshome on the computer.", source = "Desktop AI")
         return Reply(r.text.ifBlank { "Done." }, source = r.source.ifBlank { "Desktop" })
+    }
+
+    /**
+     * Reverse engineering runs on the computer (see [ReverseEngineering]). A file named here that's on the phone (in
+     * BlackLab's folders) is uploaded with the job; anything else is a path on the computer.
+     */
+    private suspend fun reverse(t: String): Reply? {
+        val route = ReverseEngineering.route(t) ?: return null
+        val off = "Reverse engineering runs on your computer, and I can't reach it right now (or hand-off is off in Assistant settings). Plug in the phone or use Wireless debugging, then run ./daddyshome."
+        if (!DesktopAi.usable && DesktopAi.probe().state != DesktopAi.State.ONLINE) return Reply(off, source = "Reverse engineering")
+        return when (route) {
+            is ReverseEngineering.Route.Quick -> {
+                val r = DesktopAi.ask(t) ?: return Reply(off, source = "Reverse engineering")
+                Reply(r.text.ifBlank { "No answer." }, source = r.source.ifBlank { "Desktop · REA" })
+            }
+            is ReverseEngineering.Route.Background -> Reply(
+                if (DesktopJobs.start(app, "ask", t.take(80), org.json.JSONObject().put("text", t))) "Working on it on your computer — Ghidra takes a minute or two. I'll notify you with the answer." else off,
+                source = "Reverse engineering")
+            is ReverseEngineering.Route.Report -> {
+                val name = route.target.substringAfterLast('/')
+                val onPhone = if (route.target.startsWith("/") || route.target.startsWith("~")) null else withContext(Dispatchers.IO) {
+                    app.storage.root.walkTopDown().maxDepth(6).firstOrNull { it.isFile && it.name.equals(name, ignoreCase = true) }
+                }
+                val params = org.json.JSONObject().put("goal", route.goal)
+                if (onPhone != null) {
+                    DesktopJobs.enqueue(app, "reverse", onPhone, "Reverse-engineer $name", params)
+                    Reply("Sending $name to your computer for a reverse-engineering report. It shows up in Documents › Reverse Engineering when it's done.", source = "Reverse engineering")
+                } else Reply(
+                    if (DesktopJobs.start(app, "reverse", "Reverse-engineer $name", params.put("path", route.target)))
+                        "Your computer is reverse-engineering $name" + (if (route.goal.isNotBlank()) ", aimed at: ${route.goal}" else "") + ". I'll notify you when the report is ready."
+                    else off, source = "Reverse engineering")
+            }
+        }
     }
 
     /** Hand-off jobs and the equipment registry, both on the computer. */

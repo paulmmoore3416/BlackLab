@@ -5,6 +5,14 @@ updates:
     directory: /
     schedule: { interval: weekly, day: monday }
     open-pull-requests-limit: 8
+    # AGP 9 is a migration (built-in Kotlin, new DSL), and the AndroidX releases that need it also need
+    # compileSdk 37 — those come in a planned upgrade, not a weekly PR.
+    ignore:
+      - dependency-name: "com.android.application"
+        update-types: ["version-update:semver-major"]
+      # Gradle 9.6+ removed an internal API that AGP 8.x uses — the wrapper moves to 9 together with AGP 9
+      - dependency-name: "gradle-wrapper"
+        update-types: ["version-update:semver-major"]
     groups:
       androidx:
         patterns: ["androidx.*"]

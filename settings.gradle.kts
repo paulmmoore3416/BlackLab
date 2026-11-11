@@ -14,3 +14,4 @@ dependencyResolutionManagement {
 }
 rootProject.name = "BlackLab"
 include(":app")
+include(":baselineprofile")

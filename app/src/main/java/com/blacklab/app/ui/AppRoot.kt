@@ -142,6 +142,7 @@ private val drawerDests = listOf(
     Dest("knowledge", "Knowledge & Talk", Icons.Rounded.Psychology),
     Dest("summarize", "Summarize", Icons.Rounded.Summarize),
     Dest("bh", "Behavioral Health", Icons.Rounded.Diversity3),
+    Dest("timeline", "Timeline & handoff", Icons.Rounded.Timeline),
     Dest("facility", "Facility", Icons.Rounded.Apartment),
     Dest("garage", "Garage · Santa Fe", Icons.Rounded.DirectionsCar),
     Dest("camera", "Camera", Icons.Rounded.PhotoCamera),
@@ -469,6 +470,8 @@ private fun NavGraph(nav: androidx.navigation.NavHostController) {
         }
         screen("settings") { SettingsScreen() }
         screen("settings/dashboard") { com.blacklab.app.ui.settings.DashboardSettingsScreen() }
+        screen("settings/health") { com.blacklab.app.ui.settings.HealthScreen() }
+        screen("timeline") { com.blacklab.app.ui.home.TimelineScreen() }
         screen("updates") { com.blacklab.app.ui.settings.UpdatesScreen() }
         screen("diagnostics") { com.blacklab.app.ui.settings.DiagnosticsScreen() }
         screen("assistant?listen={listen}", arguments = listOf(navArgument("listen") { type = NavType.BoolType; defaultValue = false })) {

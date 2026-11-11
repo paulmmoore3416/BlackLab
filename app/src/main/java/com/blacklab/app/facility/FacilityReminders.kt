@@ -69,6 +69,22 @@ object FacilityReminders {
                 listOf(asset.make, asset.model).filter { it.isNotBlank() }.joinToString(" ").ifBlank { null }).joinToString("\n"),
             dueDay = LocalDate.now().toEpochDay(), tags = "facility,work-order"))
 
+    /** Files a work order from plain words (Intake): a task in Work Orders, plus the asset's log when one matched. */
+    suspend fun addIntake(context: Context, d: Intake.Draft, by: String = ""): Long {
+        val today = LocalDate.now()
+        val due = when (d.priority) { Intake.Priority.P1, Intake.Priority.P2 -> today; Intake.Priority.P3 -> today.plusDays(7); Intake.Priority.P4 -> null }
+        val remindAt = if (d.priority == Intake.Priority.P1) System.currentTimeMillis() + 60 * 60_000L else null
+        val id = TaskOps.save(context.app, TaskEntity(profile = Profile.PROFESSIONAL.name, listId = listId(context, "Work Orders"),
+            title = "WO ${d.priority.name}: ${d.title}", priority = d.priority.taskPriority, important = d.priority == Intake.Priority.P1,
+            notes = d.notes(), dueDay = due?.toEpochDay(), reminderAt = remindAt,
+            tags = listOf("facility", "work-order", d.trade.lowercase().replace(' ', '-')).joinToString(",")))
+        d.asset?.let { a ->
+            Facility.update(context) { s -> Facility.addEntry(s, Facility.Entry(assetId = a.id, day = today.toEpochDay(), kind = Facility.Kind.WORK_ORDER,
+                text = "${d.priority.name} · ${d.title}", by = by, taskId = id)) }
+        }
+        return id
+    }
+
     fun schedule(context: Context) {
         WorkManager.getInstance(context).enqueueUniquePeriodicWork("facility_reminders", ExistingPeriodicWorkPolicy.KEEP,
             PeriodicWorkRequestBuilder<FacilityReminderWorker>(1, TimeUnit.DAYS).setInitialDelay(3, TimeUnit.HOURS).build())

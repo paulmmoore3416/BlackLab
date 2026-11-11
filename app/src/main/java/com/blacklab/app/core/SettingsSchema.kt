@@ -172,6 +172,7 @@ object SettingsSchema {
             bool(Keys.ASST_INDEX_JOURNAL, "Journal", "Index journal entries.", d.asstIndexJournal),
             bool(Keys.ASST_INDEX_TRANSCRIPTS, "Recordings & dictation", "Index transcripts.", d.asstIndexTranscripts),
             bool(Keys.ASST_INDEX_TASKS, "Tasks, events & courses", "Index titles and notes.", d.asstIndexTasks),
+            bool(Keys.ASST_INDEX_OPS, "Facility & Garage", "Index assets, inspections, work orders and service history (never the VIN or plate).", d.asstIndexOps),
         )),
         Section("car", "Android Auto", "car", "BlackLab on your car's display (set up for the 2023 Hyundai Santa Fe).", listOf(
             bool(Keys.CAR_SPEAK, "Speak replies in the car", "Read answers, summaries and confirmations aloud through the car speakers.", d.carSpeak),
@@ -189,6 +190,16 @@ object SettingsSchema {
             int(Keys.LINK_PORT, "Link port", "TCP port of the link server.", d.linkPort, 1024, 65535, advanced = true),
             bool(Keys.CLOUD_SYNC, "Cloud sync (Google Drive)", "Mirror settings and a data snapshot to your Drive's hidden app folder so the web UI works from anywhere.", d.cloudSync),
             intChoice(Keys.CLOUD_SYNC_MIN, "Cloud sync interval", "Background sync period.", d.cloudSyncMinutes, 15 to "15 minutes", 30 to "30 minutes", 60 to "1 hour", 180 to "3 hours"),
+        )),
+        Section("vault", "Obsidian vault", "book", "Mirror BlackLab into your Obsidian vault on the computer (via BlackLab Desktop): linked notes, a daily timeline and 13 knowledge nodes. Behavioral Health, keys, the VIN and plate never go.", listOf(
+            bool(Keys.VAULT_ENABLED, "Mirror to the vault", "Send BlackLab's data to the vault while the desktop link is up (every 15 minutes when something changed).", d.vaultEnabled),
+            bool(Keys.VAULT_FACILITY, "Facility", "Assets, inspections & PM, the work log.", d.vaultFacility),
+            bool(Keys.VAULT_GARAGE, "Garage", "Service, fuel, what's due and recalls (never the VIN, plate or trip places).", d.vaultGarage),
+            bool(Keys.VAULT_TASKS, "Tasks & calendar", "Tasks, work orders and the next 30 days of events.", d.vaultTasks),
+            bool(Keys.VAULT_NOTES, "Notes & notebooks", "Notes and notebook pages (locked sections stay on the phone).", d.vaultNotes),
+            bool(Keys.VAULT_LEARNING, "Learning", "Courses, assignments and certifications.", d.vaultLearning),
+            bool(Keys.VAULT_RECORDINGS, "Recordings", "Transcripts and notes of your recordings.", d.vaultRecordings),
+            bool(Keys.VAULT_JOURNAL, "Journal", "Your journal entries. Off unless you want them there.", d.vaultJournal),
         )),
         Section("calendar", "Schedule", "calendar", "Calendar views, working hours and overlays.", listOf(
             Def(Keys.WEEK_START, Store.INT, "Week starts on", "First day of week in calendar grids.", "weekday",

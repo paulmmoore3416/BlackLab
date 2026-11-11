@@ -124,13 +124,13 @@ object Weather {
         return com.blacklab.app.core.AutoTheme.location(a.context)
     }
 
-    private fun get(url: String): JSONObject {
+    private fun get(url: String): JSONObject = com.blacklab.app.core.Net.retry {
         val c = URL(url).openConnection() as HttpURLConnection
         try {
             c.connectTimeout = 8_000; c.readTimeout = 15_000
             if (c.responseCode == 401) throw SecurityException("key")
-            if (c.responseCode !in 200..299) throw IllegalStateException("HTTP ${c.responseCode}")
-            return JSONObject(c.inputStream.bufferedReader().use { it.readText() })
+            if (c.responseCode !in 200..299) throw com.blacklab.app.core.Net.HttpStatus(c.responseCode, "OpenWeatherMap")
+            JSONObject(c.inputStream.bufferedReader().use { it.readText() })
         } finally { c.disconnect() }
     }
 

@@ -205,3 +205,27 @@ device can't keep HDR with effects it retries with HDR→SDR tone-mapping.
   1. `secrets` runs `scripts/secret-scan.sh`, which checks for tracked keystores, property files and credential-shaped strings.
   2. `build` runs unit tests and the debug and release builds.
   3. `device-tests` runs `connectedDebugAndroidTest` on an API 35 emulator with KVM.
+
+## Building blocks (5.11)
+
+| Need | Use | Where |
+|---|---|---|
+| A JSON document outside Room (Facility, Garage, drive log, recalls…) | `JsonStore` — crash-safe writes, `.bak` copy, damaged files set aside, `_schema` + migrations, read-only when written by a newer app | `core/JsonStore.kt`, `JsonStoreTest` |
+| A new assistant command | add a `Rule` to `Intents.kt` (order matters), handle the `Id` in `Assistant.perform`, add the phrasing to `IntentsTest`'s corpus | `assistant/Intents.kt` |
+| A screen with real state | a `ViewModel` owning a `StateFlow<UiState>`; the composable only renders (`viewModel { XViewModel(app) }`) | `ui/settings/HealthScreen.kt`, `ui/home/TimelineScreen.kt` |
+| Network calls | throw `Net.HttpStatus` for non-2xx, wrap in `Net.retry {}`, show trouble with `ProblemBanner` | `core/Net.kt`, `ui/components/ProblemBanner.kt` |
+| Is the phone healthy? | add a check to `Health.evaluate` (pure) and its input to `HealthViewModel.gather` | `core/Health.kt` |
+| Something for the Obsidian vault | add it to `VaultFeed.build` (phone) and render it in `vault.py` `apply_feed` (desktop); the test fixtures on both sides pin the shape | `link/VaultFeed.kt`, `desktop/companion/vault.py` |
+| A desktop safety rule | `guards.py` + `tests/test_guards.py` (standard library `unittest`) | `desktop/companion/` |
+
+Bigger screens (`PageEditorScreen`, `ScheduleScreen`, `PdfViewerScreen`, `CameraScreen`) still keep their state in composables; move them to the ViewModel pattern one at a time, each with a device check, rather than in one sweep.
+
+### The Obsidian vault
+
+```
+phone ──POST /phone/vault (feed, 15 min)──► companion ──► ~/Obsidian/BlackLab (git)
+desktop AI ── conversations, task logs, meetings, briefs ──┘        ▲
+Claude Code / any agent ── vault_mcp.py (stdio MCP) ────────────────┘
+```
+
+13 nodes + `◉ Nexus` (`vault_nodes.py`): every managed note gets `up: [[◆ Node]]`, nodes rebuild members/signals/mentions each pass, and their `## Knowledge` part belongs to people and agents. Managed text lives between `%% blacklab:begin %%` and `%% blacklab:end %%`; nothing outside is ever rewritten, and nothing is deleted (it moves to `99 Archive`).

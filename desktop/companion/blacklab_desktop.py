@@ -46,8 +46,12 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import agents  # noqa: E402  (background jobs, recordings, equipment, briefs)
+import guards  # noqa: E402  (every safety rule: HTTP, paths, privacy, tool calls — unit tested)
+import reverse  # noqa: E402  (reverse engineering with REA + Ghidra, read-only — unit tested)
+import vault as vaultlib  # noqa: E402  (the Obsidian vault: notes, timeline, AI registry, git)
+import audit  # noqa: E402  (the hash-chained activity ledger — unit tested)
 
-VERSION = "1.4.1"
+VERSION = "1.7.0"
 HOST, PORT = "127.0.0.1", int(os.environ.get("BLACKLAB_DESKTOP_PORT", "8770"))
 HOME = Path.home()
 WEB_DIR = Path(__file__).resolve().parent.parent / "web"
@@ -56,12 +60,8 @@ CACHE_DIR = HOME / ".cache" / "blacklab-desktop"
 OLLAMA = os.environ.get("OLLAMA_HOST", "127.0.0.1:11434").rstrip("/")
 if not OLLAMA.startswith("http"):  # Ollama's own convention allows "host:port"
     OLLAMA = "http://" + OLLAMA.replace("0.0.0.0", "127.0.0.1")
-ALLOWED_ORIGINS = {
-    f"http://{HOST}:{PORT}", f"http://localhost:{PORT}", "https://paulmmoore3416.github.io",
-}
-# A web page can point its own domain name at 127.0.0.1 ("DNS rebinding") and then talk to this
-# port as if it were same-origin. Browsers always send the name they used in Host, so only accept ours.
-ALLOWED_HOSTS = {f"{HOST}:{PORT}", f"localhost:{PORT}"}
+ALLOWED_ORIGINS = guards.allowed_origins(HOST, PORT)
+ALLOWED_HOSTS = guards.allowed_hosts(HOST, PORT)
 PREFERRED_MODELS = ["qwen3:8b", "granite4:tiny-h", "paul-assistant:latest", "qwen2.5:14b"]
 
 
@@ -89,6 +89,10 @@ DOCS_DIR = _cfg_dir("documents_dir", AI_DIR / "Documents")
 CHAT_DIR = _cfg_dir("chat_history_dir", AI_DIR / "Chat History")
 TASK_LOG_DIR = _cfg_dir("task_log_dir", AI_DIR / "Task Logs")
 OUT_DIR = DOWNLOADS_DIR  # the name companion 1.2 and earlier used
+VAULT_ON = CONFIG.get("vault", True) is not False
+VAULT = vaultlib.Vault(_cfg_dir("vault_dir", "~/Obsidian/BlackLab"), CACHE_DIR / "vault", CONFIG.get("timezone", "America/Chicago"))
+LEDGER = audit.Ledger(CACHE_DIR / "vault" / "ledger.jsonl")
+VAULT.ledger = LEDGER
 
 
 def ensure_phone_token() -> str:
@@ -208,29 +212,16 @@ def xdg_open(target: str):
 
 # Never readable, openable or searchable by the AI, whatever a request (or a document it reads) asks:
 # wallet keys and recovery phrases, SSH/GPG keys, browser profiles, and the keys of BlackLab itself.
-PROTECTED = [HOME / p for p in (
-    "Desktop/mining/wallet-backup", "Desktop/mining/config", ".ssh", ".gnupg", ".password-store", ".local/share/keyrings",
-    ".config/blacklab-desktop", ".config/blacklab-crypto", "Desktop/BlackLab/keystore", ".mozilla", ".config/google-chrome",
-    ".config/chromium", ".electrum", ".bitcoin", ".monero", ".aws", ".kube", ".docker/config.json", ".netrc", ".git-credentials")]
-PROTECTED += [HOME / p for p in CONFIG.get("protected_paths", [])]
-PROTECTED_NAME_RE = re.compile(r"(seed|mnemonic|recovery[ _-]?phrase|private[ _-]?key|wallet\.(dat|json)|keystore|\.jks$|\.pem$|id_rsa|id_ed25519|secrets?\.json)", re.I)
+PROTECTED = guards.protected_paths(HOME, CONFIG.get("protected_paths", []))
+PROTECTED_NAME_RE = guards.PROTECTED_NAME_RE
 
 
 def is_protected(path: Path) -> bool:
-    try:
-        rp = path.resolve()
-    except OSError:
-        return True
-    return any(rp == p or p in rp.parents for p in (x.resolve() for x in PROTECTED)) or bool(PROTECTED_NAME_RE.search(rp.name))
+    return guards.is_protected(path, PROTECTED)
 
 
 def safe_home_path(p: str) -> Path | None:
-    # models often invent /home/user/…: map any other home onto this one (it can only ever point inside HOME)
-    p = re.sub(r"^/(?:home|Users)/[^/]+(?=/|$)", lambda m: str(HOME), os.path.expanduser(str(p or "").strip()))
-    path = Path(p).resolve()
-    if not str(path).startswith(str(HOME)) or is_protected(path):
-        return None
-    return path
+    return guards.safe_home_path(p, HOME, PROTECTED)
 
 
 # ---------------------------------------------------------------- privacy
@@ -239,34 +230,16 @@ def safe_home_path(p: str) -> Path | None:
 # "privately: …" / "off the record …" is answered normally but never written to the chat history,
 # the memory or the content of a task log. Identifiers are scrubbed from everything that is saved.
 
-OFF_RECORD_RE = re.compile(r"^\s*(?:(?:privately|off the record|don'?t (?:save|log|remember) (?:this|that))\b[\s,:.-]*"
-                           r"|(?:private|confidential)\s*[:,-]\s*)", re.I)
-CLINICAL_RE = re.compile(r"\b(patients?|clients?|diagnos\w*|medications?|meds|dosages?|prescri\w*|sbar|peer notes?|behavioral health|"
-                         r"therap(?:y|ist)|psychiatr\w*|psycholog\w*|suicid\w*|self[- ]harm|overdose|q ?15s?|mrn|hipaa|phi|"
-                         r"date of birth|dob|ssn|social security)\b", re.I)
-REDACTIONS = [
-    (re.compile(r"\b\d{3}-\d{2}-\d{4}\b"), "[SSN removed]"),
-    (re.compile(r"\b\d(?:[ -]?\d){12,15}\b"), "[card number removed]"),
-    (re.compile(r"\b(mrn|medical record(?: number)?|patient id|member id)([:#\s]+)[\w-]+", re.I), r"\1\2[removed]"),
-]
+OFF_RECORD_RE = guards.OFF_RECORD_RE
+CLINICAL_RE = guards.CLINICAL_RE
 
 
 def privacy_check(text: str, flagged=False) -> tuple[bool, str]:
     """(private?, text without an "off the record" prefix)."""
-    m = OFF_RECORD_RE.match(text or "")
-    if m and text[m.end():].strip():
-        return True, text[m.end():].strip()
-    if flagged or CONFIG.get("private_by_default"):
-        return True, text
-    if CONFIG.get("clinical_guard", True) is not False and CLINICAL_RE.search(text or ""):
-        return True, text
-    return False, text
+    return guards.privacy_check(text, flagged, CONFIG)
 
 
-def redact(text: str) -> str:
-    for rx, rep in REDACTIONS:
-        text = rx.sub(rep, text or "")
-    return text
+redact = guards.redact
 
 
 # ---------------------------------------------------------------- task logs
@@ -425,6 +398,7 @@ def logged_tool(name: str):
                 task_step("tool", name, f"args: {_short(args, 400)}\nfailed: {e}", time.time() - t0)
                 raise
             task_step("tool", name, f"args: {_short(args, 400)}\nresult: {_short(out)}" if args else f"result: {_short(out)}", time.time() - t0)
+            LEDGER.record("Desktop AI", f"tool:{name}", source="desktop assistant", duration_ms=int((time.time() - t0) * 1000))
             return out
         return wrapper
     return deco
@@ -475,6 +449,12 @@ def archive_chat(request: str, reply: str, origin: str, source: str, when: dt.da
         _append_private(CHAT_DIR / "chat-history.jsonl", json.dumps(
             {"at": when.isoformat(timespec="seconds"), "from": origin, "you": request.strip(), "blacklab": reply, "by": source, "tools": tools},
             ensure_ascii=False) + "\n")
+    if VAULT_ON:  # private turns never reach archive_chat, so they never reach the vault either
+        try:
+            VAULT.log("ai", request.strip().splitlines()[0][:140], reply.strip()[:600], source=f"Desktop AI · {origin.split(' (')[0]}",
+                      links=[f"{when:%Y-%m-%d}"], at=when.astimezone(VAULT.tz) if VAULT.tz else when)
+        except Exception as e:
+            print(f"vault log skipped: {e}", file=sys.stderr, flush=True)
 
 
 @logged_tool("recall_chats")
@@ -1036,14 +1016,119 @@ def pull(kind: str, phone) -> str:
 # ---------------------------------------------------------------- assistant
 
 PRONOUNS = {"it", "that", "this", "them", "those", "these", "one", "the first one", "the last one", "that one", "the file", "the folder"}
-PHONE_WORDS = re.compile(r"\b(task|tasks|to-?do|remind|reminder|calendar|schedule|meeting|event|agenda|brief|due|overdue|journal|note|notes|dictat\w*|record\w*|"
-                         r"email|gmail|inbox|drive|keep|ceu|gpa|course|class|exam|focus|pomodoro|my files|work order|nameplate|photo|camera|"
-                         r"personal|professional)\b", re.I)
+PHONE_WORDS = guards.PHONE_WORDS
+
+
+@logged_tool("vault_search")
+def tool_vault_search(args):
+    import vault_recall
+    r = vault_recall.ask(VAULT, args.get("query", "") if isinstance(args, dict) else str(args), 6, local=True, config=CONFIG)
+    hits = r.get("results") or []
+    if not hits:
+        return "Nothing in the vault matches that."
+    return f"(search: {r.get('engine')})\n\n" + "\n\n".join(f"• {h['path']}" + (f" (relevance {h['score']})" if h.get("score") is not None else "")
+                                                     + f"\n  {h['text'][:400]}" for h in hits)
+
+
+@logged_tool("skills_search")
+def tool_skills_search(args):
+    import agent_skills
+    hits = agent_skills.search(args.get("query", "") if isinstance(args, dict) else str(args), 6)
+    return "\n".join(f"• {h['name']} ({h['library']}): {h['description'][:220]}" for h in hits) or "No agent skill matches that."
+
+
+@logged_tool("skill_use")
+def tool_skill_use(args):
+    import agent_skills
+    return agent_skills.load(args.get("name", "") if isinstance(args, dict) else str(args))
+
+
+@logged_tool("vault_write")
+def tool_vault_write(args):
+    a = args if isinstance(args, dict) else {"text": str(args)}
+    folder = (a.get("folder") or vaultlib.FOLDERS["inbox"]).strip("/")
+    title = VAULT.safe_name(a.get("title") or a.get("text", "").split("\n")[0][:60], "Note")
+    r = VAULT.write_note(f"{folder}/{title}.md", a.get("text", ""), "append", author="Desktop AI")
+    if r.get("ok"):
+        task_file("created", VAULT.path(r["path"]))
+        VAULT.commit(min_gap=0)
+        return f"Saved to the vault: {r['path']}"
+    return r.get("error", "Couldn't save that.")
+
+
+RE_HOWTO_RE = re.compile(r"^(?:how (?:do|can|would|should) (?:i|we|you)|how to|what(?:'s| is) the (?:command|way)|can (?:rea|ghidra)|does rea|which rea|"
+                         r"what rea command)\b.*\b(?:rea|ghidra|reverse[- ]engineer\w*|decompil\w*)\b", re.I)
+RE_CODE_FOR_RE = re.compile(r"^(?:please )?(?:decompile|show(?: me)?|find|where(?:'s| is))\s+(?:the |all )?(?:function|code|routine|logic)s?\s+(?:that|which|where it)?\s*"
+                            r"(?:prints?|shows?|uses?|handles?|checks?|reads?|writes?|sends?|opens?|parses?|builds?|validates?|for)\s+(?:the |a |an )?(.+?)\s+(?:in|of|inside)\s+(.+)$", re.I)
+RE_REPORT_RE = re.compile(r"^(?:please )?(?:reverse[- ]?engineer|triage|(?:do|run|write) (?:a |an )?(?:full )?(?:reverse[- ]engineering|re) (?:report|pass|triage) (?:on|of|for))\s+(?:the |this |my )?(?:file |binary |program |app |apk |executable |firmware )?(.+)$", re.I | re.S)
+VAULT_SHOW_RE = re.compile(r"^(?:show|open|pull up|find)\s+(?:me\s+)?(?:(.+?)\s+(?:in|on)\s+(?:my |the )?(?:obsidian |vault |knowledge )?graph|(?:my |the )?(?:obsidian |vault |knowledge )?graph)\s*$", re.I)
+
+
+def show_in_graph(query: str) -> str:
+    """Opens Obsidian on this computer at a note's local graph (or the whole graph) through Advanced URI."""
+    import vault_graph
+    if not query.strip():
+        xdg_open(vault_graph.graph_uri(VAULT.name))
+        return "Opening your whole graph in Obsidian."
+    rel = vault_graph.find_note(VAULT, query)
+    if not rel:
+        return f"Nothing in the vault matches “{query}”."
+    xdg_open(vault_graph.local_graph_uri(VAULT.name, rel))
+    return f"Opening {Path(rel).stem} in Obsidian with its local graph."
+
+
+VAULT_SAVE_RE = re.compile(r"^(?:save|add|put|capture|log|note)(?: this| that)? (?:to|in|into|on) (?:my |the )?(?:obsidian|vault)(?: vault)?[:,\s-]+(.{3,})$", re.I | re.S)
+VAULT_FIND_RE = re.compile(r"^(?:search|find|look (?:up|for)|what(?:'s| is| do i have)) (?:in )?(?:my |the )?(?:obsidian|vault)(?: vault)?(?: for| about)?[:\s]+(.+)$", re.I)
+
+
+def private_drive():
+    import drive_private
+    return drive_private.PrivateDrive(VAULT if VAULT_ON else None, CONFIG)
 
 
 def desktop_rules(text: str, phone):
     t = text.strip()
     low = t.lower()
+    import drive_private
+    parsed = drive_private.parse(t)
+    if parsed:
+        r = private_drive().save(parsed[1], parsed[0], source="BlackLab · " + ("phone" if phone else "desktop"))
+        return (r.get("message") or r.get("error")), "Desktop · private drive"
+    if VAULT_ON:
+        m = VAULT_SAVE_RE.match(t)
+        if m:
+            return tool_vault_write({"text": m.group(1)}), "Desktop · vault"
+        m = VAULT_FIND_RE.match(t)
+        if m:
+            return tool_vault_search({"query": m.group(1)}), "Desktop · vault"
+        m = VAULT_SHOW_RE.match(t)
+        if m:
+            return show_in_graph(m.group(1) or ""), "Desktop · vault graph"
+        if re.search(r"what'?s new in (?:my |the )?(?:obsidian|vault)|vault status", low):
+            st = VAULT.status()
+            return (f"Your vault has {st['notes']} notes and {st['commits']} saved versions; {st['today']} things logged today. "
+                    + (f"Last AI visitor: {st['last_visitor']['agent']} ({st['last_visitor']['when']})." if st.get("last_visitor") else "")), "Desktop · vault"
+    if re.search(r"^(?:rea|reverse[- ]engineering|ghidra|decompiler) (?:status|doctor|check)\??$|^is (?:rea|ghidra|reverse engineering) (?:installed|ready|working)\??$", low):
+        return reverse.status_text(), "Desktop · reverse engineering"
+    if RE_HOWTO_RE.search(low) and not reverse.path_in(t):
+        return reverse.answer_howto(t), "Desktop · REA docs"
+    m = RE_CODE_FOR_RE.match(t)
+    if m and reverse.path_in(m.group(2)):
+        target, why = reverse.resolve_target(reverse.path_in(m.group(2)))
+        if not target:
+            return why, "Desktop · reverse engineering"
+        return reverse.find_code(target, m.group(1).strip(" \"'")), "Desktop · reverse engineering (REA + Ghidra)"
+    m = RE_REPORT_RE.match(t)
+    if m:
+        path = reverse.path_in(m.group(1))
+        if path:
+            target, why = reverse.resolve_target(path)
+            if not target:
+                return why, "Desktop · reverse engineering"
+            goal = re.sub(r"^\s*(?:and|to|then)\s+", "", m.group(1).replace(path, "").strip(" \"',.;:"), flags=re.I)
+            j = reverse.submit_job(target, goal)
+            return (f"On it — a full reverse-engineering pass on {target.name} is running in the background (job {j['id']})"
+                    + (f", aimed at: {goal}" if goal else "") + f". The report lands in {_home_rel(reverse.RE_DIR)}."), "Desktop · reverse engineering"
     if re.search(r"\b(system|computer|pc|desktop) (status|health|info)\b|^status$|how('s| is) (my )?(computer|pc|system)", low):
         return tool_system_status(), "Desktop · rules"
     if re.search(r"(disk|storage) (space|usage|hogs?)|using (my )?(disk|storage)|what('s| is) taking (up )?space", low):
@@ -1131,6 +1216,29 @@ TOOLS = [
                                       "parameters": {"type": "object", "properties": {"query": {"type": "string"}}, "required": ["query"]}}},
     {"type": "function", "function": {"name": "equipment", "description": "Look up the user's equipment registry: a unit's nameplate data and history (work orders, meetings, photos, repeat issues), or list units matching words like a type, make, location or refrigerant.",
                                       "parameters": {"type": "object", "properties": {"query": {"type": "string", "description": "A tag like RTU-4, a serial, or words like 'R-22' or 'chiller'; 'all' lists everything"}}, "required": ["query"]}}},
+    {"type": "function", "function": {"name": "vault_search", "description": "Search the user's Obsidian vault (their second brain: facility assets and logs, projects, meetings, daily timelines, notes).",
+                                      "parameters": {"type": "object", "properties": {"query": {"type": "string"}}, "required": ["query"]}}},
+    {"type": "function", "function": {"name": "vault_write", "description": "Save a note into the user's Obsidian vault (00 Inbox unless a folder is named). Only when the user asks to save, note or log something there.",
+                                      "parameters": {"type": "object", "properties": {"title": {"type": "string"}, "text": {"type": "string"}, "folder": {"type": "string"}}, "required": ["text"]}}},
+    {"type": "function", "function": {"name": "library_search", "description": "Search the offline reference library (~50 GB: Wikipedia, Stack Exchange, LibreTexts, Wikibooks, iFixit, MedlinePlus, Ready.gov, USDA canning, survival and field manuals) for facts and how-tos.",
+                                      "parameters": {"type": "object", "properties": {"query": {"type": "string"}}, "required": ["query"]}}},
+    {"type": "function", "function": {"name": "reverse_engineer", "description": (
+        "Reverse-engineer a program or file on this computer with REA and Ghidra (read-only: it never runs the target). "
+        "To see the code behind a message, option or feature, use 'find_code' with that text as query (it finds the string, follows the "
+        "references and decompiles them in one step). 'overview' summarizes a file; 'strings' / 'functions' list them; 'decompile' / 'xrefs' / "
+        "'disassemble' need an address you got from an earlier result (never invent one). "
+        "'inspect' runs the format parsers (APK, .NET, Python .pyc, WASM, Go/Rust build info, kernel modules, model files). "
+        "'report' writes a full report in the background. 'help' answers how-to questions about REA from its docs; 'status' says what's installed."),
+        "parameters": {"type": "object", "properties": {
+            "action": {"type": "string", "enum": list(reverse.ACTIONS)},
+            "path": {"type": "string", "description": "The file or app folder, e.g. ~/Downloads/tool.bin (not needed for help/status)"},
+            "query": {"type": "string", "description": "Address (0x401000) or function name for decompile/xrefs/disassemble; text for search; the question for report/help"},
+            "kind": {"type": "string", "enum": ["strings", "procedures"], "description": "What 'search' looks through"}},
+            "required": ["action"]}}},
+    {"type": "function", "function": {"name": "skills_search", "description": "Find agent skills (expert playbooks from Anthropic, Vercel, OpenAI, Google and Hugging Face) for a task: documents (PDF, Word, Excel, PowerPoint), web/app design, React/Next.js, Google Cloud, Vercel, Hugging Face models and datasets, MCP servers, writing.",
+                                      "parameters": {"type": "object", "properties": {"query": {"type": "string"}}, "required": ["query"]}}},
+    {"type": "function", "function": {"name": "skill_use", "description": "Load one agent skill's instructions (by name from skills_search) and follow them for the user's request. Never run a skill's scripts; show the commands instead.",
+                                      "parameters": {"type": "object", "properties": {"name": {"type": "string"}}, "required": ["name"]}}},
     {"type": "function", "function": {"name": "dev_docs", "description": "Search Google's official Android/Firebase/Cloud developer documentation (needs internet).", "parameters": {"type": "object", "properties": {"query": {"type": "string"}}, "required": ["query"]}}},
 ]
 
@@ -1138,47 +1246,18 @@ TOOLS = [
 TOOL_NAMES = {t["function"]["name"] for t in TOOLS}
 
 
-# A tool that changes something (opens a window, writes a file, adds a phone task) only runs when the request
-# itself asks for that kind of thing. Small models otherwise "try things" with side effects (see docs/DESKTOP_AI.md).
-SIDE_EFFECT_ASKS = {
-    "phone_command": PHONE_WORDS,
-    "desktop_note": re.compile(r"\b(notes?|save|write|document|doc|draft|jot|memo|checklist|report|record|log)\b", re.I),
-    "open_url": re.compile(r"\b(open|browse|go to|visit|web ?site|web ?page|link|url|pull up)\b|https?://", re.I),
-    "launch_app": re.compile(r"\b(open|launch|start|run|fire up)\b", re.I),
-    "open_path": re.compile(r"\b(open|show|pull up|browse)\b", re.I),
-}
-
-
-# Tools whose results carry text the user didn't write (files, documents, old chats, web docs, phone data).
-# Text like that can contain instructions aimed at the model ("open https://…?q=<your notes>").
-READS_CONTENT = {"read_file", "search_documents", "recall_chats", "dev_docs", "phone_command", "find_files", "equipment"}
-
-
-def _url_host(u: str) -> str:
-    u = (u or "").strip()
-    if not re.match(r"^https?://", u, re.I):
-        u = "https://" + u
-    return (urllib.parse.urlsplit(u).hostname or "").lower().removeprefix("www.")
-
-
-def tool_guard(name: str, request: str, args=None, tainted: bool = False) -> str | None:
-    rx = SIDE_EFFECT_ASKS.get(name)
-    if rx and not rx.search(request):
-        return f"Not run: the user didn't ask for {name}. Answer from what you already have, without more tools."
-    if tainted and name == "open_url":
-        # After reading content, only open sites the user named themselves, so a document can't send data out
-        url = args.get("url") if isinstance(args, dict) else str(args or "")
-        host = _url_host(url)
-        if not host or host not in request.lower():
-            return ("Not run: after reading files or documents I only open links the user typed. "
-                    "Tell the user the link instead of opening it.")
-    return None
+SIDE_EFFECT_ASKS = guards.SIDE_EFFECT_ASKS
+READS_CONTENT = guards.READS_CONTENT
+_url_host = guards.url_host
+tool_guard = guards.tool_guard
 
 
 def run_tool(name, args, phone):
     fns = {"system_status": tool_system_status, "find_files": tool_find_files, "read_file": tool_read_file, "open_path": tool_open_path,
            "open_url": tool_open_url, "launch_app": tool_launch_app, "desktop_note": tool_desktop_note, "dev_docs": tool_dev_docs,
-           "recall_chats": tool_recall_chats, "search_documents": tool_search_documents, "equipment": tool_equipment}
+           "recall_chats": tool_recall_chats, "search_documents": tool_search_documents, "equipment": tool_equipment,
+           "vault_search": tool_vault_search, "vault_write": tool_vault_write, "library_search": tool_library_search,
+           "reverse_engineer": tool_reverse_engineer, "skills_search": tool_skills_search, "skill_use": tool_skill_use}
     try:
         if name == "phone_command":
             return tool_phone(args, phone)
@@ -1187,7 +1266,26 @@ def run_tool(name, args, phone):
         return f"{name} failed: {e}"
 
 
-def ollama_chat(text, model, phone, history=(), use_memory=True, rounds=4):
+def _skill_hint(text: str) -> str:
+    try:
+        import agent_skills
+        return agent_skills.hint(text)
+    except Exception:
+        return ""
+
+
+def _skill_seed(text: str) -> tuple:
+    """'use the pdf skill to …' — the model starts with that skill loaded, as if it had called skill_use."""
+    try:
+        import agent_skills
+        s = agent_skills.named_in(text)
+        return (("skill_use", {"name": s["name"]}, agent_skills.load(s["name"])),) if s else ()
+    except Exception:
+        return ()
+
+
+def ollama_chat(text, model, phone, history=(), use_memory=True, rounds=4, seed=()):
+    seed = tuple(seed) + _skill_seed(text)
     tools = [t for t in TOOLS if phone or t["function"]["name"] != "phone_command"]
     system = ("You are BlackLab, the user's laid-back, funny but sharp personal assistant, running offline on their Linux desktop. "
               "The user is a Director of Facility Operations who is also a student. "
@@ -1196,7 +1294,11 @@ def ollama_chat(text, model, phone, history=(), use_memory=True, rounds=4):
               "Answer arithmetic, unit conversions and general questions directly, with no tools. "
               + ("Use phone_command only for things in the BlackLab phone app the user asked about (tasks, calendar, notes, journal, recordings, email, Drive). " if phone else "")
               + "Use search_documents for questions about the user's own documents or files, and recall_chats when they refer to an earlier conversation. "
-              "Keep replies short. Today is " + dt.datetime.now().strftime("%A, %B %d %Y, %I:%M %p") + "."
+              "For reverse engineering (binaries, apps, APKs, firmware, decompiling, 'what does this program do') use reverse_engineer: one step at a time, "
+              "reusing addresses from earlier results, and say which evidence each claim comes from. Never write, rewrite or 'simplify' code yourself: "
+              "quote only code a tool returned; if you haven't seen the code, call find_code or say you haven't. Only analyze software the user owns or may examine. "
+              "When a request matches an agent skill, load it with skill_use and follow it. "
+              "Keep replies short. Today is " + dt.datetime.now().strftime("%A, %B %d %Y, %I:%M %p") + "." + _skill_hint(text)
               + (memory_prompt() if use_memory else ""))
     msgs = [{"role": "system", "content": system}]
     for u, a in history or ():
@@ -1204,6 +1306,13 @@ def ollama_chat(text, model, phone, history=(), use_memory=True, rounds=4):
     msgs.append({"role": "user", "content": text})
     used = []
     tainted = False
+    outputs: list[str] = []
+    for name, args, result in seed:  # results the model starts with (as if it had called the tool)
+        msgs += [{"role": "assistant", "content": "", "tool_calls": [{"function": {"name": name, "arguments": args}}]},
+                 {"role": "tool", "content": result[:4000], "tool_name": name}]
+        used.append(name)
+        outputs.append(result)
+        tainted = tainted or name in READS_CONTENT
     task_step("model", f"Asked {model}", f"system prompt + {len(history or ())} earlier turn(s) + request; tools offered: {', '.join(t['function']['name'] for t in tools)}")
     for _ in range(rounds):
         r = http_json(f"{OLLAMA}/api/chat", {"model": model, "messages": msgs, "tools": tools, "stream": False, "think": False, "keep_alive": keep_alive(),
@@ -1212,6 +1321,8 @@ def ollama_chat(text, model, phone, history=(), use_memory=True, rounds=4):
         calls = msg.get("tool_calls") or []
         if not calls:
             content = re.sub(r"<think>.*?</think>", "", msg.get("content", ""), flags=re.S).strip()
+            if "reverse_engineer" in used or guards.RE_WORDS.search(text):
+                content = reverse.check_code(content, outputs)  # no invented "decompiled" code
             return content or "Done.", f"Desktop AI · {model} (offline)" + (f" · used {', '.join(used)}" if used else "")
         msgs.append(msg)
         for c in calls:
@@ -1230,7 +1341,9 @@ def ollama_chat(text, model, phone, history=(), use_memory=True, rounds=4):
                 task_step("guard", f"Blocked {name}: {blocked}", args)
             elif name in READS_CONTENT:
                 tainted = True
-            msgs.append({"role": "tool", "content": blocked or str(run_tool(name, args, phone))[:4000], "tool_name": name})
+            result = blocked or str(run_tool(name, args, phone))
+            outputs.append(result)
+            msgs.append({"role": "tool", "content": result[:4000], "tool_name": name})
     return "I went in circles on that one — try rephrasing?", f"Desktop AI · {model}"
 
 
@@ -1275,8 +1388,14 @@ def _assistant(body):
     models = ollama_models()
     if models:
         model = body.get("model") if body.get("model") in models else default_model(models)
+        rounds, seed = int(body.get("rounds") or 4), []
+        if guards.RE_WORDS.search(text):
+            rounds = max(rounds, 7)  # overview → strings → xrefs → decompile → answer
+            if reverse.path_in(text):  # start from facts about the file, not from what the model imagines it is
+                args = {"action": "overview", "path": reverse.path_in(text)}
+                seed = [("reverse_engineer", args, str(tool_reverse_engineer(args)))]
         text_out, source = ollama_chat(text, model, phone, body.get("history") or (), use_memory=not body.get("private"),
-                                       rounds=min(int(body.get("rounds") or 4), 10))
+                                       rounds=min(rounds, 10), seed=seed)
         return {"text": text_out, "source": source}
     if phone:
         task_step("relay", "Ollama is offline: sent to the phone's assistant")
@@ -1397,17 +1516,15 @@ class Handler(SimpleHTTPRequestHandler):
         return (self.headers.get("Host") or "").lower() in ALLOWED_HOSTS
 
     def guard(self) -> bool:
-        origin = self.headers.get("Origin")
-        if not self.host_ok() or self.headers.get("X-BlackLab") != "1" or (origin and origin not in ALLOWED_ORIGINS):
+        if not guards.ui_request_ok(self.headers.get("Host"), self.headers.get("Origin"), self.headers.get("X-BlackLab"), ALLOWED_HOSTS, ALLOWED_ORIGINS):
             self.reply(403, {"error": "forbidden"})
             return False
         return True
 
     def phone_guard(self) -> bool:
         """/phone/* is for the BlackLab app only: our Host, no browser Origin, and the shared key."""
-        auth = self.headers.get("Authorization") or ""
-        tok = SECRETS.get("phone_ai_token") or ""
-        if not self.host_ok() or self.headers.get("Origin") or not tok or not hmac.compare_digest(auth, "Bearer " + tok):
+        if not guards.phone_request_ok(self.headers.get("Host"), self.headers.get("Origin"), self.headers.get("Authorization"),
+                                       SECRETS.get("phone_ai_token") or "", ALLOWED_HOSTS):
             self.reply(401, {"error": "unauthorized"})
             return False
         if self.headers.get("X-BlackLab-Phone"):  # the app identifies itself; health checks from this computer don't count
@@ -1452,12 +1569,25 @@ class Handler(SimpleHTTPRequestHandler):
                                         "folders": {"ai": str(AI_DIR), "downloads": str(DOWNLOADS_DIR), "documents": str(DOCS_DIR),
                                                     "chat_history": str(CHAT_DIR) if CONFIG.get("chat_history", True) is not False else None},
                                         "task_logs": str(TASK_LOG_DIR) if CONFIG.get("task_logs", True) is not False else None,
-                                        "agents": agents.status()})
+                                        "agents": agents.status(), "vault": VAULT.status() if VAULT_ON else None, "reverse": reverse.status()})
             return self.reply(404, {"error": "unknown"})
         return super().do_GET()
 
     def do_POST(self):
         route = urllib.parse.urlsplit(self.path).path
+        if route.startswith("/phone/vault"):
+            if not self.phone_guard():
+                return
+            try:
+                length = int(self.headers.get("Content-Length") or 0)
+                if length > 12_000_000:
+                    return self.reply(413, {"error": "too large"})
+                body = json.loads(self.rfile.read(length) or b"{}")
+                return self.reply(200, vault_op(route.removeprefix("/phone/vault").strip("/") or "feed", body, "Phone"))
+            except ValueError as e:
+                return self.reply(400, {"error": str(e)})
+            except Exception as e:
+                return self.reply(500, {"error": str(e)})
         if route in ("/phone/upload", "/phone/jobs", "/phone/jobs/ack", "/phone/context"):
             if not self.phone_guard():
                 return
@@ -1473,6 +1603,7 @@ class Handler(SimpleHTTPRequestHandler):
                     who = PHONE.get("model") or "phone"
                     j = agents.submit(body.get("kind", ""), body.get("title", ""), body.get("params") or {}, body.get("upload"),
                                       origin=f"Phone ({who})", private=bool(body.get("private")))
+                    LEDGER.record("Phone", f"job:{body.get('kind', '')}", source=who, metadata={"private": bool(body.get("private"))})
                     return self.reply(200, agents.public(j))
                 if route == "/phone/jobs/ack":
                     agents.ack([str(i) for i in body.get("ids", [])][:200])
@@ -1526,7 +1657,10 @@ class Handler(SimpleHTTPRequestHandler):
                     agents.UPLOADS[upload] = str(f)
                 j = agents.submit(body.get("kind", ""), body.get("title", "") or (Path(body["path"]).name if body.get("path") else ""),
                                   body.get("params") or {}, upload, private=bool(body.get("private")))
+                LEDGER.record("This computer", f"job:{body.get('kind', '')}", source="desktop UI", metadata={"private": bool(body.get("private"))})
                 return self.reply(200, agents.public(j))
+            if self.path.startswith("/local/vault/"):
+                return self.reply(200, vault_op(self.path.removeprefix("/local/vault/"), body, "This computer"))
             if self.path == "/local/open":
                 return self.reply(200, {"message": tool_open_path({"path": body.get("path", "~")})})
             return self.reply(404, {"error": "unknown"})
@@ -1536,12 +1670,416 @@ class Handler(SimpleHTTPRequestHandler):
             return self.reply(500, {"error": str(e)})
 
 
-def keep_usb_link():
-    """Re-establish `adb forward` whenever the phone is plugged in, so the UI reconnects on its own."""
+# Vault actions that only read: recorded in the ledger too, but they never commit
+READ_OPS = {"skills", "status", "search", "read", "recent", "graph", "nodes", "atlas", "library", "library_status", "history", "drive_status", "ask",
+            "panel", "sds", "shift_prep", "credentials", "ledger", "recall_status"}
+
+
+def vault_op(op: str, body: dict, who: str) -> dict:
+    """Every vault action from the phone, this computer's UI and the MCP server — each one a line in the activity ledger."""
+    t0 = time.time()
+    actor = str(body.get("actor") or body.get("author") or body.get("source") or who)[:60] if isinstance(body, dict) else who
+    ok = None
+    try:
+        r = _vault_op(op, body, who)
+        ok = not (isinstance(r, dict) and r.get("ok") is False)
+        return r
+    finally:
+        if op != "checkin" and (op != "feed" or ok):  # check-ins record themselves; the phone's feed only when it worked
+            target = str(body.get("path") or body.get("node") or "")[:200] if isinstance(body, dict) else ""
+            LEDGER.record(actor, f"vault:{op}", target=target, source=who, duration_ms=int((time.time() - t0) * 1000),
+                          metadata={"ok": ok, "read_only": op in READ_OPS})
+
+
+def local_generate(prompt: str, max_tokens: int = 360) -> str:
+    """Local model only (answers from the vault never go to a cloud model)."""
+    models = ollama_models()
+    if not models:
+        raise RuntimeError("the local model (Ollama) isn't running")
+    r = http_json(f"{OLLAMA}/api/generate", {"model": default_model(models), "prompt": prompt[:24000], "stream": False, "think": False,
+                                             "keep_alive": keep_alive(), "options": {"temperature": 0.2, "num_predict": max_tokens, "num_ctx": num_ctx()}}, timeout=170)
+    return re.sub(r"<think>.*?</think>", "", r.get("response", ""), flags=re.S).strip()
+
+
+def _vault_op(op: str, body: dict, who: str) -> dict:
+    if not VAULT_ON:
+        return {"ok": False, "error": "The vault is turned off (config.json \"vault\": false)."}
+    v = VAULT
+    if op == "feed":
+        counts = v.apply_feed(body)
+        v.commit(f"Phone sync · " + ", ".join(f"{k} {n}" for k, n in counts.items()), min_gap=0)
+        return {"ok": True, "counts": counts, "status": v.status()}
+    if op == "status":
+        return dict(v.status(), ok=True, phone_mirror=PHONE_VAULT)
+    if op == "checkin":
+        r = v.checkin(body.get("agent", ""), body.get("model", ""), body.get("purpose", ""), body.get("note", ""), where=body.get("where") or who)
+    elif op == "search":
+        return {"ok": True, "results": v.search(body.get("query", ""), int(body.get("limit") or 8))}
+    elif op == "read":
+        return {"ok": True, "text": v.read(body.get("path", ""))}
+    elif op == "recent":
+        import vault_mcp
+        return {"ok": True, "text": vault_mcp.recent_text(v, int(body.get("days") or 2))}
+    elif op == "write":
+        r = v.write_note(body.get("path", ""), body.get("content", ""), body.get("mode") or "append", body.get("author") or who)
+    elif op == "log":
+        r = {"ok": v.log(body.get("kind") or "note", body.get("title", ""), body.get("detail", ""), body.get("source") or who, body.get("links") or [])}
+    elif op in ("capture", "note"):
+        r = v.capture(body.get("text", ""), body.get("title", ""), body.get("source") or who)
+    elif op == "sync":
+        threading.Thread(target=vault_pass, kwargs={"force": True}, daemon=True).start()
+        return {"ok": True, "message": "Syncing the vault now."}
+    elif op == "open":
+        xdg_open(v.status()["open_url"])
+        return {"ok": True, "message": "Opening the vault in Obsidian."}
+    elif op == "show":
+        return {"ok": True, "message": show_in_graph(body.get("query", ""))}
+    elif op == "graph":
+        import vault_graph
+        st = v._state("graph.json", {})
+        h = vault_graph.graph_health(vault_graph.scan(v))
+        plugins = {pid: (v.path(f".obsidian/plugins/{pid}/main.js").exists(), tag) for pid, (_, tag, _f) in vault_graph.PLUGINS.items()}
+        return {"ok": True, "notes": h["notes"], "edges": h["edges"], "orphans": len(h["orphans"]), "unresolved": len(h["unresolved"]),
+                "with_up": h["with_up"], "hubs": [t for _, t in h["hubs"][:6]], "related": st.get("related"), "profile": st.get("profile"),
+                "plugins": [{"id": k, "installed": ok, "version": tag} for k, (ok, tag) in plugins.items()]}
+    elif op == "nodes":
+        import vault_nodes
+        return {"ok": True, "nodes": vault_nodes.overview(v), "nexus": vault_nodes.NEXUS, "function": vault_nodes.FUNCTION}
+    elif op == "node_add":
+        import vault_nodes
+        r = vault_nodes.add(v, body.get("node", ""), body.get("content", ""), body.get("author") or who)
+        if r.get("ok"):
+            v.log("note", f"{body.get('author') or who} added to ◆ {r['node']}", "", source=body.get("author") or who, links=[f"◆ {r['node']}"])
+    elif op == "drive_save":
+        import drive_private
+        text, folder = body.get("text", ""), body.get("folder") or None
+        if body.get("say"):  # the phone sends the sentence as spoken: "save to my private drive under taxes: …"
+            parsed = drive_private.parse(body["say"])
+            if not parsed:
+                return {"ok": False, "error": "Say it like “save to my private drive: …” (optionally “… under taxes: …”)."}
+            folder, text = parsed
+        return private_drive().save(text, folder, source=body.get("source") or who)
+    elif op == "drive_status":
+        return dict(private_drive().status(), ok=True)
+    elif op == "node_create":
+        import vault_nodes
+        r = vault_nodes.create(v, body.get("name", ""), body.get("mission", ""), body.get("emoji") or "◆", body.get("color") or "", body.get("synapses") or [],
+                               body.get("keywords") or [], body.get("tags") or [], author=body.get("author") or who, primer=body.get("primer") or "")
+        if r.get("ok"):
+            v.render_nodes()
+    elif op == "atlas":
+        import vault_atlas
+        if body.get("rescan"):
+            threading.Thread(target=atlas_pass, kwargs={"force": True}, daemon=True).start()
+        return dict(vault_atlas.summary(v), ok=True, running=ATLAS_RUN["running"], last=ATLAS_RUN["last"], error=ATLAS_RUN["error"])
+    elif op == "library":
+        import library
+        return {"ok": True, "results": library.search(body.get("query", ""), library.books_for(body.get("node"), body.get("subnode")) or None, int(body.get("limit") or 8))}
+    elif op == "library_status":
+        import library
+        return dict(library.status(), ok=True)
+    elif op == "phone_mirror":
+        devs = [d for d in adb_devices()["devices"] if d["state"] == "device" and not d["emulator"]]
+        if not devs:
+            return {"ok": False, "error": "The phone isn't linked (plug it in or turn on Wireless debugging)."}
+        threading.Thread(target=phone_vault_pass, args=(devs[0]["serial"], True), daemon=True).start()
+        return {"ok": True, "message": "Copying the vault to the phone now."}
+    elif op == "history":
+        return {"ok": True, "commits": v.history(int(body.get("n") or 20))}
+    elif op == "ask":  # "what do my notes say about …": semantic recall through kb-core, an answer from the local model
+        import vault_recall
+        local = who != "Phone" or CONFIG.get("phone_recall_local", False) is True
+        if body.get("answer"):
+            return vault_recall.answer(v, body.get("query", ""), local_generate, local=local, config=CONFIG, limit=int(body.get("limit") or 5))
+        return vault_recall.ask(v, body.get("query", ""), int(body.get("limit") or 6), local=local, config=CONFIG)
+    elif op == "recall_status":
+        import vault_recall
+        return dict(vault_recall.status(v, CONFIG), ok=True)
+    elif op == "round":  # "start EOC rounds" — a dated checklist from Paul's template
+        import facility_ops
+        r = facility_ops.new_round(v, body.get("kind") or body.get("say") or "", by=body.get("source") or who)
+    elif op == "panel":
+        import facility_ops
+        return facility_ops.panel(v, body.get("query", ""))
+    elif op == "sds":
+        import facility_ops
+        return facility_ops.sds(v, body.get("query", ""))
+    elif op == "shift_prep":
+        import facility_ops
+        import vault_credentials
+        return facility_ops.shift_prep(v, vault_credentials.due_soon(v))
+    elif op == "credentials":
+        import vault_credentials
+        rows = vault_credentials.merged(v)
+        today = v.now().date()
+        soon = vault_credentials.due_soon(v, today)
+        q = (body.get("query") or "").lower().strip()
+        if q:
+            hit = [r for r in rows if q in r["name"].lower()]
+            if hit:
+                r = hit[0]
+                return {"ok": True, "message": f"{r['name']}: {vault_credentials.state(r, today)[1].split(' ', 1)[1]}" +
+                        (f" (renew by {r['renew'].isoformat()})." if r.get("renew") else ".")}
+        return {"ok": True, "count": len(rows), "due_soon": soon,
+                "message": (f"{len(rows)} credentials on file. " + ("Needs attention: " + "; ".join(soon) + "." if soon else "Nothing expires in the next 90 days."))}
+    elif op == "skills":  # "what skills do you have" / "find a skill for …" / MCP vault_skills
+        import agent_skills
+        if body.get("action") == "read":
+            return {"ok": True, "text": agent_skills.load(body.get("name") or body.get("query") or "", max_chars=40000)}
+        return agent_skills.describe(body.get("query") or "")
+    elif op == "ledger":
+        return dict(LEDGER.verify(), summary={k: x for k, x in LEDGER.summary(int(body.get("days") or 7)).items() if k != "recent"})
+    else:
+        raise ValueError(f"unknown vault action: {op}")
+    v.commit(min_gap=0)
+    return r
+
+
+VAULT_PROJECTS = [Path(os.path.expanduser(p)) for p in CONFIG.get("vault_projects", ["~/Desktop/BlackLab"])]
+VAULT_WATCH = [Path(os.path.expanduser(p)) for p in CONFIG.get("vault_watch", ["~/Desktop", "~/Documents", "~/Downloads"])]
+
+
+def vault_pass(force=False):
+    """One full desktop pass: meetings, briefs, task logs, conversations, projects, new files, Home, a commit."""
+    v = VAULT
+    with v.lock:
+        v.ensure()
+        f = vaultlib.FOLDERS
+        n = v.mirror_folder(DOCS_DIR / "Meetings", f"{f['meetings']}/Minutes", "meeting")
+        n += v.mirror_folder(DOCS_DIR / "Briefs", f"{f['meetings']}/Briefs", "brief")
+        n += v.mirror_folder(TASK_LOG_DIR, f"{f['ai']}/Task Logs", "task-log", since_days=60)
+        if CONFIG.get("chat_history", True) is not False:
+            n += v.mirror_folder(CHAT_DIR, f"{f['ai']}/Conversations", "conversation", since_days=60)
+        n += v.projects([p for p in VAULT_PROJECTS if p.is_dir()])
+        if CONFIG.get("vault_file_activity", True) is not False:
+            v.file_activity([p for p in VAULT_WATCH if p.is_dir()], PROTECTED + [AI_DIR / "Crypto Desk", HOME / "Desktop" / "mining"])
+        if CONFIG.get("guestbook_repo"):
+            try:
+                import guestbook
+                guestbook.render(v, guestbook.fetch(CONFIG["guestbook_repo"]), CONFIG["guestbook_repo"])
+            except Exception as e:
+                v.errors = (v.errors + [f"guest book: {e}"])[-20:]
+        try:
+            import library
+            library.write_cards(v)
+        except Exception as e:
+            v.errors = (v.errors + [f"library cards: {e}"])[-20:]
+        v.render_nodes()
+        try:
+            import vault_graph
+            r = vault_graph.apply(v, embed=embed if embed_model() else None, mining=agents.mining_active)
+            for k in ("plugins_error", "related_error"):
+                if r.get(k):
+                    v.errors = (v.errors + [f"graph: {r[k]}"])[-20:]
+        except Exception as e:
+            v.errors = (v.errors + [f"graph: {e}"])[-20:]
+        try:
+            import drive_private
+            m = drive_private.load_map()
+            if m.get("private"):
+                v.write_managed("90 System/Private Drive.md", {"type": "system", "tags": ["system/drive"], "up": ["[[◉ Nexus]]"]},
+                                drive_private.layout_markdown(m), user_tail="\n## Notes\n\n")
+                threading.Thread(target=private_drive().flush, daemon=True).start()  # retry anything that waited
+        except Exception as e:
+            v.errors = (v.errors + [f"private drive: {e}"])[-20:]
+        for label, fn in (("facility", lambda: __import__("facility_ops").render_all(v)),
+                          ("skills", lambda: __import__("agent_skills").render(v)),
+                          ("credentials", lambda: __import__("vault_credentials").render(v)),
+                          ("ledger", lambda: audit.render(v, LEDGER))):
+            try:
+                fn()
+            except Exception as e:
+                v.errors = (v.errors + [f"{label}: {e}"])[-20:]
+        v.render_registry()
+        v.render_home()
+        v.last_sync["desktop"] = time.time()
+        v.commit(min_gap=0 if force else 300)
+    if CONFIG.get("skills", True) is not False:  # weekly: pull the skill libraries (git, read-only; nothing in them runs)
+        threading.Thread(target=lambda: __import__("agent_skills").sync(), daemon=True, name="skills").start()
+    if CONFIG.get("recall", True) is not False and not RECALL_RUN["running"]:
+        threading.Thread(target=recall_pass, daemon=True, name="recall").start()
+    return n
+
+
+RECALL_RUN = {"running": False, "last": None}
+
+
+def recall_pass():
+    """Keep kb-core's copy of the vault current (outside the vault lock: it only reads notes). Paused while mining."""
+    if agents.mining_active():
+        return
+    RECALL_RUN["running"] = True
+    try:
+        import vault_recall
+        t0 = time.time()
+        RECALL_RUN["last"] = r = vault_recall.index(VAULT, CONFIG, budget_s=float(CONFIG.get("recall_budget_s", 240)))
+        if r.get("sent") or r.get("removed"):
+            LEDGER.record("BlackLab", "recall:index", target="kb-core", source="companion", duration_ms=int((time.time() - t0) * 1000),
+                          metadata={"sent": r.get("sent", 0), "removed": r.get("removed", 0), "pending": r.get("pending", 0)})
+    except Exception as e:
+        RECALL_RUN["last"] = {"ok": False, "error": str(e)[:200]}
+    finally:
+        RECALL_RUN["running"] = False
+
+
+def vault_keeper():
+    """Keeps the vault current: a pass at start, then every 10 minutes (and a new day note at midnight)."""
+    time.sleep(5)
+    first = True
     while True:
         try:
-            if any(d["state"] == "device" and not d["emulator"] for d in adb_devices()["devices"]):
+            vault_pass(force=first)
+            first = False
+            v = VAULT
+            today = v.now().date()
+            if not v.path(v.day_rel(today)).exists():
+                v.render_day(today)
+        except Exception as e:
+            print(f"vault pass failed: {e}", file=sys.stderr, flush=True)
+            VAULT.errors = (VAULT.errors + [str(e)[:200]])[-20:]
+        time.sleep(int(CONFIG.get("vault_every_s", 600)))
+
+
+ATLAS_RUN = {"running": False, "last": None, "error": None, "at": 0.0}
+
+
+def atlas_pass(force=False):
+    """The Atlas (vault_atlas): new/changed files on this computer → cards, guides, imported vaults; then people & topics
+    (vault_entities, local model, paused while mining). Reads files outside the vault lock; writes inside it."""
+    if not VAULT_ON or CONFIG.get("atlas", True) is False or ATLAS_RUN["running"]:
+        return
+    if not force and agents.mining_active():
+        return
+    ATLAS_RUN["running"] = True
+    try:
+        import vault_atlas
+        import vault_entities
+        a = vault_atlas.Atlas(VAULT, CONFIG, PROTECTED)
+        r = {"scan": a.scan()}
+        with VAULT.lock:
+            r["import"] = a.import_vaults()
+            r["write"] = a.write()
+        if CONFIG.get("entities", True) is not False:
+            r["entities"] = vault_entities.locked_run(VAULT, CONFIG, a, llm=True, host=OLLAMA, mining=agents.mining_active, lock=VAULT.lock)
+            if r["entities"]:
+                with VAULT.lock:
+                    a.write()  # cards show their people & topics
+        # the linked phone (◆ Mobile Device): at most every mobile_every_s (6 h), only while it's plugged in / paired
+        if CONFIG.get("mobile", True) is not False and time.time() - ATLAS_RUN.get("mobile_at", 0) > int(CONFIG.get("mobile_every_s", 21600)):
+            devs = [d for d in adb_devices()["devices"] if d["state"] == "device" and not d["emulator"]]
+            if devs:
+                import vault_mobile
+                m = vault_mobile.Mobile(VAULT, adb_path(), devs[0]["serial"], CONFIG)
+                with VAULT.lock:
+                    r["mobile"] = m.run()
+                ATLAS_RUN["mobile_at"] = time.time()
+        try:
+            import vault_drive
+            pages = Path(CONFIG.get("drive_pages_dir", str(CACHE_DIR / "drive-pages")))
+            if pages.is_dir():
+                with VAULT.lock:
+                    r["drive"] = vault_drive.DriveImport(VAULT, CONFIG).run(str(pages), _drive_folder_names(pages))
+        except Exception as e:
+            VAULT.errors = (VAULT.errors + [f"drive: {e}"])[-20:]
+        ATLAS_RUN.update(last=r, error=None, at=time.time())
+    except Exception as e:
+        ATLAS_RUN["error"] = str(e)[:300]
+        VAULT.errors = (VAULT.errors + [f"atlas: {e}"])[-20:]
+        print(f"atlas pass failed: {e}", file=sys.stderr, flush=True)
+    finally:
+        ATLAS_RUN["running"] = False
+
+
+def _drive_folder_names(pages: Path) -> dict:
+    names = {}
+    for f in pages.glob("folders*.json"):
+        try:
+            names.update({k: v for k, v in json.loads(f.read_text()).items() if v})
+        except Exception:
+            pass
+    return names
+
+
+def atlas_keeper():
+    time.sleep(60)  # after the first vault pass
+    while True:
+        atlas_pass()
+        time.sleep(int(CONFIG.get("atlas_every_s", 1800)))
+
+
+_KIWIX = {"proc": None}
+
+
+def library_keeper():
+    """Runs kiwix-serve (127.0.0.1 only) once the reader is installed and books are registered; restarts it if it stops."""
+    import library
+    while True:
+        try:
+            cmd = library.serve_cmd()
+            p = _KIWIX["proc"]
+            import socket
+            with socket.socket() as sk:
+                sk.settimeout(1)
+                up = sk.connect_ex(("127.0.0.1", library.PORT)) == 0  # one that survived a companion restart still serves
+            if cmd and not up and (p is None or p.poll() is not None):
+                _KIWIX["proc"] = subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
+        except Exception as e:
+            print(f"library server: {e}", file=sys.stderr, flush=True)
+        time.sleep(60)
+
+
+@logged_tool("reverse_engineer")
+def tool_reverse_engineer(args):
+    return reverse.tool(args if isinstance(args, dict) else {"action": "help", "query": str(args)})
+
+
+@logged_tool("library_search")
+def tool_library_search(args):
+    import library
+    q = args.get("query", "") if isinstance(args, dict) else str(args)
+    hits = library.search(q, None, 6)
+    if hits and "error" in hits[0]:
+        return hits[0]["error"]
+    return "\n\n".join(f"• {h['title']} — {h['book']}\n  {h['snippet'][:300]}\n  {h['url']}" for h in hits) or "Nothing in the offline library matches that."
+
+
+PHONE_VAULT = {"at": 0.0, "last": None, "error": None}
+
+
+def phone_vault_pass(serial: str, force=False):
+    """Mirror the Obsidian vault to the phone (Documents/BlackLab) and bring back notes edited there."""
+    if not VAULT_ON or CONFIG.get("phone_vault", True) is False:
+        return
+    if not force and time.time() - PHONE_VAULT["at"] < int(CONFIG.get("phone_vault_every_s", 300)):
+        return
+    import phone_vault
+    PHONE_VAULT["at"] = time.time()
+
+    def pulled(paths):
+        VAULT.dirty.update(paths)
+        VAULT.log("note", f"{len(paths)} note{'s' if len(paths) != 1 else ''} edited in Obsidian on the phone", ", ".join(paths[:5]), source="Phone · Obsidian",
+                  links=[Path(p).stem for p in paths[:5]])
+    try:
+        with VAULT.lock:
+            PHONE_VAULT["last"] = phone_vault.sync(adb_path(), serial, VAULT.root, CONFIG.get("phone_vault_dir", "/sdcard/Documents/BlackLab"),
+                                                   CACHE_DIR / "phone-vault.json", on_pull=pulled,
+                                                   include_local=CONFIG.get("phone_vault_local", False) is True)
+            VAULT.commit("Phone sync (Obsidian on the phone)" if PHONE_VAULT["last"]["pulled"] else "", min_gap=0 if PHONE_VAULT["last"]["pulled"] else 300)
+        PHONE_VAULT["error"] = None
+    except Exception as e:
+        PHONE_VAULT["error"] = str(e)[:200]
+        print(f"phone vault mirror: {e}", file=sys.stderr, flush=True)
+
+
+def keep_usb_link():
+    """Re-establish `adb forward` whenever the phone is plugged in, so the UI reconnects on its own — and keep
+    the phone's copy of the Obsidian vault current while it's linked."""
+    while True:
+        try:
+            phones = [d for d in adb_devices()["devices"] if d["state"] == "device" and not d["emulator"]]
+            if phones:
                 adb_forward(8765)  # desktop → phone link, and adb reverse so the phone can reach this companion's AI
+                threading.Thread(target=phone_vault_pass, args=(phones[0]["serial"],), daemon=True).start()
         except Exception:
             pass
         time.sleep(15)
@@ -1566,7 +2104,14 @@ def main():
     ensure_phone_token()
     threading.Thread(target=keep_usb_link, daemon=True).start()
     threading.Thread(target=memory_keeper, daemon=True).start()
+    if VAULT_ON:
+        threading.Thread(target=vault_keeper, daemon=True, name="vault").start()
+        if CONFIG.get("atlas", True) is not False:
+            threading.Thread(target=atlas_keeper, daemon=True, name="atlas").start()
+    if CONFIG.get("library", True) is not False:
+        threading.Thread(target=library_keeper, daemon=True, name="library").start()
     agents.setup(sys.modules[__name__])
+    reverse.setup(sys.modules[__name__])
     global OPEN_FOLDER_RE
     OPEN_FOLDER_RE = build_open_folder_re()  # agents.setup adds Equipment, Business Intelligence, Crypto Desk
     srv = ThreadingHTTPServer((HOST, PORT), Handler)

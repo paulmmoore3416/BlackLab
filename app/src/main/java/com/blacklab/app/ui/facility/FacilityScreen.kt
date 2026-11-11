@@ -118,6 +118,7 @@ fun FacilityScreen(tab: String = "", tag: String = "") {
     var binder by remember { mutableStateOf(false) }
     var complete by remember { mutableStateOf<Facility.Due?>(null) }
     var menu by remember { mutableStateOf(false) }
+    var intake by remember { mutableStateOf(false) }
     var query by rememberSaveable { mutableStateOf("") }
     val scanner = rememberCodeScanner { code ->
         val v = code.rawValue ?: code.displayValue ?: ""
@@ -136,6 +137,7 @@ fun FacilityScreen(tab: String = "", tag: String = "") {
     Scaffold(
         topBar = {
             BlTopBar("Facility", subtitle = if (due.isEmpty()) "Assets, PMs and life-safety inspections" else "$overdue overdue · $soon due soon · ${st.assets.size} assets", onBack = { shell.back() }) {
+                IconButton(onClick = { intake = true }) { Icon(Icons.Rounded.Build, "New work order") }
                 IconButton(onClick = scanner) { Icon(Icons.Rounded.QrCodeScanner, "Scan an asset tag") }
                 androidx.compose.foundation.layout.Box {
                     IconButton(onClick = { menu = true }) { Icon(Icons.Rounded.MoreVert, "More") }
@@ -166,6 +168,49 @@ fun FacilityScreen(tab: String = "", tag: String = "") {
     if (catalog) CatalogDialog(onDismiss = { catalog = false })
     if (binder) BinderDialog(st, onDismiss = { binder = false })
     complete?.let { d -> CompleteDialog(d, onDismiss = { complete = null }) }
+    if (intake) IntakeDialog(st, onDismiss = { intake = false })
+}
+
+/** "Describe the problem" → a filed work order, with a live preview of what BlackLab understood. */
+@Composable
+private fun IntakeDialog(st: Facility.State, onDismiss: () -> Unit) {
+    val ctx = LocalContext.current
+    val shell = LocalShell.current
+    val scope = rememberCoroutineScope()
+    var text by rememberSaveable { mutableStateOf("") }
+    val draft = remember(text, st) { if (text.isBlank()) null else com.blacklab.app.facility.Intake.parse(text, st) }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        icon = { Icon(Icons.Rounded.Build, null) },
+        title = { Text("New work order") },
+        text = {
+            Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedTextField(text, { text = it }, Modifier.fillMaxWidth().heightIn(min = 96.dp),
+                    label = { Text("What's wrong, and where?") }, placeholder = { Text("Leak under the sink in room 214, B-wing") })
+                Text("Tip: tap the keyboard's mic to dictate.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                draft?.let { d ->
+                    Text("${d.priority.name} · ${d.priority.label}", style = MaterialTheme.typography.titleSmall,
+                        color = if (d.priority == com.blacklab.app.facility.Intake.Priority.P1) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary)
+                    if (d.reasons.isNotEmpty()) Text("Because: " + d.reasons.joinToString(", "), style = MaterialTheme.typography.bodySmall)
+                    Text("Trade: ${d.trade}" + (if (d.location.isNotBlank()) " · ${d.location}" else ""), style = MaterialTheme.typography.bodySmall)
+                    Text(d.asset?.let { "Asset: ${it.name}" + (it.tag.takeIf { t -> t.isNotBlank() }?.let { t -> " · $t" } ?: "") } ?: "No registered asset matched",
+                        style = MaterialTheme.typography.bodySmall)
+                    d.checklist.forEach { Text("☐ $it", style = MaterialTheme.typography.bodySmall) }
+                }
+            }
+        },
+        confirmButton = {
+            Button(enabled = draft != null, onClick = {
+                val d = draft ?: return@Button
+                scope.launch {
+                    val id = com.blacklab.app.facility.FacilityReminders.addIntake(ctx, d)
+                    onDismiss()
+                    shell.toast("Work order filed · ${d.priority.name}", "Open") { shell.go("task/$id") }
+                }
+            }) { Text("File it") }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
+    )
 }
 
 @Composable

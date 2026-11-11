@@ -55,28 +55,13 @@ object Nhtsa {
         val open: List<Recall> get() = recalls.filter { it.campaign !in resolved }
     }
 
-    private val _state = MutableStateFlow(State())
-    val state: StateFlow<State> = _state.asStateFlow()
-    private var loaded = false
+    val store = com.blacklab.app.core.JsonStore("Recalls", version = 1, empty = { State() }, decode = { fromJson(it) }, encode = { toJson(it) })
+    val state: StateFlow<State> = store.state
+    fun file(context: Context) = File(context.filesDir, "garage/nhtsa.json")
 
-    private fun file(context: Context) = File(context.filesDir, "garage/nhtsa.json")
+    fun load(context: Context): State = store.load(file(context))
 
-    fun load(context: Context): State {
-        if (loaded) return _state.value
-        synchronized(this) {
-            if (!loaded) { _state.value = runCatching { fromJson(JSONObject(file(context).readText())) }.getOrDefault(State()); loaded = true }
-        }
-        return _state.value
-    }
-
-    private fun update(context: Context, change: (State) -> State) = synchronized(this) {
-        load(context)
-        _state.value = change(_state.value)
-        runCatching {
-            val f = file(context); f.parentFile?.mkdirs()
-            val tmp = File(f.parentFile, "nhtsa.json.tmp"); tmp.writeText(toJson(_state.value).toString()); tmp.renameTo(f)
-        }
-    }
+    private fun update(context: Context, change: (State) -> State) { store.update(file(context), change = change) }
 
     fun setResolved(context: Context, campaign: String, done: Boolean) = update(context) { it.copy(resolved = if (done) it.resolved + campaign else it.resolved - campaign) }
 
@@ -85,14 +70,14 @@ object Nhtsa {
 
     // ---------------------------------------------------------------- network
 
-    private fun get(url: String): JSONObject {
+    private fun get(url: String): JSONObject = com.blacklab.app.core.Net.retry {
         val c = URL(url).openConnection() as HttpURLConnection
         c.connectTimeout = 12_000; c.readTimeout = 20_000
         c.setRequestProperty("Accept", "application/json")
         c.setRequestProperty("User-Agent", "BlackLab-Android")
         try {
-            if (c.responseCode !in 200..299) error("NHTSA answered ${c.responseCode}")
-            return JSONObject(c.inputStream.bufferedReader().readText())
+            if (c.responseCode !in 200..299) throw com.blacklab.app.core.Net.HttpStatus(c.responseCode, "NHTSA")
+            JSONObject(c.inputStream.bufferedReader().readText())
         } finally { c.disconnect() }
     }
 

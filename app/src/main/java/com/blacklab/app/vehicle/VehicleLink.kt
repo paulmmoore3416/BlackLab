@@ -48,14 +48,12 @@ object VehicleLink {
         val sim: Boolean = false,
     )
 
-    private val _state = MutableStateFlow(Telemetry.State())
-    val state: StateFlow<Telemetry.State> = _state.asStateFlow()
+    val store = com.blacklab.app.core.JsonStore("Drive log", version = 1, empty = { Telemetry.State() }, decode = Telemetry::fromJson, encode = Telemetry::toJson)
+    val state: StateFlow<Telemetry.State> = store.state
     private val _live = MutableStateFlow(Live())
     val live: StateFlow<Live> = _live.asStateFlow()
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
-    private var loaded = false
-    private var file: File? = null
     private var saveJob: Job? = null
 
     const val CH_DRIVE = "drive"
@@ -73,26 +71,11 @@ object VehicleLink {
         ))
     }
 
-    fun load(context: Context): Telemetry.State {
-        if (loaded) return _state.value
-        synchronized(this) {
-            if (loaded) return _state.value
-            val f = File(context.filesDir, "garage/telemetry.json").also { file = it }
-            _state.value = runCatching { Telemetry.fromJson(JSONObject(f.readText())) }.getOrDefault(Telemetry.State())
-            loaded = true
-        }
-        return _state.value
-    }
+    fun file(context: Context) = File(context.filesDir, "garage/telemetry.json")
 
-    private fun writeNow(context: Context) = synchronized(this) {
-        runCatching {
-            val f = file ?: File(context.filesDir, "garage/telemetry.json")
-            f.parentFile?.mkdirs()
-            val tmp = File(f.parentFile, "telemetry.json.tmp")
-            tmp.writeText(Telemetry.toJson(_state.value).toString())
-            tmp.renameTo(f)
-        }
-    }
+    fun load(context: Context): Telemetry.State = store.load(file(context))
+
+    private fun writeNow(context: Context) { store.writeNow(file(context)) }
 
     /** Live readings arrive every second; the file is written at most every 20 s (and when a drive ends). */
     private fun save(context: Context, immediate: Boolean) {
@@ -102,7 +85,7 @@ object VehicleLink {
     }
 
     fun update(context: Context, immediate: Boolean = true, change: (Telemetry.State) -> Telemetry.State) {
-        synchronized(this) { load(context); _state.value = change(_state.value) }
+        store.update(file(context), persist = false, change = change)
         save(context, immediate)
         com.blacklab.app.widgets.CarWidget.refreshSoon(context)
     }

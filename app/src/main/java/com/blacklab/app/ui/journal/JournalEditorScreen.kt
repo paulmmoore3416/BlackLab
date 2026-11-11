@@ -178,7 +178,7 @@ fun JournalEditorScreen(id: Long, day: Long?, template: String?) {
             horizontalArrangement = Arrangement.spacedBy(4.dp)) {
             Text("Mood", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Spacer(Modifier.width(4.dp))
-            Moods.drop(1).forEachIndexed { i, (emoji, label) ->
+            Moods.subList(1, Moods.size).forEachIndexed { i, (emoji, label) ->
                 val idx = i + 1
                 Text(emoji, fontSize = 24.sp, modifier = Modifier.clip(CircleShape)
                     .background(if (e.mood == idx) MaterialTheme.colorScheme.primary.copy(alpha = 0.3f) else Color.Transparent)

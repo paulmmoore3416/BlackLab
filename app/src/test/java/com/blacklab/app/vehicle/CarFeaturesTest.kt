@@ -108,16 +108,16 @@ class CarFeaturesTest {
     // ------------------------------------------------------------ trip rules
 
     @Test fun rulesTagTripsByPlaceAndWeekday() {
-        val work = Telemetry.Rule("w", "Work", 32.3668, -86.3000, 250.0, Telemetry.Purpose.COMMUTE, weekdaysOnly = true)
-        val client = Telemetry.Rule("c", "Client", 32.4000, -86.2500, 250.0, Telemetry.Purpose.BUSINESS)
+        val work = Telemetry.Rule("w", "Work", 39.3668, -98.3000, 250.0, Telemetry.Purpose.COMMUTE, weekdaysOnly = true) // privacy-scan: allow (made-up place in rural Kansas)
+        val client = Telemetry.Rule("c", "Client", 39.4000, -98.2500, 250.0, Telemetry.Purpose.BUSINESS) // privacy-scan: allow (made-up place in rural Kansas)
         val monday = LocalDate.of(2026, 11, 2).atTime(8, 0).atZone(zone).toInstant().toEpochMilli()
         val saturday = LocalDate.of(2026, 11, 7).atTime(8, 0).atZone(zone).toInstant().toEpochMilli()
-        fun trip(start: Long, lat: Double, lon: Double) = Telemetry.Trip("x", start, start + 600_000, startLat = 32.30, startLon = -86.40, endLat = lat, endLon = lon)
-        assertEquals("Work", Telemetry.matchRule(trip(monday, 32.3670, -86.3002), listOf(work, client), zone)?.name)
-        assertNull(Telemetry.matchRule(trip(saturday, 32.3670, -86.3002), listOf(work), zone))
-        assertEquals("Client", Telemetry.matchRule(trip(saturday, 32.4001, -86.2501), listOf(work, client), zone)?.name)
-        assertNull(Telemetry.matchRule(trip(monday, 32.38, -86.30), listOf(work), zone)) // ~1.5 km away
-        assertEquals(1500.0, Telemetry.distanceM(32.3668, -86.30, 32.3803, -86.30), 30.0)
+        fun trip(start: Long, lat: Double, lon: Double) = Telemetry.Trip("x", start, start + 600_000, startLat = 39.30, startLon = -98.40, endLat = lat, endLon = lon)
+        assertEquals("Work", Telemetry.matchRule(trip(monday, 39.3670, -98.3002), listOf(work, client), zone)?.name) // privacy-scan: allow (made-up place in rural Kansas)
+        assertNull(Telemetry.matchRule(trip(saturday, 39.3670, -98.3002), listOf(work), zone)) // privacy-scan: allow (made-up place in rural Kansas)
+        assertEquals("Client", Telemetry.matchRule(trip(saturday, 39.4001, -98.2501), listOf(work, client), zone)?.name) // privacy-scan: allow (made-up place in rural Kansas)
+        assertNull(Telemetry.matchRule(trip(monday, 39.38, -98.30), listOf(work), zone)) // ~1.5 km away
+        assertEquals(1500.0, Telemetry.distanceM(39.3668, -98.30, 39.3803, -98.30), 30.0)
     }
 
     // ------------------------------------------------------------ predicted service dates

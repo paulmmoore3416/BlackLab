@@ -268,32 +268,12 @@ object Facility {
 
     // ---- store ------------------------------------------------------------------------------------------
 
-    private val _state = MutableStateFlow(State())
-    val state: StateFlow<State> = _state.asStateFlow()
-    @Volatile private var loaded = false
+    val store = com.blacklab.app.core.JsonStore("Facility", version = 1, empty = { State() }, decode = ::fromJson, encode = ::toJson)
+    val state: StateFlow<State> = store.state
 
-    private fun file(context: Context) = File(context.filesDir, "facility/facility.json")
+    fun file(context: Context) = File(context.filesDir, "facility/facility.json")
 
-    fun load(context: Context): State {
-        if (loaded) return _state.value
-        synchronized(this) {
-            if (loaded) return _state.value
-            _state.value = runCatching { fromJson(JSONObject(file(context).readText())) }.getOrDefault(State())
-            loaded = true
-        }
-        return _state.value
-    }
+    fun load(context: Context): State = store.load(file(context))
 
-    fun update(context: Context, change: (State) -> State): State = synchronized(this) {
-        val next = change(load(context))
-        _state.value = next
-        runCatching {
-            val f = file(context)
-            f.parentFile?.mkdirs()
-            val tmp = File(f.parentFile, "facility.json.tmp")
-            tmp.writeText(toJson(next).toString())
-            if (!tmp.renameTo(f)) tmp.delete()
-        }
-        next
-    }
+    fun update(context: Context, change: (State) -> State): State = store.update(file(context), change = change)
 }

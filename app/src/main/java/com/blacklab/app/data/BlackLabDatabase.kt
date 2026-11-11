@@ -60,7 +60,7 @@ abstract class BlackLabDatabase : RoomDatabase() {
                 items.forEachIndexed { i, (name, color) ->
                     db.execSQL(
                         "INSERT INTO task_lists (profile, name, color, emoji, sortOrder, createdAt) VALUES (?, ?, ?, ?, ?, ?)",
-                        arrayOf(profile.name, name, color, emojis[name] ?: "", i, System.currentTimeMillis()),
+                        arrayOf<Any>(profile.name, name, color, emojis[name] ?: "", i, System.currentTimeMillis()),
                     )
                 }
             }
@@ -78,7 +78,7 @@ abstract class BlackLabDatabase : RoomDatabase() {
                 items.forEachIndexed { i, (name, color) ->
                     db.execSQL(
                         "INSERT INTO event_calendars (profile, name, color, visible, sortOrder) VALUES (?, ?, ?, 1, ?)",
-                        arrayOf(profile.name, name, color, i),
+                        arrayOf<Any>(profile.name, name, color, i),
                     )
                 }
             }

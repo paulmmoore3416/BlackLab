@@ -2,6 +2,112 @@
 
 All notable changes to BlackLab are documented here. The project follows [Semantic Versioning](https://semver.org/).
 
+## [5.13.0] — 2026-11-10 (companion 1.7.0)
+
+Your whole computer is now part of the living graph, your AI has 283 expert skills, and you can ask your notes questions in plain words.
+
+### Added
+- **Agent skills** (`agent_skills.py`): 283 skills from five open libraries — [Anthropic](https://github.com/anthropics/skills), [Vercel](https://github.com/vercel-labs/agent-skills), [OpenAI](https://github.com/openai/skills), [Google](https://github.com/google/skills) and [Hugging Face](https://github.com/huggingface/skills). They cover PDF, Word, Excel and PowerPoint, web and app design, React and Next.js, Google Cloud, Vercel, Hugging Face models and datasets, MCP servers and writing.
+  - The desktop AI can use them through the new `skills_search` and `skill_use` tools. A request that names a skill starts with it already loaded, and close matches are suggested to the model.
+  - On the phone, ask *"what skills do you have"*, *"find a skill for …"* or *"use the xlsx skill to …"*. MCP agents use `vault_skills`.
+  - Each skill gets a card in `70 AI/Skills/`, linked to its library and to the node it serves.
+  - The libraries are shallow clones on this computer, updated weekly. Their scripts never run, and the clones are never copied into this repository.
+- **Ask my notes** (`vault_recall.py`): semantic recall over the whole vault through kb-core, from the OMNIX project.
+  - It combines keyword and vector search (nomic-embed-text) with a calibrated relevance score, so it can answer "nothing relevant".
+  - The local model answers from your notes and cites them. On the phone: *"what do my notes say about …"*. MCP: `vault_ask`. The desktop AI's vault search uses it too.
+  - Phone requests search only synced notes. If kb-core isn't running, it falls back to keyword search.
+- **Facility operations** (`facility_ops.py`):
+  - Templates you can edit: EOC rounds, fire & life-safety audit, daily ops report, PM calendar, CMS-2567 plan of correction and facility incident report. *"Start EOC rounds"* creates a dated checklist.
+  - A **panel directory**: *"which breaker feeds room 214"* (panel-schedule notes → a room-to-circuit index).
+  - An **SDS binder** with storage-conflict checks (oxidizers with flammables, acids with bases, bleach with ammonia or acids) and revisions older than 3 years flagged.
+  - *"Shift prep"*: what's overdue, open work orders, rounds, SDS and credential renewals.
+- **Credentials & renewals** (`vault_credentials.py`): your own table plus the app's certifications. It shows what's expired or due within 90 days, and accepts renewal rules like `10/2028` or `+12m`.
+- **Activity ledger** (`audit.py`): every vault change, job and AI tool call is one line in MemResort's observation schema, hash-chained like OMNIX's audit log. Editing or removing a past line shows up in **90 System/Activity Ledger**, and the AI Registry shows what each agent did. MCP: `vault_ledger`.
+- **Color everywhere** (`vault_colors.py`):
+  - Every node, and everything belonging to it, wears the node's color: graph groups, a shade per subnode and per skill library, note titles and headings, folders in the explorer, tags, and `> [!facility]`-style callouts.
+  - Extended Graph adds folder hulls and tag arcs.
+  - Graph colors are restored on every pass, because Obsidian on the phone was writing them back empty.
+- **Graph FX** (`desktop/obsidian/blacklab-graph-fx`), BlackLab's own Obsidian plugin with three new graph animations:
+  - ⚡ synapse signals travel the links in their note's color, and busy notes fire more;
+  - 💓 a live pulse ripples from any note that changes (you, the phone, an AI) and bursts signals to its neighbors;
+  - 🎞️ a time-lapse replays the vault being built, note by note, with the date running.
+- **Web UI:** the Obsidian vault page has *Ask*, *Skills*, shift prep, EOC rounds, a breaker lookup, credentials, and recall and ledger status.
+- **The Atlas** (`vault_atlas.py`): a card for every document, guide, photo, video and project on the computer, a folder note for every folder on the way, and **🖥️ This Computer** (hardware, disks, services, toolchains, local AI models, apps). Only changed files are re-read, every 30 minutes. Cards stay on this computer: `85 Atlas/` is git-ignored.
+- **The Atlas** (`vault_atlas.py`): a card for every document, guide, photo, video and project on the computer, a folder note for every folder on the way, and **🖥️ This Computer** (hardware, disks, services, toolchains, local AI models, apps). Only changed files are re-read, every 30 minutes. Cards stay on this computer: `85 Atlas/` is git-ignored.
+- **Every guide in one place:** user, technical, how-to and training guides (yours, your projects', your toolchains' and installed software's) are `type: guide` cards gathered in **📘 Guides** and Bases › *Guides*. BlackLab now ships its own User, Technical, How-to and Training guides in `90 System/Guides`.
+- **Other vaults imported:** every Obsidian vault on the machine is brought into `86 Imported/` note for note and kept in sync. The originals are never changed.
+- **People & topics** (`vault_entities.py`): people, organizations, equipment, credentials, projects, places and topics found across your documents become linked notes in `87 Entities/`, using known lists plus the local model. A name is kept only if it appears word for word in the text.
+- **Unlimited nodes:** four new built-in nodes (IT, Networking & Systems · Media Library · Mining & Crypto · People & Relationships) and a node registry (`90 System/Node Registry.json`) for as many more as you need. A note now joins a node through its `up:` link too.
+- MCP tools `vault_node_create` and `vault_atlas`. New graph views: *This computer*, *People & topics*, *Guides*, *Imported vaults*.
+
+### Privacy
+- `guards.vault_safe_passages` leaves out only the clinical or off-the-record paragraphs of a long document, so the rest of it can still be indexed. More secret patterns are scrubbed (OAuth client secrets, AWS keys, bearer tokens, JWTs, `key = value` secrets), and files such as `client_secret*.json`, `.env` and `token.json` are never opened.
+- Synced notes (nodes, Nexus, Graph Health) count local notes without naming them. Related links never point from a synced note to a local one.
+
+## [5.12.0] — 2026-11-09
+
+Your computer can now reverse engineer software for you. Point it at a program, APK, library or firmware image and the desktop AI decompiles it with Ghidra and explains it, citing the evidence.
+
+### Added
+- **Reverse engineering on the computer** with [REA](https://github.com/morluto/rea) and Ghidra:
+  - Say “reverse engineer ~/Downloads/tool.bin and find how it checks the license” and the report lands in Documents › Reverse Engineering.
+  - Ask “decompile the function that prints the usage message in …”, “what strings are in …”, “who calls 0x4012a0 in …” or “how do I inspect an APK with REA?”.
+  - Any program-like file (APK, .so, .exe, .dll, firmware, .pyc, .wasm, models…) has ⋮ › **Reverse-engineer on computer**.
+  - Only read-only analysis runs. BlackLab never runs, debugs or instruments the target, and keystores, wallets and keys can't be targets.
+- Reports show decompiled code in code blocks.
+
+- **A living Obsidian graph:**
+  - Links now pull notes together, so the 13 nodes form clusters. Each node has its own color, and tags no longer clutter the graph.
+  - Typed links: `synapses:` between nodes and `related:` between notes about the same thing. Related links are found by a local AI (nomic-embed-text, offline) and your own entries are kept.
+  - **Bookmarks › Graph views** has a saved graph per node, plus the brain, the AI layer, what needs attention, and the related-links web.
+  - **Graph Health** lists orphans with a suggested node, unresolved links and hubs.
+  - Plugins, pinned and checksum-verified: **Breadcrumbs** (a trail on every note, prev/next across daily notes, a relations matrix), **Extended Graph** (link types in their own colors, hubs sized by links, the open note highlighted) and **Advanced URI**.
+  - “Show RTU-4 in my graph” (phone or desktop) opens Obsidian on that note's local graph, and every node note has *Open local graph* buttons.
+- BlackLab Desktop › Obsidian vault › **Graph**: link and orphan counts, related pairs, plugin status, *Open the graph* and *Show in graph*.
+
+### Changed
+- Updated: ZXing 3.5.4, jsoup 1.24.1, ML Kit text recognition 19.0.2, ML Kit GenAI Prompt 1.0.0-beta5, Play services auth 22.0.0, and the CI actions. The AndroidX 2026.09 and AGP 9 updates wait for the planned AGP 9 migration.
+- The phone's Obsidian mirror no longer pulls Obsidian's own settings back from nested `.obsidian` folders.
+
+### Desktop (companion 1.6.0)
+- `reverse.py` adds the `reverse_engineer` tool for the desktop AI, the `reverse` background job and a reverse-engineering workspace in `~/Desktop/BlackLab AI/Reverse Engineering`. REA's own guides are indexed for search.
+- Guards for the small local model: one-step `find_code`, automatic facts about the file before it answers, repair for paths typed in the wrong case, and a warning on any code it wrote itself instead of quoting the decompiler.
+
+## [5.11.0] — 2026-11-08
+
+BlackLab gets a second brain: everything flows into an Obsidian vault on your computer, organized into 13 knowledge nodes your AIs can read and grow. Plus work-order intake, a daily timeline with ops handoff, and a Health page.
+
+### Added
+- **Obsidian vault** (Settings › Obsidian vault): BlackLab mirrors Facility, Garage, tasks and calendar, notes and notebooks, learning and recordings (journal only if you turn it on) into `~/Obsidian/BlackLab` on the computer, every 15 minutes while the desktop link is up. Behavioral Health, keys, the VIN and plate, trip places and locked notebook sections never go.
+  - **13 main nodes + the Nexus**: Facility Operations · Life Safety & Compliance · Peer Support & Milieu Safety · Leadership & Team · Vendors & Contracts · Finance & Budget · Projects & Engineering · AI & Automation · Learning & Credentials · Knowledge Library · Vehicles & Travel · Home, Family & Health · Time, Goals & Planning. Each starts with a detailed primer and grows on every sync (members, signals, mentions); every note links up to its node, and a Neural Map canvas shows the network.
+  - Daily notes with a **timeline** of everything that happened, an **AI Registry** every AI signs, version history (git), and your own writing is never overwritten.
+  - Assistant: “save this to Obsidian: …”, “add to the facility node: …”, “log to the vault: …”, “search the vault for …”, “what's new in the vault?”, “open Obsidian on my computer”, “sync the vault”.
+- **Offline library** (~50 GB, on the computer): 76 openly licensed knowledge packs (Stack Exchange, LibreTexts, Wikibooks, iFixit, MedlinePlus, Ready.gov, the USDA canning guide, field-medicine and post-disaster libraries, Wikipedia's best 50,000 articles plus 1 million article introductions) and public-domain government documents (DOE O&M guide, OSHA 29 CFR 1910/1926, the FAR, SAMHSA peer competencies, EPA water disinfection, the NWS spotter guide). Each source is a card in `95 Library/` linked to its node; the assistant answers from it offline: “look it up in the library: …”.
+- **Self-Reliance & Survival** — 17 subnodes under Home, Family & Health, each with a primer and its own library shelf: off-grid survival, plant knowledge & foraging, sourdough & bread, water filtration & purification, field dressing & game care, first aid & wilderness medicine, food preservation & canning, emergency communications, land navigation, shelter & fire, knots, off-grid power, gardening & seed saving, disaster preparedness, tools & repair, weather reading, fermentation.
+- **Work-order intake**: say or type “work order: leak under the sink in room 214, B-wing” (or Facility › 🔧). BlackLab picks the trade, priority (P1–P4, with the reason), location and matching asset, files it in To-Do › Work Orders with a safety-first checklist, and logs it on the asset.
+- **Timeline & ops handoff** (side menu): one timeline per day — inspections, work orders, tasks, meetings, recordings, notes, drives, and Behavioral Health as counts only. **Ops handoff** writes the day's summary (open work orders by urgency, inspections needing attention, tomorrow) to share, copy or send to the vault; it never includes Behavioral Health. Assistant: “ops handoff”, “what happened today”.
+- **Settings › Health**: backups, data files, desktop link, vault, crashes, storage and on-device AI on one page, each with a fix.
+- **Ask my files** now searches Facility (assets, inspections, work orders) and Garage service history (Settings › Assistant knowledge › Facility & Garage). The VIN and plate are never indexed.
+
+### Changed
+- Facility, Garage, the drive log and recalls save through one crash-safe store: a last-good copy is kept, a damaged file is set aside instead of being overwritten, and files carry a format version so future updates migrate them.
+- Weather and recall lookups retry briefly when the network blips; the assistant shows a clear offline banner.
+- The assistant's command grammar is one ordered, tested table with a phrasing corpus. Fixed: “what were the action items from the meeting” and “what did we decide in the budget meeting” were read as calendar questions.
+- Faster cold start: a generated Baseline Profile precompiles startup and Home.
+- Updated: Kotlin 2.3, Android Gradle Plugin 8.13, Compose BOM 2026.06, Room 2.8, Lifecycle 2.10, Navigation 2.9.8, WorkManager 2.12, Glance 1.2.
+
+### Desktop (companion 1.5.0)
+- The vault engine, a **vault MCP server** (`desktop/companion/vault_mcp.py`: checkin, search, read, write, log, capture, recent, nodes, node_add) so Claude Code and other agents can work in the vault, and Claude Code session hooks (`vault_hook.py`).
+- BlackLab Desktop › **Obsidian vault**: status, the 13 nodes, capture and search (vault or offline library), sync, open in Obsidian.
+- `library.py` (downloads with SHA-256 verification, cards, search through kiwix-serve on 127.0.0.1:8780) and the MCP tool `vault_library_search`; an optional, quarantined **external guest book** (`guestbook.py`, off until a public repo is configured).
+- The desktop AI can search and save to the vault; every non-private conversation lands on the day's timeline.
+- All safety rules (HTTP, protected paths, privacy, tool calls) moved into `guards.py` with unit tests. Fixed: a path like `/home/paulx/…` passed the home-folder check.
+
+### Project
+- `scripts/release.sh X.Y.Z [--install] [--publish]`: version bump, changelog check, secret + privacy scans, tests, lint, signed APK + `.sha256`, tag and GitHub Release.
+- `scripts/privacy-scan.sh` (also in CI): real VINs, personal e-mails and phone numbers, precise coordinates, SSNs and your private denylist (`~/.config/blacklab/privacy-denylist.txt`).
+- Desktop companion tests run in CI. Dependabot skips AGP major versions.
+
 ## [5.10.0] — 2026-11-08
 
 Facility gets its own section, backups are encrypted, and the desktop link is locked down.

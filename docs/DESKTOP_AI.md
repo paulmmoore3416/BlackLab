@@ -190,3 +190,88 @@ the same over Wi-Fi, so the phone keeps its desktop brain away from the cable.
 - Ask "desktop AI status", or send work to the computer: "on my computer open my downloads",
   "ask my desktop how much disk space is left".
 - Source labels show who answered: "Desktop AI · qwen3:8b" or "Gemini Nano · on-device".
+
+## Obsidian vault & MCP (companion 1.5.0)
+
+- The companion keeps `~/Obsidian/BlackLab` current (every 10 minutes, and whenever the phone sends its feed) and commits each change.
+- Desktop AI tools: `vault_search` (reads content → counts as tainted for `open_url`) and `vault_write` (only when the request asks to save/note/log).
+- MCP server for agents: `claude mcp add --scope user blacklab-vault -- python3 desktop/companion/vault_mcp.py`. Tools: `vault_checkin`, `vault_status`, `vault_search`, `vault_read`, `vault_write`, `vault_log`, `vault_capture`, `vault_recent`, `vault_nodes`, `vault_node_add`. It goes through the companion when it runs (one writer), otherwise writes directly.
+- Claude Code hooks: `vault_hook.py start|end` (SessionStart / SessionEnd) — sign-in reminder, then a session note with files changed and commits. Prompts are never copied.
+
+## Reverse engineering with REA (companion 1.6.0)
+
+`desktop/companion/reverse.py` gives the desktop AI (qwen3:8b) and the phone [REA](https://github.com/morluto/rea)
+("Reverse Engineer Anything", MIT, npm `rea-agents`, pinned 6.8.0) with Ghidra 12.1.x as the decompiler.
+
+- **Toolchain (user space):** Node 24 + JDK 21 + Ghidra in `~/.local/blacklab-toolchain/`, REA in
+  `~/.local/share/blacklab-desktop/rea` (`python3 desktop/companion/reverse.py install`; `python3 reverse.py` prints status).
+  REA 6.8 needs Node ≥ 22.23.4 / 24.22.1. The system Node is too old, so the toolchain Node is used.
+- **Tool `reverse_engineer`:** actions `overview`, `find_code` (text → string → xrefs → decompiled functions in one step;
+  small models do this badly on their own), `strings`, `functions`, `search`, `decompile`, `function`, `xrefs`,
+  `disassemble`, `inspect` (format parsers), `objdump`, `report`, `help`, `status`.
+- **Job `reverse`:** a full triage of one file → `~/Desktop/BlackLab AI/Reverse Engineering/<date> <name>/`
+  (`report.md`, `evidence/*.json`, `strings.txt`, `functions.txt`, `code/*.c`). For a stripped ELF it follows `entry` to
+  `main`, follows strings that match the user's question, and has the model write the report from that evidence only.
+- **Rules (no model):** `reverse engineer <path> [and <question>]`, `decompile the function that prints <text> in <path>`,
+  `rea status`, `how do I … with rea` (answered from REA's own docs, copied into `Reverse Engineering/REA reference/`).
+- **Safety (tests/test_reverse.py):** an allowlist of read-only commands. Nothing that runs, debugs, instruments or captures
+  the target, touches a device, installs or updates, or writes outside the workspace. Targets pass the path guard (home, or
+  /usr, /opt; never protected paths). Values can't inject flags. Only one Ghidra runs at a time, and none while mining.
+  Results count as untrusted content (`READS_CONTENT`). Any code block in a reply that isn't in the tool output gets a
+  warning, because the 8B model will "simplify" (invent) code.
+- **Phone:** `ReverseEngineering.route` (ReverseEngineeringTest). "reverse engineer <file>" starts a report job, and a phone
+  file is uploaded. Ghidra questions run as background `ask` jobs (they outlast the 180 s chat timeout). Status and how-to
+  questions are answered right away. Any program-like file has ⋮ › **Reverse-engineer on computer**. Reports arrive as
+  documents in *Reverse Engineering*.
+- Only analyze software you own or are allowed to examine.
+
+## The vault graph (companion 1.6.0)
+
+`desktop/companion/vault_graph.py` runs on every vault pass (tests: `tests/test_vault_graph.py`).
+
+- **Profile** (`PROFILE`): graph forces (link strength was 0, so nodes never clustered), one color group per node by `up:`
+  or folder, tags hidden, and a *Graph views* bookmark group with a saved graph per node. It's applied once per profile
+  bump, so your later tweaks are kept until the next bump.
+- **Typed links:** node and subnode notes carry `synapses:`. `related:` comes from local embeddings: cosine against an adaptive
+  bar (this vault's 95th-percentile pair similarity, clamped to 0.72–0.90), at most 3 per note, mutual, skipping pairs
+  that are already linked. A pair stays while it's within 0.03 of the bar. Only notes that changed are re-embedded, and a pass
+  with no changes does no work. Your own `related:` entries are kept.
+- **Graph Health** (`90 System/Graph Health.md`): orphans with a suggested node, unresolved links, hubs, related stats.
+- **Plugins:** Breadcrumbs 4.22.3 (michaelpporter), Extended Graph 2.7.7 (elsatam) and Advanced URI 2.2.1 (vinzent03).
+  They're downloaded from GitHub releases and verified against pinned SHA-256 before writing. Only installed plugins are
+  enabled. Their settings (`data.json`) are deep-merged, and their code is git-ignored in the vault. Obsidian asks once to
+  turn on community plugins.
+- **Advanced URI:** `show <note> in my graph` (desktop rule `VAULT_SHOW_RE`, phone intent `VAULT_SHOW`, `/phone/vault/show`)
+  opens `obsidian://adv-uri?…&commandid=graph:open-local`. `/local/vault/graph` returns the numbers shown in the desktop UI.
+
+## Agent skills, Ask my notes, facility ops and the ledger (companion 1.7.0)
+
+**Agent skills.** 283 skills from Anthropic, Vercel, OpenAI, Google and Hugging Face live in
+`~/.local/share/blacklab-desktop/skills`: shallow clones, updated weekly, never committed here.
+- The desktop AI finds them with `skills_search` and loads one with `skill_use`. Naming a skill ("use the pdf skill to …") loads it up front.
+- Skill text is third-party guidance. The AI never runs a skill's scripts (it has no shell); it shows you the commands. Like any other read content, skill text marks the request as tainted, so only links you typed get opened.
+- Cards live in `70 AI/Skills/`.
+- Phone: "what skills do you have", "find a skill for …", "use the … skill to …". MCP: `vault_skills`.
+
+**Ask my notes.** [kb-core](https://github.com/paulmmoore3416/omnix-ai-desktop) (loopback, `http://127.0.0.1:8100`, or `kb_core_url` in config.json) indexes the vault.
+- Synced notes go into the `blacklab-vault` collection; this computer's own folders (85–89) go into `blacklab-local`.
+- Each pass sends only changed notes, and spends at most `recall_budget_s` seconds doing it.
+- Answers come from the local model only. Vault text never goes to a cloud model.
+- Phone requests search synced notes only, unless config.json sets `"phone_recall_local": true`.
+
+**Facility ops.**
+- `10 Facility/Templates` (yours to edit) and `10 Facility/Rounds`.
+- `10 Facility/Panels`: one note per panel with a `| Ckt | Load |` table. **⚡ Panel Directory** is the room index.
+- `10 Facility/SDS Binder`: one note per product. **🧪 SDS Binder** shows conflicts and stale SDSs.
+- `40 Learning/🏅 Credentials.md`.
+- Endpoints: `/local/vault/{round,panel,sds,shift_prep,credentials}`, and the same under `/phone/vault/`.
+
+**Activity ledger.** `~/.cache/blacklab-desktop/vault/ledger.jsonl` holds one hash-chained line per action, using MemResort's fields (`ts, actor, action, source, target, model, provider, duration_ms, metadata`).
+- Metadata only: never note text, queries or answers.
+- `vault_ledger` (MCP) and `/local/vault/ledger` verify the chain.
+
+**Colors and Graph FX.**
+- `vault_colors.py` writes `.obsidian/snippets/blacklab-colors.css` from the node registry and restores the graph's color groups on every pass.
+- `desktop/obsidian/blacklab-graph-fx` is copied into the vault and enabled once. If you turn it off, it stays off.
+- Graph FX settings: signals, pulse, intensity, what counts as recent, time-lapse length, and respecting "reduce motion".
+
