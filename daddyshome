@@ -81,6 +81,16 @@ status_board() {
   else bad "Ollama is not running"; fi
   ollama_up && ok "Desktop assistant model: $(model_selected) (keep-alive $(json_get "$CFG" keep_alive || echo 30m))"
   if companion_up; then
+    local kw; kw="$(curl -fsS -m 2 -H 'X-BlackLab: 1' "$COMP/local/status" | python3 -c 'import json,sys;print(json.load(sys.stdin).get("keep_warm",{}).get("last",""))' 2>/dev/null)"
+    case "$kw" in
+      ok|loaded*) ok "Stays loaded: the companion re-pins it after reboots and Night Mining (until ./daddyshome --stop)" ;;
+      mining) ok "Stays loaded: waiting for Night Mining to finish, then it loads again" ;;
+      off) warn "Not pinned — the model unloads when idle (run ./daddyshome to keep it loaded)" ;;
+      "") ;;
+      *) warn "Keep-warm: $kw" ;;
+    esac
+  fi
+  if companion_up; then
     ok "BlackLab Desktop companion on $COMP"
     local st; st="$(curl -fsS -m 2 -H 'X-BlackLab: 1' "$COMP/local/status" 2>/dev/null)"
     local line; while IFS= read -r line; do
@@ -109,6 +119,8 @@ if a:
     local how="USB"; [[ "$p" == *:* || "$p" == *_adb-tls-* ]] && how="Wi-Fi (Wireless debugging)"
     if "$ADB" -s "$p" reverse --list 2>/dev/null | grep -q "tcp:$PORT"; then ok "Phone ${model:-$p} linked over $how (phone → desktop AI ready)"; else warn "Phone ${model:-$p} on $how but not linked"; fi
   done
+  local tn; tn="$(curl -fsS -m 2 -H 'X-BlackLab: 1' "$COMP/local/status" 2>/dev/null | python3 -c 'import json,sys;t=json.load(sys.stdin).get("tailnet",{});print(t.get("url") or t.get("note") or "")' 2>/dev/null)"
+  case "$tn" in http*) ok "Tailscale: phone API on $tn (your tailnet only — not Funnel)" ;; "") ;; *) warn "Tailscale: $tn" ;; esac
   [ $any = 0 ] && warn "No phone connected — plug it in (USB debugging) or pair Wireless debugging: adb pair <ip:port>, then adb connect <ip:port>"
   local tok; tok="$(json_get "$SECRETS" phone_ai_token)"
   if [ -n "$tok" ] && companion_up; then
@@ -179,6 +191,10 @@ else bad "Couldn't load $MODEL"; fi
 
 # ---------------------------------------------------------------- 3. companion
 step "3 · BlackLab Desktop companion"
+# Tailscale: the phone's assistant reaches this computer's AI from anywhere on your tailnet (phone API only,
+# never Funnel). On by default when Tailscale is up; config.json "tailnet": false turns it off.
+TS_IP="$(tailscale ip -4 2>/dev/null | head -1)"
+if [[ "$TS_IP" =~ ^100\. ]] && [ "$(json_get "$CFG" tailnet)" != "False" ]; then json_set tailnet true; else TS_IP=""; fi
 if systemctl --user cat blacklab-desktop.service >/dev/null 2>&1; then
   systemctl --user restart blacklab-desktop.service
 else
@@ -207,12 +223,25 @@ else
     # First time (or --repair): hand the phone the shared key. BlackLab imports it into its encrypted
     # key store and deletes the file the next time it opens or comes to the front.
     SEEN="$(curl -fsS -m 2 -H 'X-BlackLab: 1' "$COMP/local/status" | python3 -c 'import json,sys;print(json.load(sys.stdin).get("phone_ai",{}).get("paired_recently",False))' 2>/dev/null)"
-    if [ "$REPAIR" = 1 ] || { [ "$SEEN" != "True" ] && [ ! -f "$CFG_DIR/.paired-$p" ]; }; then
+    PAIR=0; TAIL=0
+    if [ "$REPAIR" = 1 ] || { [ "$SEEN" != "True" ] && [ ! -f "$CFG_DIR/.paired-$p" ]; }; then PAIR=1; fi
+    if [ -n "$TS_IP" ] && { [ "$REPAIR" = 1 ] || [ "$(cat "$CFG_DIR/.tailnet-$p" 2>/dev/null)" != "$TS_IP" ]; }; then TAIL=1; fi
+    if [ "$PAIR" = 1 ] || [ "$TAIL" = 1 ]; then
       TMP="$(mktemp)"; chmod 600 "$TMP"
-      printf '{"desktop_ai":"%s","desktop_ai_url":"http://127.0.0.1:%s"}' "$TOKEN" "$PORT" > "$TMP"
+      python3 - "$TMP" "$PAIR" "$TOKEN" "$PORT" "$TAIL" "$TS_IP" <<'PY'
+import json, sys
+path, pair, token, port, tail, ts = sys.argv[1:7]
+keys = {}
+if pair == "1":
+    keys.update(desktop_ai=token, desktop_ai_url=f"http://127.0.0.1:{port}")
+if tail == "1":
+    keys["desktop_ai_tailnet_url"] = f"http://{ts}:{port}"
+open(path, "w").write(json.dumps(keys))
+PY
       "$ADB" -s "$p" shell mkdir -p /sdcard/BlackLab/.provision >/dev/null 2>&1
       if "$ADB" -s "$p" push "$TMP" /sdcard/BlackLab/.provision/keys.json >/dev/null 2>&1; then
-        touch "$CFG_DIR/.paired-$p"; ok "Sent the pairing key to $p — open BlackLab on the phone once to finish"
+        [ "$PAIR" = 1 ] && touch "$CFG_DIR/.paired-$p" && ok "Sent the pairing key to $p — open BlackLab on the phone once to finish"
+        [ "$TAIL" = 1 ] && echo "$TS_IP" > "$CFG_DIR/.tailnet-$p" && ok "Told $p this computer's Tailscale address ($TS_IP) — the phone's assistant now reaches it away from home"
       else warn "Couldn't send the pairing key to $p"; fi
       shred -u "$TMP" 2>/dev/null || rm -f "$TMP"
     fi

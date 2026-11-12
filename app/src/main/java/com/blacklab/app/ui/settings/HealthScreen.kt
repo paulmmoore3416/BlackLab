@@ -65,12 +65,15 @@ class HealthViewModel(private val app: AppContainer) : ViewModel() {
     fun refresh() {
         _state.value = _state.value.copy(loading = true)
         viewModelScope.launch {
-            val checks = withContext(Dispatchers.IO) { Health.evaluate(gather()) }
+            val checks = Health.evaluate(HealthData.gather(app))
             _state.value = UiState(false, checks, Health.summary(checks))
         }
     }
+}
 
-    private suspend fun gather(): Health.Inputs {
+/** Gathers [Health.Inputs] (used by the Health screen and the desktop snapshot). */
+object HealthData {
+    suspend fun gather(app: AppContainer, ensureIndex: Boolean = true): Health.Inputs = withContext(Dispatchers.IO) {
         val ctx = app.context
         val s = app.settings.current
         val now = System.currentTimeMillis()
@@ -84,8 +87,8 @@ class HealthViewModel(private val app: AppContainer) : ViewModel() {
         val crashes = CrashLog.entries(ctx).filter { it.time > now - 7 * 86_400_000L }
         val desk = com.blacklab.app.assistant.DesktopAi.status.value
         val index = app.assistant.index
-        runCatching { index.ensure() }
-        return Health.Inputs(
+        if (ensureIndex) runCatching { index.ensure() }
+        Health.Inputs(
             now = now, newestBackupAt = backups.firstOrNull()?.lastModified(), backupCount = backups.size,
             plainBackups = app.backups.unencryptedBackups().size, autoBackup = s.autoBackup, backupPassphraseSet = app.backups.hasPassphrase,
             storeProblems = stores.mapNotNull { st -> st.problem?.let { st.name to it } }.toMap(), storeReadOnly = stores.filter { it.readOnly }.map { it.name },
@@ -94,6 +97,8 @@ class HealthViewModel(private val app: AppContainer) : ViewModel() {
             vaultEnabled = s.vaultEnabled, vaultLastSyncAt = com.blacklab.app.link.VaultFeed.lastSyncAt(app),
             crashes7d = crashes.size, lastCrashTitle = crashes.firstOrNull()?.title,
             freeBytes = app.storage.freeBytes(), nanoStatus = com.blacklab.app.assistant.Nano.status.value.name, indexPassages = index.size,
+            cloudSyncEnabled = s.cloudSync, googleSignedIn = s.googleAccount.isNotBlank(),
+            cloudLastSyncAt = com.blacklab.app.link.CloudSync.lastSync.value, cloudError = com.blacklab.app.link.CloudSync.lastError.value,
         )
     }
 }

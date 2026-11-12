@@ -30,6 +30,10 @@ object Health {
         val freeBytes: Long,
         val nanoStatus: String,
         val indexPassages: Int,
+        val cloudSyncEnabled: Boolean = false,
+        val googleSignedIn: Boolean = false,
+        val cloudLastSyncAt: Long = 0,
+        val cloudError: String? = null,
     )
 
     private const val DAY = 86_400_000L
@@ -74,6 +78,15 @@ object Health {
             i.vaultLastSyncAt <= 0 -> Check("vault", "Obsidian vault", Level.INFO, "Not synced yet — it syncs while the desktop link is up.")
             i.now - i.vaultLastSyncAt > 2 * DAY -> Check("vault", "Obsidian vault", Level.WARN, "Last synced ${ago(i.vaultLastSyncAt, i.now)}.")
             else -> Check("vault", "Obsidian vault", Level.OK, "Synced ${ago(i.vaultLastSyncAt, i.now)}")
+        }
+        // Cloud sync (Google Drive) — what BlackLab on the web reads when the phone isn't plugged in
+        if (i.cloudSyncEnabled) out += when {
+            !i.googleSignedIn -> Check("cloud", "Cloud sync", Level.WARN,
+                "On, but the phone isn't signed in to Google, so nothing reaches Drive and BlackLab on the web stays out of date.", "Sign in", "assistant/settings")
+            i.cloudError != null -> Check("cloud", "Cloud sync", Level.WARN, "Last try failed: ${i.cloudError}", "Settings", "assistant/settings")
+            i.cloudLastSyncAt <= 0 -> Check("cloud", "Cloud sync", Level.INFO, "Not synced yet — it runs every 15 minutes or more while online.")
+            i.now - i.cloudLastSyncAt > DAY -> Check("cloud", "Cloud sync", Level.WARN, "Last synced ${ago(i.cloudLastSyncAt, i.now)}.", "Settings", "assistant/settings")
+            else -> Check("cloud", "Cloud sync", Level.OK, "Synced to Google Drive ${ago(i.cloudLastSyncAt, i.now)}")
         }
         // Crashes
         out += if (i.crashes7d == 0) Check("crashes", "Stability", Level.OK, "No crashes in the last 7 days")

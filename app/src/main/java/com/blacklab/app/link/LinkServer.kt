@@ -51,38 +51,53 @@ import java.util.concurrent.atomic.AtomicLong
  * change so BlackLab Desktop can long-poll /api/changes and refresh immediately.
  */
 class LinkHub(private val app: AppContainer) {
-    val rev = AtomicLong(1)
-    val revFlow = MutableStateFlow(1L)
+    /**
+     * Starts at the wall clock, not 1: the desktop keeps its last rev across phone app restarts, and a counter
+     * that restarted at 1 left it long-polling for a rev it wouldn't see for hours. Anything older than
+     * [baseline] predates this process and gets a full reload.
+     */
+    val baseline = Time.now()
+    val rev = AtomicLong(baseline)
+    val revFlow = MutableStateFlow(baseline)
+    val sections = SectionRevs(baseline)
     val running = MutableStateFlow(false)
     val clients = MutableStateFlow<Map<String, Long>>(emptyMap()) // address -> last seen
     private var server: LinkServer? = null
     private var cloudJob: Job? = null
 
-    fun bump() { revFlow.value = rev.incrementAndGet(); scheduleCloudPush() }
-
-    fun watch() {
-        app.db.invalidationTracker.addObserver(object : InvalidationTracker.Observer(
-            arrayOf("documents", "journal", "tasks", "task_lists", "subtasks", "events", "event_calendars", "courses", "assignments", "certifications", "ceu_entries", "recordings", "notes", "nb_pages", "notebooks"),
-        ) {
-            override fun onInvalidated(tables: Set<String>) = bump()
-        })
-        app.appScope.launch { app.settings.state.drop(1).collect { bump() } }
-        app.appScope.launch { app.assistant.messages.drop(1).collect { bump() } }
+    /** Something in [changed] (snapshot sections, see [Sections]) changed. */
+    fun bump(changed: Set<String>) {
+        val r = rev.incrementAndGet()
+        sections.mark(changed, r)
+        revFlow.value = r
+        scheduleCloudPush()
     }
 
-    /** Debounced push of the snapshot to Google Drive while the app process is alive. */
+    fun watch() {
+        app.db.invalidationTracker.addObserver(object : InvalidationTracker.Observer(Sections.TABLES.keys.toTypedArray()) {
+            override fun onInvalidated(tables: Set<String>) = bump(Sections.forTables(tables))
+        })
+        app.appScope.launch { app.settings.state.drop(1).collect { bump(Sections.SETTINGS) } }
+        app.appScope.launch { app.assistant.messages.drop(1).collect { bump(Sections.ASSISTANT) } }
+        LinkWatch.stores().forEach { s -> LinkWatch.launch(app.appScope, listOf(s.state)) { bump(Sections.forStore(s.name)) } }
+    }
+
+    /**
+     * Pushes the snapshot to Google Drive at most 45 s after the first unpushed change. Not a resetting debounce:
+     * a steady stream of changes (a drive's live readings) would otherwise postpone the push forever.
+     */
     private fun scheduleCloudPush() {
         if (!app.settings.current.cloudSync) return
-        cloudJob?.cancel()
+        if (cloudJob?.isActive == true) return
         cloudJob = app.appScope.launch { delay(45_000); CloudSync.sync(app) }
     }
 
     @Synchronized
     fun startServer() {
         val s = app.settings.current
-        if (server?.matches(s.linkPort, s.linkLan) == true) return
+        if (server?.matches(s.linkPort, s.linkLan, s.linkTailnet) == true) return
         server?.stop()
-        server = LinkServer(app, s.linkPort, s.linkLan).also { it.start() }
+        server = LinkServer(app, s.linkPort, s.linkLan, s.linkTailnet).also { it.start() }
         running.value = true
     }
 
@@ -94,6 +109,12 @@ class LinkHub(private val app: AppContainer) {
         val lp: LinkProperties = cm.getLinkProperties(cm.activeNetwork) ?: return null
         return lp.linkAddresses.map { it.address }.firstOrNull { it is Inet4Address && !it.isLoopbackAddress }?.hostAddress
     }
+
+    /** This phone's Tailscale IPv4 address while the Tailscale app is connected. */
+    fun tailnetAddress(): String? = runCatching {
+        java.net.NetworkInterface.getNetworkInterfaces().toList().flatMap { it.inetAddresses.toList() }
+            .firstOrNull { it is Inet4Address && LinkAccess.isTailnet(it) }?.hostAddress
+    }.getOrNull()
 }
 
 /** Keeps the link server alive while BlackLab is in the background. */
@@ -112,7 +133,11 @@ class LinkService : Service() {
         val app = applicationContext.app
         val s = app.settings.current
         if (!s.linkEnabled) { stopSelf(); return START_NOT_STICKY }
-        val where = if (s.linkLan) (app.link.lanAddress()?.let { "$it:${s.linkPort}" } ?: "Wi-Fi") + " · USB" else "USB (adb) only"
+        val where = listOfNotNull(
+            if (s.linkLan) app.link.lanAddress()?.let { "$it:${s.linkPort}" } ?: "Wi-Fi" else null,
+            if (s.linkTailnet) app.link.tailnetAddress()?.let { "Tailscale $it:${s.linkPort}" } ?: "Tailscale" else null,
+            "USB",
+        ).joinToString(" · ").let { if (!s.linkLan && !s.linkTailnet) "USB (adb) only" else it }
         val n: Notification = NotificationCompat.Builder(this, Notifications.CH_LINK)
             .setSmallIcon(R.drawable.ic_notification)
             .setContentTitle("BlackLab Desktop link")
@@ -137,24 +162,26 @@ class LinkService : Service() {
  * `adb forward`) and, when allowed, to the Wi-Fi interface. Every call except /api/ping needs the
  * pairing code as a bearer token; repeated bad codes lock the client out for a minute.
  */
-class LinkServer(private val app: AppContainer, private val port: Int, private val lan: Boolean) {
+class LinkServer(private val app: AppContainer, private val port: Int, private val lan: Boolean, private val tailnet: Boolean = false) {
     private var socket: ServerSocket? = null
     // Bounded: long-polls hold a thread each, and a flood from the Wi-Fi side must not exhaust the phone
     private val pool = java.util.concurrent.ThreadPoolExecutor(2, 32, 30, java.util.concurrent.TimeUnit.SECONDS, java.util.concurrent.SynchronousQueue())
     private val failures = java.util.concurrent.ConcurrentHashMap<String, Pair<Int, Long>>()
     @Volatile private var stopped = false
 
-    fun matches(port: Int, lan: Boolean) = !stopped && this.port == port && this.lan == lan
+    fun matches(port: Int, lan: Boolean, tailnet: Boolean) = !stopped && this.port == port && this.lan == lan && this.tailnet == tailnet
 
     fun start() {
         pool.execute {
             runCatching {
                 val ss = ServerSocket()
                 ss.reuseAddress = true
-                ss.bind(InetSocketAddress(if (lan) InetAddress.getByName("0.0.0.0") else InetAddress.getLoopbackAddress(), port))
+                // Tailscale's address can appear and change while we run, so bind everywhere and admit per connection
+                ss.bind(InetSocketAddress(if (lan || tailnet) InetAddress.getByName("::") else InetAddress.getLoopbackAddress(), port))
                 socket = ss
                 while (!stopped) {
                     val c = ss.accept()
+                    if (!LinkAccess.admit(c.inetAddress, c.localAddress, lan, tailnet)) { runCatching { c.close() }; continue }
                     try { pool.execute { runCatching { serve(c) }; runCatching { c.close() } } }
                     catch (_: java.util.concurrent.RejectedExecutionException) { runCatching { c.close() } }
                 }
@@ -256,12 +283,17 @@ class LinkServer(private val app: AppContainer, private val port: Int, private v
                 LinkService.sync(app.context)
                 200 to JSONObject().put("applied", JSONArray(applied)).put("refused", JSONArray(refused)).put("values", SettingsSchema.values(app.settings.prefs)).toString()
             }
-            r.method == "GET" && r.path == "/api/snapshot" -> 200 to Snapshot.build(app).toString()
+            r.method == "GET" && r.path == "/api/snapshot" -> 200 to Snapshot.build(app, Sections.parse(r.query["sections"])).toString()
             r.method == "GET" && r.path == "/api/changes" -> {
+                // Long-poll: answers as soon as anything changes after `since`, with which sections did
+                // (`changed: null` = reload everything: the client's rev is from before this process).
+                val hub = app.link
                 val since = r.query["since"]?.toLongOrNull() ?: 0
                 val wait = (r.query["wait"]?.toLongOrNull() ?: 25).coerceIn(0, 50) * 1000
-                if (app.link.rev.get() <= since) withTimeoutOrNull(wait) { app.link.revFlow.first { it > since } }
-                200 to JSONObject().put("rev", app.link.rev.get()).toString()
+                if (since >= hub.baseline && since >= hub.rev.get()) withTimeoutOrNull(wait) { hub.revFlow.first { it > since } }
+                val now = hub.rev.get()
+                val changed = if (since > now) null else hub.sections.changedSince(since)
+                200 to JSONObject().put("rev", now).put("changed", changed?.let { JSONArray(it.sorted()) } ?: JSONObject.NULL).toString()
             }
             r.method == "POST" && r.path == "/api/assistant" -> {
                 val reply = app.assistant.handle(body.optString("text"), Origin.DESKTOP)
@@ -375,6 +407,29 @@ object LinkAccess {
     private val pages = setOf("https://paulmmoore3416.github.io")
     private val loopback = Regex("^http://(127\\.0\\.0\\.1|localhost)(:\\d{1,5})?$")
 
+    private val tailnetV6 = byteArrayOf(0xfd.toByte(), 0x7a, 0x11, 0x5c, 0xa1.toByte(), 0xe0.toByte()) // fd7a:115c:a1e0::/48
+
+    /** Tailscale's address ranges: CGNAT 100.64.0.0/10 (also as an IPv4-mapped IPv6 address) and fd7a:115c:a1e0::/48. */
+    fun isTailnet(a: InetAddress): Boolean {
+        val b = a.address
+        val mapped = b.size == 16 && (0 until 10).all { b[it] == 0.toByte() } && b[10] == 0xff.toByte() && b[11] == 0xff.toByte()
+        val v4 = if (b.size == 4) b else if (mapped) b.copyOfRange(12, 16) else null
+        return if (v4 != null) (v4[0].toInt() and 0xFF) == 100 && (v4[1].toInt() and 0xC0) == 0x40
+        else b.copyOfRange(0, 6).contentEquals(tailnetV6)
+    }
+
+    /**
+     * Which connections the link server talks to at all: USB (adb forward arrives on loopback) always; Wi-Fi peers
+     * when "Allow Wi-Fi" is on; Tailscale peers when "Allow Tailscale" is on and both ends are tailnet addresses —
+     * replies to a spoofed 100.x source go back through the tunnel, so a LAN device can't complete the handshake.
+     */
+    fun admit(remote: InetAddress, local: InetAddress, lan: Boolean, tailnet: Boolean): Boolean = when {
+        remote.isLoopbackAddress -> true
+        lan -> true
+        tailnet -> isTailnet(remote) && isTailnet(local)
+        else -> false
+    }
+
     /** BlackLab Desktop: the GitHub Pages site or the local companion page. */
     fun originAllowed(origin: String): Boolean = origin in pages || loopback.matches(origin)
 
@@ -392,7 +447,7 @@ object LinkAccess {
     val usbOnlySettings: Set<String> = setOf(
         com.blacklab.app.core.Keys.APP_LOCK, com.blacklab.app.core.Keys.LOCK_PROFESSIONAL, com.blacklab.app.core.Keys.LOCK_TIMEOUT,
         com.blacklab.app.core.Keys.WIDGET_PRIVACY, com.blacklab.app.core.Keys.SIG_CONFIRM,
-        com.blacklab.app.core.Keys.LINK_ENABLED, com.blacklab.app.core.Keys.LINK_LAN, com.blacklab.app.core.Keys.LINK_PORT,
+        com.blacklab.app.core.Keys.LINK_ENABLED, com.blacklab.app.core.Keys.LINK_LAN, com.blacklab.app.core.Keys.LINK_TAILNET, com.blacklab.app.core.Keys.LINK_PORT,
         com.blacklab.app.core.Keys.CLOUD_SYNC,
     )
 }

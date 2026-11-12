@@ -7,9 +7,9 @@
 **A private, all-in-one personal & professional workspace for Android.**
 Pro camera & photo editor · dictation · audio recorder · Word-class documents · journal · to-do · calendar · education & certification tracking — in one app, with every file saved to a real folder on your phone.
 
-[![Version](https://img.shields.io/badge/version-5.10.0-2BD9A8)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-5.14.0-2BD9A8)](CHANGELOG.md)
 [![Android](https://img.shields.io/badge/Android-15%2B-3DDC84?logo=android&logoColor=white)](#requirements)
-[![Kotlin](https://img.shields.io/badge/Kotlin-2.1-7F52FF?logo=kotlin&logoColor=white)](https://kotlinlang.org)
+[![Kotlin](https://img.shields.io/badge/Kotlin-2.4-7F52FF?logo=kotlin&logoColor=white)](https://kotlinlang.org)
 [![Jetpack Compose](https://img.shields.io/badge/Jetpack%20Compose-Material%203-4285F4?logo=jetpackcompose&logoColor=white)](https://developer.android.com/compose)
 [![Android CI](https://github.com/paulmmoore3416/BlackLab/actions/workflows/android.yml/badge.svg)](https://github.com/paulmmoore3416/BlackLab/actions/workflows/android.yml)
 
@@ -97,7 +97,10 @@ An encrypted workspace for working on a behavioral health unit, using initials a
 
 ### 🖥️ BlackLab Desktop
 - **`./daddyshome`** wakes the desktop brain: starts Ollama, loads and pins your desktop assistant model, starts the companion and links the phone both ways. The phone's assistant then **thinks with your computer's local AI** whenever it's linked (USB or Wireless debugging) and falls back to Gemini Nano when it isn't. See [docs/DESKTOP_AI.md](docs/DESKTOP_AI.md)
-- Dashboard, assistant and **detailed settings for every section**, synced live with the phone over USB or Wi-Fi, or through your Google Drive's hidden app folder
+- Dashboard, assistant and **detailed settings for every section**, synced live with the phone over USB, Wi-Fi or **Tailscale**, or through your Google Drive's hidden app folder. A change on the phone reaches the desktop within seconds, and only the sections that changed are sent (5.14)
+- **Stays on until you say stop** (5.14): after `./daddyshome` the model stays loaded through reboots, Ollama restarts and Night Mining; `./daddyshome --stop` lets it unload
+- **From anywhere over Tailscale** (5.14): turn on *Allow Tailscale* on the phone and the desktop connects over your own encrypted tailnet; `./daddyshome` also gives the phone's assistant your computer's AI away from home. Only your tailnet's devices are let in, and only the phone API is offered there (never Tailscale Funnel)
+- **Continuous vault sync with Syncthing** (optional, 5.14): `scripts/syncthing-setup.sh` syncs the Obsidian vault with the phone as you edit, over the tailnet only (no discovery servers, relays or reporting), with the same privacy boundary as the USB sync
 - Same glass look, palettes and light styles as the phone; an **Appearance** page that sets them on the phone; a printable **Behavioral Health** reference (crisis lines, de-escalation, group library, safety-round sheets)
 - Run it locally (`desktop/install.sh`) or open **https://paulmmoore3416.github.io/BlackLab/** and sign in with Google
 - Local companion with an offline desktop assistant (Ollama) for desktop tasks
@@ -263,7 +266,7 @@ From 4.3.0 on, BlackLab can update itself: **Settings › App updates › Check 
 
 ## Build from source
 
-Requirements: **JDK 17+** (21 recommended) and the **Android SDK** (platform 36).
+Requirements: **JDK 17+** (21 recommended) and the **Android SDK** (platform 37; the Gradle 9 wrapper and AGP 9 install what's missing).
 
 ```bash
 git clone https://github.com/paulmmoore3416/BlackLab.git
@@ -290,10 +293,15 @@ keyPassword=…
 ```bash
 ./gradlew :app:testDebugUnitTest            # JVM unit tests
 ./gradlew :app:connectedDebugAndroidTest    # on-device tests (emulator or phone)
+node --test desktop/web/tests/views.test.mjs desktop/obsidian/blacklab-graph-fx/graph_fx.test.mjs   # desktop UI + Obsidian plugin
+python3 -m unittest discover -s desktop/companion/tests                                             # desktop companion
 scripts/secret-scan.sh                      # fails if a key, token or keystore is tracked
+scripts/privacy-scan.sh                     # fails on personal data (plus your private denylist)
 ```
 
-CI runs the secret scan, unit tests, both builds and the on-device tests on an Android 15 emulator for every push and pull request. The on-device tests cover the database upgrade, pictures on pages and every export format, notebook import, voice recording, location reminders, the widgets, update verification, the crash log, the PDF tools, encrypted signatures and signing, filling and signing a real PDF form, and every Android Auto screen against the Car App Library's template rules. Unit tests cover the knowledge bases (format and retrieval quality), every summary style, and the Garage schedule, MPG and voice parsing.
+**Phone ⇄ desktop contract.** `SnapshotContractTest` builds the phone's snapshot from sample data with the app's own code and checks its shape against `desktop/web/tests/snapshot.fixture.json`; the desktop tests render every view against that fixture and fail on any field the desktop reads that the phone doesn't send. Change the snapshot on purpose → regenerate with `BL_EXPORT=1 ./gradlew :app:testDebugUnitTest --tests com.blacklab.app.link.SnapshotContractTest`.
+
+CI runs the secret and privacy scans, the desktop and companion tests, unit tests, both builds and the on-device tests on an Android 15 emulator for every push and pull request. The on-device tests cover the database upgrade, pictures on pages and every export format, notebook import, voice recording, location reminders, the widgets, update verification, the crash log, the PDF tools, encrypted signatures and signing, filling and signing a real PDF form, and every Android Auto screen against the Car App Library's template rules. Unit tests cover the knowledge bases (format and retrieval quality), every summary style, and the Garage schedule, MPG and voice parsing.
 
 ### Publishing a release
 
@@ -303,9 +311,10 @@ Attach `BlackLab-vX.Y.Z.apk` and `BlackLab-vX.Y.Z.apk.sha256` (the output of `sh
 
 | Area | Technology |
 |---|---|
-| Language / UI | Kotlin 2.1, Jetpack Compose, Material 3 |
+| Language / UI | Kotlin 2.4, Jetpack Compose, Material 3 |
+| Build | Gradle 9.8, Android Gradle Plugin 9.5 (built-in Kotlin), KSP, R8, Baseline Profiles |
 | Persistence | Room (SQLite), SharedPreferences, plain files in the BlackLab folder |
-| Camera | CameraX 1.4 (core, video, extensions) |
+| Camera | CameraX 1.6 (core, video, extensions) |
 | Audio | AudioRecord, MediaCodec AAC + MediaMuxer, audio effects, SpeechRecognizer |
 | Media | Media3 ExoPlayer, Session (background music), Transformer + Effect (video editing) |
 | PDF | Platform `PdfRenderer` for display, PdfBox-Android for editing, forms, encryption and text |
@@ -314,9 +323,10 @@ Attach `BlackLab-vX.Y.Z.apk` and `BlackLab-vX.Y.Z.apk.sha256` (the output of `sh
 | Reminders | Exact alarms (single self-rescheduling alarm), notifications with actions |
 | Security | AndroidX Biometric; AES-256-GCM + PBKDF2 for locked notebook sections |
 | Notebooks | WebView canvas engine (text boxes, SVG ink, lasso), ZXing QR codes, local Live Share server |
-| Widgets | Jetpack Glance 1.1 (app widgets) |
+| Widgets | Jetpack Glance 1.2 (app widgets) |
 | Updates | GitHub Releases API, SHA-256 + signing-certificate verification, `PackageInstaller` sessions |
-| Testing | JUnit, AndroidX Test, Room `MigrationTestHelper`, GitHub Actions with an emulator |
+| Desktop link | HTTP/1.1 JSON API on the phone (USB, Wi-Fi, Tailscale), per-section change tracking + long-poll, Google Drive app folder |
+| Testing | JUnit, AndroidX Test, Room `MigrationTestHelper`, Node `node:test`, Python `unittest`, GitHub Actions with an emulator |
 
 See **[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)** for the design.
 
@@ -330,7 +340,7 @@ app/src/main/java/com/blacklab/app/
 ├── core/        Profiles, settings + schema, storage, time & recurrence, backups, crash log,
 │                encrypted signatures, form auto-fill, activity feed, auto theme, intent guard
 ├── data/        Room entities/DAOs, calendar logic, task ops, grades, SRS
-├── link/        Desktop link server, data snapshot, Google Drive cloud sync
+├── link/        Desktop link server (USB/Wi-Fi/Tailscale), snapshot + per-section changes, Google Drive cloud sync
 ├── docs/        HTML ⇄ blocks model, DOCX writer/reader, PDF writer, Markdown
 ├── files/       File types, PDF tools, spreadsheet engine, Office/EPUB readers, ZIP
 ├── media/       Music service & library, audio editor engine, video export
@@ -343,8 +353,10 @@ app/src/main/java/com/blacklab/app/
                  editor, journal, tasks, schedule, education, settings, onboarding, assistant,
                  brainstorm, signature, theme palettes)
 desktop/
-├── web/         BlackLab Desktop UI (also published to GitHub Pages)
-└── companion/   Local companion: serves the UI, USB link, offline desktop assistant
+├── web/         BlackLab Desktop UI (also published to GitHub Pages); tests/ = view + contract tests
+├── companion/   Local companion: serves the UI, USB + Tailscale link, offline desktop assistant, vault, keep-warm
+└── obsidian/    BlackLab's Obsidian graph plugin
+scripts/         release, secret + privacy scans, Syncthing setup
 ```
 
 ## Privacy & security
@@ -356,6 +368,8 @@ BlackLab has no backend and collects no analytics of its own — documents, reco
 **Signatures & form details:** saved signatures are encrypted with a key held in the phone's Android Keystore, kept out of backups and sync, and placed only after a fingerprint check (by default). Contact details for forms stay on the phone. The automatic theme uses the last known location rounded to ~10 km, computed on the phone.
 
 **Updates & problem reports:** the update check is a single anonymous request to GitHub's public API, made only when you tap *Check now* or turn on the weekly check. Problem reports stay in the app's private storage (not in backups) until you share them.
+
+**Phone ⇄ desktop links:** USB is the default and the only way to change security settings, read files, write keys or make backups. Wi-Fi is plain HTTP on your network, protected by the pairing code. Tailscale traffic is WireGuard-encrypted and admitted only when both ends are tailnet addresses; on the computer, the Tailscale listener offers the phone API alone and is never exposed through Funnel. Optional Syncthing vault sync listens only on the tailnet with discovery, relays, NAT traversal and reporting off.
 
 Signing keys, passwords and machine-specific files are excluded from this repository by `.gitignore`. See [SECURITY.md](SECURITY.md).
 

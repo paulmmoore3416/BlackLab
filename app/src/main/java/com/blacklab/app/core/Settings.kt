@@ -152,6 +152,8 @@ data class Settings(
     // desktop link & cloud sync
     val linkEnabled: Boolean = false,
     val linkLan: Boolean = false,
+    /** Accept the desktop over Tailscale (both ends on the tailnet; WireGuard-encrypted). */
+    val linkTailnet: Boolean = false,
     val linkPort: Int = 8765,
     val cloudSync: Boolean = false,
     val cloudSyncMinutes: Int = 15,
@@ -337,6 +339,7 @@ object Keys {
     const val CAR_BRIEF_ON_START = "car_brief_on_start"
     const val LINK_ENABLED = "link_enabled"
     const val LINK_LAN = "link_lan"
+    const val LINK_TAILNET = "link_tailnet"
     const val LINK_PORT = "link_port"
     const val CLOUD_SYNC = "cloud_sync"
     const val CLOUD_SYNC_MIN = "cloud_sync_min"
@@ -518,6 +521,7 @@ class SettingsRepository(context: Context) {
             carBriefOnStart = getBoolean(Keys.CAR_BRIEF_ON_START, d.carBriefOnStart),
             linkEnabled = getBoolean(Keys.LINK_ENABLED, d.linkEnabled),
             linkLan = getBoolean(Keys.LINK_LAN, d.linkLan),
+            linkTailnet = getBoolean(Keys.LINK_TAILNET, d.linkTailnet),
             linkPort = getInt(Keys.LINK_PORT, d.linkPort),
             cloudSync = getBoolean(Keys.CLOUD_SYNC, d.cloudSync),
             cloudSyncMinutes = getInt(Keys.CLOUD_SYNC_MIN, d.cloudSyncMinutes),

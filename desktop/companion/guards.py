@@ -11,6 +11,7 @@ Pure functions only — no server state — so every rule can be checked without
 from __future__ import annotations
 
 import hmac
+import ipaddress
 import os
 import re
 import urllib.parse
@@ -27,6 +28,31 @@ def allowed_hosts(host: str, port: int) -> set[str]:
     # A web page can point its own domain at 127.0.0.1 ("DNS rebinding") and then talk to this port as if it
     # were same-origin. Browsers always send the name they used in Host, so only accept ours.
     return {f"{host}:{port}", f"localhost:{port}"}
+
+
+TAILNET_V4 = ipaddress.ip_network("100.64.0.0/10")
+TAILNET_V6 = ipaddress.ip_network("fd7a:115c:a1e0::/48")
+
+
+def tailnet_peer(addr: str | None) -> bool:
+    """True for Tailscale addresses (CGNAT 100.64.0.0/10 and Tailscale's IPv6 prefix): WireGuard-authenticated peers."""
+    try:
+        ip = ipaddress.ip_address((addr or "").split("%")[0])
+    except ValueError:
+        return False
+    return ip in (TAILNET_V4 if ip.version == 4 else TAILNET_V6)
+
+
+def tailnet_request_ok(client: str | None, path: str) -> bool:
+    """The Tailscale listener: a tailnet peer, asking for the phone API (/phone/<name>) and nothing else."""
+    p = (path or "").split("?", 1)[0]
+    return tailnet_peer(client) and re.fullmatch(r"/phone/[a-z_]+(?:/[a-z_]+)?", p) is not None
+
+
+def tailscale_ipv4(cli_output: str) -> str | None:
+    """This computer's tailnet address from `tailscale ip -4`; None unless it really is one."""
+    first = (cli_output or "").strip().splitlines()[:1]
+    return first[0].strip() if first and tailnet_peer(first[0].strip()) and "." in first[0] else None
 
 
 def ui_request_ok(host_header: str | None, origin: str | None, pair_header: str | None, hosts: set[str], origins: set[str]) -> bool:

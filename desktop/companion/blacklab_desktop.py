@@ -51,7 +51,7 @@ import reverse  # noqa: E402  (reverse engineering with REA + Ghidra, read-only 
 import vault as vaultlib  # noqa: E402  (the Obsidian vault: notes, timeline, AI registry, git)
 import audit  # noqa: E402  (the hash-chained activity ledger — unit tested)
 
-VERSION = "1.7.0"
+VERSION = "1.8.0"
 HOST, PORT = "127.0.0.1", int(os.environ.get("BLACKLAB_DESKTOP_PORT", "8770"))
 HOME = Path.home()
 WEB_DIR = Path(__file__).resolve().parent.parent / "web"
@@ -1565,6 +1565,7 @@ class Handler(SimpleHTTPRequestHandler):
                 models = ollama_models()
                 return self.reply(200, {"companion": True, "version": VERSION, "adb": adb_devices(), "ollama": models, "model": default_model(models),
                                         "phone_ai": {"paired_recently": time.time() - PHONE["last_seen"] < 600, "last_seen": PHONE["last_seen"], "phone": PHONE["model"]},
+                                        "keep_warm": dict(KEEP_WARM), "tailnet": dict(TAILNET),
                                         "eleven": bool(SECRETS.get("elevenlabs")), "devdocs": bool(SECRETS.get("developer_knowledge")), "out": str(DOWNLOADS_DIR),
                                         "folders": {"ai": str(AI_DIR), "downloads": str(DOWNLOADS_DIR), "documents": str(DOCS_DIR),
                                                     "chat_history": str(CHAT_DIR) if CONFIG.get("chat_history", True) is not False else None},
@@ -2050,6 +2051,8 @@ def phone_vault_pass(serial: str, force=False):
     """Mirror the Obsidian vault to the phone (Documents/BlackLab) and bring back notes edited there."""
     if not VAULT_ON or CONFIG.get("phone_vault", True) is False:
         return
+    if CONFIG.get("vault_sync") == "syncthing":  # scripts/syncthing-setup.sh: Syncthing over Tailscale does it continuously
+        return
     if not force and time.time() - PHONE_VAULT["at"] < int(CONFIG.get("phone_vault_every_s", 300)):
         return
     import phone_vault
@@ -2098,12 +2101,89 @@ def migrate_old_folders():
         print(f"moved {_home_rel(old)} → {_home_rel(new)}", flush=True)
 
 
+class TailnetHandler(Handler):
+    """The Tailscale listener: only tailnet peers, only the phone API (/phone/*, which also needs the shared key).
+    Everything else — the desktop UI, /local/*, /api/* — answers 404 here. This is never put on Tailscale Funnel."""
+
+    def _tailnet_ok(self) -> bool:
+        if guards.tailnet_request_ok(self.client_address[0], self.path):
+            return True
+        self.send_response(404)
+        self.send_header("Content-Length", "0")
+        self.end_headers()
+        return False
+
+    def do_GET(self):
+        if self._tailnet_ok():
+            super().do_GET()
+
+    def do_POST(self):
+        if self._tailnet_ok():
+            super().do_POST()
+
+    def do_HEAD(self):
+        self._tailnet_ok() and super().do_HEAD()
+
+    def do_OPTIONS(self):
+        self._tailnet_ok() and super().do_OPTIONS()
+
+
+TAILNET = {"url": "", "note": ""}
+
+
+def tailnet_keeper():
+    """config.json "tailnet": true — serve the phone API on this computer's Tailscale address too, so the phone's
+    assistant reaches the desktop AI away from home. Waits for Tailscale to come up after a reboot."""
+    while CONFIG.get("tailnet"):
+        try:
+            out = subprocess.run(["tailscale", "ip", "-4"], capture_output=True, text=True, timeout=5).stdout
+        except Exception:  # noqa: BLE001 — Tailscale not installed
+            out = ""
+        ip = guards.tailscale_ipv4(out)
+        if ip:
+            try:
+                srv = ThreadingHTTPServer((ip, PORT), TailnetHandler)
+            except OSError as e:
+                TAILNET.update(note=f"couldn't listen on {ip}:{PORT}: {e}")
+            else:
+                ALLOWED_HOSTS.add(f"{ip}:{PORT}")
+                TAILNET.update(url=f"http://{ip}:{PORT}", note="phone API only")
+                print(f"tailnet: phone API on http://{ip}:{PORT}", flush=True)
+                srv.serve_forever()
+        else:
+            TAILNET.update(note="waiting for Tailscale")
+        time.sleep(60)
+
+
+KEEP_WARM = {"last": "", "at": 0}
+
+
+def keep_warm_keeper():
+    """Keeps the assistant's model loaded while ./daddyshome has pinned it (see keep_warm.py)."""
+    import keep_warm
+    while True:
+        try:
+            # ./daddyshome --stop edits config.json without restarting us: follow the file, not the copy from startup
+            cfg = load_json(CONFIG_DIR / "config.json", {})
+            CONFIG["keep_alive"] = cfg.get("keep_alive", "30m")
+            r = keep_warm.pass_once(cfg, lambda u, b=None, timeout=30: http_json(u, b, timeout=timeout), agents.mining_active,
+                                    OLLAMA, cfg.get("model") or "qwen3:8b", num_ctx())
+            if r != KEEP_WARM["last"] and r not in ("ok", "off"):
+                print(f"keep-warm: {r}", flush=True)
+            KEEP_WARM.update(last=r, at=int(time.time()))
+        except Exception as e:  # noqa: BLE001 — never let this thread die
+            KEEP_WARM.update(last=f"error: {e}", at=int(time.time()))
+        time.sleep(60)
+
+
 def main():
     migrate_old_folders()
     _private_dir(AI_DIR, DOWNLOADS_DIR, DOCS_DIR, CHAT_DIR, TASK_LOG_DIR)
     ensure_phone_token()
     threading.Thread(target=keep_usb_link, daemon=True).start()
     threading.Thread(target=memory_keeper, daemon=True).start()
+    threading.Thread(target=keep_warm_keeper, daemon=True, name="keep-warm").start()
+    threading.Thread(target=tailnet_keeper, daemon=True, name="tailnet").start()
     if VAULT_ON:
         threading.Thread(target=vault_keeper, daemon=True, name="vault").start()
         if CONFIG.get("atlas", True) is not False:

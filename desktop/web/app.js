@@ -105,7 +105,9 @@ const Phone = {
     while (S.mode === 'phone') {
       try {
         const r = await this.req(`/api/changes?since=${S.rev}&wait=25`);
-        if (r.rev > S.rev) { S.rev = r.rev; await loadFromPhone(); }
+        const plan = syncPlan(r, S.rev, S.snap);
+        if (plan.kind === 'full') { await loadFromPhone(); S.rev = r.rev; }
+        else if (plan.kind === 'partial') { await loadChanged(plan.sections); S.rev = r.rev; }
       } catch {
         await sleep(2500);
         if (!(await this.ping())) { setMode(S.google.token ? 'cloud' : 'offline'); toast('Phone link lost'); break; }
@@ -118,7 +120,30 @@ const Phone = {
 async function loadFromPhone() {
   const [values, snap] = await Promise.all([Phone.req('/api/settings'), Phone.req('/api/snapshot')]);
   if (!S.schema || !S.schemaFresh) { S.schema = (await Phone.req('/api/schema')).sections; S.schemaFresh = true; }
-  S.values = values; S.snap = snap; S.rev = Math.max(S.rev, snap.info?.rev || 0); S.lastSync = Date.now();
+  // the phone's rev, not the higher of the two: after the phone app restarts its rev can be lower than ours
+  S.values = values; S.snap = snap; S.rev = snap.info?.rev ?? S.rev; S.lastSync = Date.now();
+  persist(); render(true);
+}
+
+/**
+ * What to fetch after /api/changes answers. BlackLab 5.14+ says which sections changed, so only those
+ * are rebuilt and sent; older phones (no `changed`), a rev from before the phone app started
+ * (`changed: null`), a phone rev lower than ours (it restarted) or an empty cache mean a full reload.
+ */
+function syncPlan(r, rev, snap) {
+  if (r.rev === rev) return { kind: 'none' };
+  if (!snap || !Array.isArray(r.changed) || r.rev < rev) return { kind: 'full' };
+  return r.changed.length ? { kind: 'partial', sections: r.changed } : { kind: 'none' };
+}
+
+/** Fetches just the changed sections (and settings values when they changed) and merges them in. */
+async function loadChanged(sections) {
+  const snapKeys = sections.filter((k) => k !== 'settings');
+  const jobs = [];
+  if (sections.includes('settings')) jobs.push(Phone.req('/api/settings').then((v) => { S.values = v; }));
+  if (snapKeys.length) jobs.push(Phone.req('/api/snapshot?sections=' + encodeURIComponent(snapKeys.join(','))).then((part) => { S.snap = Object.assign({}, S.snap, part); }));
+  await Promise.all(jobs);
+  S.lastSync = Date.now();
   persist(); render(true);
 }
 
@@ -139,9 +164,18 @@ async function connectPhone(silent) {
   } catch (e) { if (!silent) toast(e.message); return false; }
 }
 
+// A Web OAuth client ID looks like 123456789012-abc….apps.googleusercontent.com. API keys (AIza…) are a
+// different credential: Google Identity Services rejects them, so sign-in and cloud sync would silently never work.
+const CLIENT_ID_RE = /^\d+-[a-z0-9]+\.apps\.googleusercontent\.com$/i;
+function clientIdProblem(v) {
+  if (!v || CLIENT_ID_RE.test(v)) return '';
+  return /^AIza/.test(v) ? 'That is an API key, not an OAuth client ID. Create a Web application OAuth client (steps above) and paste its client ID — it ends in .apps.googleusercontent.com.'
+    : 'That doesn’t look like an OAuth client ID — it should end in .apps.googleusercontent.com.';
+}
 const Cloud = {
   client: null,
-  get clientId() { return LS.get('googleClientId', '') || CFG.googleClientId || ''; },
+  get savedClientId() { return LS.get('googleClientId', '') || CFG.googleClientId || ''; },
+  get clientId() { const v = this.savedClientId; return clientIdProblem(v) ? '' : v; },
   get valid() { return !!S.google.token && Date.now() < S.google.exp; },
   init() {
     if (!window.google?.accounts?.oauth2 || !this.clientId) return false;
@@ -152,7 +186,7 @@ const Cloud = {
     return true;
   },
   signIn(prompt = '') {
-    if (!this.clientId) { go('connect'); toast('Add your Google OAuth client ID under Connect first'); return; }
+    if (!this.clientId) { go('connect'); toast(clientIdProblem(this.savedClientId) || 'Add your Google OAuth client ID under Connect first', 7000); return; }
     if (!this.client && !this.init()) { toast('Google sign-in is still loading — try again in a second'); return; }
     this.client.requestAccessToken({ prompt, login_hint: S.google.email || undefined });
   },
@@ -394,6 +428,7 @@ async function speak(text) {
 // ------------------------------------------------------------------ navigation
 const NAV = [
   { id: 'dashboard', label: 'Dashboard', ico: '◧' },
+  { id: 'timeline', label: 'Timeline', ico: '◷' },
   { id: 'assistant', label: 'Assistant', ico: '✦' },
   { id: 'tasks', label: 'To-Do', ico: '✓' },
   { id: 'calendar', label: 'Schedule', ico: '▦' },
@@ -406,9 +441,11 @@ const NAV = [
   { id: 'media', label: 'Recordings', ico: '◉' },
   { id: 'files', label: 'Phone files', ico: '▤' },
   { id: 'bh', label: 'Behavioral Health', ico: '✚' },
+  { id: 'facility', label: 'Facility', ico: '⌸' },
   { id: 'garage', label: 'Garage', ico: '⛭' },
   { id: 'vault', label: 'Obsidian vault', ico: '◈' },
   { sep: true },
+  { id: 'health', label: 'Health', ico: '♡' },
   { id: 'appearance', label: 'Appearance', ico: '◐' },
   { id: 'settings', label: 'Settings', ico: '⚙' },
   { id: 'desktop', label: 'Desktop tools', ico: '⌂' },
@@ -472,6 +509,8 @@ Views.dashboard = () => {
       ${i.weather ? `<div class="tile"><span class="k">Weather${i.weather.place ? ' · ' + esc(i.weather.place) : ''}</span><span class="v">${Math.round(i.weather.temp)}°</span><span class="s">${esc(i.weather.condition)} · H ${Math.round(i.weather.high)}° L ${Math.round(i.weather.low)}°${(i.weather.alerts || []).length ? ` · <span style="color:var(--warn)">⚠ ${esc(i.weather.alerts[0].title)}</span>` : ''}</span></div>` : ''}
       ${S.snap?.vehicle && !S.snap.vehicle.error ? (() => { const c = S.snap.vehicle; const n = (c.due || []).find((d) => d.status === 'OVERDUE' || d.status === 'DUE_SOON') || (c.due || []).find((d) => d.status === 'OK'); const f = (c.live || []).find((m) => m.key === 'fuel_pct');
         return `<a class="tile" href="#/garage" style="text-decoration:none;color:inherit"><span class="k">Car</span><span class="v" style="font-size:20px">${c.odometerEstimated ? '≈ ' : ''}${mi(c.odometer)} mi</span><span class="s">${f ? esc(f.value) + ' fuel · ' : ''}${n ? esc(n.name) + ' ' + esc(n.text) : 'nothing due'}</span></a>`; })() : ''}
+      ${S.snap?.facility ? (() => { const c = S.snap.facility.counts || {}; return `<a class="tile" href="#/facility" style="text-decoration:none;color:inherit"><span class="k">Facility</span><span class="v" style="${c.overdue ? 'color:var(--danger)' : ''}">${c.overdue || 0}</span><span class="s">overdue · ${c.dueSoon || 0} due soon · ${(S.snap.tasks || []).filter((t) => !t.completed && isWorkOrder(t)).length} open WOs</span></a>`; })() : ''}
+      ${S.snap?.health ? `<a class="tile" href="#/health" style="text-decoration:none;color:inherit"><span class="k">Health</span><span class="v" style="font-size:20px">${esc(S.snap.health.summary)}</span><span class="s">${(S.snap.health.checks || []).length} checks on the phone</span></a>` : ''}
       <div class="tile"><span class="k">Assistant</span><span class="v" style="font-size:20px">${esc(i.assistant?.name || 'BlackLab')}</span><span class="s">${i.assistant?.nano === 'AVAILABLE' ? 'Gemini Nano ready' : 'Rules engine'} · voice ${i.assistant ? (i.assistant.elevenCharsUsed || 0) + '/' + (i.assistant.elevenBudget || 0) : '—'}</span></div>
     </div>
     ${whatsNew()}
@@ -531,6 +570,87 @@ function bindTaskChecks() {
     } catch (e) { toast(e.message); }
   });
 }
+
+// ---------------- facility, timeline, health (from the phone's snapshot — BlackLab 5.13.1+)
+function olderPhone(section, name) {
+  if (!S.snap || S.snap[section]) return '';
+  return `<div class="notice">The phone didn't send ${name}. Update the phone to BlackLab 5.13.1 or later, then reconnect.</div>`;
+}
+const statusChip = (st) => st === 'OVERDUE' ? '<span class="chip danger">Overdue</span>' : st === 'DUE_SOON' ? '<span class="chip warn">Due soon</span>' : '<span class="chip">OK</span>';
+// Same rule as the phone's DayTimeline.isWorkOrder.
+const isWorkOrder = (t) => /work-?order/i.test(t.tags || '') || /^WO[ :]/.test(t.title || '');
+
+Views.facility = () => {
+  const f = S.snap?.facility;
+  if (!f) return `<div class="view-inner"><div class="hero"><div><h1>Facility</h1></div></div>${needData()}${olderPhone('facility', 'facility data')}</div>`;
+  const c = f.counts || {};
+  const q = (S.ui.facQ || '').toLowerCase();
+  const kind = S.ui.facKind || '';
+  const kinds = [...new Set((f.assets || []).map((a) => a.kind))].sort();
+  const assets = (f.assets || []).filter((a) => (!kind || a.kind === kind) && (!q || [a.name, a.tag, a.location, a.make, a.model, a.serial].join(' ').toLowerCase().includes(q)));
+  const attention = (f.due || []).filter((d) => d.status !== 'OK');
+  const upcoming = (f.due || []).filter((d) => d.status === 'OK').slice(0, 8);
+  const wos = (S.snap.tasks || []).filter((t) => !t.completed && isWorkOrder(t)).sort((a, b) => (b.priority - a.priority) || ((a.dueDay ?? Infinity) - (b.dueDay ?? Infinity)));
+  const worst = (a) => (a.pms || []).reduce((w, p) => (p.status === 'OVERDUE' ? 'OVERDUE' : w === 'OVERDUE' ? w : p.status === 'DUE_SOON' ? 'DUE_SOON' : w), 'OK');
+  const next = (a) => (a.pms || []).slice().sort((x, y) => x.due - y.due)[0];
+  return `<div class="view-inner">
+    <div class="hero"><div><h1>Facility</h1><div class="muted">${esc(f.site || 'Assets, inspections and work orders from the phone')}</div></div></div>
+    ${needData()}
+    <div class="grid g4" style="margin-bottom:16px;grid-template-columns:repeat(auto-fit,minmax(170px,1fr))">
+      <div class="tile"><span class="k">Assets</span><span class="v">${c.assets || 0}</span><span class="s">${kinds.length} kind${kinds.length === 1 ? '' : 's'}</span></div>
+      <div class="tile"><span class="k">Overdue</span><span class="v" style="${c.overdue ? 'color:var(--danger)' : ''}">${c.overdue || 0}</span><span class="s">inspections / PMs</span></div>
+      <div class="tile"><span class="k">Due soon</span><span class="v" style="${c.dueSoon ? 'color:var(--warn)' : ''}">${c.dueSoon || 0}</span><span class="s">within their warning window</span></div>
+      <div class="tile"><span class="k">Open work orders</span><span class="v">${wos.length}</span><span class="s">${c.fails30 || 0} failed check${c.fails30 === 1 ? '' : 's'} in 30 days</span></div>
+    </div>
+    <div class="grid g2">
+      <div class="card"><h2>Needs attention</h2>${attention.length ? `<ul class="list">${attention.map((d) => `<li><span class="t">${esc(d.pm)}<br><span class="muted small">${esc(d.asset)}${d.standard ? ' · ' + esc(d.standard) : ''} — ${esc(d.text)}</span></span><span class="meta">${fmtDate(d.due, { month: 'short', day: 'numeric' })}</span>${statusChip(d.status)}</li>`).join('')}</ul>` : '<div class="empty">Every inspection is current.</div>'}
+        ${upcoming.length ? `<h3 class="small muted" style="margin:12px 0 4px">Coming up</h3><ul class="list">${upcoming.map((d) => `<li><span class="t">${esc(d.pm)} <span class="muted">· ${esc(d.asset)}</span></span><span class="meta">${esc(d.text)}</span></li>`).join('')}</ul>` : ''}</div>
+      <div class="card"><h2>Open work orders<span class="spacer"></span><a href="#/tasks" class="small">To-Do →</a></h2>${wos.length ? `<ul class="list">${wos.slice(0, 15).map((t) => `<li><span class="t">${esc(t.title)}${t.notes ? `<br><span class="muted small">${esc(t.notes.slice(0, 140))}</span>` : ''}</span>${t.overdue ? '<span class="chip danger">overdue</span>' : t.dueDay ? `<span class="meta">${relDay(t.dueDay)}</span>` : ''}</li>`).join('')}</ul>` : '<div class="empty">No open work orders. Say “work order: …” to the assistant to add one.</div>'}</div>
+      <div class="card span2"><h2>Assets<span class="spacer"></span>
+          <select id="facKind" title="Kind" style="font-size:14px;font-weight:400"><option value="">All kinds</option>${kinds.map((k) => `<option ${k === kind ? 'selected' : ''}>${esc(k)}</option>`).join('')}</select>
+          <input id="facQ" placeholder="Search name, tag, location…" value="${esc(S.ui.facQ || '')}" style="margin-left:8px;width:220px;font-size:14px;font-weight:400"></h2>
+        ${assets.length ? `<div class="table-wrap"><table class="tbl"><thead><tr><th>Asset</th><th>Kind</th><th>Tag</th><th>Location</th><th>Next</th><th>Status</th></tr></thead><tbody>
+          ${assets.map((a) => { const n = next(a); return `<tr><td>${esc(a.name)}${a.make || a.model ? `<br><span class="muted small">${esc([a.make, a.model].filter(Boolean).join(' '))}${a.serial ? ' · S/N ' + esc(a.serial) : ''}</span>` : ''}</td><td>${esc(a.kind)}</td><td class="mono">${esc(a.tag)}</td><td>${esc(a.location)}</td>
+            <td>${n ? esc(n.title) + `<br><span class="muted small">${fmtDate(n.due, { month: 'short', day: 'numeric', year: 'numeric' })}</span>` : '<span class="muted">No schedule</span>'}</td><td>${(a.pms || []).length ? statusChip(worst(a)) : ''}</td></tr>`; }).join('')}</tbody></table></div>`
+          : `<div class="empty">${(f.assets || []).length ? 'No assets match.' : 'No assets yet — add them on the phone (Facility).'}</div>`}</div>
+      <div class="card span2"><h2>Log · last 90 days</h2>${(f.log || []).length ? `<div class="table-wrap"><table class="tbl"><thead><tr><th>Day</th><th>Asset</th><th>Kind</th><th>Result</th><th>Notes</th><th>By</th></tr></thead><tbody>
+        ${f.log.slice(0, 60).map((e) => `<tr><td>${fmtDate(e.day, { month: 'short', day: 'numeric' })}</td><td>${esc(e.asset)}${e.pmTitle ? `<br><span class="muted small">${esc(e.pmTitle)}</span>` : ''}</td><td>${esc(e.kindLabel)}</td>
+          <td>${e.result === 'FAIL' ? '<span class="chip danger">Fail</span>' : e.result === 'PASS' ? '<span class="chip">Pass</span>' : e.result === 'NA' ? '<span class="chip">N/A</span>' : ''}</td><td>${esc(e.text)}</td><td>${esc(e.by)}</td></tr>`).join('')}</tbody></table></div>` : '<div class="empty">Nothing logged in the last 90 days.</div>'}</div>
+    </div></div>`;
+};
+Views.facility.bind = () => {
+  const k = $('#facKind'); if (k) k.onchange = () => { S.ui.facKind = k.value; saveUi(); render(); };
+  const q = $('#facQ'); if (q) q.oninput = () => { S.ui.facQ = q.value; saveUi(); const pos = q.selectionStart; render(); const n = $('#facQ'); if (n) { n.focus(); n.setSelectionRange(pos, pos); } };
+};
+
+Views.timeline = () => {
+  const t = S.snap?.timeline;
+  if (!t) return `<div class="view-inner"><div class="hero"><div><h1>Timeline</h1></div></div>${needData()}${olderPhone('timeline', 'the day’s timeline')}</div>`;
+  const items = t.items || [];
+  const stale = S.snap.generatedAt && startOfDay(S.snap.generatedAt) !== startOfDay();
+  return `<div class="view-inner">
+    <div class="hero"><div><h1>Timeline</h1><div class="muted">${fmtDate(new Date(t.day + 'T12:00').getTime(), { weekday: 'long', month: 'long', day: 'numeric' })} · from the phone ${S.snap.generatedAt ? ago(S.snap.generatedAt) : ''}</div></div></div>
+    ${stale ? '<div class="notice" style="margin-bottom:16px">This is an earlier day — reconnect the phone for today’s timeline.</div>' : ''}
+    <div class="grid g2">
+      <div class="card"><h2>The day</h2>${items.length ? `<ul class="list">${items.map((i) => `<li><span class="meta" style="width:74px">${fmtTime(i.time)}</span><span class="t">${esc(i.emoji)} ${esc(i.title)}${i.detail ? `<br><span class="muted small">${esc(i.detail)}</span>` : ''}</span><span class="chip">${esc(i.label)}</span></li>`).join('')}</ul>` : '<div class="empty">Nothing yet today.</div>'}</div>
+      <div class="card"><h2>Ops handoff<span class="spacer"></span><button class="ghost small" id="copyHandoff">Copy</button></h2>
+        <pre id="handoffTxt" style="white-space:pre-wrap;margin:0;font-family:inherit">${esc(t.handoff || '')}</pre>
+        <div class="muted small" style="margin-top:8px">The same handoff the phone builds. It never includes Behavioral Health.</div></div>
+    </div></div>`;
+};
+Views.timeline.bind = () => {
+  const b = $('#copyHandoff'); if (b) b.onclick = async () => { try { await navigator.clipboard.writeText(S.snap.timeline.handoff || ''); toast('Handoff copied'); } catch { toast('Couldn’t copy — select the text instead'); } };
+};
+
+Views.health = () => {
+  const h = S.snap?.health;
+  if (!h) return `<div class="view-inner"><div class="hero"><div><h1>Health</h1></div></div>${needData()}${olderPhone('health', 'its health checks')}</div>`;
+  const tone = { BAD: ['danger', 'Problem'], WARN: ['warn', 'Warning'], INFO: ['pro', 'Note'], OK: ['', 'OK'] };
+  return `<div class="view-inner">
+    <div class="hero"><div><h1>Health</h1><div class="muted">${esc(h.summary)} · checked on the phone ${S.snap.generatedAt ? ago(S.snap.generatedAt) : ''}</div></div></div>
+    <div class="card"><ul class="list">${(h.checks || []).map((c) => `<li><span class="t">${esc(c.title)}<br><span class="muted small">${esc(c.detail)}${c.fix ? ` — on the phone: <b>${esc(c.fix)}</b>` : ''}</span></span><span class="chip ${tone[c.level]?.[0] || ''}">${tone[c.level]?.[1] || esc(c.level)}</span></li>`).join('')}</ul></div>
+  </div>`;
+};
 
 // ---------------- garage (the car, from the phone's snapshot: profile, what's due, fuel, trips, live values, recalls)
 const mi = (n) => (n == null ? '—' : Math.round(n).toLocaleString());
@@ -1220,7 +1340,9 @@ Views.connect = () => {
     <div class="card"><h2>2 · Google account <span class="chip ${S.mode === 'cloud' ? 'pro' : ''}">${S.google.token ? 'signed in' : 'from anywhere'}</span></h2>
       <p class="muted">Signs in with Google and reads the sync file your phone keeps in your Drive's hidden app folder. Settings and assistant commands travel back the same way.</p>
       <div class="row" style="margin:10px 0">${S.google.token ? `<span>${esc(S.google.email)}</span><span class="spacer"></span><button class="ghost" id="gOut">Sign out</button><button class="ghost" id="gLoad">Load now</button>` : '<button id="gIn">Sign in with Google</button>'}</div>
-      <details ${Cloud.clientId ? '' : 'open'}><summary class="small muted">OAuth client ID ${Cloud.clientId ? '(set)' : '(required once)'}</summary>
+      ${phoneCloudNotice()}
+      ${clientIdProblem(Cloud.savedClientId) ? `<div class="notice small" style="margin:10px 0;border-color:var(--danger)"><b style="color:var(--danger)">Saved client ID won't work.</b> ${esc(clientIdProblem(Cloud.savedClientId))}</div>` : ''}
+      <details ${Cloud.clientId ? '' : 'open'}><summary class="small muted">OAuth client ID ${Cloud.clientId ? '(set)' : Cloud.savedClientId ? '(invalid — replace it)' : '(required once)'}</summary>
         <ol class="steps small"><li>Google Cloud Console › APIs &amp; Services › Credentials › <b>Create OAuth client ID › Web application</b> — in the same project as the phone's Android client.</li>
         <li>Authorized JavaScript origins: <code>${esc(location.origin)}</code>${onPages ? '' : ' and <code>https://paulmmoore3416.github.io</code>'}</li>
         <li>Enable the <b>Google Drive API</b>; add yourself as a test user on the OAuth consent screen.</li>
@@ -1236,6 +1358,18 @@ Views.connect = () => {
       <button class="ghost" id="sendKeys" ${S.mode === 'phone' ? '' : 'disabled'}>Send to phone</button></div>
   </div></div>`;
 };
+/** What the phone says about its side of cloud sync (from the snapshot): the web copy only updates when the phone uploads. */
+function phoneCloudNotice() {
+  const c = D.info.cloud; if (!S.snap || !c) return '';
+  const signedIn = !!D.info.google?.account;
+  let msg = '';
+  if (!c.enabled) msg = 'Cloud sync is <b>off</b> on the phone (Settings › Assistant &amp; desktop › Cloud sync), so Drive never gets new data.';
+  else if (!signedIn) msg = 'Cloud sync is on, but the phone <b>isn’t signed in to Google</b>, so nothing reaches Drive. On the phone: Settings › Assistant &amp; desktop › Google account (needs the Android OAuth client in Google Cloud).';
+  else if (c.error) msg = 'The phone’s last cloud sync failed: ' + esc(c.error);
+  else if (c.lastSync) return `<div class="muted small" style="margin:6px 0">Phone uploaded to Drive ${ago(c.lastSync)}${D.info.google.account ? ' as ' + esc(D.info.google.account) : ''}.</div>`;
+  else return '';
+  return `<div class="notice small" style="margin:10px 0;border-color:var(--warn)">${msg}</div>`;
+}
 Views.connect.bind = () => {
   $('#phConn').onclick = async () => {
     LS.set('phoneUrl', $('#phUrl').value.trim() || 'http://127.0.0.1:8765');
@@ -1245,7 +1379,11 @@ Views.connect.bind = () => {
   const gi = $('#gIn'); if (gi) gi.onclick = () => Cloud.signIn('consent');
   const go_ = $('#gOut'); if (go_) go_.onclick = () => Cloud.signOut();
   const gl = $('#gLoad'); if (gl) gl.onclick = () => Cloud.load(true);
-  $('#gSave').onclick = () => { LS.set('googleClientId', $('#gCid').value.trim()); Cloud.client = null; Cloud.init(); renderGsi(); toast('Saved'); };
+  $('#gSave').onclick = () => {
+    const v = $('#gCid').value.trim(); const bad = clientIdProblem(v);
+    if (bad) { toast(bad, 8000); return; }
+    LS.set('googleClientId', v); Cloud.client = null; Cloud.init(); renderGsi(); render(); toast('Saved');
+  };
   $('#sendKeys').onclick = async () => {
     const body = {}; ['elevenlabs', 'developer_knowledge'].forEach((k) => { const v = $('#key-' + k).value.trim(); if (v) body[k] = v; });
     if (!Object.keys(body).length) { toast('Paste a key first'); return; }

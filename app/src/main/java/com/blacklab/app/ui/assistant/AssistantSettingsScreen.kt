@@ -84,7 +84,7 @@ fun AssistantSettingsScreen() {
     var syncing by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) { Nano.refresh() }
-    LaunchedEffect(s.linkEnabled, s.linkLan, s.linkPort) { LinkService.sync(ctx) }
+    LaunchedEffect(s.linkEnabled, s.linkLan, s.linkTailnet, s.linkPort) { LinkService.sync(ctx) }
 
     val signIn = rememberLauncherForActivityResult(ActivityResultContracts.StartIntentSenderForResult()) { r ->
         GoogleAuth.resultFromIntent(ctx, r.data)?.accessToken?.let { t -> scope.launch { GoogleAuth.rememberAccount(app, t); shell.toast("Google connected") } }
@@ -314,15 +314,24 @@ fun AssistantSettingsScreen() {
                     LabeledSwitchRow("Allow Wi-Fi", "Otherwise USB only (adb forward)", s.linkLan, enabled = s.linkEnabled, icon = Icons.Rounded.Wifi) { v ->
                         app.settings.update { putBoolean(Keys.LINK_LAN, v) }
                     }
+                    LabeledSwitchRow("Allow Tailscale", "Encrypted, from anywhere — only your own tailnet", s.linkTailnet, enabled = s.linkEnabled, icon = Icons.Rounded.VpnLock) { v ->
+                        app.settings.update { putBoolean(Keys.LINK_TAILNET, v) }
+                    }
                     Text("Pairing code", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 8.dp, start = 8.dp))
                     Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(start = 8.dp)) {
                         Text(token.chunked(4).joinToString(" "), fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold, fontSize = 26.sp, modifier = Modifier.weight(1f))
                         TextButton(onClick = { token = app.secrets.resetLinkToken(); shell.toast("New code — re-pair BlackLab Desktop") }) { Text("New code") }
                     }
                     val addr = if (s.linkLan) app.link.lanAddress() else null
+                    val tail = if (s.linkTailnet) app.link.tailnetAddress() else null
                     Text(
                         "USB: run BlackLab Desktop (it sets up `adb forward tcp:${s.linkPort}`), then enter the code.\n" +
-                            (addr?.let { "Wi-Fi: http://$it:${s.linkPort}" } ?: "Wi-Fi: turn on “Allow Wi-Fi” to connect without a cable."),
+                            (addr?.let { "Wi-Fi: http://$it:${s.linkPort}" } ?: "Wi-Fi: turn on “Allow Wi-Fi” to connect without a cable.") + "\n" +
+                            when {
+                                tail != null -> "Tailscale: http://$tail:${s.linkPort}"
+                                s.linkTailnet -> "Tailscale: open the Tailscale app and connect."
+                                else -> "Tailscale: turn on “Allow Tailscale” to connect from anywhere over your tailnet."
+                            },
                         style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(8.dp),
                     )
                 }
@@ -356,7 +365,7 @@ fun AssistantSettingsScreen() {
             listOf("assistant", "voice", "knowledge", "google", "sync").forEach { id ->
                 val sec = SettingsSchema.sections.first { it.id == id }
                 item(key = "h-$id") { SectionHeader(sec.title + " · all options") }
-                sec.items.filter { it.key != Keys.LINK_ENABLED && it.key != Keys.LINK_LAN && it.key != Keys.CLOUD_SYNC && it.key != Keys.GOOGLE_ACCOUNT }
+                sec.items.filter { it.key != Keys.LINK_ENABLED && it.key != Keys.LINK_LAN && it.key != Keys.LINK_TAILNET && it.key != Keys.CLOUD_SYNC && it.key != Keys.GOOGLE_ACCOUNT }
                     .forEach { def -> item(key = def.key) { SchemaItem(def) } }
             }
             item { Spacer(Modifier.size(40.dp)) }
