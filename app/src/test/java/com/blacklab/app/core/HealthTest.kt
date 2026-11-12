@@ -32,4 +32,15 @@ class HealthTest {
         listOf("backup", "vault", "desktop", "backup_plain").forEach { id -> assertEquals(id, Health.Level.WARN, c.first { it.id == id }.level) }
         assertEquals("10 days ago", Health.ago(now - 10 * day, now))
     }
+
+    @Test fun cloudSyncWithoutGoogleSignInWarns() {
+        assertTrue(Health.evaluate(inputs()).none { it.id == "cloud" }) // off: no row
+        val c = Health.evaluate(inputs().copy(cloudSyncEnabled = true, googleSignedIn = false)).first { it.id == "cloud" }
+        assertEquals(Health.Level.WARN, c.level)
+        assertTrue(c.detail.contains("signed in to Google"))
+        assertTrue(c.fixRoute != null)
+        assertEquals(Health.Level.WARN, Health.evaluate(inputs().copy(cloudSyncEnabled = true, googleSignedIn = true, cloudError = "Drive 403")).first { it.id == "cloud" }.level)
+        assertEquals(Health.Level.WARN, Health.evaluate(inputs().copy(cloudSyncEnabled = true, googleSignedIn = true, cloudLastSyncAt = now - 2 * day)).first { it.id == "cloud" }.level)
+        assertEquals(Health.Level.OK, Health.evaluate(inputs().copy(cloudSyncEnabled = true, googleSignedIn = true, cloudLastSyncAt = now - 600_000L)).first { it.id == "cloud" }.level)
+    }
 }

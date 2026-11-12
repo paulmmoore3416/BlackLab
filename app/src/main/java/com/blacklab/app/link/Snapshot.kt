@@ -7,7 +7,9 @@ import com.blacklab.app.BuildConfig
 import com.blacklab.app.assistant.Nano
 import com.blacklab.app.assistant.Secrets
 import com.blacklab.app.assistant.toPublicJson
+import com.blacklab.app.core.DayTimeline
 import com.blacklab.app.core.Folder
+import com.blacklab.app.core.Health
 import com.blacklab.app.core.Profile
 import com.blacklab.app.core.Time
 import com.blacklab.app.data.CalendarLogic
@@ -34,6 +36,7 @@ object Snapshot {
             put("assistant", JSONObject().put("name", s.asstName).put("nano", Nano.status.value.name).put("nanoModel", Nano.modelName)
                 .put("elevenCharsUsed", app.speaker.charsUsedThisMonth()).put("elevenBudget", s.asstElevenBudget))
             put("google", JSONObject().put("account", s.googleAccount))
+            put("cloud", JSONObject().put("enabled", s.cloudSync).put("lastSync", CloudSync.lastSync.value).put("error", CloudSync.lastError.value ?: JSONObject.NULL))
             put("keys", JSONObject().apply { Secrets.all.forEach { put(it, app.secrets.has(it)) } })
             put("time", Time.now())
             com.blacklab.app.assistant.Weather.report.value?.let { put("weather", com.blacklab.app.assistant.Weather.toJson(it)) }
@@ -235,6 +238,14 @@ object Snapshot {
             })
             put("backups", JSONArray().apply { app.backups.listBackups().take(14).forEach { put(JSONObject().put("name", it.name).put("size", it.length()).put("time", it.lastModified())) } })
             put("assistant", JSONArray().apply { app.assistant.messages.value.takeLast(60).forEach { put(it.toPublicJson()) } })
+            // Facility, the day's timeline + ops handoff, and Health — so the desktop shows what the phone does.
+            // Each is optional: a failure here never costs the desktop the rest of the snapshot.
+            runCatching { DesktopSections.facility(com.blacklab.app.facility.Facility.load(app.context), todayEpoch) }.onSuccess { put("facility", it) }
+            runCatching {
+                val i = com.blacklab.app.ui.home.DayTimelineData.inputs(app, today)
+                DesktopSections.timeline(today, DayTimeline.build(i), com.blacklab.app.ui.home.DayTimelineData.handoff(app, today))
+            }.onSuccess { put("timeline", it) }
+            runCatching { DesktopSections.health(Health.evaluate(com.blacklab.app.ui.settings.HealthData.gather(app, ensureIndex = false))) }.onSuccess { put("health", it) }
         }
     }
 }

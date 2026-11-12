@@ -2,6 +2,19 @@
 
 All notable changes to BlackLab are documented here. The project follows [Semantic Versioning](https://semver.org/).
 
+## [5.13.1] — 2026-11-10
+
+The phone and BlackLab Desktop show the same things again. The desktop was getting only part of the phone's data: Facility, the day's Timeline and Health never left the phone.
+
+### Fixed
+- **Facility on the desktop.** A new Facility view shows assets, inspections that are overdue or due soon, open work orders and the last 90 days of the log, with search and a filter by kind. The dashboard gets a Facility tile.
+- **Timeline and ops handoff on the desktop.** It shows the same day timeline and handoff text the phone builds, with a Copy button. Behavioral Health stays on the phone: its timeline item, even the counts, is never sent.
+- **Health on the desktop.** It shows the phone's health checks (backups, data files, desktop link, vault, cloud sync, stability, storage, AI) with what to tap on the phone to fix each one.
+- **Cloud sync now says why it isn't working.**
+  - Phone Health has a new *Cloud sync* check. It warns when sync is on but the phone isn't signed in to Google (nothing reaches Drive), when the last sync failed, and when the last sync is more than a day old.
+  - The desktop Connect page shows the phone's side of cloud sync.
+  - It now refuses an API key (`AIza…`) in the OAuth client ID field and says what to paste instead. Google sign-in only accepts a Web application client ID ending in `.apps.googleusercontent.com`.
+
 ## [5.13.0] — 2026-11-10 (companion 1.7.0)
 
 Your whole computer is now part of the living graph, your AI has 283 expert skills, and you can ask your notes questions in plain words.
