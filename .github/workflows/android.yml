@@ -38,6 +38,12 @@ jobs:
       # Standard library only: the safety rules (HTTP, paths, privacy, tool calls) and the Obsidian vault writer
       - name: Unit tests
         run: python3 -m unittest discover -s desktop/companion/tests -v
+      # The runner's own Node (no install step). The views test renders every desktop view against the
+      # snapshot contract the phone build checks (SnapshotContractTest); graph_fx tests the Obsidian plugin.
+      - name: Desktop web + Obsidian plugin tests
+        run: |
+          node --version
+          node --test desktop/web/tests/views.test.mjs desktop/obsidian/blacklab-graph-fx/graph_fx.test.mjs
 
   build:
     name: Build & unit tests

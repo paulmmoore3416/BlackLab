@@ -1,0 +1,587 @@
+{
+  "courses": [{
+    "code": "FM-201",
+    "instructor": "",
+    "color": -13408564,
+    "credits": 3,
+    "kind": "COLLEGE",
+    "profile": "PROFESSIONAL",
+    "finalGrade": "",
+    "id": 1,
+    "title": "Facility Systems",
+    "status": "IN_PROGRESS"
+  }],
+  "assignments": [{
+    "dueAt": 1794592800000,
+    "kind": "Homework",
+    "profile": "PROFESSIONAL",
+    "course": "FM-201",
+    "id": 1,
+    "title": "Case study",
+    "status": "TODO"
+  }],
+  "brainstorm": {
+    "notes": [{
+      "pinned": true,
+      "attachments": 0,
+      "profile": "PERSONAL",
+      "checklist": true,
+      "title": "Groceries",
+      "body": "",
+      "reminderAt": null,
+      "labels": ["home"],
+      "archived": false,
+      "light": "",
+      "dark": "",
+      "id": 1,
+      "items": [{
+        "t": "Milk",
+        "d": false,
+        "i": 0
+      }],
+      "updatedAt": 1794518152216
+    }],
+    "notebooks": [{
+      "emoji": "📓",
+      "color": -16742021,
+      "profile": "PROFESSIONAL",
+      "name": "Projects",
+      "id": 1,
+      "sections": [{
+        "pages": [{
+          "preview": "Phase 1\u2026",
+          "pinned": false,
+          "level": 0,
+          "words": 50,
+          "id": 1,
+          "text": "Phase 1 plan",
+          "title": "Chiller swap",
+          "reminderAt": null,
+          "updatedAt": 1794518152216,
+          "tags": [{
+            "tag": "todo",
+            "text": "Call vendor",
+            "done": false
+          }]
+        }],
+        "color": -9823334,
+        "name": "Plans",
+        "id": 1,
+        "locked": false,
+        "group": ""
+      }],
+      "updatedAt": 1794518152216
+    }]
+  },
+  "documents": [{
+    "preview": "Environment of care\u2026",
+    "path": "Professional/Documents/eoc.md",
+    "pinned": false,
+    "folder": "Plans",
+    "profile": "PROFESSIONAL",
+    "words": 840,
+    "id": 1,
+    "title": "EOC plan",
+    "updatedAt": 1794330000000
+  }],
+  "assistant": [{
+    "role": "assistant",
+    "text": "Good morning",
+    "time": 1794333600000
+  }],
+  "health": {
+    "summary": "1 thing to look at",
+    "checks": [{
+      "fix": "Open backups",
+      "level": "WARN",
+      "id": "backup",
+      "detail": "Last backup 9 days ago",
+      "title": "Backups"
+    }]
+  },
+  "certifications": [{
+    "examAt": 1797573600000,
+    "expiresDay": 1799474400000,
+    "profile": "PROFESSIONAL",
+    "name": "CHFM",
+    "id": 1,
+    "issuer": "AHA",
+    "status": "STUDYING",
+    "ceuRequired": 0
+  }],
+  "vehicle": {
+    "codes": [{
+      "code": "P0420",
+      "kind": "stored",
+      "text": "Catalytic converter efficiency below threshold (bank 1)",
+      "since": 1794160800000
+    }],
+    "recalls": [{
+      "date": "01/02/2026",
+      "summary": "A sample recall summary.",
+      "component": "ELECTRICAL",
+      "campaign": "26V001000",
+      "remedy": "Dealers will fix it.",
+      "parkIt": false,
+      "resolved": false
+    }],
+    "year": 2023,
+    "fuel": [
+      {
+        "cost": 52.5,
+        "gallons": 15,
+        "station": "Station B",
+        "time": 1794247200000,
+        "miles": 12000,
+        "full": true
+      },
+      {
+        "cost": 54,
+        "gallons": 15.5,
+        "station": "Station A",
+        "time": 1793469600000,
+        "miles": 11620,
+        "full": true
+      }
+    ],
+    "odometerAt": 1794247200000,
+    "weekly": [
+      [
+        1787461200000,
+        0,
+        0
+      ],
+      [
+        1788066000000,
+        0,
+        0
+      ],
+      [
+        1788670800000,
+        0,
+        0
+      ],
+      [
+        1789275600000,
+        0,
+        0
+      ],
+      [
+        1789880400000,
+        0,
+        0
+      ],
+      [
+        1790485200000,
+        0,
+        0
+      ],
+      [
+        1791090000000,
+        0,
+        0
+      ],
+      [
+        1791694800000,
+        0,
+        0
+      ],
+      [
+        1792299600000,
+        0,
+        0
+      ],
+      [
+        1792904400000,
+        0,
+        0
+      ],
+      [
+        1793509200000,
+        0,
+        0
+      ],
+      [
+        1794117600000,
+        18.2,
+        0
+      ]
+    ],
+    "recallsCheckedAt": 1794247200000,
+    "specs": [],
+    "trim": "",
+    "mpgSeries": [[
+      1794247200000,
+      25.333333333333332
+    ]],
+    "engine": "2.5L 4-cylinder",
+    "model": "Santa Fe",
+    "vin": "TESTVIN0000000000",
+    "make": "Hyundai",
+    "live": [{
+      "alert": false,
+      "num": 62,
+      "label": "Fuel level",
+      "source": "OBD-II",
+      "time": 1794333600000,
+      "value": "62%",
+      "key": "fuel_pct",
+      "group": "Fuel"
+    }],
+    "fuelStats": {
+      "monthCost": 106.5,
+      "costPerMile": 0.13783433994823124,
+      "avgMpg": 25.333333333333332,
+      "lastMpg": 25.333333333333332
+    },
+    "parked": {
+      "place": "Work lot",
+      "time": 1794326400000
+    },
+    "odometer": 12000,
+    "totals": {
+      "week": {
+        "business": 18.2,
+        "trips": 1,
+        "deductible": 12.739999999999998,
+        "miles": 18.2
+      },
+      "month": {
+        "business": 18.2,
+        "trips": 1,
+        "deductible": 12.739999999999998,
+        "miles": 18.2
+      },
+      "year": {
+        "business": 18.2,
+        "trips": 1,
+        "deductible": 12.739999999999998,
+        "miles": 18.2
+      }
+    },
+    "tankGallons": 18.8,
+    "pendingFill": {
+      "gallons": 14.1,
+      "from": 20,
+      "to": 95,
+      "time": 1794330000000
+    },
+    "odometerEstimated": false,
+    "milesPerDay": 32,
+    "due": [
+      {
+        "milesLeft": 3000,
+        "expected": 1802584800000,
+        "name": "Cabin air filter",
+        "text": "in 3,000 mi (around Feb 14)",
+        "status": "OK"
+      },
+      {
+        "milesLeft": 3000,
+        "expected": 1802584800000,
+        "name": "Brake inspection (pads, rotors, lines)",
+        "text": "in 3,000 mi (around Feb 14)",
+        "status": "OK"
+      },
+      {
+        "milesLeft": 18000,
+        "expected": 1843102800000,
+        "name": "Engine air filter",
+        "text": "in 18,000 mi (around May 28)",
+        "status": "OK"
+      },
+      {
+        "milesLeft": 18000,
+        "expected": 1843102800000,
+        "name": "Brake fluid",
+        "text": "in 18,000 mi (around May 28)",
+        "status": "OK"
+      },
+      {
+        "milesLeft": 18000,
+        "expected": 1843102800000,
+        "name": "AWD transfer case & rear differential (inspect)",
+        "text": "in 18,000 mi (around May 28)",
+        "status": "OK"
+      },
+      {
+        "milesLeft": 48000,
+        "expected": 1924063200000,
+        "name": "Transmission fluid (inspect)",
+        "text": "in 48,000 mi (around Dec 21)",
+        "status": "OK"
+      },
+      {
+        "milesLeft": 48000,
+        "expected": 1924063200000,
+        "name": "Drive belt (inspect)",
+        "text": "in 48,000 mi (around Dec 21)",
+        "status": "OK"
+      },
+      {
+        "milesLeft": 88000,
+        "expected": 2032059600000,
+        "name": "Spark plugs",
+        "text": "in 88,000 mi (around May 24)",
+        "status": "OK"
+      },
+      {
+        "milesLeft": 108000,
+        "expected": 2086063200000,
+        "name": "Engine coolant",
+        "text": "in 108,000 mi (around Feb 8)",
+        "status": "OK"
+      },
+      {
+        "milesLeft": null,
+        "expected": null,
+        "name": "Engine oil & filter",
+        "text": "Log when it was last done",
+        "status": "UNKNOWN"
+      },
+      {
+        "milesLeft": null,
+        "expected": null,
+        "name": "Tire rotation",
+        "text": "Log when it was last done",
+        "status": "UNKNOWN"
+      },
+      {
+        "milesLeft": null,
+        "expected": null,
+        "name": "12V battery test",
+        "text": "Log when it was last done",
+        "status": "UNKNOWN"
+      },
+      {
+        "milesLeft": null,
+        "expected": null,
+        "name": "Wiper blades",
+        "text": "Log when it was last done",
+        "status": "UNKNOWN"
+      }
+    ],
+    "trips": [{
+      "note": "Site visit",
+      "purpose": "Business",
+      "mpg": null,
+      "sim": false,
+      "start": 1794322800000,
+      "end": 1794326400000,
+      "from": "Home",
+      "to": "Work",
+      "miles": 18.2
+    }],
+    "name": "Test car",
+    "drive": "AWD",
+    "lastSession": 1794326400000
+  },
+  "journal": [{
+    "preview": "Walked\u2026",
+    "mood": 4,
+    "profile": "PERSONAL",
+    "words": 120,
+    "id": 1,
+    "title": "A good day",
+    "day": 1794290400000,
+    "favorite": true
+  }],
+  "recordings": [{
+    "createdAt": 1794330000000,
+    "path": "Professional/Recordings/r1.m4a",
+    "profile": "PROFESSIONAL",
+    "id": 1,
+    "title": "Huddle",
+    "durationMs": 600000,
+    "hasTranscript": true
+  }],
+  "lists": [{
+    "emoji": "🛠️",
+    "color": -13730510,
+    "profile": "PROFESSIONAL",
+    "name": "Work orders",
+    "id": 1
+  }],
+  "dictations": [{
+    "path": "Personal/Dictation/d1",
+    "profile": "PERSONAL",
+    "words": 0,
+    "startedAt": 1794330000000,
+    "title": "Idea",
+    "durationMs": 30000
+  }],
+  "generatedAt": 1794333600000,
+  "timeline": {
+    "handoff": "Ops handoff \u2014 sample",
+    "day": "2026-11-10",
+    "items": [{
+      "emoji": "🛠️",
+      "kind": "WORK_ORDER",
+      "time": 1794330000000,
+      "label": "Work order",
+      "detail": "room 214",
+      "title": "WO P2: Leak"
+    }]
+  },
+  "decks": [{
+    "cards": 1,
+    "due": 1,
+    "learned": 0,
+    "profile": "PROFESSIONAL",
+    "name": "NFPA 99",
+    "course": "FM-201",
+    "id": 1
+  }],
+  "facility": {
+    "site": "Sample campus",
+    "assets": [{
+      "installed": null,
+      "notes": "",
+      "serial": "",
+      "kind": "Generator",
+      "pms": [{
+        "standard": "",
+        "last": 1790830800000,
+        "due": 1793422800000,
+        "checklist": [],
+        "id": "load",
+        "daysLeft": -10,
+        "title": "Monthly load test",
+        "every": 30,
+        "status": "OVERDUE"
+      }],
+      "name": "Generator 1",
+      "location": "Yard",
+      "model": "",
+      "id": "gen",
+      "tag": "GEN-1",
+      "make": ""
+    }],
+    "due": [{
+      "standard": "",
+      "due": 1793422800000,
+      "assetId": "gen",
+      "daysLeft": -10,
+      "text": "10 days overdue",
+      "asset": "Generator 1",
+      "pm": "Monthly load test",
+      "status": "OVERDUE"
+    }],
+    "log": [{
+      "pmTitle": "Monthly load test",
+      "result": "PASS",
+      "kindLabel": "Inspection / PM",
+      "assetId": "gen",
+      "kind": "PM",
+      "by": "J",
+      "id": "e1",
+      "time": 1794518152215,
+      "text": "ok",
+      "asset": "Generator 1",
+      "day": 1794117600000
+    }],
+    "counts": {
+      "assets": 1,
+      "dueSoon": 0,
+      "overdue": 1,
+      "fails30": 0
+    }
+  },
+  "tasks": [
+    {
+      "completedAt": null,
+      "notes": "Ceiling tile",
+      "profile": "PROFESSIONAL",
+      "completed": false,
+      "title": "WO P2: Leak in room 214",
+      "dueDay": 1794204000000,
+      "priority": 3,
+      "list": "Work orders",
+      "tags": "wo",
+      "important": true,
+      "dueMinute": 540,
+      "overdue": true,
+      "repeat": "WEEKLY",
+      "id": 1
+    },
+    {
+      "completedAt": 1794330000000,
+      "notes": "",
+      "profile": "PERSONAL",
+      "completed": true,
+      "title": "Renew registration",
+      "dueDay": null,
+      "priority": 0,
+      "list": "",
+      "tags": "",
+      "important": false,
+      "dueMinute": null,
+      "overdue": false,
+      "repeat": "",
+      "id": 2
+    }
+  ],
+  "events": [{
+    "calendar": "Work",
+    "allDay": false,
+    "notes": "Agenda",
+    "color": -15374912,
+    "profile": "PROFESSIONAL",
+    "start": 1794337200000,
+    "location": "Room 1",
+    "end": 1794340800000,
+    "id": 1,
+    "title": "Safety huddle"
+  }],
+  "info": {
+    "app": "BlackLab",
+    "storageFree": 64000000000,
+    "rev": 42,
+    "activeProfile": "PERSONAL",
+    "keys": {
+      "gmail": false,
+      "gemini": false,
+      "openweather": false,
+      "google_keep": false,
+      "developer_knowledge": false,
+      "picovoice": false,
+      "elevenlabs": true,
+      "google_drive": false
+    },
+    "android": "17",
+    "assistant": {
+      "nano": "READY",
+      "nanoModel": "nano",
+      "name": "BlackLab",
+      "elevenBudget": 9000,
+      "elevenCharsUsed": 1200
+    },
+    "charging": false,
+    "profiles": {
+      "PERSONAL": "Personal",
+      "PROFESSIONAL": "Work"
+    },
+    "google": {"account": ""},
+    "battery": 80,
+    "version": "0.0.0",
+    "versionCode": 1,
+    "cloud": {
+      "lastSync": 1794330000000,
+      "error": null,
+      "enabled": false
+    },
+    "storagePublic": true,
+    "time": 1794333600000,
+    "device": "Google Pixel",
+    "user": {
+      "org": "Sample Org",
+      "name": "Sample User",
+      "title": "Director"
+    }
+  },
+  "backups": [{
+    "size": 1048576,
+    "name": "blacklab-2026-11-10.blbackup",
+    "time": 1794330000000
+  }]
+}
