@@ -51,7 +51,7 @@ import reverse  # noqa: E402  (reverse engineering with REA + Ghidra, read-only 
 import vault as vaultlib  # noqa: E402  (the Obsidian vault: notes, timeline, AI registry, git)
 import audit  # noqa: E402  (the hash-chained activity ledger — unit tested)
 
-VERSION = "1.7.0"
+VERSION = "1.8.0"
 HOST, PORT = "127.0.0.1", int(os.environ.get("BLACKLAB_DESKTOP_PORT", "8770"))
 HOME = Path.home()
 WEB_DIR = Path(__file__).resolve().parent.parent / "web"
@@ -1565,6 +1565,7 @@ class Handler(SimpleHTTPRequestHandler):
                 models = ollama_models()
                 return self.reply(200, {"companion": True, "version": VERSION, "adb": adb_devices(), "ollama": models, "model": default_model(models),
                                         "phone_ai": {"paired_recently": time.time() - PHONE["last_seen"] < 600, "last_seen": PHONE["last_seen"], "phone": PHONE["model"]},
+                                        "keep_warm": dict(KEEP_WARM),
                                         "eleven": bool(SECRETS.get("elevenlabs")), "devdocs": bool(SECRETS.get("developer_knowledge")), "out": str(DOWNLOADS_DIR),
                                         "folders": {"ai": str(AI_DIR), "downloads": str(DOWNLOADS_DIR), "documents": str(DOCS_DIR),
                                                     "chat_history": str(CHAT_DIR) if CONFIG.get("chat_history", True) is not False else None},
@@ -2098,12 +2099,34 @@ def migrate_old_folders():
         print(f"moved {_home_rel(old)} → {_home_rel(new)}", flush=True)
 
 
+KEEP_WARM = {"last": "", "at": 0}
+
+
+def keep_warm_keeper():
+    """Keeps the assistant's model loaded while ./daddyshome has pinned it (see keep_warm.py)."""
+    import keep_warm
+    while True:
+        try:
+            # ./daddyshome --stop edits config.json without restarting us: follow the file, not the copy from startup
+            cfg = load_json(CONFIG_DIR / "config.json", {})
+            CONFIG["keep_alive"] = cfg.get("keep_alive", "30m")
+            r = keep_warm.pass_once(cfg, lambda u, b=None, timeout=30: http_json(u, b, timeout=timeout), agents.mining_active,
+                                    OLLAMA, cfg.get("model") or "qwen3:8b", num_ctx())
+            if r != KEEP_WARM["last"] and r not in ("ok", "off"):
+                print(f"keep-warm: {r}", flush=True)
+            KEEP_WARM.update(last=r, at=int(time.time()))
+        except Exception as e:  # noqa: BLE001 — never let this thread die
+            KEEP_WARM.update(last=f"error: {e}", at=int(time.time()))
+        time.sleep(60)
+
+
 def main():
     migrate_old_folders()
     _private_dir(AI_DIR, DOWNLOADS_DIR, DOCS_DIR, CHAT_DIR, TASK_LOG_DIR)
     ensure_phone_token()
     threading.Thread(target=keep_usb_link, daemon=True).start()
     threading.Thread(target=memory_keeper, daemon=True).start()
+    threading.Thread(target=keep_warm_keeper, daemon=True, name="keep-warm").start()
     if VAULT_ON:
         threading.Thread(target=vault_keeper, daemon=True, name="vault").start()
         if CONFIG.get("atlas", True) is not False:

@@ -81,6 +81,16 @@ status_board() {
   else bad "Ollama is not running"; fi
   ollama_up && ok "Desktop assistant model: $(model_selected) (keep-alive $(json_get "$CFG" keep_alive || echo 30m))"
   if companion_up; then
+    local kw; kw="$(curl -fsS -m 2 -H 'X-BlackLab: 1' "$COMP/local/status" | python3 -c 'import json,sys;print(json.load(sys.stdin).get("keep_warm",{}).get("last",""))' 2>/dev/null)"
+    case "$kw" in
+      ok|loaded*) ok "Stays loaded: the companion re-pins it after reboots and Night Mining (until ./daddyshome --stop)" ;;
+      mining) ok "Stays loaded: waiting for Night Mining to finish, then it loads again" ;;
+      off) warn "Not pinned — the model unloads when idle (run ./daddyshome to keep it loaded)" ;;
+      "") ;;
+      *) warn "Keep-warm: $kw" ;;
+    esac
+  fi
+  if companion_up; then
     ok "BlackLab Desktop companion on $COMP"
     local st; st="$(curl -fsS -m 2 -H 'X-BlackLab: 1' "$COMP/local/status" 2>/dev/null)"
     local line; while IFS= read -r line; do

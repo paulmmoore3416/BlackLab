@@ -21,7 +21,8 @@ After=network.target
 
 [Service]
 ExecStart=/usr/bin/env python3 ${HERE}/companion/blacklab_desktop.py
-Restart=on-failure
+# always: the desktop AI stays up until ./daddyshome --stop or `systemctl --user stop blacklab-desktop`
+Restart=always
 RestartSec=3
 
 [Install]
