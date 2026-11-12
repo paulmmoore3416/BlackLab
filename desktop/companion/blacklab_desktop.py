@@ -2051,6 +2051,8 @@ def phone_vault_pass(serial: str, force=False):
     """Mirror the Obsidian vault to the phone (Documents/BlackLab) and bring back notes edited there."""
     if not VAULT_ON or CONFIG.get("phone_vault", True) is False:
         return
+    if CONFIG.get("vault_sync") == "syncthing":  # scripts/syncthing-setup.sh: Syncthing over Tailscale does it continuously
+        return
     if not force and time.time() - PHONE_VAULT["at"] < int(CONFIG.get("phone_vault_every_s", 300)):
         return
     import phone_vault
