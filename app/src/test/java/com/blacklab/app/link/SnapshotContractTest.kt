@@ -43,7 +43,8 @@ import java.time.LocalDateTime
  * desktop tests:
  *   BL_EXPORT=1 ./gradlew :app:testDebugUnitTest --tests com.blacklab.app.link.SnapshotContractTest
  *   node --test desktop/web/tests/
- * Sample data only — made-up names, a fake VIN, no coordinates.
+ * Sample data only — made-up names, a fake VIN, no coordinates — and no clock: every time is fixed, so the
+ * fixture only changes when the snapshot does.
  */
 class SnapshotContractTest {
     private val root = listOf(File("../desktop/web"), File("desktop/web")).first { it.isDirectory }
@@ -83,7 +84,7 @@ class SnapshotContractTest {
             site = "Sample campus",
             assets = listOf(Facility.Asset(id = "gen", name = "Generator 1", kind = "Generator", tag = "GEN-1", location = "Yard",
                 pms = listOf(Facility.Pm(id = "load", title = "Monthly load test", everyDays = 30, lastDay = day - 40)))),
-            log = listOf(Facility.Entry(id = "e1", assetId = "gen", pmId = "load", day = day - 2, kind = Facility.Kind.PM, result = Facility.Result.PASS, text = "ok", by = "J")),
+            log = listOf(Facility.Entry(id = "e1", assetId = "gen", pmId = "load", day = day - 2, kind = Facility.Kind.PM, result = Facility.Result.PASS, text = "ok", by = "J", time = now - 48 * hour)),
         )
         val info = SnapshotJson.info(SnapshotJson.InfoInputs(
             settings = Settings(userName = "Sample User", jobTitle = "Director", organization = "Sample Org"),
@@ -114,10 +115,10 @@ class SnapshotContractTest {
             dictations = listOf(Triple("PERSONAL", DictationMeta("Idea", now - hour, durationMs = 30_000), "Personal/Dictation/d1")),
             vehicle = SnapshotJson.vehicle(g, t, n, pace = 32.0, now = now),
             brainstorm = SnapshotJson.brainstorm(
-                listOf(NotebookEntity(id = 1, profile = "PROFESSIONAL", name = "Projects", color = 0xFF00897B.toInt(), emoji = "📓")),
+                listOf(NotebookEntity(id = 1, profile = "PROFESSIONAL", name = "Projects", color = 0xFF00897B.toInt(), emoji = "📓", createdAt = now, updatedAt = now)),
                 listOf(section),
-                listOf(PageEntity(id = 1, profile = "PROFESSIONAL", sectionId = 1, title = "Chiller swap", preview = "Phase 1…", searchText = "Phase 1 plan", tagIndex = "todo|0|Call vendor", wordCount = 50)),
-                listOf(NoteEntity(id = 1, profile = "PERSONAL", title = "Groceries", body = "", checklist = true, items = """[{"t":"Milk","d":false,"i":0}]""", labels = ",home,", pinned = true)),
+                listOf(PageEntity(id = 1, profile = "PROFESSIONAL", sectionId = 1, title = "Chiller swap", preview = "Phase 1…", searchText = "Phase 1 plan", tagIndex = "todo|0|Call vendor", wordCount = 50, createdAt = now, updatedAt = now)),
+                listOf(NoteEntity(id = 1, profile = "PERSONAL", title = "Groceries", body = "", checklist = true, items = """[{"t":"Milk","d":false,"i":0}]""", labels = ",home,", pinned = true, createdAt = now, updatedAt = now)),
             ),
             decks = listOf(DeckEntity(id = 1, profile = "PROFESSIONAL", name = "NFPA 99", courseId = 1)),
             cards = listOf(FlashcardEntity(id = 1, deckId = 1, front = "Q", back = "A", dueDay = day)),

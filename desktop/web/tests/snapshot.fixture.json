@@ -39,7 +39,7 @@
         "d": false,
         "i": 0
       }],
-      "updatedAt": 1794518152216
+      "updatedAt": 1794333600000
     }],
     "notebooks": [{
       "emoji": "📓",
@@ -57,7 +57,7 @@
           "text": "Phase 1 plan",
           "title": "Chiller swap",
           "reminderAt": null,
-          "updatedAt": 1794518152216,
+          "updatedAt": 1794333600000,
           "tags": [{
             "tag": "todo",
             "text": "Call vendor",
@@ -70,7 +70,7 @@
         "locked": false,
         "group": ""
       }],
-      "updatedAt": 1794518152216
+      "updatedAt": 1794333600000
     }]
   },
   "documents": [{
@@ -475,7 +475,7 @@
       "kind": "PM",
       "by": "J",
       "id": "e1",
-      "time": 1794518152215,
+      "time": 1794160800000,
       "text": "ok",
       "asset": "Generator 1",
       "day": 1794117600000

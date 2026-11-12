@@ -2,6 +2,30 @@
 
 All notable changes to BlackLab are documented here. The project follows [Semantic Versioning](https://semver.org/).
 
+## [5.14.0] — 2026-11-12 (companion 1.8.0)
+
+The phone and the desktop now stay in step from anywhere: live updates that send only what changed, a private Tailscale link, and a desktop AI that stays on until you say stop.
+
+### Added
+- **Tailscale link.** On the phone, Settings › Assistant › BlackLab Desktop › *Allow Tailscale* lets BlackLab Desktop connect over your own tailnet, encrypted, from anywhere. A connection is accepted only when both ends are tailnet addresses. Files, keys, backups and security settings still need USB.
+- **The desktop AI away from home.** The companion can also listen on the computer's Tailscale address. It offers only the phone API, only to your tailnet, and never through Tailscale Funnel. The phone tries the USB link first, then Tailscale, and shows "via Tailscale" when it uses it. `./daddyshome` sets this up when Tailscale is running (`"tailnet": false` in `config.json` opts out).
+- **The desktop AI stays on until you say stop.** After `./daddyshome`, the companion keeps the model loaded through reboots, Ollama restarts and Night Mining. It never loads during mining and comes back when mining stops. `./daddyshome --stop` lets it unload again, at once, without a restart. The companion's service now restarts on any exit.
+- **Syncthing vault sync (optional).** `scripts/syncthing-setup.sh` installs a pinned, checksum-verified Syncthing that syncs the Obsidian vault with the phone as you edit, over the tailnet only: no discovery servers, relays, NAT traversal or reporting. It uses the same privacy boundary as the USB sync (Atlas, Imported, Entities, Drive and Mobile stay on the computer). It replaces the 5-minute USB pass once the phone is added; `--undo` switches back.
+
+### Changed
+- **Faster live sync.** The phone tracks which parts of its data changed, and the desktop fetches only those, instead of rebuilding and sending everything on every edit. Desktops talking to older phones still work, with full reloads.
+- **Toolchain:** Gradle 9.8.2 (checksum-pinned wrapper), Android Gradle Plugin 9.5.1 with built-in Kotlin, Kotlin 2.4.21, compile SDK 37, Compose BOM 2026.09.00, Core 1.19.1, Navigation 2.10.2, Baseline Profile 1.5.0, UiAutomator 2.4.1. The target SDK stays at 36.
+
+### Fixed
+- **The desktop missed changes to Facility, Garage, drives and recalls** until a manual refresh. It also missed changes to flashcards, notebook sections and note labels. Bursts of live car readings are throttled to one update every 5 seconds.
+- **After the phone app restarted, the desktop stopped seeing changes** (its change counter started again at 1, below the desktop's). Changes now always come through.
+- **Cloud sync never pushed while you drove.** A steady stream of changes kept postponing it; it now pushes at most 45 s after the first change.
+- **`./daddyshome --stop` didn't stick:** the next desktop chat pinned the model again.
+
+### Tests
+- **Phone ⇄ desktop contract.** The phone's snapshot is built from pure functions (`link/SnapshotJson.kt`) and exported as a fixture. The desktop's Node tests render every view against it and fail on any field the desktop reads that the phone doesn't send. CI now runs the desktop and Obsidian plugin tests too.
+- New tests for change tracking, Tailscale admission, desktop-AI routing, keep-warm and the Syncthing rules.
+
 ## [5.13.1] — 2026-11-10
 
 The phone and BlackLab Desktop show the same things again. The desktop was getting only part of the phone's data: Facility, the day's Timeline and Health never left the phone.

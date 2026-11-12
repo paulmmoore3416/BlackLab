@@ -14,7 +14,7 @@ always works.
 ./daddyshome --status   # status board only
 ./daddyshome --open     # …then open the BlackLab Desktop window
 ./daddyshome --repair   # re-send the phone's key (after reinstalling the app)
-./daddyshome --stop     # unload the model and unlink the phone
+./daddyshome --stop     # unload the model, let it unload when idle from now on, and unlink the phone
 ```
 
 `./daddyshome`:
@@ -32,6 +32,18 @@ always works.
    the app imports into its Keystore-encrypted store and deletes when it next opens or comes to the
    front.
 6. Prints a status board and checks the whole path end to end.
+7. When Tailscale is up, turns on the companion's tailnet listener and tells the phone this
+   computer's Tailscale address (once per address), so the phone's assistant reaches the desktop AI
+   away from home. `config.json` → `"tailnet": false` opts out.
+
+### It stays on until you say stop (companion 1.8.0)
+
+While `keep_alive` is `-1` (set by `./daddyshome`), the companion checks every minute that the model
+is loaded and loads it again if not — after a reboot, an Ollama restart or Night Mining (which unloads
+every model at 23:00; the model comes back when mining stops, never during it). The companion's
+service restarts on any exit. `./daddyshome --stop` sets `keep_alive` back to `30m`; the companion
+follows `config.json`, so that takes effect at once, without a restart. `./daddyshome --status`
+shows the keep-warm state.
 
 ## How it stays private
 
@@ -182,6 +194,23 @@ touches.
 Pair the phone with Android's **Wireless debugging** (Developer options):
 `adb pair <ip:pairing-port>`, then `adb connect <ip:port>`, then `./daddyshome`. `adb reverse` works
 the same over Wi-Fi, so the phone keeps its desktop brain away from the cable.
+
+## Tailscale (companion 1.8.0, BlackLab 5.14)
+
+With Tailscale on both devices, the link works from anywhere, encrypted by WireGuard:
+
+- **Phone → desktop AI.** The companion listens on this computer's Tailscale address too
+  (`config.json` → `"tailnet": true`, which `./daddyshome` sets). That listener serves the phone API
+  (`/phone/*`, which also needs the shared key) and nothing else, and only to tailnet addresses
+  (100.64.0.0/10, fd7a:115c:a1e0::/48). The phone tries the USB link first, then the Tailscale
+  address; Settings › Assistant shows "via Tailscale" when it's using it. It is never put on
+  Tailscale Funnel.
+- **Desktop → phone.** On the phone, Settings › Assistant › BlackLab Desktop › **Allow Tailscale**
+  (only changeable on the phone or over USB). The desktop then connects to
+  `http://<phone's Tailscale IP>:8765` with the pairing code. Both ends must be tailnet addresses;
+  files, keys, backups and security settings still need USB.
+- **Vault.** `scripts/syncthing-setup.sh` (optional) replaces the 5-minute USB vault pass with
+  Syncthing over the tailnet only — see the script's header for the phone steps.
 
 ## On the phone
 
