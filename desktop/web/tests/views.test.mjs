@@ -53,7 +53,8 @@ function load() {
   const src = readFileSync(join(web, 'app.js'), 'utf8');
   const cut = src.lastIndexOf('\nboot();');
   assert.ok(cut > 0, 'app.js must end its setup with a top-level boot(); call');
-  vm.runInContext(src.slice(0, cut) + '\nglobalThis.__bl = { S, Views };', ctx, { filename: 'app.js' });
+  vm.runInContext(src.slice(0, cut) + `
+globalThis.__bl = { S, Views, Phone, syncPlan: typeof syncPlan === 'function' ? syncPlan : undefined, loadChanged: typeof loadChanged === 'function' ? loadChanged : undefined };`, ctx, { filename: 'app.js' });
   return ctx.__bl;
 }
 
@@ -149,4 +150,34 @@ test('views survive having no snapshot yet (first launch)', () => {
     S.view = name; S.sub = '';
     assert.doesNotThrow(() => Views[name](), `${name} threw with no snapshot`);
   }
+});
+
+test('sync plan: partial when the phone names sections, full otherwise', () => {
+  const { syncPlan: plan } = load();
+  const syncPlan = (...a) => JSON.parse(JSON.stringify(plan(...a))); // objects from the vm's realm
+  const snap = { tasks: [] };
+  assert.deepEqual(syncPlan({ rev: 5, changed: [] }, 5, snap), { kind: 'none' });
+  assert.deepEqual(syncPlan({ rev: 6, changed: ['tasks', 'timeline'] }, 5, snap), { kind: 'partial', sections: ['tasks', 'timeline'] });
+  assert.deepEqual(syncPlan({ rev: 6, changed: null }, 5, snap), { kind: 'full' }); // our rev predates the phone app's start
+  assert.deepEqual(syncPlan({ rev: 6 }, 5, snap), { kind: 'full' }); // phones before 5.14 don't say what changed
+  assert.deepEqual(syncPlan({ rev: 3 }, 9, snap), { kind: 'full' }); // the phone restarted with a lower rev
+  assert.deepEqual(syncPlan({ rev: 6, changed: ['tasks'] }, 5, null), { kind: 'full' }); // nothing cached yet
+});
+
+test('a partial update replaces only the changed sections', async () => {
+  const { S, Phone, loadChanged } = load();
+  S.snap = structuredClone(fixture); S.values = { a: 1 };
+  const asked = [];
+  Phone.req = async (path) => {
+    asked.push(path);
+    if (path.startsWith('/api/snapshot')) return { info: { rev: 77 }, generatedAt: 123, facility: { site: 'Changed', assets: [], due: [], log: [], counts: {} } };
+    if (path === '/api/settings') return { a: 2 };
+    throw new Error(path);
+  };
+  await loadChanged(['facility', 'settings']);
+  assert.deepEqual(asked.sort(), ['/api/settings', '/api/snapshot?sections=facility']);
+  assert.equal(S.snap.facility.site, 'Changed');
+  assert.equal(S.snap.tasks.length, fixture.tasks.length); // untouched
+  assert.equal(S.snap.generatedAt, 123);
+  assert.equal(S.values.a, 2);
 });

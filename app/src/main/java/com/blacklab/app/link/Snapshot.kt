@@ -53,40 +53,42 @@ object Snapshot {
         return SnapshotJson.brainstorm(b.allNotebooks(), b.allSections(), b.allPages(), app.db.notes().all())
     }
 
-    suspend fun build(app: AppContainer): JSONObject {
+    /** The snapshot, or only the sections in [only] (plus [Sections.ALWAYS]) — nothing else is read from the database. */
+    suspend fun build(app: AppContainer, only: Set<String>? = null): JSONObject {
         val db = app.db
         val today = Time.today()
         val todayEpoch = today.toEpochDay()
         val edu = db.education()
+        fun want(vararg k: String) = only == null || k.any { it in only }
         return SnapshotJson.assemble(SnapshotJson.Inputs(
             info = info(app),
             generatedAt = Time.now(),
             todayEpoch = todayEpoch,
-            lists = Profile.entries.flatMap { db.tasks().lists(it.name) },
-            tasks = db.tasks().all(),
-            events = db.events().all().flatMap { CalendarLogic.expand(it, today.minusDays(7), today.plusDays(60)) },
-            calendars = db.events().allCalendars().associateBy { it.id },
-            courses = edu.allCourses(),
-            assignments = edu.allAssignments(),
-            certifications = edu.allCerts(),
-            documents = db.documents().all(),
-            journal = Profile.entries.flatMap { db.journal().allFor(it.name) },
-            recordings = Profile.entries.flatMap { db.recordings().allFor(it.name) },
-            dictations = Profile.entries.flatMap { p ->
+            lists = if (want("lists", "tasks")) Profile.entries.flatMap { db.tasks().lists(it.name) } else emptyList(),
+            tasks = if (want("tasks")) db.tasks().all() else emptyList(),
+            events = if (want("events")) db.events().all().flatMap { CalendarLogic.expand(it, today.minusDays(7), today.plusDays(60)) } else emptyList(),
+            calendars = if (want("events")) db.events().allCalendars().associateBy { it.id } else emptyMap(),
+            courses = if (want("courses", "assignments", "decks")) edu.allCourses() else emptyList(),
+            assignments = if (want("assignments")) edu.allAssignments() else emptyList(),
+            certifications = if (want("certifications")) edu.allCerts() else emptyList(),
+            documents = if (want("documents")) db.documents().all() else emptyList(),
+            journal = if (want("journal")) Profile.entries.flatMap { db.journal().allFor(it.name) } else emptyList(),
+            recordings = if (want("recordings")) Profile.entries.flatMap { db.recordings().allFor(it.name) } else emptyList(),
+            dictations = if (!want("dictations")) emptyList() else Profile.entries.flatMap { p ->
                 DictationStore.list(app.storage.dir(p, Folder.DICTATION)).take(60).map { (folder, m) -> Triple(p.name, m, app.storage.relative(folder)) }
             },
-            vehicle = vehicle(app),
-            brainstorm = brainstorm(app),
-            decks = edu.allDecks(),
-            cards = edu.allCards(),
-            backups = app.backups.listBackups().map { Triple(it.name, it.length(), it.lastModified()) },
-            assistant = JSONArray().apply { app.assistant.messages.value.takeLast(60).forEach { put(it.toPublicJson()) } },
-            facility = runCatching { DesktopSections.facility(com.blacklab.app.facility.Facility.load(app.context), todayEpoch) }.getOrNull(),
-            timeline = runCatching {
+            vehicle = if (want("vehicle")) vehicle(app) else JSONObject(),
+            brainstorm = if (want("brainstorm")) brainstorm(app) else JSONObject(),
+            decks = if (want("decks")) edu.allDecks() else emptyList(),
+            cards = if (want("decks")) edu.allCards() else emptyList(),
+            backups = if (want("backups")) app.backups.listBackups().map { Triple(it.name, it.length(), it.lastModified()) } else emptyList(),
+            assistant = if (!want("assistant")) JSONArray() else JSONArray().apply { app.assistant.messages.value.takeLast(60).forEach { put(it.toPublicJson()) } },
+            facility = if (!want("facility")) null else runCatching { DesktopSections.facility(com.blacklab.app.facility.Facility.load(app.context), todayEpoch) }.getOrNull(),
+            timeline = if (!want("timeline")) null else runCatching {
                 val i = com.blacklab.app.ui.home.DayTimelineData.inputs(app, today)
                 DesktopSections.timeline(today, DayTimeline.build(i), com.blacklab.app.ui.home.DayTimelineData.handoff(app, today))
             }.getOrNull(),
             health = runCatching { DesktopSections.health(Health.evaluate(com.blacklab.app.ui.settings.HealthData.gather(app, ensureIndex = false))) }.getOrNull(),
-        ))
+        ), only)
     }
 }

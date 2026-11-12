@@ -105,11 +105,11 @@ object SnapshotJson {
     )
 
     /** The whole snapshot. Every top-level key BlackLab Desktop can read is put here and nowhere else. */
-    fun assemble(i: Inputs): JSONObject {
+    fun assemble(i: Inputs, only: Set<String>? = null): JSONObject {
         val listNames = i.lists.associate { it.id to it.name }
         val courseById = i.courses.associateBy { it.id }
         val recentDone = i.generatedAt - 14 * 86_400_000L
-        return JSONObject().apply {
+        val all = JSONObject().apply {
             put("info", i.info)
             put("generatedAt", i.generatedAt)
             put("lists", JSONArray().apply { i.lists.forEach { put(list(it)) } })
@@ -139,6 +139,9 @@ object SnapshotJson {
             i.timeline?.let { put("timeline", it) }
             i.health?.let { put("health", it) }
         }
+        if (only == null) return all
+        // A partial snapshot: just the sections that changed, plus what every snapshot carries
+        return JSONObject().apply { (only + Sections.ALWAYS).forEach { k -> if (all.has(k)) put(k, all.get(k)) } }
     }
 
     fun list(l: TaskListEntity): JSONObject =

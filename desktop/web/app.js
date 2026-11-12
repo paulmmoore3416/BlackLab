@@ -105,7 +105,9 @@ const Phone = {
     while (S.mode === 'phone') {
       try {
         const r = await this.req(`/api/changes?since=${S.rev}&wait=25`);
-        if (r.rev > S.rev) { S.rev = r.rev; await loadFromPhone(); }
+        const plan = syncPlan(r, S.rev, S.snap);
+        if (plan.kind === 'full') { await loadFromPhone(); S.rev = r.rev; }
+        else if (plan.kind === 'partial') { await loadChanged(plan.sections); S.rev = r.rev; }
       } catch {
         await sleep(2500);
         if (!(await this.ping())) { setMode(S.google.token ? 'cloud' : 'offline'); toast('Phone link lost'); break; }
@@ -118,7 +120,30 @@ const Phone = {
 async function loadFromPhone() {
   const [values, snap] = await Promise.all([Phone.req('/api/settings'), Phone.req('/api/snapshot')]);
   if (!S.schema || !S.schemaFresh) { S.schema = (await Phone.req('/api/schema')).sections; S.schemaFresh = true; }
-  S.values = values; S.snap = snap; S.rev = Math.max(S.rev, snap.info?.rev || 0); S.lastSync = Date.now();
+  // the phone's rev, not the higher of the two: after the phone app restarts its rev can be lower than ours
+  S.values = values; S.snap = snap; S.rev = snap.info?.rev ?? S.rev; S.lastSync = Date.now();
+  persist(); render(true);
+}
+
+/**
+ * What to fetch after /api/changes answers. BlackLab 5.14+ says which sections changed, so only those
+ * are rebuilt and sent; older phones (no `changed`), a rev from before the phone app started
+ * (`changed: null`), a phone rev lower than ours (it restarted) or an empty cache mean a full reload.
+ */
+function syncPlan(r, rev, snap) {
+  if (r.rev === rev) return { kind: 'none' };
+  if (!snap || !Array.isArray(r.changed) || r.rev < rev) return { kind: 'full' };
+  return r.changed.length ? { kind: 'partial', sections: r.changed } : { kind: 'none' };
+}
+
+/** Fetches just the changed sections (and settings values when they changed) and merges them in. */
+async function loadChanged(sections) {
+  const snapKeys = sections.filter((k) => k !== 'settings');
+  const jobs = [];
+  if (sections.includes('settings')) jobs.push(Phone.req('/api/settings').then((v) => { S.values = v; }));
+  if (snapKeys.length) jobs.push(Phone.req('/api/snapshot?sections=' + encodeURIComponent(snapKeys.join(','))).then((part) => { S.snap = Object.assign({}, S.snap, part); }));
+  await Promise.all(jobs);
+  S.lastSync = Date.now();
   persist(); render(true);
 }
 

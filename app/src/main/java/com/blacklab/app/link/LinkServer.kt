@@ -51,24 +51,35 @@ import java.util.concurrent.atomic.AtomicLong
  * change so BlackLab Desktop can long-poll /api/changes and refresh immediately.
  */
 class LinkHub(private val app: AppContainer) {
-    val rev = AtomicLong(1)
-    val revFlow = MutableStateFlow(1L)
+    /**
+     * Starts at the wall clock, not 1: the desktop keeps its last rev across phone app restarts, and a counter
+     * that restarted at 1 left it long-polling for a rev it wouldn't see for hours. Anything older than
+     * [baseline] predates this process and gets a full reload.
+     */
+    val baseline = Time.now()
+    val rev = AtomicLong(baseline)
+    val revFlow = MutableStateFlow(baseline)
+    val sections = SectionRevs(baseline)
     val running = MutableStateFlow(false)
     val clients = MutableStateFlow<Map<String, Long>>(emptyMap()) // address -> last seen
     private var server: LinkServer? = null
     private var cloudJob: Job? = null
 
-    fun bump() { revFlow.value = rev.incrementAndGet(); scheduleCloudPush() }
+    /** Something in [changed] (snapshot sections, see [Sections]) changed. */
+    fun bump(changed: Set<String>) {
+        val r = rev.incrementAndGet()
+        sections.mark(changed, r)
+        revFlow.value = r
+        scheduleCloudPush()
+    }
 
     fun watch() {
-        app.db.invalidationTracker.addObserver(object : InvalidationTracker.Observer(
-            arrayOf("documents", "journal", "tasks", "task_lists", "subtasks", "events", "event_calendars", "courses", "assignments", "certifications", "ceu_entries", "recordings", "notes", "nb_pages", "notebooks"),
-        ) {
-            override fun onInvalidated(tables: Set<String>) = bump()
+        app.db.invalidationTracker.addObserver(object : InvalidationTracker.Observer(Sections.TABLES.keys.toTypedArray()) {
+            override fun onInvalidated(tables: Set<String>) = bump(Sections.forTables(tables))
         })
-        app.appScope.launch { app.settings.state.drop(1).collect { bump() } }
-        app.appScope.launch { app.assistant.messages.drop(1).collect { bump() } }
-        LinkWatch.launch(app.appScope, LinkWatch.stores().map { it.state }) { bump() }
+        app.appScope.launch { app.settings.state.drop(1).collect { bump(Sections.SETTINGS) } }
+        app.appScope.launch { app.assistant.messages.drop(1).collect { bump(Sections.ASSISTANT) } }
+        LinkWatch.stores().forEach { s -> LinkWatch.launch(app.appScope, listOf(s.state)) { bump(Sections.forStore(s.name)) } }
     }
 
     /**
@@ -260,12 +271,17 @@ class LinkServer(private val app: AppContainer, private val port: Int, private v
                 LinkService.sync(app.context)
                 200 to JSONObject().put("applied", JSONArray(applied)).put("refused", JSONArray(refused)).put("values", SettingsSchema.values(app.settings.prefs)).toString()
             }
-            r.method == "GET" && r.path == "/api/snapshot" -> 200 to Snapshot.build(app).toString()
+            r.method == "GET" && r.path == "/api/snapshot" -> 200 to Snapshot.build(app, Sections.parse(r.query["sections"])).toString()
             r.method == "GET" && r.path == "/api/changes" -> {
+                // Long-poll: answers as soon as anything changes after `since`, with which sections did
+                // (`changed: null` = reload everything: the client's rev is from before this process).
+                val hub = app.link
                 val since = r.query["since"]?.toLongOrNull() ?: 0
                 val wait = (r.query["wait"]?.toLongOrNull() ?: 25).coerceIn(0, 50) * 1000
-                if (app.link.rev.get() <= since) withTimeoutOrNull(wait) { app.link.revFlow.first { it > since } }
-                200 to JSONObject().put("rev", app.link.rev.get()).toString()
+                if (since >= hub.baseline && since >= hub.rev.get()) withTimeoutOrNull(wait) { hub.revFlow.first { it > since } }
+                val now = hub.rev.get()
+                val changed = if (since > now) null else hub.sections.changedSince(since)
+                200 to JSONObject().put("rev", now).put("changed", changed?.let { JSONArray(it.sorted()) } ?: JSONObject.NULL).toString()
             }
             r.method == "POST" && r.path == "/api/assistant" -> {
                 val reply = app.assistant.handle(body.optString("text"), Origin.DESKTOP)
