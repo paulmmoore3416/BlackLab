@@ -28,6 +28,33 @@ class HttpGuards(unittest.TestCase):
         self.assertFalse(ok("127.0.0.1:8770", None, "Bearer ", "", HOSTS), "no token configured")
 
 
+class Tailnet(unittest.TestCase):
+    """The optional Tailscale listener serves the phone API only, and only to tailnet peers."""
+
+    def test_only_tailnet_peers(self):
+        self.assertTrue(guards.tailnet_peer("100.90.1.2"))
+        self.assertTrue(guards.tailnet_peer("fd7a:115c:a1e0::1"))
+        self.assertFalse(guards.tailnet_peer("192.168.1.20"))
+        self.assertFalse(guards.tailnet_peer("100.128.0.1"))  # just outside 100.64.0.0/10
+        self.assertFalse(guards.tailnet_peer("127.0.0.1"))
+        self.assertFalse(guards.tailnet_peer("not an ip"))
+
+    def test_only_the_phone_api(self):
+        ok = lambda path: guards.tailnet_request_ok("100.90.1.2", path)  # noqa: E731
+        self.assertTrue(ok("/phone/status"))
+        self.assertTrue(ok("/phone/generate"))
+        self.assertTrue(ok("/phone/jobs/ack"))
+        self.assertTrue(ok("/phone/upload?name=a.pdf"))
+        for p in ("/", "/local/status", "/api/notes", "/phone", "/phonex/status", "/phone/../local/status", "/index.html"):
+            self.assertFalse(ok(p), p)
+        self.assertFalse(guards.tailnet_request_ok("192.168.1.20", "/phone/status"))
+
+    def test_tailscale_ipv4_from_cli_output(self):
+        self.assertEqual(guards.tailscale_ipv4("100.101.102.103\n"), "100.101.102.103")
+        self.assertIsNone(guards.tailscale_ipv4(""))
+        self.assertIsNone(guards.tailscale_ipv4("192.168.1.4\n"))  # never bind anything that isn't the tailnet
+
+
 class Paths(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()

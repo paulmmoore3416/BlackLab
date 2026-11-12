@@ -1565,7 +1565,7 @@ class Handler(SimpleHTTPRequestHandler):
                 models = ollama_models()
                 return self.reply(200, {"companion": True, "version": VERSION, "adb": adb_devices(), "ollama": models, "model": default_model(models),
                                         "phone_ai": {"paired_recently": time.time() - PHONE["last_seen"] < 600, "last_seen": PHONE["last_seen"], "phone": PHONE["model"]},
-                                        "keep_warm": dict(KEEP_WARM),
+                                        "keep_warm": dict(KEEP_WARM), "tailnet": dict(TAILNET),
                                         "eleven": bool(SECRETS.get("elevenlabs")), "devdocs": bool(SECRETS.get("developer_knowledge")), "out": str(DOWNLOADS_DIR),
                                         "folders": {"ai": str(AI_DIR), "downloads": str(DOWNLOADS_DIR), "documents": str(DOCS_DIR),
                                                     "chat_history": str(CHAT_DIR) if CONFIG.get("chat_history", True) is not False else None},
@@ -2099,6 +2099,60 @@ def migrate_old_folders():
         print(f"moved {_home_rel(old)} → {_home_rel(new)}", flush=True)
 
 
+class TailnetHandler(Handler):
+    """The Tailscale listener: only tailnet peers, only the phone API (/phone/*, which also needs the shared key).
+    Everything else — the desktop UI, /local/*, /api/* — answers 404 here. This is never put on Tailscale Funnel."""
+
+    def _tailnet_ok(self) -> bool:
+        if guards.tailnet_request_ok(self.client_address[0], self.path):
+            return True
+        self.send_response(404)
+        self.send_header("Content-Length", "0")
+        self.end_headers()
+        return False
+
+    def do_GET(self):
+        if self._tailnet_ok():
+            super().do_GET()
+
+    def do_POST(self):
+        if self._tailnet_ok():
+            super().do_POST()
+
+    def do_HEAD(self):
+        self._tailnet_ok() and super().do_HEAD()
+
+    def do_OPTIONS(self):
+        self._tailnet_ok() and super().do_OPTIONS()
+
+
+TAILNET = {"url": "", "note": ""}
+
+
+def tailnet_keeper():
+    """config.json "tailnet": true — serve the phone API on this computer's Tailscale address too, so the phone's
+    assistant reaches the desktop AI away from home. Waits for Tailscale to come up after a reboot."""
+    while CONFIG.get("tailnet"):
+        try:
+            out = subprocess.run(["tailscale", "ip", "-4"], capture_output=True, text=True, timeout=5).stdout
+        except Exception:  # noqa: BLE001 — Tailscale not installed
+            out = ""
+        ip = guards.tailscale_ipv4(out)
+        if ip:
+            try:
+                srv = ThreadingHTTPServer((ip, PORT), TailnetHandler)
+            except OSError as e:
+                TAILNET.update(note=f"couldn't listen on {ip}:{PORT}: {e}")
+            else:
+                ALLOWED_HOSTS.add(f"{ip}:{PORT}")
+                TAILNET.update(url=f"http://{ip}:{PORT}", note="phone API only")
+                print(f"tailnet: phone API on http://{ip}:{PORT}", flush=True)
+                srv.serve_forever()
+        else:
+            TAILNET.update(note="waiting for Tailscale")
+        time.sleep(60)
+
+
 KEEP_WARM = {"last": "", "at": 0}
 
 
@@ -2127,6 +2181,7 @@ def main():
     threading.Thread(target=keep_usb_link, daemon=True).start()
     threading.Thread(target=memory_keeper, daemon=True).start()
     threading.Thread(target=keep_warm_keeper, daemon=True, name="keep-warm").start()
+    threading.Thread(target=tailnet_keeper, daemon=True, name="tailnet").start()
     if VAULT_ON:
         threading.Thread(target=vault_keeper, daemon=True, name="vault").start()
         if CONFIG.get("atlas", True) is not False:

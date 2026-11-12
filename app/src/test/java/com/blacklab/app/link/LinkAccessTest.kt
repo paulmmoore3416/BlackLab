@@ -30,4 +30,28 @@ class LinkAccessTest {
         assertTrue(Keys.LINK_LAN in LinkAccess.usbOnlySettings)
         assertTrue(Keys.CLOUD_SYNC in LinkAccess.usbOnlySettings)
     }
+
+    private fun ip(s: String) = java.net.InetAddress.getByName(s) // literals only: no DNS
+
+    @Test fun usbIsAlwaysAdmitted() {
+        assertTrue(LinkAccess.admit(ip("127.0.0.1"), ip("127.0.0.1"), lan = false, tailnet = false))
+    }
+
+    @Test fun wifiPeersOnlyWhenWifiIsAllowed() {
+        assertFalse(LinkAccess.admit(ip("192.168.1.20"), ip("192.168.1.5"), lan = false, tailnet = true))
+        assertTrue(LinkAccess.admit(ip("192.168.1.20"), ip("192.168.1.5"), lan = true, tailnet = false))
+    }
+
+    /** Both ends must be tailnet addresses: a LAN device spoofing a 100.x source never completes the handshake, and Wi-Fi traffic stays out. */
+    @Test fun tailnetPeersOnlyOverTheTailnet() {
+        assertTrue(LinkAccess.admit(ip("100.101.102.103"), ip("100.90.1.2"), lan = false, tailnet = true))
+        assertTrue(LinkAccess.admit(ip("fd7a:115c:a1e0::1"), ip("fd7a:115c:a1e0::2"), lan = false, tailnet = true))
+        assertFalse(LinkAccess.admit(ip("100.101.102.103"), ip("100.90.1.2"), lan = false, tailnet = false))
+        assertFalse(LinkAccess.admit(ip("100.101.102.103"), ip("192.168.1.5"), lan = false, tailnet = true))
+        assertFalse(LinkAccess.admit(ip("100.128.0.1"), ip("100.90.1.2"), lan = false, tailnet = true)) // outside 100.64/10
+    }
+
+    @Test fun tailnetSwitchIsUsbOnly() {
+        assertTrue(Keys.LINK_TAILNET in LinkAccess.usbOnlySettings)
+    }
 }

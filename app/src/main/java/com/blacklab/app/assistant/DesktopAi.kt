@@ -52,7 +52,25 @@ object DesktopAi {
 
     private val enabled: Boolean get() = app?.settings?.current?.asstDesktopAi ?: false
     private fun token(): String? = app?.secrets?.get(Secrets.DESKTOP_AI)
-    private fun base(): String = (app?.secrets?.get(Secrets.DESKTOP_AI_URL) ?: DEFAULT_URL).trimEnd('/')
+    /** The address that answered last (USB or Tailscale); calls go there until a probe finds otherwise. */
+    @Volatile private var active: String? = null
+    private fun routes(): List<String> = candidates(app?.secrets?.get(Secrets.DESKTOP_AI_URL), app?.secrets?.get(Secrets.DESKTOP_AI_TAILNET_URL))
+    private fun base(): String = active ?: routes().first()
+
+    private val tailnetHost = Regex("^(100\\.(6[4-9]|[7-9]\\d|1[01]\\d|12[0-7])\\.\\d{1,3}\\.\\d{1,3}|[a-z0-9-]+(\\.[a-z0-9-]+)*\\.ts\\.net)$")
+
+    /**
+     * Where to look for the computer: the USB link (adb reverse) first, then its Tailscale address
+     * (./daddyshome provisions it when the companion's tailnet listener is on). The shared key goes to
+     * whichever answers, so the Tailscale URL is used only if it really names a tailnet host.
+     */
+    fun candidates(usbUrl: String?, tailnetUrl: String?): List<String> {
+        val usb = (usbUrl?.takeIf { it.isNotBlank() } ?: DEFAULT_URL).trimEnd('/')
+        val tail = tailnetUrl?.trim()?.trimEnd('/')?.takeIf { u ->
+            runCatching { java.net.URI(u) }.getOrNull()?.let { it.scheme == "http" && it.host != null && tailnetHost.matches(it.host.lowercase()) } == true
+        }
+        return listOfNotNull(usb, tail).distinct()
+    }
 
     private val handOff = Regex("^(?:on (?:my |the )?(?:desktop|computer|pc|laptop)\\b|(?:ask|tell|have) (?:my |the )?(?:desktop|computer|pc|laptop)\\b|(?:desktop|computer)[:,])")
     private val bare = Regex("^(?:what'?s|whats|how'?s|hows|check|show)?\\s*(?:the |my )?(?:desktop|computer|pc|laptop)(?:'?s)? (?:ai|brain|model|llm|assistant)(?: status| connection)?$|^(?:desktop|computer) (?:status|connection)$|^(?:is|are) (?:the |my )?(?:desktop|computer|pc|laptop)(?:'?s)? (?:ai )?(?:up|down)$")
@@ -84,10 +102,15 @@ object DesktopAi {
             token() == null -> Status(State.NOT_PAIRED)
             else -> {
                 val t0 = System.currentTimeMillis()
-                runCatching { call("GET", "/phone/status", null, 1_500) }.fold(
+                // the first route that answers wins (USB, then Tailscale); a rejected key stops the search
+                val tried = routes().asSequence().map { url -> url to runCatching { call("GET", "/phone/status", null, 1_500, url) } }
+                    .firstOrNull { (_, r) -> r.isSuccess || r.exceptionOrNull() is SecurityException } ?: (base() to Result.failure(java.io.IOException("unreachable")))
+                if (tried.second.isSuccess) active = tried.first
+                tried.second.fold(
                     onSuccess = { j ->
                         val models = j.optJSONArray("models")?.let { a -> (0 until a.length()).map { a.getString(it) } }.orEmpty()
                         if (j.optBoolean("ollama")) Status(State.ONLINE, j.optString("model"), models, j.optString("host"), System.currentTimeMillis(), System.currentTimeMillis() - t0)
+                            .let { st -> if (tried.first != routes().first()) st.copy(note = "via Tailscale") else st }
                         else Status(State.OFFLINE, note = "The companion is up but Ollama isn't — run ./daddyshome", checkedAt = System.currentTimeMillis())
                     },
                     onFailure = { e -> Status(State.OFFLINE, note = if (e is SecurityException) "The computer rejected this phone's key — run ./daddyshome again" else "", checkedAt = System.currentTimeMillis()) },
@@ -147,8 +170,8 @@ object DesktopAi {
         }
     }
 
-    private fun call(method: String, path: String, body: JSONObject?, timeoutMs: Int): JSONObject {
-        val c = URL(base() + path).openConnection() as HttpURLConnection
+    private fun call(method: String, path: String, body: JSONObject?, timeoutMs: Int, at: String = base()): JSONObject {
+        val c = URL(at + path).openConnection() as HttpURLConnection
         try {
             c.requestMethod = method
             c.connectTimeout = minOf(timeoutMs, 2_000)

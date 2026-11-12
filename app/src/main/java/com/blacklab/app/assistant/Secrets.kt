@@ -30,6 +30,7 @@ class Secrets(context: Context) {
         /** Shared key for the desktop's local AI (provisioned by ./daddyshome) and where to reach it. */
         const val DESKTOP_AI = "desktop_ai"
         const val DESKTOP_AI_URL = "desktop_ai_url"
+        const val DESKTOP_AI_TAILNET_URL = "desktop_ai_tailnet_url"
 
         /** Free keys: Google AI Studio (Gemini), Picovoice (wake word), OpenWeatherMap (weather & facility alerts). */
         const val GEMINI = "gemini"
@@ -38,7 +39,7 @@ class Secrets(context: Context) {
 
         val all = listOf(ELEVENLABS, DEV_KNOWLEDGE, GOOGLE_DRIVE, GMAIL, GOOGLE_KEEP, GEMINI, PICOVOICE, OPENWEATHER)
         /** Keys that may arrive by provisioning file or the desktop link (not shown in the key list). */
-        val provisionable = all + listOf(DESKTOP_AI, DESKTOP_AI_URL)
+        val provisionable = all + listOf(DESKTOP_AI, DESKTOP_AI_URL, DESKTOP_AI_TAILNET_URL)
         private const val ALIAS = "blacklab_secrets_v1"
     }
 

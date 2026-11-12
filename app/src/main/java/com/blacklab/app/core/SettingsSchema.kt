@@ -187,6 +187,7 @@ object SettingsSchema {
         Section("sync", "Desktop link & sync", "sync", "How the phone talks to BlackLab Desktop.", listOf(
             bool(Keys.LINK_ENABLED, "Desktop link", "Run the local link server so BlackLab Desktop can sync over USB or Wi-Fi.", d.linkEnabled),
             bool(Keys.LINK_LAN, "Allow Wi-Fi connections", "Listen on the local network, not just USB. Still requires the pairing code.", d.linkLan),
+            bool(Keys.LINK_TAILNET, "Allow Tailscale connections", "Accept BlackLab Desktop from your own tailnet (encrypted, works away from home). Still requires the pairing code.", d.linkTailnet),
             int(Keys.LINK_PORT, "Link port", "TCP port of the link server.", d.linkPort, 1024, 65535, advanced = true),
             bool(Keys.CLOUD_SYNC, "Cloud sync (Google Drive)", "Mirror settings and a data snapshot to your Drive's hidden app folder so the web UI works from anywhere.", d.cloudSync),
             intChoice(Keys.CLOUD_SYNC_MIN, "Cloud sync interval", "Background sync period.", d.cloudSyncMinutes, 15 to "15 minutes", 30 to "30 minutes", 60 to "1 hour", 180 to "3 hours"),
