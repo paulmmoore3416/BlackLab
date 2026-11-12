@@ -34,7 +34,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       # Standard library only: the safety rules (HTTP, paths, privacy, tool calls) and the Obsidian vault writer
       - name: Unit tests
         run: python3 -m unittest discover -s desktop/companion/tests -v
@@ -60,7 +60,7 @@ jobs:
           java-version: '21'
 
       - name: Set up Gradle
-        uses: gradle/actions/setup-gradle@ed408507eac070d1f99cc633dbcf757c94c7933a # v4 (also validates the Gradle wrapper)
+        uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c # v4 (also validates the Gradle wrapper)
 
       - name: Unit tests
         run: ./gradlew :app:testDebugUnitTest --stacktrace
@@ -102,7 +102,7 @@ jobs:
           java-version: '21'
 
       - name: Set up Gradle
-        uses: gradle/actions/setup-gradle@ed408507eac070d1f99cc633dbcf757c94c7933a # v4 (also validates the Gradle wrapper)
+        uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c # v4 (also validates the Gradle wrapper)
 
       - name: Enable KVM
         run: |
