@@ -117,7 +117,7 @@ dependencies {
     implementation("androidx.room:room-ktx:$room")
     ksp("androidx.room:room-compiler:$room")
     // room-testing 2.8 (MigrationTest) is built against kotlinx-serialization 1.8; keep the app on the same line
-    implementation(platform("org.jetbrains.kotlinx:kotlinx-serialization-bom:1.8.1"))
+    implementation(platform("org.jetbrains.kotlinx:kotlinx-serialization-bom:1.12.0"))
 
     // 1.6+: Extensions (Night/Portrait/HDR) keep working after CameraX ≤1.5 support ends on 2026-11-01
     val camerax = "1.6.2"
