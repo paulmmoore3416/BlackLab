@@ -68,12 +68,16 @@ class LinkHub(private val app: AppContainer) {
         })
         app.appScope.launch { app.settings.state.drop(1).collect { bump() } }
         app.appScope.launch { app.assistant.messages.drop(1).collect { bump() } }
+        LinkWatch.launch(app.appScope, LinkWatch.stores().map { it.state }) { bump() }
     }
 
-    /** Debounced push of the snapshot to Google Drive while the app process is alive. */
+    /**
+     * Pushes the snapshot to Google Drive at most 45 s after the first unpushed change. Not a resetting debounce:
+     * a steady stream of changes (a drive's live readings) would otherwise postpone the push forever.
+     */
     private fun scheduleCloudPush() {
         if (!app.settings.current.cloudSync) return
-        cloudJob?.cancel()
+        if (cloudJob?.isActive == true) return
         cloudJob = app.appScope.launch { delay(45_000); CloudSync.sync(app) }
     }
 
