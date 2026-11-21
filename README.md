@@ -1,8 +1,8 @@
 <div align="center">
 
-<img src="docs/icon.png" width="112" alt="BlackLab icon"/>
+<img src="docs/brand/blacklab-logo.jpg" width="100%" alt="BlackLab — Software &amp; AI Solutions"/>
 
-# BlackLab
+<h1>BlackLab</h1>
 
 **A private, all-in-one personal & professional workspace for Android.**
 Pro camera & photo editor · dictation · audio recorder · Word-class documents · journal · to-do · calendar · education & certification tracking — in one app, with every file saved to a real folder on your phone.
@@ -57,11 +57,11 @@ Optimized for the **Google Pixel 10 Pro XL** and newer (Android 15+).
 - **Activity ledger:** a tamper-evident, hash-chained record of every change, job and AI tool call
 - **Reverse engineering** on the computer with REA + Ghidra (read-only)
 
-### 🚗 Android Auto — built for the 2023 Hyundai Santa Fe
+### 🚗 Android Auto
 - **Ask BlackLab** hands-free through the car's microphone, with spoken replies — tasks, calendar, notes, email, summaries, knowledge questions, “navigate to my next meeting”
 - **Brief me** (daily briefing and spoken summaries), **Agenda** with Navigate and Call, **Tasks** with check-off and voice add, **Voice notes**
 - **Talk** through any conversation knowledge base, hands-free
-- **Santa Fe Garage** on the dash: fuel level, range and odometer when the car shares them, service due, MPG, voice fuel and service logs
+- **New task** by voice from the home grid
 - Reminders pop up on the car display; music and recordings play from Android Auto's media launcher
 - Setup (Unknown sources in Android Auto developer settings) in [docs/ANDROID_AUTO.md](docs/ANDROID_AUTO.md)
 
@@ -87,10 +87,13 @@ An encrypted workspace for working on a behavioral health unit, using initials a
 - **Wellness & Supervision**: after-shift check-ins, compassion-fatigue trends, supervision hours, self-care plan
 - Encrypted with a Keystore key, never backed up or synced; census, rounds and drafts are erased automatically. The facility's EHR stays the record of care.
 
-### 🔧 Garage
-- 2023 Santa Fe profile, editable maintenance schedule (normal or severe service) with what's due next, fuel log with MPG and cost per mile, service history
-- **Car link** (5.7): connect to the car's Bluetooth and a drive starts on its own. You get a trip log with a mileage-deduction CSV, the parking spot, and an odometer estimate between readings. It also pulls everything the car shares through **Android Auto**, a Bluetooth **OBD-II** adapter (VIN, check-engine codes, temperatures, voltage, fuel flow and real MPG) and **Hyundai Bluelink** (locks, doors, tire warnings, fluids, 12V battery, where it's parked). See [docs/ANDROID_AUTO.md](docs/ANDROID_AUTO.md#car-data)
-- **5.8**: recalls and build details from your VIN (NHTSA), fill-up detection, predicted service dates with To-Do reminders, automatic trip tags, a Car widget, a practice-drive simulator, Garage charts, and a Garage page on BlackLab Desktop. Appearance adds True black and other dark styles, corner and size options, font and reading-font choices, and an Android 16 Live Update for drives
+### 💼 Office — PowerPoint, Excel, Word, Microsoft 365 and Teams (5.15)
+- **PowerPoint as it looks in PowerPoint:** shapes, text, pictures, tables, theme colors, layouts and charts drawn from the deck's own data, with speaker notes
+- **Present:** full screen with tap, swipe or a Bluetooth clicker; a presenter view with notes, a timer and the next slide; slides on a TV or projector while the phone shows your notes
+- **Excel as it looks in Excel:** number formats, bold, fills, colors, column widths and frozen headers, with live formulas across sheets and named ranges (lookups, SUMIFS, SUMPRODUCT, NPV/IRR/PMT and more). **Saving rewrites only the cells you changed**, so charts, formatting and names stay intact
+- **Office hub:** recent Office files, one tap to open in PowerPoint/Excel/Word with write access, Teams meetings from your calendars with **Join**, and your personal **Microsoft 365** account (OneDrive with save-back, Outlook, calendar, To Do)
+- **Sections:** pick 2–5 bottom tabs, order the side menu, hide or rename any section
+- **Fluent glass:** Microsoft's Mica and acrylic look with Fluent corners and Microsoft Blue, Word, Excel, PowerPoint and Teams palettes, plus one-tap **quick looks**
 - **5.8.1**: BlackLab Desktop adds Brainstorm (notebooks, notes with checklists, tagged lines), Knowledge (every knowledge base), Summarize and Flashcards, to match the app
 - **5.10.0**: **Facility** — assets with QR tags, PM and life-safety inspection schedules (NFPA 10/101/110, ANSI Z358.1 and more), pass/fail logging with work orders, and a survey binder PDF; encrypted backups with a passphrase and a checked, reversible restore
 - **5.9.0**: Notes gets its own Google Keep-style section (labels, reminders, archive, swipe to archive, undo/redo) with a Notes card on Home, and Settings › Home dashboard lets you choose and order every Home card
@@ -223,7 +226,7 @@ Rich-text entries saved as dated files, mood tracking, tags & location, favorite
 ### 🔐 Accounts, privacy & storage
 - Personal / Professional accounts with separate data and folders; default account at launch
 - Optional **biometric / device-credential lock** for the app and/or the Professional account
-- Daily automatic **encrypted backups** (database, settings, Garage, Facility, conversations) to `BlackLab/Backups` (14 kept); a backup passphrase lets them restore on a new phone, and every restore is checked first and reversible
+- Daily automatic **encrypted backups** (database, settings, Facility, conversations) to `BlackLab/Backups` (14 kept); a backup passphrase lets them restore on a new phone, and every restore is checked first and reversible
 - **Safe in-app updates** from GitHub Releases: an update installs only if its SHA-256 matches the published checksum **and** it is signed with the same key as the installed app (optional weekly check, off by default)
 - **Problem reports** kept only on the phone: crashes, freezes (ANRs) and native crashes, with share/copy/delete
 - BlackLab has no backend, no account and no analytics of its own; your content never leaves the device unless you share or export it
@@ -301,7 +304,7 @@ scripts/privacy-scan.sh                     # fails on personal data (plus your 
 
 **Phone ⇄ desktop contract.** `SnapshotContractTest` builds the phone's snapshot from sample data with the app's own code and checks its shape against `desktop/web/tests/snapshot.fixture.json`; the desktop tests render every view against that fixture and fail on any field the desktop reads that the phone doesn't send. Change the snapshot on purpose → regenerate with `BL_EXPORT=1 ./gradlew :app:testDebugUnitTest --tests com.blacklab.app.link.SnapshotContractTest`.
 
-CI runs the secret and privacy scans, the desktop and companion tests, unit tests, both builds and the on-device tests on an Android 15 emulator for every push and pull request. The on-device tests cover the database upgrade, pictures on pages and every export format, notebook import, voice recording, location reminders, the widgets, update verification, the crash log, the PDF tools, encrypted signatures and signing, filling and signing a real PDF form, and every Android Auto screen against the Car App Library's template rules. Unit tests cover the knowledge bases (format and retrieval quality), every summary style, and the Garage schedule, MPG and voice parsing.
+CI runs the secret and privacy scans, the desktop and companion tests, unit tests, both builds and the on-device tests on an Android 15 emulator for every push and pull request. The on-device tests cover the database upgrade, pictures on pages and every export format, notebook import, voice recording, location reminders, the widgets, update verification, the crash log, the PDF tools, encrypted signatures and signing, filling and signing a real PDF form, and every Android Auto screen against the Car App Library's template rules. Unit tests cover the knowledge bases (format and retrieval quality), every summary style, Excel reading/formatting/in-place saving and formulas, and PowerPoint rendering.
 
 ### Publishing a release
 

@@ -131,8 +131,6 @@ object Widgets {
         runCatching { TodayWidget().updateAll(context) }
         runCatching { ChecklistWidget().updateAll(context) }
         runCatching { CaptureWidget().updateAll(context) }
-        CarWidget.version.value = CarWidget.version.value + 1
-        runCatching { CarWidget().updateAll(context) }
     }
 
     private fun hide(app: AppContainer, onLockScreen: Boolean) = onLockScreen || app.settings.current.widgetPrivacy == "COUNTS"

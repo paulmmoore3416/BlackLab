@@ -38,17 +38,35 @@ object DesktopAi {
     private val lock = Mutex()
     const val DEFAULT_URL = "http://127.0.0.1:8770"
 
+    /** Wakes the link check early (network change, app opened); the loop below does the work. */
+    private val wake = kotlinx.coroutines.channels.Channel<Unit>(kotlinx.coroutines.channels.Channel.CONFLATED)
+
     fun init(container: AppContainer) {
         if (app != null) return
         app = container
         container.appScope.launch {
             while (true) {
+                val was = _status.value.state
                 probe()
                 if (_status.value.state == State.ONLINE) runCatching { DesktopJobs.sync(container) }
-                delay(if (_status.value.state == State.ONLINE) (if (DesktopJobs.jobs.value.isNotEmpty()) 20_000 else 60_000) else 20_000)
+                if (was != State.ONLINE && _status.value.state == State.ONLINE) android.util.Log.i("DesktopAi", "computer reachable ${_status.value.note}")
+                val wait = if (_status.value.state == State.ONLINE) (if (DesktopJobs.jobs.value.isNotEmpty() || DesktopJobs.outbox.value > 0) 20_000L else 60_000L) else 12_000L
+                kotlinx.coroutines.withTimeoutOrNull(wait) { wake.receive() }
             }
         }
+        // Wi-Fi, cellular or Tailscale coming up (or going away): check the computer right away
+        runCatching {
+            val cm = container.context.getSystemService(android.net.ConnectivityManager::class.java)
+            cm.registerDefaultNetworkCallback(object : android.net.ConnectivityManager.NetworkCallback() {
+                override fun onAvailable(network: android.net.Network) { kick() }
+                override fun onLost(network: android.net.Network) { kick() }
+                override fun onCapabilitiesChanged(network: android.net.Network, caps: android.net.NetworkCapabilities) { if (_status.value.state != State.ONLINE) kick() }
+            })
+        }
     }
+
+    /** Re-check the computer now (and send anything waiting in the outbox once it answers). */
+    fun kick() { wake.trySend(Unit) }
 
     private val enabled: Boolean get() = app?.settings?.current?.asstDesktopAi ?: false
     private fun token(): String? = app?.secrets?.get(Secrets.DESKTOP_AI)
@@ -103,7 +121,8 @@ object DesktopAi {
             else -> {
                 val t0 = System.currentTimeMillis()
                 // the first route that answers wins (USB, then Tailscale); a rejected key stops the search
-                val tried = routes().asSequence().map { url -> url to runCatching { call("GET", "/phone/status", null, 1_500, url) } }
+                // USB answers in milliseconds; Tailscale over cellular can take a few seconds to wake
+                val tried = routes().asSequence().map { url -> url to runCatching { call("GET", "/phone/status", null, if (url.contains("127.0.0.1") || url.contains("localhost")) 1_500 else 4_000, url) } }
                     .firstOrNull { (_, r) -> r.isSuccess || r.exceptionOrNull() is SecurityException } ?: (base() to Result.failure(java.io.IOException("unreachable")))
                 if (tried.second.isSuccess) active = tried.first
                 tried.second.fold(
@@ -127,9 +146,9 @@ object DesktopAi {
         return lock.withLock {
             withContext(Dispatchers.IO) {
                 runCatching {
-                    call("POST", "/phone/generate", JSONObject().put("prompt", prompt).put("temperature", temperature.toDouble()).put("max_tokens", maxTokens), timeoutMs.toInt())
+                    callAny("POST", "/phone/generate", JSONObject().put("prompt", prompt).put("temperature", temperature.toDouble()).put("max_tokens", maxTokens), timeoutMs.toInt())
                         .optString("text").trim().takeIf { it.isNotBlank() }
-                }.getOrElse { _status.value = _status.value.copy(state = State.OFFLINE, checkedAt = System.currentTimeMillis()); null }
+                }.getOrElse { kick(); null } // one slow or failed reply isn't "offline": re-check instead of guessing
             }
         }
     }
@@ -141,14 +160,42 @@ object DesktopAi {
         if (!usable && probe().state != State.ONLINE) return null
         return withContext(Dispatchers.IO) {
             runCatching {
-                val j = call("POST", "/phone/ask", JSONObject().put("text", text), 180_000)
+                val j = callAny("POST", "/phone/ask", JSONObject().put("text", text), 180_000)
                 DesktopReply(j.optString("text"), j.optString("source", "Desktop"))
             }.getOrNull()
         }
     }
 
+    /** Executes a specific tool on the desktop assistant (execute_command, find_files, vault_search, nightjar_camera, etc.) */
+    suspend fun executeTool(name: String, arguments: JSONObject = JSONObject()): JSONObject? {
+        if (!usable && probe().state != State.ONLINE) return null
+        return withContext(Dispatchers.IO) {
+            runCatching {
+                callAny("POST", "/phone/tool", JSONObject().put("name", name).put("arguments", arguments), 120_000)
+            }.getOrNull()
+        }
+    }
+
+
     /** For DesktopJobs: one authenticated call to the companion (throws on failure). */
-    internal fun request(method: String, path: String, body: JSONObject?, timeoutMs: Int): JSONObject = call(method, path, body, timeoutMs)
+    internal fun request(method: String, path: String, body: JSONObject?, timeoutMs: Int): JSONObject = callAny(method, path, body, timeoutMs)
+
+    /**
+     * [call] on the route that answered last, then on the other one if the connection itself failed (USB unplugged
+     * mid-session while Tailscale is up, or the other way round). A rejected key or an HTTP error is not retried.
+     */
+    private fun callAny(method: String, path: String, body: JSONObject?, timeoutMs: Int): JSONObject {
+        val first = base()
+        try { return call(method, path, body, timeoutMs, first) } catch (e: java.io.IOException) {
+            for (url in routes().filter { it != first }) {
+                val r = runCatching { call(method, path, body, timeoutMs, url) }
+                if (r.isSuccess) { active = url; kick(); return r.getOrThrow() }
+                if (r.exceptionOrNull() is SecurityException) throw r.exceptionOrNull()!!
+            }
+            kick()
+            throw e
+        }
+    }
 
     /** Streams a file to the companion's inbox and returns its upload id, or null if the computer refused it. */
     internal fun upload(file: java.io.File): String? {

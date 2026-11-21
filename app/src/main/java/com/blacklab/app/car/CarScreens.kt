@@ -40,7 +40,6 @@ import com.blacklab.app.data.TaskOps
 import com.blacklab.app.knowledge.Knowledge
 import com.blacklab.app.summarize.Summarizer
 import com.blacklab.app.summarize.SummarySources
-import com.blacklab.app.vehicle.Garage
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -101,7 +100,7 @@ class CarHomeScreen(carContext: CarContext) : Screen(carContext) {
             Tile("Tasks", R.drawable.ic_car_task) { CarTasksScreen(c) },
             Tile("Talk", R.drawable.ic_car_chat) { CarTalkListScreen(c) },
             Tile("Voice note", R.drawable.ic_car_note) { CarCaptureScreen(c, CarCaptureScreen.Mode.NOTE) },
-            Tile(Garage.load(c).vehicle.model.ifBlank { "Garage" }, R.drawable.ic_car_car) { CarGarageScreen(c) },
+            Tile("New task", R.drawable.ic_car_task) { CarCaptureScreen(c, CarCaptureScreen.Mode.TASK) },
         )
         val max = c.limit(ConstraintManager.CONTENT_LIMIT_TYPE_GRID, 6)
         // "Ask" is always in the header too, so it's the first tile to give up if the car allows fewer
@@ -220,7 +219,7 @@ abstract class VoiceTurnScreen(carContext: CarContext, private val title: String
     }
 }
 
-/** "Ask BlackLab": the full assistant by voice — tasks, calendar, notes, Gmail, summaries, Garage, knowledge, navigation. */
+/** "Ask BlackLab": the full assistant by voice — tasks, calendar, notes, Gmail, summaries, knowledge, navigation. */
 class CarAskScreen(carContext: CarContext) : VoiceTurnScreen(carContext, "Ask ${carContext.app.settings.current.asstName}", carContext.app.settings.current.asstName, autoStart = true) {
     override fun keepListening() = app.assistant.pending.value != null // waiting for a yes/no
     override suspend fun respond(text: String): String {
@@ -235,7 +234,6 @@ class CarAskScreen(carContext: CarContext) : VoiceTurnScreen(carContext, "Ask ${
                         val q = route.substringAfter("?q=", "").let { Uri.decode(it) }
                         screenManager.push(CarTalkScreen(carContext, id, q.ifBlank { null }))
                     }
-                    route == "garage" -> screenManager.push(CarGarageScreen(carContext))
                     route == "tasks" || route.startsWith("task/") -> {}
                 }
             }
@@ -399,14 +397,12 @@ class CarTasksScreen(carContext: CarContext) : Screen(carContext) {
     }
 }
 
-// ------------------------------------------------------------------ capture: voice note / task / fuel / service
+// ------------------------------------------------------------------ capture: voice note / task
 
 class CarCaptureScreen(carContext: CarContext, private val mode: Mode) : Screen(carContext) {
     enum class Mode(val title: String, val prompt: String) {
         NOTE("Voice note", "Speak your note. Tap Save when you're done."),
         TASK("New task", "Say the task — e.g. “call the roofer tomorrow at 9”."),
-        FUEL("Log fuel", "Say gallons, price and miles — “13.2 gallons, 48 dollars, 31,250 miles”."),
-        SERVICE("Log service", "Say what was done — “oil change and tire rotation at 31,000 miles”."),
     }
 
     private val app = carContext.app
@@ -469,20 +465,6 @@ class CarCaptureScreen(carContext: CarContext, private val mode: Mode) : Screen(
             "Saved your voice note."
         }
         Mode.TASK -> app.assistant.handle("add task $t", Origin.CAR).text
-        Mode.FUEL -> {
-            val f = Garage.parseFuel(t) ?: return "I need the gallons — try again with “13 gallons”."
-            Garage.addFuel(carContext, f)
-            val mpg = Garage.fuelStats(Garage.state.value.fuel).lastMpg
-            "Logged ${f.gallons} gallons" + (f.cost?.let { " for $${"%.2f".format(it)}" } ?: "") + "." + (mpg?.let { " That tank was ${"%.1f".format(it)} mpg." } ?: "")
-        }
-        Mode.SERVICE -> {
-            val st = Garage.load(carContext)
-            val ids = Garage.matchItems(t, st.items)
-            if (ids.isEmpty()) return "I didn't recognize the service. Try “oil change at 31,000 miles”."
-            val miles = Regex("(\\d{1,3}(?:,\\d{3})+|\\d{3,6})").findAll(t).map { it.value.replace(",", "").toInt() }.filter { it >= 100 }.maxOrNull()
-            Garage.logService(carContext, ids, miles)
-            "Logged " + st.items.filter { it.id in ids }.joinToString(", ") { it.name.lowercase() } + (miles?.let { " at ${Garage.fmtMiles(it)} miles" } ?: "") + "."
-        }
     } }
 
     override fun onGetTemplate(): Template {
@@ -551,80 +533,6 @@ class CarSummaryScreen(carContext: CarContext, private val preset: SummarySource
             .addAction(action("Stop", c.icon(R.drawable.ic_car_stop)) { app.speaker.stop() })
             .build()
         return PaneTemplate.Builder(pane).setTitle(title).setHeaderAction(Action.BACK).build()
-    }
-}
-
-// ------------------------------------------------------------------ garage (Santa Fe)
-
-class CarGarageScreen(carContext: CarContext) : Screen(carContext) {
-    private var shown = ""
-
-    init {
-        // Redraw when the car reports something new that changes what's on screen (at most every 5 s)
-        lifecycleScope.launch {
-            com.blacklab.app.vehicle.VehicleLink.state.collect {
-                val text = lines().joinToString("|")
-                if (text != shown) { shown = text; invalidate(); kotlinx.coroutines.delay(5000) }
-            }
-        }
-    }
-
-    private fun lines(): List<String> {
-        val s = com.blacklab.app.vehicle.VehicleLink.state.value
-        val T = com.blacklab.app.vehicle.Telemetry
-        val live = com.blacklab.app.vehicle.VehicleLink.live.value
-        val fuel = listOfNotNull(s["fuel_pct"]?.let { "Fuel ${T.format(it)}" }, s["range"]?.let { "${T.format(it)} range" }).joinToString(" · ")
-        val health = listOfNotNull(
-            s.activeDtcs.takeIf { it.isNotEmpty() }?.let { c -> "${c.size} code${if (c.size > 1) "s" else ""}: ${c.first().code}" } ?: s["mil"]?.takeIf { it.bool == true }?.let { "Check engine ON" },
-            s["battery_v"]?.let { "Battery ${T.format(it)}" }, s["coolant"]?.let { "Coolant ${T.format(it)}" },
-            s["tire_warning"]?.takeIf { it.text != "OK" }?.let { "Tires: ${it.text}" },
-            live.takeIf { it.active && it.tripMiles > 0.1 }?.let { "Trip %.1f mi".format(it.tripMiles) },
-        ).joinToString(" · ")
-        return listOf(s["model"]?.text.orEmpty(), fuel, health)
-    }
-
-    override fun onGetTemplate(): Template {
-        val c = carContext
-        val st = Garage.load(c)
-        val v = st.vehicle
-        val due = Garage.due(st)
-        val urgent = due.filter { it.status == Garage.Status.OVERDUE || it.status == Garage.Status.DUE_SOON }
-        val next = urgent.firstOrNull() ?: due.firstOrNull { it.status == Garage.Status.OK }
-        val stats = Garage.fuelStats(st.fuel)
-        val (model, fuelLine, health) = lines()
-        val pane = Pane.Builder()
-        val odo = if (v.odometer > 0) "${if (v.estMiles > 0) "≈ " else ""}${Garage.fmtMiles(v.odometerNow)} mi" else "Odometer not set"
-        pane.addRow(row(model.ifBlank { v.name }, listOfNotNull(odo, fuelLine.ifBlank { null }).joinToString(" · ")))
-        pane.addRow(row(if (urgent.isNotEmpty()) "Service due" else "Next service",
-            next?.let { "${it.item.name} — ${it.describe()}" } ?: "Log your last service to start tracking",
-            if (urgent.size > 1) "+${urgent.size - 1} more due" else ""))
-        pane.addRow(row("Fuel", listOfNotNull(stats.avgMpg?.let { "Avg ${"%.1f".format(it)} mpg" }, stats.lastMpg?.let { "last ${"%.1f".format(it)}" },
-            stats.monthCost.takeIf { it > 0 }?.let { "$${"%.0f".format(it)} this month" }).joinToString(" · ").ifBlank { "Log a fill-up to see MPG" }))
-        if (health.isNotBlank() && c.limit(ConstraintManager.CONTENT_LIMIT_TYPE_PANE, 4) >= 4) pane.addRow(row("Car health", health))
-        pane.addAction(action("Log fuel", c.icon(R.drawable.ic_car_fuel, CarColor.PRIMARY)) { screenManager.pushForResult(CarCaptureScreen(c, CarCaptureScreen.Mode.FUEL)) { invalidate() } })
-        pane.addAction(action("Log service", c.icon(R.drawable.ic_car_wrench)) { screenManager.pushForResult(CarCaptureScreen(c, CarCaptureScreen.Mode.SERVICE)) { invalidate() } })
-        val strip = ActionStrip.Builder()
-            .addAction(action("Schedule", c.icon(R.drawable.ic_car_wrench)) { screenManager.push(CarScheduleScreen(c)) })
-            .addAction(iconAction(c.icon(R.drawable.ic_car_fuel)) { c.navigateTo("gas station") })
-            .build()
-        return PaneTemplate.Builder(pane.build()).setTitle(v.nickname.ifBlank { "${v.model} · Garage" }).setHeaderAction(Action.BACK).setActionStrip(strip).build()
-    }
-}
-
-class CarScheduleScreen(carContext: CarContext) : Screen(carContext) {
-    override fun onGetTemplate(): Template {
-        val c = carContext
-        val st = Garage.load(c)
-        val limit = c.limit(ConstraintManager.CONTENT_LIMIT_TYPE_LIST, 6)
-        val il = ItemList.Builder()
-        Garage.due(st).take(limit).forEach { d ->
-            val tag = when (d.status) { Garage.Status.OVERDUE -> "Overdue"; Garage.Status.DUE_SOON -> "Due soon"; Garage.Status.OK -> "OK"; Garage.Status.UNKNOWN -> "Not logged" }
-            il.addItem(Row.Builder().setTitle(d.item.name).addText("$tag · ${d.describe()}").setImage(c.icon(R.drawable.ic_car_wrench,
-                if (d.status == Garage.Status.OVERDUE) CarColor.RED else if (d.status == Garage.Status.DUE_SOON) CarColor.YELLOW else null)).build())
-        }
-        val dealer = st.vehicle.dealer.ifBlank { "Hyundai service center" }
-        return ListTemplate.Builder().setTitle("Maintenance").setHeaderAction(Action.BACK).setSingleList(il.build())
-            .setActionStrip(ActionStrip.Builder().addAction(action("Dealer", c.icon(R.drawable.ic_car_nav)) { c.navigateTo(dealer) }).build()).build()
     }
 }
 

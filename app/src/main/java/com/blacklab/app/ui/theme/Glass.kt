@@ -34,24 +34,42 @@ data class GlassStyle(
     /** 0–1: how strongly the palette colors show in the backdrop. */
     val intensity: Float = 0.6f,
     val dark: Boolean = true,
+    /** Microsoft Fluent materials: Mica page, acrylic cards with a hairline stroke, neutral (untinted) surfaces. */
+    val fluent: Boolean = false,
+    /** 0–1: how opaque cards are. 0.5 is the original frosted look. */
+    val frost: Float = 0.5f,
 ) {
     val animated: Boolean get() = enabled && backdrop == "AURORA" && !Motion.reduced
 
     /** Card fill: frosted white in light mode, a faint lift in dark mode. */
     fun cardFill(tint: Color? = null): Color {
-        val base = if (dark) Color.White.copy(alpha = 0.065f) else Color.White.copy(alpha = 0.68f)
+        val f = frost.coerceIn(0f, 1f)
+        if (fluent) {
+            // Acrylic: a neutral layer (white / charcoal) at 55–95% over the Mica page; accent tint only as a whisper
+            val base = if (dark) Color(0xFF2C2C2C).copy(alpha = 0.42f + 0.5f * f) else Color.White.copy(alpha = 0.55f + 0.4f * f)
+            return if (tint == null) base else tint.copy(alpha = 0.05f).over(base)
+        }
+        val base = if (dark) Color.White.copy(alpha = 0.035f + 0.06f * f) else Color.White.copy(alpha = 0.45f + 0.46f * f)
         return if (tint == null) base else tint.copy(alpha = if (dark) 0.10f else 0.07f).over(base)
     }
 
     /** A light-catching edge: bright at the top-left, fading toward the bottom-right. */
     fun edge(tint: Color? = null): Brush {
+        if (fluent) {
+            // Fluent card stroke: a hairline that is a touch lighter at the top edge (elevation border)
+            val top = tint?.copy(alpha = 0.45f) ?: if (dark) Color.White.copy(alpha = 0.10f) else Color.Black.copy(alpha = 0.06f)
+            val bottom = tint?.copy(alpha = 0.25f) ?: if (dark) Color.White.copy(alpha = 0.05f) else Color.Black.copy(alpha = 0.13f)
+            return Brush.verticalGradient(listOf(top, bottom))
+        }
         val hi = tint?.copy(alpha = if (dark) 0.55f else 0.65f) ?: Color.White.copy(alpha = if (dark) 0.20f else 0.95f)
         val lo = tint?.copy(alpha = 0.14f) ?: (if (dark) Color.White.copy(alpha = 0.04f) else Color.Black.copy(alpha = 0.06f))
         return Brush.linearGradient(listOf(hi, lo))
     }
 
     /** Bars (top app bar when scrolled, navigation bar, drawer) over the backdrop. */
-    fun barFill(surface: Color, alpha: Float = 0.82f): Color = surface.copy(alpha = if (dark) alpha - 0.06f else alpha)
+    fun barFill(surface: Color, alpha: Float = 0.82f): Color =
+        if (fluent) (if (dark) Color(0xFF202020) else Color(0xFFF3F3F3)).copy(alpha = 0.80f + 0.15f * frost)
+        else surface.copy(alpha = if (dark) alpha - 0.06f else alpha)
 }
 
 val LocalGlass = staticCompositionLocalOf { GlassStyle(enabled = false) }
@@ -77,6 +95,17 @@ fun Backdrop(page: Color, accent: Color, secondary: Color, tertiary: Color, styl
     Canvas(modifier) {
         drawRect(page)
         if (style.backdrop == "PLAIN" || k == 0f) return@Canvas
+        if (style.backdrop == "MICA") {
+            // Mica: the page picks up a soft, still wash of your colors from the corners, like Windows 11 over a wallpaper
+            val w = size.width; val h = size.height; val r = max(w, h)
+            val a = k * if (style.dark) 0.20f else 0.24f
+            drawRect(Brush.radialGradient(listOf(accent.copy(alpha = a), accent.copy(alpha = 0f)), Offset(w * 0.05f, h * 0.0f), r * 0.95f))
+            drawRect(Brush.radialGradient(listOf(secondary.copy(alpha = a * 0.55f), secondary.copy(alpha = 0f)), Offset(w * 1.0f, h * 0.95f), r * 0.85f))
+            drawRect(Brush.radialGradient(listOf(tertiary.copy(alpha = a * 0.35f), tertiary.copy(alpha = 0f)), Offset(w * 0.9f, h * 0.15f), r * 0.6f))
+            // Luminosity layer: Mica keeps contrast by mixing the page color back over the tint
+            drawRect(page.copy(alpha = if (style.dark) 0.30f else 0.38f))
+            return@Canvas
+        }
         val t = phase.value * 2f * PI.toFloat()
         val w = size.width; val h = size.height; val r = max(w, h)
         fun blob(c: Color, a: Float, cx: Float, cy: Float, radius: Float) {

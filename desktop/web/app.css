@@ -283,7 +283,7 @@ button:not(.ghost):not(.danger):not(.icon-btn) { box-shadow: 0 6px 18px color-mi
   .card::before, .tile::before { display: none; }
 }
 
-/* garage charts: thin marks, 4px rounded tops, 2px gaps, recessive grid; text in text colors */
+/* charts: thin marks, 4px rounded tops, 2px gaps, recessive grid; text in text colors */
 .chart { width: 100%; height: auto; display: block; }
 .chart .grid { stroke: var(--line); stroke-width: 1; }
 .chart .ax { fill: var(--muted); font-size: 10px; }
@@ -323,3 +323,20 @@ button:not(.ghost):not(.danger):not(.icon-btn) { box-shadow: 0 6px 18px color-mi
 .kb-card { text-decoration: none; color: inherit; display: block; }
 .kb-card:hover { border-color: var(--accent); }
 .kb-entry p { line-height: 1.65; max-width: 72ch; }
+
+/* ---------- Fluent glass (Microsoft 365 / Windows 11): Mica page, acrylic layers, 4/8px corners, accent pill on the current nav item */
+:root[data-fluent] { --radius-sm: 4px; }
+:root[data-fluent] body { letter-spacing: 0; }
+:root[data-fluent] h1 { font-size: 28px; font-weight: 600; letter-spacing: 0; }
+:root[data-fluent] h2 { font-size: 20px; font-weight: 600; }
+:root[data-fluent] h3 { font-size: 14px; font-weight: 600; }
+:root[data-fluent] .card, :root[data-fluent] .tile { -webkit-backdrop-filter: blur(30px) saturate(1.25); backdrop-filter: blur(30px) saturate(1.25); }
+:root[data-fluent] button, :root[data-fluent] input, :root[data-fluent] select, :root[data-fluent] textarea, :root[data-fluent] .chip { border-radius: 4px; }
+:root[data-fluent] button { font-weight: 600; }
+:root[data-fluent] .seg { border-radius: 6px; }
+:root[data-fluent] .seg button { border-radius: 4px; }
+:root[data-fluent] nav a { border-radius: 4px; position: relative; }
+:root[data-fluent] nav a.active::before {
+  content: ""; position: absolute; left: 0; top: 50%; width: 3px; height: 16px; margin-top: -8px; border-radius: 2px; background: var(--accent);
+}
+:root[data-fluent] .topbar { border-bottom-color: var(--glass-line); }

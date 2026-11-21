@@ -85,7 +85,7 @@ test('every view renders the phone snapshot without holes', () => {
 });
 
 /**
- * Wraps the snapshot so every key a view reads is recorded as a path like `vehicle.trips[].mpg`.
+ * Wraps the snapshot so every key a view reads is recorded as a path like `brainstorm.notebooks[].name`.
  * Reads of keys the phone doesn't send are the drift this file exists to catch: the views fall
  * back to "—" or skip a panel, so nothing looks broken — the data is just silently gone.
  */
@@ -116,7 +116,6 @@ function recording(root) {
  * Keep this short: anything else a view reads must exist in the phone's snapshot.
  */
 const OPTIONAL = new Map([
-  ['vehicle.error', 'set by the phone only when the car section failed to build'],
   ['info.weather', 'only present once the phone has fetched a forecast'],
   ['info.cloud.error', 'null when sync is healthy (present as null — kept for older phones)'],
 ]);
@@ -138,7 +137,6 @@ test('views that only read the snapshot show its data', () => {
   shows('facility', 'Generator 1');
   shows('timeline', 'WO P2: Leak');
   shows('health', 'Last backup 9 days ago');
-  shows('garage', 'Work lot');
   shows('brainstorm', 'Projects');
   shows('tasks', 'Leak in room 214');
 });

@@ -239,12 +239,12 @@ fun HomeScreen() {
             }
             "tools" -> {
                 item {
-                    // Smart tools: summarize anything, talk through the knowledge bases, the Santa Fe
+                    // Smart tools: summarize anything, talk through the knowledge bases, your documents
                     Row(Modifier.fillMaxWidth().padding(top = 10.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         listOf(
                             Triple("Summarize", Icons.Rounded.Summarize, "summarize"),
                             Triple("Talk", Icons.Rounded.Forum, "knowledge"),
-                            Triple("Garage", Icons.Rounded.DirectionsCar, "garage"),
+                            Triple("Documents", Icons.Rounded.Description, "documents"),
                         ).forEach { (label, icon, route) ->
                             Surface(onClick = { shell.go(route) }, shape = RoundedCornerShape(16.dp), color = MaterialTheme.colorScheme.surfaceContainer, modifier = Modifier.weight(1f)) {
                                 Row(Modifier.padding(horizontal = 12.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.Center) {

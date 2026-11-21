@@ -50,14 +50,15 @@ object SettingsSchema {
     /** Mirrors ui/theme AccentPalette (kept here so settings don't depend on the UI layer). */
     private val PALETTES = arrayOf("MINT" to "Mint", "COBALT" to "Cobalt", "VIOLET" to "Violet", "CORAL" to "Coral", "ROSE" to "Rose",
         "FOREST" to "Forest", "AMBER" to "Amber", "OCEAN" to "Ocean", "GRAPHITE" to "Graphite", "AURORA" to "Aurora", "CRIMSON" to "Crimson",
-        "MIDNIGHT" to "Midnight", "SAGE" to "Sage", "COPPER" to "Copper", "LIME" to "Lime", "PLUM" to "Plum", "SKY" to "Sky")
+        "MIDNIGHT" to "Midnight", "SAGE" to "Sage", "COPPER" to "Copper", "LIME" to "Lime", "PLUM" to "Plum", "SKY" to "Sky",
+        "MICROSOFT" to "Microsoft Blue", "WORD" to "Word", "EXCEL" to "Excel", "POWERPOINT" to "PowerPoint", "TEAMS" to "Teams")
 
     /** Mirrors ui/theme LightStyle. */
-    private val LIGHT_STYLES = arrayOf("CLEAN" to "Clean", "PURE" to "Pure white", "WARM" to "Warm paper", "COOL" to "Cool mist", "WASH" to "Accent wash")
+    private val LIGHT_STYLES = arrayOf("CLEAN" to "Clean", "PURE" to "Pure white", "WARM" to "Warm paper", "COOL" to "Cool mist", "WASH" to "Accent wash", "FLUENT" to "Fluent Mica")
 
     /** Mirrors ui/theme DarkStyle and CornerStyle. */
-    private val DARK_STYLES = arrayOf("GRAPHITE" to "Graphite", "OLED" to "True black", "SLATE" to "Slate", "WASH" to "Accent wash")
-    private val CORNER_STYLES = arrayOf("ROUND" to "Round", "SOFT" to "Soft", "SQUARE" to "Square")
+    private val DARK_STYLES = arrayOf("GRAPHITE" to "Graphite", "OLED" to "True black", "SLATE" to "Slate", "WASH" to "Accent wash", "FLUENT" to "Fluent Mica")
+    private val CORNER_STYLES = arrayOf("ROUND" to "Round", "SOFT" to "Soft", "SQUARE" to "Square", "FLUENT" to "Fluent")
 
     private fun choice(key: String, label: String, help: String, default: String, vararg options: Pair<String, String>, advanced: Boolean = false) =
         Def(key, Store.STRING, label, help, "choice", options.toList(), default = default, advanced = advanced)
@@ -91,10 +92,11 @@ object SettingsSchema {
             choice(Keys.READING_FONT, "Reading font", "For long reading: Knowledge, Journal, Summaries, text files and the document editor's zoom.", d.readingFont,
                 "SAME" to "Same as the app", "SERIF" to "Serif", "SANS" to "Inter", "MONO" to "Monospace"),
             Def(Keys.READING_SIZE, Store.INT, "Reading size", "Text size for long reading.", "percent", min = 80.0, max = 160.0, step = 10.0, unit = "%", default = d.readingSize),
-            choice(Keys.VISUAL_STYLE, "Visual style", "Glass: a slowly moving backdrop in your palette colors with frosted cards. Solid: the classic flat look.", d.visualStyle,
-                "GLASS" to "Glass", "SOLID" to "Solid"),
-            choice(Keys.BACKDROP, "Backdrop", "Glass style background: moving aurora, still gradient, or plain.", d.backdrop, "AURORA" to "Aurora (moving)", "GRADIENT" to "Gradient (still)", "PLAIN" to "Plain"),
+            choice(Keys.VISUAL_STYLE, "Visual style", "Fluent glass: Microsoft's Mica and acrylic look. Glass: a slowly moving backdrop in your palette colors with frosted cards. Solid: the classic flat look.", d.visualStyle,
+                "FLUENT" to "Fluent glass", "GLASS" to "Glass", "SOLID" to "Solid"),
+            choice(Keys.BACKDROP, "Backdrop", "Glass style background: Mica (still, Windows 11), moving aurora, still gradient, or plain.", d.backdrop, "MICA" to "Mica (still)", "AURORA" to "Aurora (moving)", "GRADIENT" to "Gradient (still)", "PLAIN" to "Plain"),
             Def(Keys.BACKDROP_INTENSITY, Store.INT, "Backdrop intensity", "How strongly your palette colors show behind the glass.", "percent", min = 0.0, max = 100.0, step = 5.0, unit = "%", default = d.backdropIntensity),
+            Def(Keys.CARD_FROST, Store.INT, "Card frost", "How solid glass cards are. Lower lets more of the backdrop through.", "percent", min = 0.0, max = 100.0, step = 5.0, unit = "%", default = d.cardFrost),
             bool(Keys.HIGH_CONTRAST, "Stronger contrast", "Darker text and borders and deeper accents (WCAG AAA), in light and dark.", d.highContrast),
             bool(Keys.HAPTICS, "Haptic feedback", "Small vibrations when you complete, toggle, place or delete something.", d.haptics),
             bool(Keys.REDUCE_MOTION, "Reduce motion", "Shorter, simpler animations. Also follows the phone's \"Remove animations\" setting.", d.reduceMotion),
@@ -172,7 +174,7 @@ object SettingsSchema {
             bool(Keys.ASST_INDEX_JOURNAL, "Journal", "Index journal entries.", d.asstIndexJournal),
             bool(Keys.ASST_INDEX_TRANSCRIPTS, "Recordings & dictation", "Index transcripts.", d.asstIndexTranscripts),
             bool(Keys.ASST_INDEX_TASKS, "Tasks, events & courses", "Index titles and notes.", d.asstIndexTasks),
-            bool(Keys.ASST_INDEX_OPS, "Facility & Garage", "Index assets, inspections, work orders and service history (never the VIN or plate).", d.asstIndexOps),
+            bool(Keys.ASST_INDEX_OPS, "Facility", "Index assets, inspections and work orders.", d.asstIndexOps),
         )),
         Section("car", "Android Auto", "car", "BlackLab on your car's display (set up for the 2023 Hyundai Santa Fe).", listOf(
             bool(Keys.CAR_SPEAK, "Speak replies in the car", "Read answers, summaries and confirmations aloud through the car speakers.", d.carSpeak),
@@ -195,7 +197,6 @@ object SettingsSchema {
         Section("vault", "Obsidian vault", "book", "Mirror BlackLab into your Obsidian vault on the computer (via BlackLab Desktop): linked notes, a daily timeline and 13 knowledge nodes. Behavioral Health, keys, the VIN and plate never go.", listOf(
             bool(Keys.VAULT_ENABLED, "Mirror to the vault", "Send BlackLab's data to the vault while the desktop link is up (every 15 minutes when something changed).", d.vaultEnabled),
             bool(Keys.VAULT_FACILITY, "Facility", "Assets, inspections & PM, the work log.", d.vaultFacility),
-            bool(Keys.VAULT_GARAGE, "Garage", "Service, fuel, what's due and recalls (never the VIN, plate or trip places).", d.vaultGarage),
             bool(Keys.VAULT_TASKS, "Tasks & calendar", "Tasks, work orders and the next 30 days of events.", d.vaultTasks),
             bool(Keys.VAULT_NOTES, "Notes & notebooks", "Notes and notebook pages (locked sections stay on the phone).", d.vaultNotes),
             bool(Keys.VAULT_LEARNING, "Learning", "Courses, assignments and certifications.", d.vaultLearning),

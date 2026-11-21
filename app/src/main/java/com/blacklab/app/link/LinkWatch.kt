@@ -2,9 +2,6 @@ package com.blacklab.app.link
 
 import com.blacklab.app.core.JsonStore
 import com.blacklab.app.facility.Facility
-import com.blacklab.app.vehicle.Garage
-import com.blacklab.app.vehicle.Nhtsa
-import com.blacklab.app.vehicle.VehicleLink
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -17,15 +14,14 @@ import kotlinx.coroutines.launch
 
 /**
  * What the desktop link watches besides Room. File-backed [JsonStore]s don't go through Room's
- * invalidation tracker, so without this the desktop's Facility and Garage views stayed stale until
+ * invalidation tracker, so without this the desktop's Facility view stayed stale until
  * a manual refresh. LinkWatchTest fails when a new JsonStore is added but not listed here.
  */
 object LinkWatch {
-    fun stores(): List<JsonStore<*>> = listOf(Facility.store, Garage.store, VehicleLink.store, Nhtsa.store)
+    fun stores(): List<JsonStore<*>> = listOf(Facility.store)
 
     /**
-     * Calls [onChange] when any of [sources] changes; each source's current value is skipped. Bursts (live car readings
-     * arrive every second) are throttled to one call per [minGapMs], and the last change of a burst always gets a call.
+     * Calls [onChange] when any of [sources] changes; each source's current value is skipped. Bursts are throttled to one call per [minGapMs], and the last change of a burst always gets a call.
      */
     fun launch(scope: CoroutineScope, sources: List<Flow<*>>, minGapMs: Long = 5_000, onStart: () -> Unit = {}, onChange: () -> Unit): Job =
         scope.launch {
@@ -76,7 +72,6 @@ object Sections {
 
     fun forStore(name: String): Set<String> = when (name) {
         "Facility" -> setOf("facility", "timeline")
-        "Garage", "Drive log", "Recalls" -> setOf("vehicle", "timeline")
         else -> emptySet()
     }
 

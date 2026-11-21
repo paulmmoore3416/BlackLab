@@ -34,6 +34,7 @@ SKIP_TOP = {".obsidian", ".git", ".trash", "95 Library", "99 Archive", "Attachme
 PREFIX = "vault:"
 MIN_SCORE = 0.4          # kb-core's calibrated cut-off (unrelated text scores ≤ 0.25)
 BATCH = 40
+BATCH_BYTES = 600_000    # a few big workbooks per request, so one slow embed never runs past the timeout
 MAX_BYTES = 400_000
 STATE = "recall.json"
 
@@ -65,10 +66,12 @@ def collection_for(rel: str) -> str:
 
 
 def doc_text(rel: str, text: str) -> str:
-    """What kb-core gets: the title, then the note without frontmatter or BlackLab's markers; clinical passages dropped."""
+    """What kb-core gets: the title, then the note without frontmatter or BlackLab's markers; clinical passages dropped
+    (program reference notes keep them — see guards.is_reference_note — but never a filled-in identifier)."""
+    reference = guards.is_reference_note(rel, text)
     body = re.sub(r"\A---\n.*?\n---\n", "", text, flags=re.S)
     body = re.sub(r"%%\s*/?blacklab[^%]*%%", "", body)
-    safe, _ = guards.vault_safe_passages(body)
+    safe, _ = guards.reference_safe_passages(body) if reference else guards.vault_safe_passages(body)
     title = rel.rsplit("/", 1)[-1].removesuffix(".md")
     return f"# {title}\n\n{safe.strip()}"[:MAX_BYTES]
 
@@ -103,7 +106,12 @@ def index(v, config: dict | None = None, budget_s: float = 240.0, include_local:
         nonlocal sent
         if not batch:
             return
-        r = _req(config, "POST", "/documents/batch", {"documents": [b[1] for b in batch]}, timeout=300)
+        try:
+            r = _req(config, "POST", "/documents/batch", {"documents": [b[1] for b in batch]}, timeout=300)
+        except (OSError, urllib.error.URLError) as e:  # timeouts included: kb-core keeps going; the next pass re-sends
+            errors.append(f"{len(batch)} note(s) not confirmed: {e}"[:200])
+            batch.clear()
+            return
         for (rel, _doc, h, m), res in zip(batch, r.get("results", [])):
             if res.get("error"):
                 errors.append(f"{rel}: {res['error']}"[:200])
@@ -130,7 +138,7 @@ def index(v, config: dict | None = None, budget_s: float = 240.0, include_local:
         if len(text) < 40:
             continue
         batch.append((rel, {"name": PREFIX + rel, "content": text, "mime_type": "text/markdown", "collection": collection_for(rel)}, h, m))
-        if len(batch) >= BATCH:
+        if len(batch) >= BATCH or sum(len(b[1]["content"]) for b in batch) >= BATCH_BYTES:
             flush()
     flush()
     removed = 0

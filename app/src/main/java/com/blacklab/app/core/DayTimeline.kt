@@ -3,7 +3,6 @@ package com.blacklab.app.core
 import com.blacklab.app.data.RecordingEntity
 import com.blacklab.app.data.TaskEntity
 import com.blacklab.app.facility.Facility
-import com.blacklab.app.vehicle.Telemetry
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
@@ -19,7 +18,7 @@ import java.time.format.DateTimeFormatter
 object DayTimeline {
     enum class Kind(val label: String, val emoji: String) {
         EVENT("Meeting", "📅"), WORK_ORDER("Work order", "🛠️"), INSPECTION("Inspection", "🔍"), FINDING("Finding", "⚠️"), FACILITY_NOTE("Facility note", "🏢"),
-        TASK_DONE("Done", "✅"), TASK_NEW("New task", "➕"), RECORDING("Recording", "🎙️"), NOTE("Note", "📝"), TRIP("Drive", "🚙"), BH("Behavioral Health", "🔒"),
+        TASK_DONE("Done", "✅"), TASK_NEW("New task", "➕"), RECORDING("Recording", "🎙️"), NOTE("Note", "📝"), BH("Behavioral Health", "🔒"),
     }
 
     data class Item(val time: Long, val kind: Kind, val title: String, val detail: String = "", val route: String? = null)
@@ -36,7 +35,6 @@ object DayTimeline {
         val tasks: List<TaskEntity> = emptyList(),
         val events: List<Event> = emptyList(),
         val facility: Facility.State = Facility.State(),
-        val trips: List<Telemetry.Trip> = emptyList(),
         val recordings: List<RecordingEntity> = emptyList(),
         val notes: List<Pair<Long, String>> = emptyList(),
         val bh: BhCounts = BhCounts(),
@@ -74,9 +72,6 @@ object DayTimeline {
             out += Item(r.createdAt, Kind.RECORDING, r.title.ifBlank { "Recording" }, if (r.durationMs > 0) "${(r.durationMs / 60_000).coerceAtLeast(1)} min" else "", "recording/${r.id}")
         }
         i.notes.filter { inDay(it.first) }.forEach { (t, title) -> out += Item(t, Kind.NOTE, title.ifBlank { "Note" }) }
-        i.trips.filter { inDay(it.start) && !it.simulated }.forEach { tr ->
-            out += Item(tr.start, Kind.TRIP, "%.1f mi".format(tr.miles) + (tr.rule.takeIf { it.isNotBlank() }?.let { " · $it" } ?: ""), route = "garage")
-        }
         if (i.bh.any) out += Item(end - 1, Kind.BH, "Behavioral Health", listOfNotNull(
             i.bh.checks.takeIf { it > 0 }?.let { "$it observation check${if (it == 1) "" else "s"}" },
             i.bh.eocRounds.takeIf { it > 0 }?.let { "$it environmental round${if (it == 1) "" else "s"}" + if (i.bh.eocIssues > 0) " (${i.bh.eocIssues} issue${if (i.bh.eocIssues == 1) "" else "s"})" else "" },

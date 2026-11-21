@@ -35,7 +35,7 @@
   const rgba = (h, a) => { const [r, g, b] = hexToRgb(h); return `rgba(${r},${g},${b},${a})`; };
 
   // ---------------------------------------------------------------- theme from the phone's settings
-  const state = { dark: true, accent: '#2BD9A8', secondary: '#FF8A70', tertiary: '#8C9EFF', page: '#0E1014', glass: true, backdrop: 'AURORA', intensity: 0.6, motion: true };
+  const state = { dark: true, accent: '#2BD9A8', secondary: '#FF8A70', tertiary: '#8C9EFF', page: '#0E1014', glass: true, fluent: false, backdrop: 'AURORA', intensity: 0.6, motion: true };
 
   function resolveDark(values, uiTheme) {
     if (uiTheme === 'dark') return true;
@@ -81,22 +81,36 @@
         '--glass-shadow': '0 10px 34px rgba(17,24,39,.08)', '--shadow': '0 10px 30px rgba(10,30,25,.10)' };
       state.accent = acc; state.secondary = sec; state.tertiary = ter;
     }
+    // Card frost (opacity) and Fluent glass: Mica page, acrylic cards with hairline strokes, neutral surfaces
+    const frost = Math.max(0, Math.min(100, values.card_frost ?? 50)) / 100;
+    const fluent = values.visual_style === 'FLUENT';
+    if (fluent) {
+      Object.assign(v, dark
+        ? { '--glass': `rgba(44,44,44,${(0.42 + 0.5 * frost).toFixed(3)})`, '--glass-bar': `rgba(32,32,32,${(0.80 + 0.15 * frost).toFixed(3)})`, '--glass-line': 'rgba(255,255,255,.08)',
+            '--glass-hi': 'rgba(255,255,255,.06)', '--glass-shadow': '0 2px 4px rgba(0,0,0,.20), 0 8px 16px rgba(0,0,0,.26)' }
+        : { '--glass': `rgba(255,255,255,${(0.55 + 0.4 * frost).toFixed(3)})`, '--glass-bar': `rgba(243,243,243,${(0.80 + 0.15 * frost).toFixed(3)})`, '--glass-line': 'rgba(0,0,0,.08)',
+            '--glass-hi': 'rgba(255,255,255,.70)', '--glass-shadow': '0 2px 4px rgba(0,0,0,.04), 0 8px 16px rgba(0,0,0,.08)' });
+    } else if (dark) v['--glass'] = `rgba(255,255,255,${(0.035 + 0.06 * frost).toFixed(3)})`;
+    else v['--glass'] = `rgba(255,255,255,${(0.45 + 0.46 * frost).toFixed(3)})`;
     // Corners and font follow the phone's Appearance choices too
     const cs = (DATA.corners || []).find((c) => c.id === values.corner_style);
     v['--radius'] = (cs ? Math.round(cs.card * 0.75) : 16) + 'px';
     v['--radius-sm'] = (cs ? Math.max(3, Math.round(cs.small * 0.72)) : 10) + 'px';
     v['--font'] = values.font_family === 'SERIF' ? 'ui-serif, Georgia, "Times New Roman", serif'
       : values.font_family === 'SYSTEM' ? 'system-ui, -apple-system, "Segoe UI", Roboto, sans-serif'
+      : fluent ? '"Segoe UI Variable Text", "Segoe UI Variable", "Segoe UI", "Inter", ui-sans-serif, system-ui, sans-serif'
       : '"Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif';
     for (const [k, val] of Object.entries(v)) root.style.setProperty(k, val);
     root.setAttribute('data-theme', dark ? 'dark' : 'light');
     root.style.colorScheme = dark ? 'dark' : 'light';
     state.dark = dark; state.page = page;
     state.glass = values.visual_style !== 'SOLID';
+    state.fluent = fluent;
     state.backdrop = values.backdrop || 'AURORA';
     state.intensity = Math.max(0, Math.min(100, values.backdrop_intensity ?? 60)) / 100;
     state.motion = values.reduce_motion !== true && !matchMedia('(prefers-reduced-motion: reduce)').matches;
     root.setAttribute('data-style', state.glass ? 'glass' : 'solid');
+    root.toggleAttribute('data-fluent', state.glass && fluent);
     document.querySelector('meta[name="theme-color"]')?.setAttribute('content', page);
     drawOnce();
   }
@@ -120,6 +134,15 @@
   function draw() {
     ctx.fillStyle = state.page; ctx.fillRect(0, 0, w, h);
     if (!state.glass || state.backdrop === 'PLAIN' || state.intensity === 0) return;
+    if (state.backdrop === 'MICA') {
+      // Mica: a soft, still wash of your colors from the corners, then a luminosity layer of the page color
+      const r = Math.max(w, h), a = state.intensity * (state.dark ? 0.20 : 0.24);
+      blob(state.accent, a, w * 0.05, 0, r * 0.95);
+      blob(state.secondary, a * 0.55, w, h * 0.95, r * 0.85);
+      blob(state.tertiary, a * 0.35, w * 0.9, h * 0.15, r * 0.6);
+      ctx.fillStyle = rgba(state.page, state.dark ? 0.30 : 0.38); ctx.fillRect(0, 0, w, h);
+      return;
+    }
     const k = state.intensity * (state.dark ? 0.34 : 0.42); const t = phase * Math.PI * 2; const r = Math.max(w, h);
     blob(state.accent, 1.0 * k, w * (0.18 + 0.22 * Math.sin(t)), h * (0.10 + 0.10 * Math.cos(t * 2)), r * (0.62 + 0.05 * Math.sin(t * 3)));
     blob(state.secondary, 0.8 * k, w * (0.92 + 0.10 * Math.cos(t)), h * (0.42 + 0.14 * Math.sin(t + 1.2)), r * (0.55 + 0.05 * Math.cos(t * 2)));

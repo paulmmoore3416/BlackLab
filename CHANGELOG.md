@@ -2,6 +2,39 @@
 
 All notable changes to BlackLab are documented here. The project follows [Semantic Versioning](https://semver.org/).
 
+## [5.15.0] — 2026-11-21 (companion 1.9.0)
+
+Office work on the phone: PowerPoint decks that look like PowerPoint (with a presenter mode), Excel workbooks that keep every format and formula, Microsoft 365 and Teams. Plus a Microsoft-style Fluent glass look, sections you arrange yourself, and a desktop link that keeps working when the computer is away.
+
+### Added
+- **PowerPoint, as it looks in PowerPoint.** Decks open slide by slide with every shape in place: fills, outlines, text sizes, colors and bullets, pictures, tables, groups, theme colors and layout/master backgrounds. Charts (column, bar, stacked, line, area, pie, doughnut) are drawn from the values stored in the deck. Speaker notes are one tap away.
+- **Present.** Full screen and landscape. Tap or swipe to move, or use a Bluetooth clicker or keyboard (arrows, Page Up/Down, Space). A presenter view shows your notes, a timer and the next slide. With a TV or projector attached (HDMI, USB-C or a cast screen), the slides go there and the phone shows your notes.
+- **Excel, as it looks in Excel.** Workbooks show their number formats ($, %, dates, accounting, thousands), bold, fills, font colors, alignment, column widths and frozen header rows. Every formula is live: the engine follows other sheets and named ranges, and knows lookups (VLOOKUP, INDEX/MATCH), conditional math (SUMIF(S), COUNTIF(S), AVERAGEIF(S)), SUMPRODUCT, finance (NPV, IRR, PMT, FV, PV), dates and text. Formulas it can't work out show Excel's last result in italics.
+- **Saving keeps the workbook intact.** Saving an .xlsx rewrites only the cells you changed. Charts, formatting, names, validation and everything else in the file stay exactly as they were. Results are refreshed and Excel recalculates when it opens the file. Inserting, deleting or sorting rows saves a new workbook next to the original instead of overwriting it.
+- **Office hub** (new section). Recent PowerPoint, Excel and Word files with one tap to open in BlackLab or in Microsoft's app (with write access, so Save in PowerPoint or Excel writes back). Teams meetings from your calendars with a Join button. Shortcuts to PowerPoint, Excel, Word, Teams, Outlook and OneDrive.
+- **Microsoft 365 (personal account).** Connect your Outlook.com account for OneDrive (recent files, open, and save changes back), your Outlook inbox, this week's calendar with Teams Join links, and Microsoft To Do. It needs the Application ID of your own Entra app registration; there's no secret to store. Work accounts managed by IT stay in Microsoft's apps.
+- **Sections.** Settings › Sections (or *Edit sections* in the side menu): choose 2–5 bottom tabs, order the side menu, hide sections you don't use and rename any of them.
+- **Fluent glass.** A new visual style in Microsoft's Fluent design: a still Mica backdrop, acrylic cards with hairline borders, 4/8 dp corners and neutral surfaces. It comes with new Fluent Mica light and dark styles, Fluent corners, and Microsoft Blue, Word, Excel, PowerPoint and Teams palettes (22 in all, every one checked for AA contrast).
+- **Quick looks** (Appearance). One tap sets style, colors, backdrop and corners together: Microsoft 365, Teams, Office trio, Presenter, Aurora glass, OLED night, Paper, Classic solid. **Card frost** sets how see-through glass cards are. All of these are on BlackLab Desktop's Appearance page too.
+- **Desktop outbox.** When the computer is away, "on my computer…" requests and vault, node, timeline and private-drive saves wait on the phone and go through the moment the link is back. You get a notification with the result.
+
+### Changed
+- **New BlackLab logo.** The low-poly Labrador is now the app icon, including the themed (monochrome) icon, the splash screen, the status-bar icon, onboarding and the drawer. It's also on BlackLab Desktop's window, the web app and PWA icons, and the README. Brand files are in `docs/brand/`.
+- **A steadier desktop link.** When one route drops mid-session, the phone switches to the other (USB ⇄ Tailscale) and retries. One slow reply no longer marks the computer offline. The phone re-checks the moment Wi-Fi, cellular or Tailscale changes and when you open the app. Tailscale gets a longer wake-up timeout over cellular.
+- **The vault keeps program documents whole.** Notes in `02 Projects/` marked `blacklab_reference: program` (business plans, policy packages, financial models) are indexed in full for the AI. Paragraphs with a filled-in identifier are still dropped, and everything is still scrubbed. Before, the clinical-word guard dropped 60–86 % of them.
+- **Veteran Initiative in the vault.** The master presentation (with speaker notes), financial model v2, funding workbook, calculators and the 00–20 package are in `02 Projects/Veteran Initiative/` for the desktop AI and the phone's vault questions. They're also in the phone's Library under Professional › Veteran Initiative.
+
+### Removed
+- **Garage.** The Garage section, Car link (OBD-II, Bluelink, drive log), NHTSA recall checks, service reminders, the car widget and the Garage screens on Android Auto and BlackLab Desktop are gone, along with their permissions. Android Auto keeps the assistant, agenda, tasks, talk and voice notes, plus a new *New task* tile.
+
+### Fixed
+- **Sections were listed twice.** Home, To-Do, Schedule, Education and Library were both bottom tabs and side-menu items. The side menu now lists only what isn't a tab.
+- **BlackLab Desktop's Appearance page changed the light style on every click.** Its light-style buttons shared an attribute with the page itself, so any click anywhere sent a light-style change to the phone.
+
+### Tests
+- Workbook reading, number formats, in-place saving (untouched parts byte for byte, shared formulas, refreshed results), cross-sheet formulas and the new functions. On the Veteran Initiative workbooks, all 1,882 formulas match Excel's own results.
+- Slide rendering (layout inheritance, theme colors, charts, notes), sections layout, Teams link detection, and the program-reference rule in the vault.
+
 ## [5.14.0] — 2026-11-12 (companion 1.8.0)
 
 The phone and the desktop now stay in step from anywhere: live updates that send only what changed, a private Tailscale link, and a desktop AI that stays on until you say stop.

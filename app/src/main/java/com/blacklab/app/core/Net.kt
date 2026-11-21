@@ -8,7 +8,7 @@ import java.net.UnknownHostException
 import javax.net.ssl.SSLException
 
 /**
- * One way to talk about network trouble everywhere (weather, recalls, Bluelink, updates, Google, the desktop):
+ * One way to talk about network trouble everywhere (weather, updates, Google, Microsoft, the desktop):
  * a [Problem] kind, the same plain-words message, and the same short retry for the failures that are worth
  * retrying (no connection yet, timeouts, 429 and 5xx) — never for sign-in or "not found".
  */

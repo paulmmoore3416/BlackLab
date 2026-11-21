@@ -198,6 +198,18 @@ class RecallTest(Base):
         self.assertEqual(R.collection_for("85 Atlas/x.md"), R.LOCAL)
         self.assertEqual(R.collection_for("10 Facility/x.md"), R.SHARED)
 
+    def test_program_reference_notes_keep_clinical_words_but_not_identifiers(self):
+        fm = "---\nblacklab_reference: program\n---\n"
+        body = "Patients at 75% occupancy pay $1.24M EBITDA.\n\nPsychiatric per-diem rate build.\n\nMRN: 448812 for J.D.\n\nDOB: ____\n"
+        t = R.doc_text("02 Projects/Veteran Initiative/07 Model.md", fm + body)
+        self.assertIn("75% occupancy", t)
+        self.assertIn("Psychiatric per-diem", t)
+        self.assertNotIn("448812", t, "a filled-in identifier is still dropped")
+        self.assertIn("DOB: ____", t, "a blank form field is fine")
+        # Without the flag, or outside a reference folder, the keyword guard still applies
+        self.assertNotIn("75% occupancy", R.doc_text("02 Projects/Other.md", body))
+        self.assertNotIn("75% occupancy", R.doc_text("10 Facility/x.md", fm + body))
+
     def test_falls_back_to_keyword_search_without_kb_core(self):
         self.put("10 Facility/Boiler notes.md", "# Boiler notes\n\nThe boiler vendor is Acme Mechanical; tune-up every September.\n")
         self.put("85 Atlas/Card.md", "# Card\n\nboiler vendor card from the atlas\n")

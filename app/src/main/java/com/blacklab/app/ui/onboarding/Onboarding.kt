@@ -117,7 +117,7 @@ fun OnboardingScreen() {
                 when (s) {
                     0 -> {
                         Spacer(Modifier.height(40.dp))
-                        Image(painterResource(R.drawable.ic_launcher_foreground), null, Modifier.size(140.dp).align(Alignment.CenterHorizontally))
+                        Image(painterResource(R.drawable.brand_tile), null, Modifier.size(140.dp).align(Alignment.CenterHorizontally))
                         Text("BlackLab", style = MaterialTheme.typography.displaySmall, fontWeight = FontWeight.Bold, modifier = Modifier.align(Alignment.CenterHorizontally))
                         Text("Your personal & professional command center.", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurfaceVariant,
                             textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth().padding(top = 8.dp))
@@ -259,7 +259,7 @@ fun LockScreen(activity: MainActivity) {
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
     ) {
-        Image(painterResource(R.drawable.ic_launcher_foreground), null, Modifier.size(120.dp))
+        Image(painterResource(R.drawable.brand_tile), null, Modifier.size(120.dp))
         Text("BlackLab is locked", style = MaterialTheme.typography.headlineSmall)
         Spacer(Modifier.height(24.dp))
         Button(onClick = unlock) {

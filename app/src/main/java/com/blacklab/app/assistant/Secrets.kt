@@ -37,9 +37,14 @@ class Secrets(context: Context) {
         const val PICOVOICE = "picovoice"
         const val OPENWEATHER = "openweather"
 
+        /** Microsoft 365 (personal account): the Entra app's Application ID (not secret), the refresh token, and who's signed in. */
+        const val MS_CLIENT_ID = "ms_client_id"
+        const val MS_REFRESH = "ms_refresh"
+        const val MS_ACCOUNT = "ms_account"
+
         val all = listOf(ELEVENLABS, DEV_KNOWLEDGE, GOOGLE_DRIVE, GMAIL, GOOGLE_KEEP, GEMINI, PICOVOICE, OPENWEATHER)
         /** Keys that may arrive by provisioning file or the desktop link (not shown in the key list). */
-        val provisionable = all + listOf(DESKTOP_AI, DESKTOP_AI_URL, DESKTOP_AI_TAILNET_URL)
+        val provisionable = all + listOf(DESKTOP_AI, DESKTOP_AI_URL, DESKTOP_AI_TAILNET_URL, MS_CLIENT_ID)
         private const val ALIAS = "blacklab_secrets_v1"
     }
 

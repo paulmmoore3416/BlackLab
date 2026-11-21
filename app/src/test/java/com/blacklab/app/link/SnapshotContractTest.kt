@@ -22,9 +22,6 @@ import com.blacklab.app.data.TaskEntity
 import com.blacklab.app.data.TaskListEntity
 import com.blacklab.app.dictation.DictationMeta
 import com.blacklab.app.facility.Facility
-import com.blacklab.app.vehicle.Garage
-import com.blacklab.app.vehicle.Nhtsa
-import com.blacklab.app.vehicle.Telemetry
 import org.json.JSONArray
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
@@ -61,25 +58,6 @@ class SnapshotContractTest {
         val cal = EventCalendarEntity(id = 1, profile = "PROFESSIONAL", name = "Work", color = 0xFF1565C0.toInt())
         val ev = EventEntity(id = 1, profile = "PROFESSIONAL", calendarId = 1, title = "Safety huddle", location = "Room 1", start = now + hour, end = now + 2 * hour, notes = "Agenda")
         val section = SectionEntity(id = 1, notebookId = 1, name = "Plans", color = 0xFF6A1B9A.toInt())
-        val g = Garage.State(
-            vehicle = Garage.Vehicle(nickname = "Test car", vin = "TESTVIN0000000000", odometer = 12_000, odometerAt = now - 24 * hour),
-            fuel = listOf(
-                Garage.Fuel("f2", now - 24 * hour, 12_000, 15.0, 52.5, station = "Station B"),
-                Garage.Fuel("f1", now - 240 * hour, 11_620, 15.5, 54.0, station = "Station A"),
-            ),
-        )
-        val t = Telemetry.State(
-            snapshot = mapOf("fuel_pct" to Telemetry.Metric("fuel_pct", 62.0, null, Telemetry.Source.OBD, now)),
-            trips = listOf(Telemetry.Trip(id = "t1", start = now - 3 * hour, end = now - 2 * hour, startPlace = "Home", endPlace = "Work", gpsMiles = 18.2, purpose = Telemetry.Purpose.BUSINESS, note = "Site visit")),
-            dtcs = listOf(Telemetry.Dtc("P0420", "stored", now - 48 * hour, now)),
-            parked = Telemetry.Parked(0.0, 0.0, "Work lot", now - 2 * hour, Telemetry.Source.PHONE),
-            lastSession = now - 2 * hour,
-            pendingFill = Telemetry.PendingFill(now - hour, 20.0, 95.0, 14.1, 12_010),
-        )
-        val n = Nhtsa.State(
-            recalls = listOf(Nhtsa.Recall("26V001000", "01/02/2026", "ELECTRICAL", "A sample recall summary.", "Sample consequence.", "Dealers will fix it.")),
-            checkedAt = now - 24 * hour,
-        )
         val facility = Facility.State(
             site = "Sample campus",
             assets = listOf(Facility.Asset(id = "gen", name = "Generator 1", kind = "Generator", tag = "GEN-1", location = "Yard",
@@ -113,7 +91,6 @@ class SnapshotContractTest {
             journal = listOf(JournalEntity(id = 1, profile = "PERSONAL", entryDay = day, title = "A good day", mood = 4, preview = "Walked…", wordCount = 120, favorite = true)),
             recordings = listOf(RecordingEntity(id = 1, profile = "PROFESSIONAL", filePath = "Professional/Recordings/r1.m4a", title = "Huddle", durationMs = 600_000, createdAt = now - hour, transcript = "Notes")),
             dictations = listOf(Triple("PERSONAL", DictationMeta("Idea", now - hour, durationMs = 30_000), "Personal/Dictation/d1")),
-            vehicle = SnapshotJson.vehicle(g, t, n, pace = 32.0, now = now),
             brainstorm = SnapshotJson.brainstorm(
                 listOf(NotebookEntity(id = 1, profile = "PROFESSIONAL", name = "Projects", color = 0xFF00897B.toInt(), emoji = "📓", createdAt = now, updatedAt = now)),
                 listOf(section),
@@ -156,14 +133,14 @@ class SnapshotContractTest {
 
     @Test fun sampleCoversEveryTopLevelSection() {
         val keys = sample().keys().asSequence().toSet()
-        listOf("info", "tasks", "events", "vehicle", "brainstorm", "decks", "facility", "timeline", "health").forEach { assertTrue("missing $it", it in keys) }
+        listOf("info", "tasks", "events", "brainstorm", "decks", "facility", "timeline", "health").forEach { assertTrue("missing $it", it in keys) }
         // a section with no items would hide its field names from the contract
         keys.forEach { k -> (sample().get(k) as? JSONArray)?.let { assertTrue("sample has no $k items", it.length() > 0) } }
     }
 
-    @Test fun fixtureCarriesNoCoordinatesOrRealVin() {
+    @Test fun fixtureCarriesNoCoordinates() {
         val text = sample().toString()
         assertFalse(text.contains("\"lat\"") || text.contains("\"lon\""))
-        assertTrue(text.contains("TESTVIN0000000000"))
+        assertFalse(text.contains("\"vehicle\""))
     }
 }

@@ -18,7 +18,7 @@ import java.util.zip.ZipOutputStream
 
 /**
  * Encrypted backups of everything that isn't already a file in the BlackLab folder: the database, settings,
- * assistant history, Garage (vehicles, service, fuel, trips), saved knowledge conversations, playlists and the
+ * assistant history, saved knowledge conversations, playlists and the
  * custom wake word. Signatures, the Behavioral Health workspace and crash logs are never included.
  *
  * Backups are written to BlackLab/Backups as `.blbackup` files (see [BackupCrypto]); older plain `.zip` backups
@@ -35,7 +35,7 @@ class BackupManager(private val context: Context, private val app: AppContainer)
         private const val PASS_WRAP = "backup_pass_wrap"
         private const val PREFS_NAME = "blacklab_settings.xml"
         /** App-private files and folders (relative to filesDir) that go into every backup. */
-        val FILES = listOf("assistant", "garage", "knowledge", "facility", "playlists.json", "wake")
+        val FILES = listOf("assistant", "knowledge", "facility", "playlists.json", "wake")
         /** Tables counted for the restore preview. */
         val COUNTED = listOf("tasks" to "tasks", "events" to "events", "documents" to "documents", "journal" to "journal entries",
             "notes" to "notes", "nb_pages" to "notebook pages", "courses" to "courses", "certifications" to "certifications", "recordings" to "recordings")
