@@ -2,6 +2,24 @@
 
 All notable changes to BlackLab are documented here. The project follows [Semantic Versioning](https://semver.org/).
 
+## [5.16.0] — 2026-11-21 (companion 1.10.0)
+
+Autopilot: the computer looks after itself overnight and tells you how it went the first time you open BlackLab in the morning.
+
+### Added
+- **Overnight system check.** At 03:00 Central the computer checks the desktop AI end to end (Ollama, the assistant model answering a test question, keep-warm, jobs, Whisper), the phone link (shared key, last check-in, Tailscale on both ends, USB), BlackLab's services (companion, vault sync, recall memory, cameras), the system (memory, swap, drive SMART, GPU, temperatures, failed units, log errors, updates), storage (free space, what was freed since the last scan, Trash, biggest folders) and your data (configs, signing key, release checksum, the code repo, vault notes, vault history, sync conflicts). It fixes what it safely can and writes a report to *BlackLab AI › Documents › System Health*.
+- **The report on your phone.** The first time BlackLab opens after the check, it shows the result: healthy, needs a look or problems found, each issue with its fix, and what was fixed automatically. The full report is saved under Documents › System Health. A notification comes only when something's wrong.
+- **Nightly restart and BlackLab-only mode.** The computer restarts at 04:00 (after the check) and comes back with only BlackLab and the services it uses running; other projects stay off. `./daddyshome` runs by itself at every power-on, and the after-restart check adds how it came back to the same report. A watchdog keeps the companion answering and a plugged-in phone linked every 5 minutes. Install: `desktop/autopilot/install.sh`, then `sudo desktop/autopilot/install-system.sh` once for the restart.
+- **Vault history repair.** `desktop/autopilot/repair-vault-git.sh` fixes the vault's git history after a crash or power cut (backs up `.git` first and never touches notes).
+
+### Fixed
+- **Vault versions stopped saving after a crash.** Empty git objects left by an interrupted write meant no vault version was saved after Nov 14. The nightly check now catches this.
+- **A folder named like a note stopped the vault graph.** Folders ending in `.md` are skipped by every vault scan.
+- **Keep-warm reported an error for its first minute after every start.** It no longer runs before the jobs module is ready.
+
+### Tests
+- The report hand-off (one per night, the after-restart copy replaces an undelivered one), the report builder, and the phone's report parsing and show-once rule.
+
 ## [5.15.0] — 2026-11-21 (companion 1.9.0)
 
 Office work on the phone: PowerPoint decks that look like PowerPoint (with a presenter mode), Excel workbooks that keep every format and formula, Microsoft 365 and Teams. Plus a Microsoft-style Fluent glass look, sections you arrange yourself, and a desktop link that keeps working when the computer is away.

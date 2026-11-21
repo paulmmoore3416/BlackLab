@@ -51,7 +51,7 @@ import reverse  # noqa: E402  (reverse engineering with REA + Ghidra, read-only 
 import vault as vaultlib  # noqa: E402  (the Obsidian vault: notes, timeline, AI registry, git)
 import audit  # noqa: E402  (the hash-chained activity ledger — unit tested)
 
-VERSION = "1.9.0"
+VERSION = "1.10.0"
 HOST, PORT = "127.0.0.1", int(os.environ.get("BLACKLAB_DESKTOP_PORT", "8770"))
 HOME = Path.home()
 WEB_DIR = Path(__file__).resolve().parent.parent / "web"
@@ -1767,6 +1767,10 @@ class Handler(SimpleHTTPRequestHandler):
                 return self.reply(200, {"message": msg})
             if self.path == "/local/notify":
                 return self.reply(200, agents.public(agents.notice(str(body.get("title", "BlackLab")), str(body.get("text", "")))))
+            if self.path == "/local/health":  # the nightly system check → the phone shows it the next time BlackLab opens
+                j = agents.health_report(body)
+                LEDGER.record("This computer", "health:report", source="autopilot", metadata={"status": body.get("status")})
+                return self.reply(200, {"ok": True, "id": j["id"]})
             if self.path == "/local/jobs":
                 upload = None
                 if body.get("path"):
@@ -2280,6 +2284,8 @@ KEEP_WARM = {"last": "", "at": 0}
 def keep_warm_keeper():
     """Keeps the assistant's model loaded while ./daddyshome has pinned it (see keep_warm.py)."""
     import keep_warm
+    while agents.C is None:  # main() starts this thread before agents.setup(); mining_active needs it
+        time.sleep(1)
     while True:
         try:
             # ./daddyshome --stop edits config.json without restarting us: follow the file, not the copy from startup

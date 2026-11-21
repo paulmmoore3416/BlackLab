@@ -233,6 +233,12 @@ object DesktopJobs {
                 val docId = saveDoc(app, Profile.PROFESSIONAL, r.optString("title", job.title), "Briefs", r.optString("text"), "brief")
                 Notifications.big(c, nid, Notifications.CH_AGENDA, nTitle, nText, "doc/$docId")
             }
+            "health" -> {
+                // the nightly system check: shown in-app the next time BlackLab opens; a notification only when something's wrong
+                val docId = saveDoc(app, Profile.PROFESSIONAL, r.optString("title", job.title), "System Health", r.optString("text"), "health")
+                val show = com.blacklab.app.link.SystemHealth.receive(c, r, docId)
+                if (show && r.optString("status") != "ok") Notifications.big(c, 7290, Notifications.CH_DESKTOP, nTitle, nText, "doc/$docId")
+            }
             else -> Notifications.big(c, nid, Notifications.CH_DESKTOP, nTitle, nText, "assistant")
         }
     }

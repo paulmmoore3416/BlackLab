@@ -131,7 +131,7 @@ class DriveImport:
 
     def _private_cards(self):
         root = self.v.path(f"{ROOT}/Paul's Private")
-        return [str(p.relative_to(self.v.root)) for p in root.rglob("*.md")] if root.exists() else []
+        return [str(p.relative_to(self.v.root)) for p in root.rglob("*.md") if p.is_file()] if root.exists() else []
 
     def _rel(self, f: dict, folder: str) -> str:
         fold = self.v.safe_name(folder or "Folder " + f.get("parentId", "")[:8])

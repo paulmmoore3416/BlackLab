@@ -247,6 +247,33 @@ def notice(title: str, text: str, origin="Phone (notice)") -> dict:
     return j
 
 
+HEALTH_KEYS = ("id", "date", "kind", "status", "title", "summary", "generated", "fixed", "issues", "counts", "text")
+
+
+def health_report(rep: dict) -> dict:
+    """The nightly system check (desktop/autopilot/blacklab_health.py). One per night: a newer copy of the same
+    night (the after-restart addendum) replaces the one the phone hasn't picked up yet. BlackLab shows it on open."""
+    if not isinstance(rep, dict) or not str(rep.get("id", "")).startswith("health-"):
+        raise ValueError("not a health report")
+    if rep.get("status") not in ("ok", "warn", "fail"):
+        raise ValueError("bad status")
+    body = {k: rep.get(k) for k in HEALTH_KEYS}
+    body["text"] = str(body.get("text") or "")[:60_000]
+    body["issues"] = [i for i in (body.get("issues") or []) if isinstance(i, dict)][:30]
+    icon = {"ok": "Healthy", "warn": "Needs a look", "fail": "Problems found"}[body["status"]]
+    title = str(body.get("title") or "System check")[:80]
+    with _LOCK:
+        for old in [k for k, j in JOBS.items() if j["kind"] == "health" and j["title"] == title and not j["delivered"]]:
+            JOBS.pop(old, None)
+        j = {"id": uuid.uuid4().hex[:12], "kind": "health", "title": title, "params": {}, "file": None, "status": "done", "progress": "Done",
+             "created": time.time(), "started": time.time(), "finished": time.time(), "origin": "Phone (nightly check)", "private": False,
+             "result": dict(body, notify={"title": f"{title} · {icon}"[:80], "text": str(body.get("summary") or "")[:300]}),
+             "error": None, "delivered": False}
+        JOBS[j["id"]] = j
+    _save()
+    return j
+
+
 def pending_for_phone() -> list[dict]:
     with _LOCK:
         return [public(j) for j in sorted(JOBS.values(), key=lambda j: j["created"])

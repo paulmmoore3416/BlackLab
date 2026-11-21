@@ -333,6 +333,7 @@ private fun AppShell(activity: MainActivity) {
             }
         }
         ShareIntake()
+        SystemHealthSheet()
     }
 }
 

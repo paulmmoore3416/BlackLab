@@ -848,6 +848,8 @@ class Vault:
             return []
         hits = []
         for p in self.root.rglob("*.md"):
+            if not p.is_file():  # a folder can be named like a note (e.g. saned.install.md)
+                continue
             if ".obsidian" in p.parts or ".git" in p.parts or FOLDERS["archive"] in p.parts:
                 continue
             try:

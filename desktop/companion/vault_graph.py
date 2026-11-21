@@ -260,6 +260,8 @@ def scan(v) -> dict[str, dict]:
     """Every note: its title, frontmatter lines, body, outgoing link targets and props (cheap; no YAML library)."""
     notes = {}
     for p in v.root.rglob("*.md"):
+        if not p.is_file():  # a folder can be named like a note (e.g. saned.install.md)
+            continue
         rel = p.relative_to(v.root).as_posix()
         if set(Path(rel).parts) & SKIP_DIRS or "/Files/" in rel:
             continue

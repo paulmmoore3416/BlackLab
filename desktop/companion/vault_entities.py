@@ -186,6 +186,8 @@ class Entities:
             yield rec["path"], rel, Path(rec["path"]).name, text, rec.get("mode", "home") == "home", rec.get("nodes", [])
         root = self.v.root
         for p in root.rglob("*.md"):
+            if not p.is_file():  # a folder can be named like a note (e.g. saned.install.md)
+                continue
             r = p.relative_to(root).as_posix()
             drive_or_phone = r.startswith(("88 Drive/", "89 Mobile/"))  # Drive and phone cards are local, but they're documents
             if (not drive_or_phone and r.startswith(VN.LOCAL_PREFIXES + (VN.NODES_DIR + "/", "90 System/", "99 Archive/", "01 Daily/", "95 Library/", "."))) \
