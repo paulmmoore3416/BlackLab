@@ -51,7 +51,7 @@ import reverse  # noqa: E402  (reverse engineering with REA + Ghidra, read-only 
 import vault as vaultlib  # noqa: E402  (the Obsidian vault: notes, timeline, AI registry, git)
 import audit  # noqa: E402  (the hash-chained activity ledger — unit tested)
 
-VERSION = "1.8.0"
+VERSION = "1.9.0"
 HOST, PORT = "127.0.0.1", int(os.environ.get("BLACKLAB_DESKTOP_PORT", "8770"))
 HOME = Path.home()
 WEB_DIR = Path(__file__).resolve().parent.parent / "web"
@@ -960,11 +960,115 @@ def tool_dev_docs(args):
     return "\n\n".join(out)
 
 
+@logged_tool("execute_command")
+def tool_execute_command(args):
+    cmd = args.get("command") if isinstance(args, dict) else str(args or "")
+    if not cmd.strip():
+        return "No command provided."
+    try:
+        r = subprocess.run(cmd, shell=True, capture_output=True, text=True, timeout=30, cwd=str(HOME))
+        out = (r.stdout or "").strip()
+        err = (r.stderr or "").strip()
+        res = f"Exit code {r.returncode}\n"
+        if out:
+            res += f"{out[:4000]}\n"
+        if err:
+            res += f"stderr: {err[:2000]}\n"
+        return res.strip()
+    except subprocess.TimeoutExpired:
+        return "Command timed out after 30 seconds."
+    except Exception as e:
+        return f"Error executing command: {e}"
+
+
+@logged_tool("nightjar_camera")
+def tool_nightjar_camera(args):
+    action = args.get("action", "list") if isinstance(args, dict) else "list"
+    camera_id = args.get("camera", "") if isinstance(args, dict) else ""
+    question = args.get("question", "") if isinstance(args, dict) else ""
+    nj_conf = Path(os.environ.get("NIGHTJAR_CONFIG", HOME / ".config" / "nightjar" / "auth.json"))
+    if not nj_conf.exists():
+        return "Nightjar auth.json not found."
+    try:
+        tok = json.loads(nj_conf.read_text()).get("api_token", "")
+        headers = {"Authorization": f"Bearer {tok}", "Content-Type": "application/json"}
+        if action == "list" or not camera_id:
+            req = urllib.request.Request("http://127.0.0.1:8790/api/cameras", headers=headers)
+            with urllib.request.urlopen(req, timeout=10) as r:
+                cams = json.loads(r.read().decode())
+                if not cams:
+                    return "No cameras configured in Nightjar."
+                return "\n".join(f"- {c.get('name', 'Camera')} (id: {c.get('id')}, online: {c.get('online')})" for c in cams)
+        elif action == "ask":
+            body = json.dumps({"camera": camera_id, "question": question or "What do you see?"}).encode()
+            req = urllib.request.Request("http://127.0.0.1:8790/api/ask", data=body, headers=headers, method="POST")
+            with urllib.request.urlopen(req, timeout=60) as r:
+                return json.loads(r.read().decode()).get("answer", "No answer returned.")
+        elif action == "events":
+            req = urllib.request.Request("http://127.0.0.1:8790/api/events", headers=headers)
+            with urllib.request.urlopen(req, timeout=10) as r:
+                return json.dumps(json.loads(r.read().decode())[:10], indent=2)
+        return "Unknown Nightjar action."
+    except Exception as e:
+        return f"Nightjar error: {e}"
+
+
+@logged_tool("qdrant_search")
+def tool_qdrant_search(args):
+    query = args.get("query") if isinstance(args, dict) else str(args or "")
+    if not query.strip():
+        return "No query specified."
+    try:
+        req = urllib.request.Request("http://127.0.0.1:6333/collections", headers={"Content-Type": "application/json"})
+        with urllib.request.urlopen(req, timeout=2) as r:
+            cols = json.loads(r.read().decode())
+            return f"Qdrant active. Collections: {cols}. " + str(tool_search_documents({"query": query}))
+    except Exception:
+        return tool_search_documents({"query": query})
+
+
+def tailnet_phone_ip() -> str | None:
+    """Finds the connected Android phone on your tailnet dynamically."""
+    try:
+        out = subprocess.run(["tailscale", "status", "--json"], capture_output=True, text=True, timeout=2).stdout
+        st = json.loads(out or "{}")
+        for p in st.get("Peer", {}).values():
+            if p.get("OS") == "android":
+                ips = p.get("TailscaleIPs", [])
+                if ips:
+                    return ips[0]
+    except Exception:
+        pass
+    return None
+
+
+def resolve_phone(explicit=None):
+    if explicit and isinstance(explicit, dict) and explicit.get("url"):
+        return explicit
+    tok = SECRETS.get("phone_ai_token", "")
+    candidates = ["http://127.0.0.1:8765"]
+    tip = tailnet_phone_ip()
+    if tip:
+        candidates.append(f"http://{tip}:8765")
+    for base in candidates:
+        try:
+            req = urllib.request.Request(base + "/api/ping", headers={"Authorization": f"Bearer {tok}"})
+            with urllib.request.urlopen(req, timeout=0.8) as r:
+                if r.status in (200, 401):
+                    return {"url": base, "token": tok}
+        except Exception:
+            continue
+    return explicit
+
+
+
 def phone_call(phone, path, body=None, timeout=60):
+    phone = resolve_phone(phone)
     if not phone or not phone.get("url"):
         raise RuntimeError("The phone isn't linked — pair it under Connect.")
     return http_json(phone["url"].rstrip("/") + path, body, {"Authorization": "Bearer " + phone.get("token", "")}, timeout=timeout,
                      method="POST" if body is not None else "GET")
+
 
 
 @logged_tool("phone_command")
@@ -1240,6 +1344,9 @@ TOOLS = [
     {"type": "function", "function": {"name": "skill_use", "description": "Load one agent skill's instructions (by name from skills_search) and follow them for the user's request. Never run a skill's scripts; show the commands instead.",
                                       "parameters": {"type": "object", "properties": {"name": {"type": "string"}}, "required": ["name"]}}},
     {"type": "function", "function": {"name": "dev_docs", "description": "Search Google's official Android/Firebase/Cloud developer documentation (needs internet).", "parameters": {"type": "object", "properties": {"query": {"type": "string"}}, "required": ["query"]}}},
+    {"type": "function", "function": {"name": "execute_command", "description": "Run a shell command on this Linux computer and return stdout/stderr (e.g. system inspection, docker, git, systemctl).", "parameters": {"type": "object", "properties": {"command": {"type": "string"}}, "required": ["command"]}}},
+    {"type": "function", "function": {"name": "nightjar_camera", "description": "Interact with Nightjar private AI cameras: list cameras, inspect live frames, or ask what a camera sees.", "parameters": {"type": "object", "properties": {"action": {"type": "string", "enum": ["list", "ask", "events"]}, "camera": {"type": "string"}, "question": {"type": "string"}}, "required": ["action"]}}},
+    {"type": "function", "function": {"name": "qdrant_search", "description": "Semantic search across vector memory and ingested documents.", "parameters": {"type": "object", "properties": {"query": {"type": "string"}}, "required": ["query"]}}},
 ]
 
 
@@ -1257,13 +1364,15 @@ def run_tool(name, args, phone):
            "open_url": tool_open_url, "launch_app": tool_launch_app, "desktop_note": tool_desktop_note, "dev_docs": tool_dev_docs,
            "recall_chats": tool_recall_chats, "search_documents": tool_search_documents, "equipment": tool_equipment,
            "vault_search": tool_vault_search, "vault_write": tool_vault_write, "library_search": tool_library_search,
-           "reverse_engineer": tool_reverse_engineer, "skills_search": tool_skills_search, "skill_use": tool_skill_use}
+           "reverse_engineer": tool_reverse_engineer, "skills_search": tool_skills_search, "skill_use": tool_skill_use,
+           "execute_command": tool_execute_command, "nightjar_camera": tool_nightjar_camera, "qdrant_search": tool_qdrant_search}
     try:
         if name == "phone_command":
             return tool_phone(args, phone)
         return fns[name](args or {})
     except Exception as e:
         return f"{name} failed: {e}"
+
 
 
 def _skill_hint(text: str) -> str:
@@ -1336,7 +1445,7 @@ def ollama_chat(text, model, phone, history=(), use_memory=True, rounds=4, seed=
             used.append(name)
             if name not in TOOL_NAMES:
                 task_step("model", f"{model} asked for an unknown tool: {name}", args)
-            blocked = tool_guard(name, text + " " + " ".join(u for u, _ in (history or ())[-1:]), args, tainted)
+            blocked = tool_guard(name, text + " " + " ".join(u for u, _ in (history or ())[-1:]), args, tainted, autonomous=CONFIG.get("autonomous_mode", True))
             if blocked:
                 task_step("guard", f"Blocked {name}: {blocked}", args)
             elif name in READS_CONTENT:
@@ -1372,7 +1481,7 @@ def assistant(body):
 def _assistant(body):
     text = (body.get("text") or "").strip()
     target = body.get("target", "auto")
-    phone = body.get("phone")
+    phone = resolve_phone(body.get("phone"))
     if not text:
         return {"text": ""}
     if target != "phone":
@@ -1446,11 +1555,13 @@ def phone_generate(body):
 
 
 def phone_ask(body):
-    """The phone hands the desktop assistant a request for the computer. Phone tools are off here so it can't loop back."""
+    """The phone hands the desktop assistant a request for the computer."""
     who = PHONE.get("model") or "phone"
-    r = assistant({"text": body.get("text", ""), "target": "desktop", "phone": None, "origin": f"Phone assistant ({who})",
+    phone = resolve_phone()
+    r = assistant({"text": body.get("text", ""), "target": "desktop", "phone": phone, "origin": f"Phone assistant ({who})",
                    "private": bool(body.get("private"))})
     return {"text": r.get("text", ""), "source": "Desktop · " + r.get("source", "")}
+
 
 
 def tts(text: str) -> bytes | None:
@@ -1615,12 +1726,20 @@ class Handler(SimpleHTTPRequestHandler):
                 return self.reply(400, {"error": str(e)})
             except Exception as e:
                 return self.reply(500, {"error": str(e)})
-        if self.path in ("/phone/generate", "/phone/ask"):
+        if self.path in ("/phone/generate", "/phone/ask", "/phone/tool"):
             if not self.phone_guard():
                 return
             try:
                 body = json.loads(self.rfile.read(min(int(self.headers.get("Content-Length") or 0), 200_000)) or b"{}")
-                return self.reply(200, phone_generate(body) if self.path == "/phone/generate" else phone_ask(body))
+                if self.path == "/phone/generate":
+                    return self.reply(200, phone_generate(body))
+                elif self.path == "/phone/tool":
+                    tname = body.get("name", "")
+                    targs = body.get("arguments") or {}
+                    phone = resolve_phone()
+                    return self.reply(200, {"ok": True, "result": run_tool(tname, targs, phone)})
+                else:
+                    return self.reply(200, phone_ask(body))
             except Exception as e:
                 return self.reply(503, {"error": str(e)})
         if not self.path.startswith("/local/"):

@@ -6,7 +6,7 @@
 set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
 CONF="${HOME}/.config/blacklab-desktop"
-mkdir -p "$CONF" "${HOME}/.config/systemd/user" "${HOME}/.local/share/applications" "${HOME}/.local/share/icons/hicolor/scalable/apps"
+mkdir -p "$CONF" "${HOME}/.config/systemd/user" "${HOME}/.local/share/applications" "${HOME}/.local/share/icons/hicolor/512x512/apps"
 
 if [ ! -f "$CONF/secrets.json" ]; then
   printf '{\n  "elevenlabs": "",\n  "developer_knowledge": ""\n}\n' > "$CONF/secrets.json"
@@ -29,7 +29,8 @@ RestartSec=3
 WantedBy=default.target
 UNIT
 
-cp "${HERE}/web/icon.svg" "${HOME}/.local/share/icons/hicolor/scalable/apps/blacklab-desktop.svg"
+rm -f "${HOME}/.local/share/icons/hicolor/scalable/apps/blacklab-desktop.svg"   # the old flask icon (5.13 and earlier)
+cp "${HERE}/web/icon.png" "${HOME}/.local/share/icons/hicolor/512x512/apps/blacklab-desktop.png"
 cat > "${HOME}/.local/share/applications/blacklab-desktop.desktop" <<DESK
 [Desktop Entry]
 Type=Application

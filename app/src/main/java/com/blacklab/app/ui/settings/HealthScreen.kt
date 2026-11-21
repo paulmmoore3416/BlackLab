@@ -80,9 +80,6 @@ object HealthData {
         val backups = app.backups.listBackups()
         val stores = listOf(
             com.blacklab.app.facility.Facility.store.also { com.blacklab.app.facility.Facility.load(ctx) },
-            com.blacklab.app.vehicle.Garage.store.also { com.blacklab.app.vehicle.Garage.load(ctx) },
-            com.blacklab.app.vehicle.VehicleLink.store.also { com.blacklab.app.vehicle.VehicleLink.load(ctx) },
-            com.blacklab.app.vehicle.Nhtsa.store.also { com.blacklab.app.vehicle.Nhtsa.load(ctx) },
         )
         val crashes = CrashLog.entries(ctx).filter { it.time > now - 7 * 86_400_000L }
         val desk = com.blacklab.app.assistant.DesktopAi.status.value

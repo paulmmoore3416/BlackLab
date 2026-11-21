@@ -85,6 +85,20 @@ object DesktopJobs {
         app.appScope.launch { sync(app) }
     }
 
+    /**
+     * Queues one call to the computer (vault capture, log, node add, private-drive save…) to be made as soon as it's
+     * reachable. Used when the computer is away, so nothing you ask it to save is lost.
+     */
+    fun queueCall(app: AppContainer, path: String, body: JSONObject, title: String) {
+        val c = app.context
+        synchronized(this) {
+            val a = pending(c)
+            a.put(JSONObject().put("kind", "__call").put("title", title).put("call", path).put("params", body).put("path", ""))
+            savePending(c, a)
+        }
+        DesktopAi.kick()
+    }
+
     /** Starts a job that needs no file and says whether the computer took it. */
     suspend fun start(app: AppContainer, kind: String, title: String, params: JSONObject = JSONObject()): Boolean {
         if (!enabled(app) || DesktopAi.probe().state != DesktopAi.State.ONLINE) return false
@@ -102,10 +116,13 @@ object DesktopJobs {
 
     /** Called by DesktopAi's link check while the computer is reachable. */
     suspend fun sync(app: AppContainer) {
-        if (!enabled(app) || !DesktopAi.usable) return
+        if (!app.settings.current.asstDesktopAi || !DesktopAi.usable) return
+        _outbox.value = pending(app.context).length()
         lock.withLock {
             withContext(Dispatchers.IO) {
+                // queued saves go out whenever the link is on; the rest needs "Desktop jobs"
                 runCatching { sendOutbox(app) }.onFailure { android.util.Log.w(TAG, "outbox", it) }
+                if (!enabled(app)) return@withContext
                 runCatching { sendContext(app) }.onFailure { android.util.Log.w(TAG, "context", it) }
                 runCatching { collect(app) }.onFailure { android.util.Log.w(TAG, "collect", it) }
                 runCatching { com.blacklab.app.link.VaultFeed.sync(app) }.onFailure { android.util.Log.w(TAG, "vault", it) }
@@ -122,7 +139,11 @@ object DesktopJobs {
             val upload = if (f != null) {
                 if (!f.isFile) null else DesktopAi.upload(f)
             } else null
-            if (f == null || upload != null) {
+            if (item.optString("kind") == "__call") {
+                val r = DesktopAi.request("POST", item.optString("call"), item.optJSONObject("params") ?: JSONObject(), 60_000)
+                Notifications.simple(c, 7200 + (item.optString("title").hashCode() and 0x3ff), Notifications.CH_DESKTOP, "Sent to your computer",
+                    item.optString("title") + (r.optString("message").takeIf { it.isNotBlank() }?.let { " — $it" } ?: ""), null)
+            } else if (f == null || upload != null) {
                 DesktopAi.request("POST", "/phone/jobs", JSONObject().put("kind", item.optString("kind")).put("title", item.optString("title"))
                     .put("params", item.optJSONObject("params") ?: JSONObject()).put("private", item.optBoolean("private")).apply { upload?.let { put("upload", it) } }, 30_000)
             }

@@ -156,7 +156,7 @@ fun LazyListScope.backupItems(ui: BackupUi, s: Settings, app: AppContainer, shar
     }
     item {
         SettingRow("Back up now",
-            (if (s.lastBackupDay > 0) "Last backup ${Time.date(java.time.LocalDate.ofEpochDay(s.lastBackupDay))}" else "Database, settings, Garage, conversations") + " · encrypted · BlackLab/Backups",
+            (if (s.lastBackupDay > 0) "Last backup ${Time.date(java.time.LocalDate.ofEpochDay(s.lastBackupDay))}" else "Database, settings, conversations") + " · encrypted · BlackLab/Backups",
             Icons.Rounded.Backup) { ui.backupNow(share) }
     }
     item {
@@ -231,7 +231,6 @@ fun BackupDialogs(ui: BackupUi, app: AppContainer) {
     ui.inspected?.let { i ->
         val made = (if (i.appVersion.isNotBlank()) "BlackLab ${i.appVersion} · " else "") + Time.dateTime(i.created)
         val extras = buildList {
-            if (i.files.any { it.startsWith("garage/") }) add("Garage")
             if (i.files.any { it.startsWith("knowledge/") }) add("conversations")
             if (i.files.any { it.startsWith("assistant/") }) add("assistant history")
             if (i.files.any { it.startsWith("facility/") }) add("Facility")
@@ -244,7 +243,7 @@ fun BackupDialogs(ui: BackupUi, app: AppContainer) {
             text = { Text("$details\n\nIt decrypted, its database passed an integrity check, and it can be restored on this version of BlackLab.") },
             confirmButton = { TextButton(onClick = { app.backups.discard(); ui.inspected = null }) { Text("Done") } },
         ) else ConfirmDialog("Restore this backup?",
-            "$details\n\nYour current tasks, events, notes, courses, Garage and settings will be replaced. They're saved first as a “before-restore” backup. Files in the BlackLab folder aren't touched. BlackLab will close; reopen it afterwards.",
+            "$details\n\nYour current tasks, events, notes, courses and settings will be replaced. They're saved first as a “before-restore” backup. Files in the BlackLab folder aren't touched. BlackLab will close; reopen it afterwards.",
             "Restore", onDismiss = { app.backups.discard(); ui.inspected = null }) {
             ui.restore(i) { activity?.finishAffinity(); exitProcess(0) }
         }

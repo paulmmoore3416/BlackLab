@@ -11,7 +11,7 @@ object HomeLayout {
 
     val cards: List<Card> = listOf(
         Card("ask", "Ask bar", "Type or talk to the assistant, or get a spoken briefing."),
-        Card("tools", "Smart tools", "Summarize, Talk and Garage shortcuts."),
+        Card("tools", "Smart tools", "Summarize, Talk and Documents shortcuts."),
         Card("status", "Recording & dictation", "Shows only while a recording or dictation is running."),
         Card("weather", "Weather", "Current conditions and facility weather alerts."),
         Card("bh", "Behavioral Health", "On shift and rounds due. Counts only, never initials or rooms."),

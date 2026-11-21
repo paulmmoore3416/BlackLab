@@ -80,7 +80,7 @@ object DayTimelineData {
             DayTimeline.BhCounts(s.checks.count { it.time in start until end }, rounds.size, rounds.sumOf { r -> r.areas.sumOf { a -> a.results.count { it.value == "ISSUE" } } })
         }.getOrDefault(DayTimeline.BhCounts())
         DayTimeline.Inputs(day, zone, tasks = app.db.tasks().all(), events = events, facility = com.blacklab.app.facility.Facility.load(ctx),
-            trips = com.blacklab.app.vehicle.VehicleLink.load(ctx).trips, recordings = Profile.entries.flatMap { app.db.recordings().allFor(it.name) },
+            recordings = Profile.entries.flatMap { app.db.recordings().allFor(it.name) },
             notes = app.db.notes().all().filter { it.trashedAt == null }.map { it.updatedAt to it.title }, bh = bh)
     }
 

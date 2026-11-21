@@ -29,7 +29,9 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.MenuBook
 import androidx.compose.material.icons.automirrored.rounded.StickyNote2
 import androidx.compose.material.icons.rounded.*
+import androidx.compose.material.icons.outlined.BusinessCenter
 import androidx.compose.material.icons.outlined.CalendarMonth
+import androidx.compose.material.icons.outlined.Description
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.material.icons.outlined.CheckCircle
 import androidx.compose.material.icons.outlined.FolderOpen
@@ -125,41 +127,34 @@ fun AppRoot(activity: MainActivity) {
     }
 }
 
-private data class Dest(val route: String, val label: String, val icon: ImageVector, val selectedIcon: ImageVector = icon)
-
 /** Outlined when idle, filled (rounded) when selected, so the current tab reads at a glance. */
-private val bottomDests = listOf(
-    Dest("home", "Home", Icons.Outlined.Home, Icons.Rounded.Home),
-    Dest("tasks", "Tasks", Icons.Outlined.CheckCircle, Icons.Rounded.CheckCircle),
-    Dest("schedule", "Schedule", Icons.Outlined.CalendarMonth, Icons.Rounded.CalendarMonth),
-    Dest("education", "Learn", Icons.Outlined.School, Icons.Rounded.School),
-    Dest("library", "Library", Icons.Outlined.FolderOpen, Icons.Rounded.Folder),
-)
+private fun navIcons(route: String): Pair<ImageVector, ImageVector> = when (route) {
+    "home" -> Icons.Outlined.Home to Icons.Rounded.Home
+    "assistant" -> Icons.Rounded.AutoAwesome to Icons.Rounded.AutoAwesome
+    "tasks" -> Icons.Outlined.CheckCircle to Icons.Rounded.CheckCircle
+    "schedule" -> Icons.Outlined.CalendarMonth to Icons.Rounded.CalendarMonth
+    "notes" -> Icons.AutoMirrored.Rounded.StickyNote2 to Icons.AutoMirrored.Rounded.StickyNote2
+    "office" -> Icons.Outlined.BusinessCenter to Icons.Rounded.BusinessCenter
+    "documents" -> Icons.Outlined.Description to Icons.Rounded.Description
+    "facility" -> Icons.Rounded.Apartment to Icons.Rounded.Apartment
+    "bh" -> Icons.Rounded.Diversity3 to Icons.Rounded.Diversity3
+    "timeline" -> Icons.Rounded.Timeline to Icons.Rounded.Timeline
+    "signatures" -> Icons.Rounded.Draw to Icons.Rounded.Draw
+    "library" -> Icons.Outlined.FolderOpen to Icons.Rounded.Folder
+    "create" -> Icons.Rounded.AddCircle to Icons.Rounded.AddCircle
+    "brainstorm" -> Icons.Rounded.Lightbulb to Icons.Rounded.Lightbulb
+    "education" -> Icons.Outlined.School to Icons.Rounded.School
+    "knowledge" -> Icons.Rounded.Psychology to Icons.Rounded.Psychology
+    "summarize" -> Icons.Rounded.Summarize to Icons.Rounded.Summarize
+    "journal" -> Icons.AutoMirrored.Rounded.MenuBook to Icons.AutoMirrored.Rounded.MenuBook
+    "camera" -> Icons.Rounded.PhotoCamera to Icons.Rounded.PhotoCamera
+    "recorder" -> Icons.Rounded.Mic to Icons.Rounded.Mic
+    "dictation" -> Icons.Rounded.RecordVoiceOver to Icons.Rounded.RecordVoiceOver
+    "music" -> Icons.Rounded.LibraryMusic to Icons.Rounded.LibraryMusic
+    else -> Icons.Rounded.Widgets to Icons.Rounded.Widgets
+}
 
-private val drawerDests = listOf(
-    Dest("home", "Home", Icons.Rounded.Dashboard),
-    Dest("assistant", "Assistant", Icons.Rounded.AutoAwesome),
-    Dest("knowledge", "Knowledge & Talk", Icons.Rounded.Psychology),
-    Dest("summarize", "Summarize", Icons.Rounded.Summarize),
-    Dest("bh", "Behavioral Health", Icons.Rounded.Diversity3),
-    Dest("timeline", "Timeline & handoff", Icons.Rounded.Timeline),
-    Dest("facility", "Facility", Icons.Rounded.Apartment),
-    Dest("garage", "Garage · Santa Fe", Icons.Rounded.DirectionsCar),
-    Dest("camera", "Camera", Icons.Rounded.PhotoCamera),
-    Dest("recorder", "Recorder", Icons.Rounded.Mic),
-    Dest("music", "Music", Icons.Rounded.LibraryMusic),
-    Dest("dictation", "Dictation", Icons.Rounded.RecordVoiceOver),
-    Dest("library", "Library & Files", Icons.Rounded.Folder),
-    Dest("create", "Create & Edit", Icons.Rounded.AddCircle),
-    Dest("notes", "Notes", Icons.AutoMirrored.Rounded.StickyNote2),
-    Dest("brainstorm", "Brainstorm", Icons.Rounded.Lightbulb),
-    Dest("documents", "Documents", Icons.Rounded.Description),
-    Dest("signatures", "Signatures", Icons.Rounded.Draw),
-    Dest("journal", "Journal", Icons.AutoMirrored.Rounded.MenuBook),
-    Dest("tasks", "To-Do", Icons.Rounded.TaskAlt),
-    Dest("schedule", "Schedule", Icons.Rounded.CalendarMonth),
-    Dest("education", "Education", Icons.Rounded.School),
-)
+internal fun navIcon(route: String, selected: Boolean = false): ImageVector = navIcons(route).let { if (selected) it.second else it.first }
 
 @Composable
 private fun AppShell(activity: MainActivity) {
@@ -196,7 +191,8 @@ private fun AppShell(activity: MainActivity) {
 
     val backStack by nav.currentBackStackEntryAsState()
     val route = backStack?.destination?.route?.substringBefore('?')?.substringBefore('/') ?: "home"
-    val showBottom = bottomDests.any { it.route == route }
+    val layout = settings.nav
+    val showBottom = layout.isTab(route)
     // The bottom bar slides away while you scroll down a list and comes back when you scroll up
     var barShown by remember { androidx.compose.runtime.mutableStateOf(true) }
     LaunchedEffect(route) { barShown = true; com.blacklab.app.core.FrameStats.route = route }
@@ -240,7 +236,7 @@ private fun AppShell(activity: MainActivity) {
 
                     Column(Modifier.verticalScroll(rememberScrollState()).padding(horizontal = 12.dp)) {
                         Row(Modifier.padding(start = 8.dp, top = 20.dp, bottom = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                            Image(painterResource(R.drawable.ic_launcher_foreground), null, Modifier.size(52.dp))
+                            Image(painterResource(R.drawable.brand_tile), null, Modifier.size(52.dp))
                             Column {
                                 Text("BlackLab", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
                                 Text(listOf(settings.userName, settings.jobTitle).filter { it.isNotBlank() }.joinToString(" · ").ifBlank { "Personal & professional workspace" },
@@ -271,18 +267,24 @@ private fun AppShell(activity: MainActivity) {
                         Spacer(Modifier.height(12.dp))
                         HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                         Spacer(Modifier.height(8.dp))
-                        drawerDests.forEach { d ->
+                        // Only what isn't already a bottom tab — nothing is listed twice (Settings › Sections)
+                        layout.menu.forEach { r ->
                             NavigationDrawerItem(
-                                label = { Text(d.label) },
-                                icon = { Icon(d.icon, null) },
-                                selected = route == d.route,
+                                label = { Text(layout.label(r)) },
+                                icon = { Icon(navIcon(r), null) },
+                                selected = route == r,
                                 onClick = {
                                     scope.launch { drawer.close() }
-                                    nav.navigate(d.route) { popUpTo("home"); launchSingleTop = true }
+                                    nav.navigate(r) { popUpTo("home"); launchSingleTop = true }
                                 },
                                 colors = NavigationDrawerItemDefaults.colors(unselectedContainerColor = Color.Transparent),
                             )
                         }
+                        NavigationDrawerItem(
+                            label = { Text("Edit sections") }, icon = { Icon(Icons.Rounded.Tune, null) }, selected = route == "settings",
+                            onClick = { scope.launch { drawer.close() }; nav.navigate("settings/sections") { launchSingleTop = true } },
+                            colors = NavigationDrawerItemDefaults.colors(unselectedContainerColor = Color.Transparent),
+                        )
                         HorizontalDivider(Modifier.padding(vertical = 8.dp), color = MaterialTheme.colorScheme.outlineVariant)
                         NavigationDrawerItem(
                             label = { Text("Settings") }, icon = { Icon(Icons.Rounded.Settings, null) }, selected = route == "settings",
@@ -306,16 +308,16 @@ private fun AppShell(activity: MainActivity) {
                     if (showBottom && musicOn) com.blacklab.app.ui.music.MiniPlayer(com.blacklab.app.ui.music.rememberPlayer(), bottomInset = false) { nav.navigate("nowplaying") { launchSingleTop = true } }
                     AnimatedVisibility(showBottom && barShown, enter = slideInVertically(Motion.enter()) { it } + fadeIn(Motion.enter()), exit = slideOutVertically(Motion.exit()) { it } + fadeOut(Motion.exit())) {
                         NavigationBar(containerColor = com.blacklab.app.ui.theme.LocalGlass.current.let { g -> if (g.enabled) g.barFill(MaterialTheme.colorScheme.surface, 0.86f) else MaterialTheme.colorScheme.surfaceContainerLow }, tonalElevation = 0.dp) {
-                            bottomDests.forEach { d ->
+                            layout.tabs.forEach { r ->
                                 NavigationBarItem(
-                                    selected = route == d.route,
-                                    onClick = { if (route != d.route) navHaptics.tick(); nav.navigate(d.route) { popUpTo("home") { saveState = true }; launchSingleTop = true; restoreState = true } },
+                                    selected = route == r,
+                                    onClick = { if (route != r) navHaptics.tick(); nav.navigate(r) { popUpTo("home") { saveState = true }; launchSingleTop = true; restoreState = true } },
                                     icon = {
-                                        androidx.compose.animation.Crossfade(route == d.route, animationSpec = Motion.enter(200), label = "tab") { sel ->
-                                            Icon(if (sel) d.selectedIcon else d.icon, d.label)
+                                        androidx.compose.animation.Crossfade(route == r, animationSpec = Motion.enter(200), label = "tab") { sel ->
+                                            Icon(navIcon(r, sel), layout.label(r))
                                         }
                                     },
-                                    label = { Text(d.label) },
+                                    label = { Text(layout.label(r), maxLines = 1) },
                                     colors = androidx.compose.material3.NavigationBarItemDefaults.colors(indicatorColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.16f)),
                                 )
                             }
@@ -470,6 +472,8 @@ private fun NavGraph(nav: androidx.navigation.NavHostController) {
         }
         screen("settings") { SettingsScreen() }
         screen("settings/dashboard") { com.blacklab.app.ui.settings.DashboardSettingsScreen() }
+        screen("settings/sections") { com.blacklab.app.ui.settings.SectionsSettingsScreen() }
+        screen("office") { com.blacklab.app.ui.office.OfficeScreen() }
         screen("settings/health") { com.blacklab.app.ui.settings.HealthScreen() }
         screen("timeline") { com.blacklab.app.ui.home.TimelineScreen() }
         screen("updates") { com.blacklab.app.ui.settings.UpdatesScreen() }
@@ -489,7 +493,6 @@ private fun NavGraph(nav: androidx.navigation.NavHostController) {
             com.blacklab.app.ui.knowledge.TalkScreen(it.arguments?.getString("id") ?: "", Uri.decode(it.arguments?.getString("q") ?: ""))
         }
         screen("summarize") { com.blacklab.app.ui.summarize.SummarizeScreen() }
-        screen("garage") { com.blacklab.app.ui.vehicle.GarageScreen() }
         screen("facility?tab={tab}&tag={tag}", arguments = listOf(navArgument("tab") { defaultValue = "" }, navArgument("tag") { defaultValue = "" })) {
             com.blacklab.app.ui.facility.FacilityScreen(it.arguments?.getString("tab") ?: "", Uri.decode(it.arguments?.getString("tag") ?: ""))
         }

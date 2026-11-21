@@ -8,7 +8,7 @@ import java.util.Locale
  * the test's corpus first, then fix the rule.
  *
  * Order matters: the first rule that matches wins. Rules are split into two phases because the Facility,
- * Garage, Behavioral Health and desktop routers (which have their own vocabularies) run in between —
+ * Facility, Behavioral Health and desktop routers (which have their own vocabularies) run in between —
  * "what inspections are due?" must reach Facility before the generic "what's due?" task rule.
  *
  * [Match.groups] is like [MatchResult.groupValues]: index 0 is the whole match, then the capture groups,

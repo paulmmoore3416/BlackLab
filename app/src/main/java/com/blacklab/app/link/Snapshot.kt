@@ -38,15 +38,6 @@ object Snapshot {
         ))
     }
 
-    /** The car for the desktop's Garage page (see [SnapshotJson.vehicle]). */
-    fun vehicle(app: AppContainer): JSONObject = runCatching {
-        val ctx = app.context
-        SnapshotJson.vehicle(
-            com.blacklab.app.vehicle.Garage.load(ctx), com.blacklab.app.vehicle.VehicleLink.load(ctx), com.blacklab.app.vehicle.Nhtsa.load(ctx),
-            com.blacklab.app.vehicle.ServiceReminders.pace(ctx), System.currentTimeMillis(),
-        )
-    }.getOrElse { JSONObject().put("error", it.message ?: "unavailable") }
-
     /** Brainstorm for the desktop (see [SnapshotJson.brainstorm]). */
     suspend fun brainstorm(app: AppContainer): JSONObject {
         val b = app.db.brainstorm()
@@ -77,7 +68,6 @@ object Snapshot {
             dictations = if (!want("dictations")) emptyList() else Profile.entries.flatMap { p ->
                 DictationStore.list(app.storage.dir(p, Folder.DICTATION)).take(60).map { (folder, m) -> Triple(p.name, m, app.storage.relative(folder)) }
             },
-            vehicle = if (want("vehicle")) vehicle(app) else JSONObject(),
             brainstorm = if (want("brainstorm")) brainstorm(app) else JSONObject(),
             decks = if (want("decks")) edu.allDecks() else emptyList(),
             cards = if (want("decks")) edu.allCards() else emptyList(),

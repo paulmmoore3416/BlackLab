@@ -168,6 +168,33 @@ def vault_safe_passages(text: str) -> tuple[str, int]:
     return "\n\n".join(keep), dropped
 
 
+# Program reference material (a business plan, a policy package, a financial model) talks *about* patients and
+# psychiatric care on every page, so the keyword guard above would drop most of it. A note may opt out of the keyword
+# guard — never out of the identifier guard — when it lives under a reference folder and its frontmatter says
+# `blacklab_reference: program`. Paragraphs that carry a filled-in identifier (MRN: 1234, DOB: 3/4/71…) are still
+# dropped and every secret/identifier redaction still runs.
+REFERENCE_DIRS = ("02 Projects/",)
+REFERENCE_FLAG_RE = re.compile(r"\A---\n(?:.*\n)*?blacklab_reference:\s*[\"']?program[\"']?\s*\n(?:.*\n)*?---\n")
+PATIENT_RECORD_RE = re.compile(r"(?i)\b(mrn|medical record(?: number)?|patient (?:id|name|initials)|date of birth|dob|ssn|"
+                               r"social security(?: number)?)\b\s*[:#=]\s*(?![_\s|]|$)\S")
+
+
+def is_reference_note(rel: str, text: str) -> bool:
+    return any(rel.startswith(d) for d in REFERENCE_DIRS) and bool(REFERENCE_FLAG_RE.match(text or ""))
+
+
+def reference_safe_passages(text: str) -> tuple[str, int]:
+    """vault_safe_passages for program reference notes: no keyword guard, but filled-in identifiers and
+    off-the-record paragraphs are still dropped and everything is redacted."""
+    keep, dropped = [], 0
+    for para in re.split(r"\n\s*\n", text or ""):
+        if PATIENT_RECORD_RE.search(para) or OFF_RECORD_RE.match(para):
+            dropped += para.strip() != ""
+            continue
+        keep.append(VIN_RE.sub("[VIN removed]", redact(para)))
+    return "\n\n".join(keep), dropped
+
+
 def vault_safe(text: str) -> tuple[bool, str]:
     """What may go into the Obsidian vault: never clinical text; identifiers, keys, passwords and VINs scrubbed."""
     if CLINICAL_RE.search(text or "") or OFF_RECORD_RE.match(text or ""):
@@ -189,6 +216,9 @@ SIDE_EFFECT_ASKS = {
     "launch_app": re.compile(r"\b(open|launch|start|run|fire up)\b", re.I),
     "open_path": re.compile(r"\b(open|show|pull up|browse)\b", re.I),
     "vault_write": re.compile(r"\b(obsidian|vault|save|write|note|log|record|capture|add|remember)\b", re.I),
+    "execute_command": re.compile(r"\b(run|exec|execute|terminal|bash|shell|command|docker|systemctl|git|status|service|process)\b", re.I),
+    "nightjar_camera": re.compile(r"\b(camera|cameras|see|look|watch|nightjar|video|feed|snapshot|frame)\b", re.I),
+    "qdrant_search": re.compile(r"\b(search|find|recall|lookup|vector|memory|qdrant|context)\b", re.I),
     # Starts Ghidra (every core for a while), so only for reverse-engineering requests
     "reverse_engineer": None,  # set below from RE_WORDS
 }
@@ -201,7 +231,7 @@ SIDE_EFFECT_ASKS["reverse_engineer"] = RE_WORDS
 # Text like that can contain instructions aimed at the model ("open https://…?q=<your notes>").
 READS_CONTENT = {"read_file", "search_documents", "recall_chats", "dev_docs", "phone_command", "find_files", "equipment", "vault_search", "library_search",
                  "reverse_engineer",  # strings inside a binary are attacker-chosen text
-                 "skill_use", "skills_search"}  # agent skills are third-party text
+                 "skill_use", "skills_search", "nightjar_camera", "qdrant_search"}  # agent skills are third-party text
 
 
 def url_host(u: str) -> str:
@@ -211,11 +241,12 @@ def url_host(u: str) -> str:
     return (urllib.parse.urlsplit(u).hostname or "").lower().removeprefix("www.")
 
 
-def tool_guard(name: str, request: str, args=None, tainted: bool = False) -> str | None:
+def tool_guard(name: str, request: str, args=None, tainted: bool = False, autonomous: bool = False) -> str | None:
     """None when the tool may run; otherwise the message handed back to the model instead of running it."""
-    rx = SIDE_EFFECT_ASKS.get(name)
-    if rx and not rx.search(request):
-        return f"Not run: the user didn't ask for {name}. Answer from what you already have, without more tools."
+    if not autonomous:
+        rx = SIDE_EFFECT_ASKS.get(name)
+        if rx and not rx.search(request):
+            return f"Not run: the user didn't ask for {name}. Answer from what you already have, without more tools."
     if tainted and name == "open_url":
         # After reading content, only open sites the user named themselves, so a document can't send data out
         url = args.get("url") if isinstance(args, dict) else str(args or "")
@@ -224,3 +255,4 @@ def tool_guard(name: str, request: str, args=None, tainted: bool = False) -> str
             return ("Not run: after reading files or documents I only open links the user typed. "
                     "Tell the user the link instead of opening it.")
     return None
+

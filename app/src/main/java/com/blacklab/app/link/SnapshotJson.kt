@@ -21,10 +21,6 @@ import com.blacklab.app.data.SectionEntity
 import com.blacklab.app.data.TaskEntity
 import com.blacklab.app.data.TaskListEntity
 import com.blacklab.app.dictation.DictationMeta
-import com.blacklab.app.vehicle.Dtcs
-import com.blacklab.app.vehicle.Garage
-import com.blacklab.app.vehicle.Nhtsa
-import com.blacklab.app.vehicle.Telemetry
 import org.json.JSONArray
 import org.json.JSONObject
 import java.time.LocalDate
@@ -92,7 +88,6 @@ object SnapshotJson {
         val recordings: List<RecordingEntity> = emptyList(),
         /** profile, meta, path relative to the BlackLab folder */
         val dictations: List<Triple<String, DictationMeta, String>> = emptyList(),
-        val vehicle: JSONObject = JSONObject(),
         val brainstorm: JSONObject = JSONObject(),
         val decks: List<DeckEntity> = emptyList(),
         val cards: List<FlashcardEntity> = emptyList(),
@@ -126,7 +121,6 @@ object SnapshotJson {
             put("journal", JSONArray().apply { i.journal.sortedByDescending { it.entryDay }.take(120).forEach { put(journal(it)) } })
             put("recordings", JSONArray().apply { i.recordings.sortedByDescending { it.createdAt }.take(100).forEach { put(recording(it)) } })
             put("dictations", JSONArray().apply { i.dictations.forEach { (p, m, path) -> put(dictation(p, m, path)) } })
-            put("vehicle", i.vehicle)
             put("brainstorm", i.brainstorm)
             put("decks", JSONArray().apply {
                 val cards = i.cards.groupBy { it.deckId }
@@ -195,58 +189,6 @@ object SnapshotJson {
             .put("cards", cards.size).put("due", cards.count { it.dueDay <= todayEpoch }).put("learned", cards.count { it.repetitions >= 2 })
 
     fun backup(name: String, size: Long, time: Long): JSONObject = JSONObject().put("name", name).put("size", size).put("time", time)
-
-    /** The car for the desktop's Garage page: profile, what's due, fuel, trips, live values, codes, recalls. */
-    fun vehicle(g: Garage.State, t: Telemetry.State, n: Nhtsa.State, pace: Double?, now: Long): JSONObject {
-        val v = g.vehicle
-        val stats = Garage.fuelStats(g.fuel)
-        val Tm = Telemetry
-        return JSONObject().apply {
-            put("name", v.name); put("year", v.year); put("make", v.make); put("model", v.model); put("trim", v.trim); put("engine", v.engine); put("drive", v.drive)
-            put("vin", v.vin); put("odometer", v.odometerNow); put("odometerEstimated", v.estMiles > 0); put("odometerAt", v.odometerAt); put("tankGallons", v.tankGallons)
-            put("milesPerDay", pace ?: NULL)
-            put("fuelStats", JSONObject().put("avgMpg", stats.avgMpg ?: NULL).put("lastMpg", stats.lastMpg ?: NULL)
-                .put("costPerMile", stats.costPerMile ?: NULL).put("monthCost", stats.monthCost))
-            put("due", JSONArray().apply {
-                Garage.due(g, milesPerDay = pace).forEach { d ->
-                    put(JSONObject().put("name", d.item.name).put("status", d.status.name).put("text", d.describe()).put("milesLeft", d.milesLeft ?: NULL)
-                        .put("expected", d.expectedDay?.let { dayMillis(it) } ?: NULL))
-                }
-            })
-            put("fuel", JSONArray().apply { g.fuel.take(40).forEach { f -> put(JSONObject().put("time", f.time).put("miles", f.miles ?: NULL).put("gallons", f.gallons).put("cost", f.cost ?: NULL).put("full", f.full).put("station", f.station)) } })
-            put("mpgSeries", JSONArray().apply { Garage.mpgSeries(g.fuel).takeLast(24).forEach { (time, mpg) -> put(JSONArray().put(time).put(mpg)) } })
-            put("weekly", JSONArray().apply { Tm.weeklyMiles(t.trips, 12).forEach { (d, b, o) -> put(JSONArray().put(Time.millis(d)).put(b).put(o)) } })
-            put("totals", JSONObject().apply {
-                listOf("week" to Tm.weekStart(), "month" to Tm.monthStart(), "year" to Tm.yearStart()).forEach { (k, from) ->
-                    val x = Tm.totals(t.trips, from, now + 1, t.link.ratePerMile)
-                    put(k, JSONObject().put("miles", x.miles).put("trips", x.trips).put("business", x.byPurpose[Telemetry.Purpose.BUSINESS] ?: 0.0).put("deductible", x.deductible))
-                }
-            })
-            put("trips", JSONArray().apply {
-                t.trips.filter { it.end != null }.take(60).forEach { tr ->
-                    put(JSONObject().put("start", tr.start).put("end", tr.end).put("miles", tr.miles).put("from", tr.startPlace).put("to", tr.endPlace).put("purpose", tr.purpose.label)
-                        .put("mpg", tr.mpg(v.tankGallons) ?: NULL).put("sim", tr.simulated).put("note", tr.note))
-                }
-            })
-            put("live", JSONArray().apply {
-                t.snapshot.values.sortedBy { m -> Tm.DEFS.indexOfFirst { it.key == m.key } }.forEach { m ->
-                    val d = Tm.def(m.key)
-                    put(JSONObject().put("key", m.key).put("label", d?.label ?: m.key).put("group", d?.group?.label ?: "").put("value", Tm.format(m))
-                        .put("num", m.num ?: NULL).put("source", m.source.label).put("time", m.time).put("alert", Tm.isAlert(m)))
-                }
-            })
-            put("codes", JSONArray().apply { t.activeDtcs.forEach { d -> put(JSONObject().put("code", d.code).put("kind", d.kind).put("text", Dtcs.describe(d.code)).put("since", d.firstSeen)) } })
-            t.parked?.let { p -> put("parked", JSONObject().put("place", p.place).put("time", p.time)) }
-            t.pendingFill?.let { f -> put("pendingFill", JSONObject().put("gallons", f.gallons).put("from", f.fromPct).put("to", f.toPct).put("time", f.time)) }
-            put("lastSession", t.lastSession)
-            put("recalls", JSONArray().apply {
-                n.recalls.forEach { r -> put(JSONObject().put("campaign", r.campaign).put("date", r.date).put("component", r.component).put("summary", r.summary)
-                    .put("remedy", r.remedy).put("resolved", r.campaign in n.resolved).put("parkIt", r.parkIt || r.parkOutside)) }
-            })
-            put("recallsCheckedAt", n.checkedAt)
-            put("specs", JSONArray().apply { n.decoded?.specs?.forEach { (k, value) -> put(JSONArray().put(k).put(value)) } })
-        }
-    }
 
     /**
      * Brainstorm for the desktop: notebooks › sections › pages (title, preview, tagged lines and a

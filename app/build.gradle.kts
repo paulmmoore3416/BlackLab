@@ -14,6 +14,12 @@ val keystoreProps = Properties().apply {
 }
 
 android {
+    // No Google Play dependency-metadata block in the APK signing block: it's encrypted with fresh randomness on
+    // every build (so identical code gave a different APK and checksum each time), and BlackLab isn't on Play.
+    dependenciesInfo {
+        includeInApk = false
+        includeInBundle = false
+    }
     namespace = "com.blacklab.app"
     compileSdk = 37
 
@@ -21,8 +27,8 @@ android {
         applicationId = "com.blacklab.app"
         minSdk = 35
         targetSdk = 36
-        versionCode = 28
-        versionName = "5.14.0"
+        versionCode = 29
+        versionName = "5.15.0"
         vectorDrawables { useSupportLibrary = true }
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }

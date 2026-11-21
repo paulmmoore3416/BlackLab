@@ -33,7 +33,7 @@ class ContrastTest {
             }
             listOf(p.darkAccent, p.darkSecondary, p.darkTertiary).forEach { c -> assertTrue("${p.name} dark ${c.toString(16)}", Contrast.ratio(i(c), darkBg) >= Contrast.AA) }
         }
-        assertEquals(17, AccentPalette.entries.size)
+        assertEquals(22, AccentPalette.entries.size)
     }
 
     @Test fun lightStylesKeepTextAndBordersReadable() {

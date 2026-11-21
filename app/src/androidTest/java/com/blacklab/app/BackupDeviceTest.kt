@@ -18,7 +18,7 @@ class BackupDeviceTest {
     @Test fun backupIsEncryptedAndVerifies() = runBlocking {
         val title = DeviceTest.tag()
         val id = TaskOps.save(app, TaskEntity(profile = app.settings.current.activeProfile.name, title = title))
-        val garage = File(DeviceTest.context.filesDir, "garage/devicetest.json").apply { parentFile?.mkdirs(); writeText("{\"t\":1}") }
+        val garage = File(DeviceTest.context.filesDir, "facility/devicetest.json").apply { parentFile?.mkdirs(); writeText("{\"t\":1}") }
         val f = app.backups.backupNow()
         try {
             assertTrue(f.name.endsWith(".blbackup"))
@@ -27,7 +27,7 @@ class BackupDeviceTest {
             val i = app.backups.inspect(f)
             assertTrue(i.encrypted && i.fromThisInstall)
             assertTrue(i.counts.first { it.first == "tasks" }.second >= 1)
-            assertTrue(i.files.contains("garage/devicetest.json"))
+            assertTrue(i.files.contains("facility/devicetest.json"))
             app.backups.discard()
 
             val bad = File(f.parentFile, ".devicetest-bad.blbackup").apply { writeBytes(raw.copyOf().also { it[it.size - 3] = (it[it.size - 3].toInt() xor 1).toByte() }) }

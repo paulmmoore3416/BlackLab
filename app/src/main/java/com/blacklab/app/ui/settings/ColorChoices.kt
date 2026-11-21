@@ -76,6 +76,15 @@ fun ColorChoices() {
             else "Each palette pairs a main color with a complementary secondary color. Both are tuned for light and dark mode.",
             style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
+        Text("Quick looks", style = MaterialTheme.typography.labelLarge, modifier = Modifier.padding(top = 12.dp, bottom = 6.dp))
+        Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            ThemePresets.all.forEach { pr ->
+                PresetCard(pr, dark, selected = ThemePresets.matches(pr, s)) { app.settings.update { ThemePresets.apply(pr, this) } }
+            }
+        }
+        Text("A quick look sets the style, colors, backdrop and corners together. Fine-tune anything below.", style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 4.dp))
+
         SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth().padding(top = 10.dp)) {
             Profile.entries.forEachIndexed { i, p ->
                 SegmentedButton(which == p, { which = p }, SegmentedButtonDefaults.itemShape(i, 2)) { Text(app.settings.profileName(p)) }
@@ -124,7 +133,7 @@ fun ColorChoices() {
         Text("Corners", style = MaterialTheme.typography.labelLarge, modifier = Modifier.padding(top = 14.dp, bottom = 6.dp))
         SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
             com.blacklab.app.ui.theme.CornerStyle.entries.forEachIndexed { i, c ->
-                SegmentedButton(choice.corners == c, { app.settings.update { putString(Keys.CORNER_STYLE, c.name) } }, SegmentedButtonDefaults.itemShape(i, 3)) { Text(c.label) }
+                SegmentedButton(choice.corners == c, { app.settings.update { putString(Keys.CORNER_STYLE, c.name) } }, SegmentedButtonDefaults.itemShape(i, com.blacklab.app.ui.theme.CornerStyle.entries.size)) { Text(c.label, maxLines = 1) }
             }
         }
 
@@ -175,14 +184,20 @@ fun ColorChoices() {
 
         Text("Visual style", style = MaterialTheme.typography.labelLarge, modifier = Modifier.padding(top = 14.dp, bottom = 6.dp))
         SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
-            listOf("GLASS" to "Glass", "SOLID" to "Solid").forEachIndexed { i, (k, l) ->
-                SegmentedButton(s.visualStyle == k, { app.settings.update { putString(Keys.VISUAL_STYLE, k) } }, SegmentedButtonDefaults.itemShape(i, 2)) { Text(l) }
+            listOf("FLUENT" to "Fluent glass", "GLASS" to "Glass", "SOLID" to "Solid").forEachIndexed { i, (k, l) ->
+                SegmentedButton(s.visualStyle == k, { app.settings.update { putString(Keys.VISUAL_STYLE, k); if (k == "FLUENT" && s.backdrop == "AURORA") putString(Keys.BACKDROP, "MICA") } },
+                    SegmentedButtonDefaults.itemShape(i, 3)) { Text(l, maxLines = 1) }
             }
         }
+        Text(when (s.visualStyle) {
+            "FLUENT" -> "Microsoft's Fluent look: a still Mica page, acrylic cards with hairline borders, neutral surfaces."
+            "GLASS" -> "Frosted cards over a backdrop in your palette colors."
+            else -> "Flat, solid surfaces."
+        }, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 4.dp))
         if (s.visualStyle != "SOLID") {
             Text("Backdrop", style = MaterialTheme.typography.labelLarge, modifier = Modifier.padding(top = 10.dp, bottom = 4.dp))
             androidx.compose.foundation.layout.FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                listOf("AURORA" to "Aurora · moving", "GRADIENT" to "Gradient · still", "PLAIN" to "Plain").forEach { (k, l) ->
+                listOf("MICA" to "Mica · still", "AURORA" to "Aurora · moving", "GRADIENT" to "Gradient · still", "PLAIN" to "Plain").forEach { (k, l) ->
                     androidx.compose.material3.FilterChip(s.backdrop == k, { app.settings.update { putString(Keys.BACKDROP, k) } }, label = { Text(l) })
                 }
             }
@@ -193,6 +208,15 @@ fun ColorChoices() {
                     androidx.compose.material3.Slider(level, { level = it }, Modifier.weight(1f), valueRange = 0f..100f, steps = 19,
                         onValueChangeFinished = { app.settings.update { putInt(Keys.BACKDROP_INTENSITY, level.toInt()) } })
                     Text("${level.toInt()}%", style = MaterialTheme.typography.labelMedium, modifier = Modifier.width(44.dp))
+                }
+            }
+            run {
+                var frost by remember(s.cardFrost) { mutableStateOf(s.cardFrost.toFloat()) }
+                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 2.dp)) {
+                    Text("Card frost", style = MaterialTheme.typography.labelLarge, modifier = Modifier.width(80.dp))
+                    androidx.compose.material3.Slider(frost, { frost = it }, Modifier.weight(1f), valueRange = 0f..100f, steps = 19,
+                        onValueChangeFinished = { app.settings.update { putInt(Keys.CARD_FROST, frost.toInt()) } })
+                    Text("${frost.toInt()}%", style = MaterialTheme.typography.labelMedium, modifier = Modifier.width(44.dp))
                 }
             }
             Text(if (com.blacklab.app.ui.theme.Motion.reduced) "Reduce motion is on, so the aurora holds still." else "Glass cards glow where you touch them; numbers count up as they appear.",
@@ -363,5 +387,35 @@ fun AutoThemeOptions(s: com.blacklab.app.core.Settings) {
         com.blacklab.app.ui.components.TimePickerDialogBox(if (which == "from") s.themeDarkFrom else s.themeDarkTo, onDismiss = { pick = null }) { m ->
             app.settings.update { putInt(if (which == "from") Keys.THEME_DARK_FROM else Keys.THEME_DARK_TO, m) }; pick = null
         }
+    }
+}
+
+/** A small mock of a quick look: its page, a card and the accent, with its name. */
+@Composable
+private fun PresetCard(p: ThemePresets.Preset, dark: Boolean, selected: Boolean, onClick: () -> Unit) {
+    val d = p.dark ?: dark
+    val pal = p.palette
+    val page = if (d) Color(com.blacklab.app.ui.theme.DarkStyle.of(p.darkStyle).background) else Color(com.blacklab.app.ui.theme.LightStyle.of(p.lightStyle).background)
+    val card = if (d) Color(com.blacklab.app.ui.theme.DarkStyle.of(p.darkStyle).container) else Color(com.blacklab.app.ui.theme.LightStyle.of(p.lightStyle).card)
+    val r = com.blacklab.app.ui.theme.CornerStyle.of(p.corners).md.dp
+    Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.width(96.dp)) {
+        Box(
+            Modifier.size(width = 92.dp, height = 64.dp).clip(RoundedCornerShape(r + 4.dp))
+                .background(androidx.compose.ui.graphics.Brush.linearGradient(listOf(pal.accent(d).copy(alpha = if (p.visualStyle == "SOLID") 0f else 0.35f).compositeOverColor(page), page)))
+                .border(if (selected) 3.dp else 1.dp, if (selected) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.outline, RoundedCornerShape(r + 4.dp))
+                .clickable(onClick = onClick)
+                .semantics { contentDescription = "${p.label} look"; this.selected = selected }
+                .padding(10.dp),
+        ) {
+            Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(r)).background(card.copy(alpha = if (p.visualStyle == "SOLID") 1f else 0.8f)).padding(6.dp)) {
+                Box(Modifier.fillMaxWidth(0.7f).height(4.dp).clip(RoundedCornerShape(2.dp)).background(if (d) Color(0xFFE9EBEF) else Color(0xFF1B1B1B)))
+                Spacer(Modifier.height(5.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Box(Modifier.size(width = 22.dp, height = 7.dp).clip(RoundedCornerShape(4.dp)).background(pal.accent(d)))
+                    Box(Modifier.size(width = 14.dp, height = 7.dp).clip(RoundedCornerShape(4.dp)).background(pal.secondary(d)))
+                }
+            }
+        }
+        Text(p.label, style = MaterialTheme.typography.labelSmall, modifier = Modifier.padding(top = 3.dp), maxLines = 1)
     }
 }

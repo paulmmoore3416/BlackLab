@@ -7,7 +7,6 @@ import com.blacklab.app.core.Profile
 import com.blacklab.app.data.CalendarLogic
 import com.blacklab.app.data.ContentStore
 import com.blacklab.app.facility.Facility
-import com.blacklab.app.vehicle.Garage
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -140,7 +139,6 @@ object VaultFeed {
             .put("user", JSONObject().put("name", s.userName).put("title", s.jobTitle).put("org", s.organization))
 
         if (s.vaultFacility) out.put("facility", facility(Facility.load(ctx)))
-        if (s.vaultGarage) out.put("garage", garage(app))
 
         val lists = Profile.entries.flatMap { app.db.tasks().lists(it.name) }.associateBy { it.id }
         val allTasks = app.db.tasks().all()
@@ -251,31 +249,6 @@ object VaultFeed {
                 f.log.sortedByDescending { it.day }.take(5000).forEach { e ->
                     put(JSONObject().put("id", e.id).put("assetId", e.assetId).put("pmId", e.pmId ?: "").put("day", e.day).put("kind", e.kind.label)
                         .put("result", e.result.label).put("text", e.text).put("by", e.by))
-                }
-            })
-    }
-
-    /** The car without its VIN, plate or where it has been. */
-    fun garage(app: AppContainer): JSONObject {
-        val g = Garage.load(app.context)
-        val v = g.vehicle
-        val snap = Snapshot.vehicle(app)
-        return JSONObject()
-            .put("vehicle", JSONObject().put("name", v.name).put("year", v.year).put("make", v.make).put("model", v.model).put("trim", v.trim)
-                .put("engine", v.engine).put("drive", v.drive).put("odometer", v.odometerNow).put("tirePsi", v.tirePsi).put("oil", v.oil)
-                .put("dealer", v.dealer).put("insurance", v.insurance))
-            .put("due", snap.optJSONArray("due") ?: JSONArray())
-            .put("recalls", snap.optJSONArray("recalls") ?: JSONArray())
-            .put("services", JSONArray().apply {
-                g.services.forEach { r ->
-                    put(JSONObject().put("day", r.day).put("miles", r.miles ?: JSONObject.NULL).put("title", r.title).put("cost", r.cost ?: JSONObject.NULL)
-                        .put("shop", r.shop).put("notes", r.notes)
-                        .put("items", JSONArray(r.items.mapNotNull { id -> g.items.firstOrNull { it.id == id }?.name })))
-                }
-            })
-            .put("fuel", JSONArray().apply {
-                g.fuel.takeLast(200).forEach { f ->
-                    put(JSONObject().put("time", f.time).put("miles", f.miles ?: JSONObject.NULL).put("gallons", f.gallons).put("cost", f.cost ?: JSONObject.NULL).put("station", f.station))
                 }
             })
     }

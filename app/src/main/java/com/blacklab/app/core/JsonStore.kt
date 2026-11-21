@@ -12,7 +12,7 @@ import java.nio.file.StandardCopyOption
 
 /**
  * One JSON document on disk, for the parts of BlackLab that keep their data outside Room (Facility,
- * Garage, drive telemetry, recalls…). Every store gets the same guarantees:
+ * Facility…). Every store gets the same guarantees:
  *
  *  - **Crash-safe writes**: the new copy is written to a temp file, flushed to disk, then moved into place.
  *    The previous good copy is kept as `name.json.bak`, so a write cut short by a crash or a full disk

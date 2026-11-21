@@ -61,7 +61,13 @@ enum class AccentPalette(
     COPPER("Copper", 0xFFE0955E, 0xFF8F4513, 0xFF6EC6E6, 0xFF0F5F7F, 0xFFB7D96B, 0xFF4F6B12),
     LIME("Lime", 0xFFB8F15A, 0xFF436E00, 0xFFB18CFF, 0xFF6236C7, 0xFF5CE1E6, 0xFF00727A),
     PLUM("Plum", 0xFFD58BE6, 0xFF8B2F9E, 0xFFFFD27A, 0xFF8A5800, 0xFF7FD6B2, 0xFF0E6E4E),
-    SKY("Sky", 0xFF7CC8FF, 0xFF0B66B2, 0xFFFFA07A, 0xFFB2441A, 0xFFA5E887, 0xFF2F6E12);
+    SKY("Sky", 0xFF7CC8FF, 0xFF0B66B2, 0xFFFFA07A, 0xFFB2441A, 0xFFA5E887, 0xFF2F6E12),
+    // Microsoft 365: each app's brand color with a complementary secondary (Fluent 2 brand ramps, AA-checked)
+    MICROSOFT("Microsoft Blue", 0xFF479EF5, 0xFF0F6CBD, 0xFF4CC2CC, 0xFF00727A, 0xFFFFB900, 0xFF8A5A00),
+    WORD("Word", 0xFF5B9BF0, 0xFF185ABD, 0xFFFFB900, 0xFF8A5A00, 0xFF4DD0C4, 0xFF0F766E),
+    EXCEL("Excel", 0xFF4CC38A, 0xFF107C41, 0xFFC490F0, 0xFF6B3FA0, 0xFFFFB74D, 0xFF9A5200),
+    POWERPOINT("PowerPoint", 0xFFF2795A, 0xFFB7391A, 0xFF4DC9D9, 0xFF0B6E7A, 0xFFFFC857, 0xFF8A5A00),
+    TEAMS("Teams", 0xFF9EA2FF, 0xFF5B5FC7, 0xFFFFC857, 0xFF8A5A00, 0xFF5CD6C0, 0xFF0B6E61);
 
     fun accent(dark: Boolean) = Color(if (dark) darkAccent else lightAccent)
     fun secondary(dark: Boolean) = Color(if (dark) darkSecondary else lightSecondary)
@@ -88,7 +94,8 @@ enum class LightStyle(
     PURE("Pure white", "Bright white page, outlined cards", 0xFFFFFFFF, 0xFFF5F6F8, 0xFFFFFFFF, 0xFFECEEF1, 0xFFE3E6EA, 0xFF111316, 0xFF434952, 0f),
     WARM("Warm paper", "Cream, easy on the eyes at night", 0xFFF4EFE5, 0xFFFFFCF6, 0xFFF9F5EC, 0xFFEAE3D5, 0xFFE1D9C8, 0xFF1D1A14, 0xFF51493C, 0f),
     COOL("Cool mist", "Blue-gray calm", 0xFFECF0F5, 0xFFFFFFFF, 0xFFF5F7FA, 0xFFE1E6ED, 0xFFD8DFE8, 0xFF121720, 0xFF434C5A, 0f),
-    WASH("Accent wash", "Your main color tints the page", 0xFFF4F5F7, 0xFFFFFFFF, 0xFFFAFAFB, 0xFFEAECEF, 0xFFE2E5E9, 0xFF14161A, 0xFF474D57, 0.055f);
+    WASH("Accent wash", "Your main color tints the page", 0xFFF4F5F7, 0xFFFFFFFF, 0xFFFAFAFB, 0xFFEAECEF, 0xFFE2E5E9, 0xFF14161A, 0xFF474D57, 0.055f),
+    FLUENT("Fluent Mica", "Windows 11 light: neutral gray page, white cards", 0xFFF3F3F3, 0xFFFFFFFF, 0xFFF9F9F9, 0xFFEBEBEB, 0xFFE0E0E0, 0xFF1B1B1B, 0xFF4A4A4A, 0f);
 
     companion object {
         fun of(name: String?) = entries.firstOrNull { it.name == name } ?: CLEAN
@@ -109,7 +116,8 @@ enum class DarkStyle(
     GRAPHITE("Graphite", "Soft near-black, the original look", 0xFF0E1014, 0xFF0A0B0E, 0xFF13161B, 0xFF171A20, 0xFF1D2128, 0xFF242830, 0xFF1D2027, 0xFF262A32, 0f),
     OLED("True black", "Pure black page for OLED screens — saves battery", 0xFF000000, 0xFF000000, 0xFF08090B, 0xFF0E1013, 0xFF15171B, 0xFF1C1F24, 0xFF15171B, 0xFF1F2228, 0f),
     SLATE("Slate", "Cool blue-gray", 0xFF0F141B, 0xFF0B0F15, 0xFF141A23, 0xFF18202A, 0xFF1E2733, 0xFF252F3C, 0xFF1E2733, 0xFF2A3442, 0f),
-    WASH("Accent wash", "Your main color tints the dark page", 0xFF0E1014, 0xFF0A0B0E, 0xFF13161B, 0xFF171A20, 0xFF1D2128, 0xFF242830, 0xFF1D2027, 0xFF262A32, 0.07f);
+    WASH("Accent wash", "Your main color tints the dark page", 0xFF0E1014, 0xFF0A0B0E, 0xFF13161B, 0xFF171A20, 0xFF1D2128, 0xFF242830, 0xFF1D2027, 0xFF262A32, 0.07f),
+    FLUENT("Fluent Mica", "Windows 11 dark: neutral charcoal, like Office and Teams", 0xFF202020, 0xFF1C1C1C, 0xFF272727, 0xFF2B2B2B, 0xFF323232, 0xFF3A3A3A, 0xFF2D2D2D, 0xFF3D3D3D, 0f);
 
     companion object { fun of(name: String?) = entries.firstOrNull { it.name == name } ?: GRAPHITE }
 }
@@ -118,7 +126,9 @@ enum class DarkStyle(
 enum class CornerStyle(val label: String, val xs: Int, val sm: Int, val md: Int, val lg: Int, val xl: Int, val card: Int, val widget: Int) {
     ROUND("Round", 10, 14, 20, 26, 32, 22, 24),
     SOFT("Soft", 6, 8, 12, 16, 20, 14, 16),
-    SQUARE("Square", 2, 4, 6, 8, 10, 6, 8);
+    SQUARE("Square", 2, 4, 6, 8, 10, 6, 8),
+    /** Microsoft Fluent: 4 dp controls, 8 dp cards and flyouts. */
+    FLUENT("Fluent", 4, 4, 8, 8, 12, 8, 10);
 
     companion object { fun of(name: String?) = entries.firstOrNull { it.name == name } ?: ROUND }
 }
@@ -159,12 +169,14 @@ data class ThemeChoice(
     val lightStyle: LightStyle = LightStyle.CLEAN,
     /** Stronger contrast: AAA (7:1) text and accents, darker borders, in light and dark. */
     val highContrast: Boolean = false,
-    /** GLASS (aurora backdrop + frosted cards) or SOLID (classic). */
+    /** FLUENT (Mica backdrop + acrylic cards, Microsoft style), GLASS (aurora backdrop + frosted cards) or SOLID (classic). */
     val visualStyle: String = "GLASS",
-    /** AURORA, GRADIENT or PLAIN. */
+    /** AURORA, GRADIENT, MICA or PLAIN. */
     val backdrop: String = "AURORA",
     /** 0–100. */
     val intensity: Int = 60,
+    /** 0–100: how opaque glass cards are (0 = most see-through). */
+    val frost: Int = 50,
     val darkStyle: DarkStyle = DarkStyle.GRAPHITE,
     val corners: CornerStyle = CornerStyle.ROUND,
     /** Interface size: 1.0 comfortable, smaller = compact. */
@@ -184,7 +196,7 @@ data class ThemeChoice(
         fun from(s: com.blacklab.app.core.Settings) = ThemeChoice(
             AccentPalette.of(s.accentPersonal, AccentPalette.MINT), AccentPalette.of(s.accentProfessional, AccentPalette.COBALT),
             s.secondaryPersonal, s.secondaryProfessional, LightStyle.of(s.lightStyle), s.highContrast,
-            s.visualStyle, s.backdrop, s.backdropIntensity,
+            s.visualStyle, s.backdrop, s.backdropIntensity, s.cardFrost,
             DarkStyle.of(s.darkStyle), CornerStyle.of(s.cornerStyle), (s.uiScale / 100f).coerceIn(0.8f, 1.1f), FontChoice.of(s.fontFamily),
             ReadingStyle(s.readingFont, (s.readingSize / 100f).coerceIn(0.8f, 1.6f)),
         )
@@ -359,15 +371,16 @@ val InterFamily = androidx.compose.ui.text.font.FontFamily(
     },
 )
 
-private fun typographyFor(font: FontChoice): Typography {
+private fun typographyFor(font: FontChoice, fluent: Boolean = false): Typography {
     val fam = when (font) {
         FontChoice.INTER -> InterFamily
         FontChoice.SYSTEM -> androidx.compose.ui.text.font.FontFamily.Default
         FontChoice.SERIF -> androidx.compose.ui.text.font.FontFamily.Serif
     }
-    fun TextStyle.bl() = copy(fontFamily = fam)
+    // Fluent's type ramp sets no extra tracking and keeps titles semibold (Segoe UI Variable's feel, in Inter)
+    fun TextStyle.bl() = copy(fontFamily = fam).let { if (fluent) it.copy(letterSpacing = 0.sp) else it }
     /** Display sizes are mostly numbers (timers, big counts): tabular figures so they don't shift. */
-    fun TextStyle.blNum() = copy(fontFamily = fam, fontFeatureSettings = "tnum")
+    fun TextStyle.blNum() = copy(fontFamily = fam, fontFeatureSettings = "tnum").let { if (fluent) it.copy(letterSpacing = 0.sp, fontWeight = FontWeight.SemiBold) else it }
     return Typography().let { t ->
     t.copy(
         bodyLarge = t.bodyLarge.copy(lineHeight = 25.sp, letterSpacing = 0.2.sp),
@@ -429,7 +442,8 @@ fun BlackLabTheme(themeMode: String, dynamic: Boolean, profile: Profile, choice:
     }
     // Every color change — palette, secondary, light style, light/dark, contrast — blends over ~half a second
     val scheme = animateScheme(solid)
-    val glass = GlassStyle(enabled = choice.visualStyle != "SOLID", backdrop = choice.backdrop, intensity = choice.intensity / 100f, dark = dark)
+    val glass = GlassStyle(enabled = choice.visualStyle != "SOLID", backdrop = choice.backdrop, intensity = choice.intensity / 100f, dark = dark,
+        fluent = choice.visualStyle == "FLUENT", frost = choice.frost / 100f)
     val target = if (choice.highContrast) Contrast.AAA else Contrast.AA
     val bl = BlColors(
         accent = scheme.primary,
@@ -443,7 +457,7 @@ fun BlackLabTheme(themeMode: String, dynamic: Boolean, profile: Profile, choice:
     )
     // With glass on, screens are see-through and the aurora shows behind them
     val drawn = if (glass.enabled) scheme.copy(background = Color.Transparent) else scheme
-    val typography = androidx.compose.runtime.remember(choice.font) { typographyFor(choice.font) }
+    val typography = androidx.compose.runtime.remember(choice.font, glass.fluent) { typographyFor(choice.font, glass.fluent) }
     val shapes = androidx.compose.runtime.remember(choice.corners) { shapesFor(choice.corners) }
     val baseDensity = androidx.compose.ui.platform.LocalDensity.current
     // Interface size scales layout and text together (on top of the phone's own display and font size)

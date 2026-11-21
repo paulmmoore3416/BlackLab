@@ -86,10 +86,9 @@ class MainActivity : FragmentActivity() {
         com.blacklab.app.core.FrameStats.attach(this)
         val app = app
         com.blacklab.app.link.LinkService.sync(this)
+        com.blacklab.app.assistant.DesktopAi.kick()
         // Keys pushed by ./daddyshome while the app was already running: import them now and re-check the desktop
         app.appScope.launch {
-            if (runCatching { com.blacklab.app.vehicle.Garage.importProvisioning(this@MainActivity, app.storage.root) }.getOrDefault(false))
-                com.blacklab.app.vehicle.Nhtsa.refreshSoon(this@MainActivity)
             if (app.secrets.importProvisioning(app.storage.root) > 0) com.blacklab.app.assistant.DesktopAi.probe()
         }
         // The wake word may only start while the app is in front (Android's rule for the microphone)
@@ -111,6 +110,15 @@ class MainActivity : FragmentActivity() {
 
     private fun handleIntent(intent: Intent?) {
         intent ?: return
+        // Microsoft sign-in coming back from the browser (state-checked in Microsoft365.complete)
+        if (intent.action == Intent.ACTION_VIEW && com.blacklab.app.office.Microsoft365.isRedirect(this, intent.data)) {
+            val uri = intent.data!!
+            app.appScope.launch {
+                val msg = com.blacklab.app.office.Microsoft365.complete(app, uri)
+                withContext(Dispatchers.Main) { android.widget.Toast.makeText(this@MainActivity, msg, android.widget.Toast.LENGTH_LONG).show(); pendingRoute.value = "office" }
+            }
+            return
+        }
         // This activity is exported, so any app can send these extras. Routes may not carry file
         // paths (that would open BlackLab's private files in the viewer/editor), and only the
         // home-screen shortcut's own request runs in the assistant: arbitrary text could otherwise

@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Launcher icon background: the charcoal of the BlackLab logo, lit from the top. -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
+    <gradient android:angle="270" android:startColor="#FF2E333E" android:endColor="#FF121419" />
+</shape>

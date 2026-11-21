@@ -52,6 +52,12 @@ class WebDataExportTest {
                     "high" to hex(s.high), "highest" to hex(s.highest), "line" to hex(s.outlineVariant), "wash" to s.wash.toDouble())
             },
             "corners" to com.blacklab.app.ui.theme.CornerStyle.entries.map { c -> linkedMapOf("id" to c.name, "label" to c.label, "card" to c.card, "small" to c.sm) },
+            "presets" to com.blacklab.app.ui.settings.ThemePresets.all.map { p ->
+                linkedMapOf("id" to p.id, "label" to p.label, "visual_style" to p.visualStyle, "backdrop" to p.backdrop, "backdrop_intensity" to p.intensity,
+                    "card_frost" to p.frost, "corner_style" to p.corners, "light_style" to p.lightStyle, "dark_style" to p.darkStyle,
+                    "accent_personal" to p.personal.name, "accent_professional" to p.professional.name,
+                    "theme_mode" to (p.dark?.let { if (it) "DARK" else "LIGHT" } ?: ""))
+            },
             "bh" to linkedMapOf(
                 "phases" to Library.CRISIS_PHASES.map { linkedMapOf("name" to it.name, "looks" to it.looks, "respond" to it.respond, "say" to it.say, "avoid" to it.avoid) },
                 "tips" to Library.DEESCALATION_TIPS,

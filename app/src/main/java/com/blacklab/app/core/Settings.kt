@@ -134,7 +134,6 @@ data class Settings(
     val asstIndexOps: Boolean = true,
     val vaultEnabled: Boolean = true,
     val vaultFacility: Boolean = true,
-    val vaultGarage: Boolean = true,
     val vaultTasks: Boolean = true,
     val vaultNotes: Boolean = true,
     val vaultLearning: Boolean = true,
@@ -179,6 +178,8 @@ data class Settings(
     val backdrop: String = "AURORA",
     /** 0–100: how strongly the palette shows in the backdrop. */
     val backdropIntensity: Int = 60,
+    /** Glass card opacity, 0–100. */
+    val cardFrost: Int = 50,
     /** ui/theme DarkStyle name: GRAPHITE, OLED (true black), SLATE, WASH. */
     val darkStyle: String = "GRAPHITE",
     /** ui/theme CornerStyle name: ROUND, SOFT, SQUARE. */
@@ -199,6 +200,8 @@ data class Settings(
     // Home dashboard: card order and the cards you've hidden (see HomeLayout)
     val homeOrder: List<String> = HomeLayout.order(""),
     val homeHidden: Set<String> = emptySet(),
+    // Sections: bottom tabs, side-menu order, hidden sections and your names for them (see NavLayout)
+    val nav: NavLayout.Layout = NavLayout.parse(null, null, null, null),
     // Notes (Keep-style)
     val notesNewBottom: Boolean = true,
     val notesCheckedBottom: Boolean = true,
@@ -323,7 +326,6 @@ object Keys {
     const val ASST_INDEX_OPS = "asst_index_ops"
     const val VAULT_ENABLED = "vault_enabled"
     const val VAULT_FACILITY = "vault_facility"
-    const val VAULT_GARAGE = "vault_garage"
     const val VAULT_TASKS = "vault_tasks"
     const val VAULT_NOTES = "vault_notes"
     const val VAULT_LEARNING = "vault_learning"
@@ -357,6 +359,7 @@ object Keys {
     const val VISUAL_STYLE = "visual_style"
     const val BACKDROP = "backdrop"
     const val BACKDROP_INTENSITY = "backdrop_intensity"
+    const val CARD_FROST = "card_frost"
     const val DARK_STYLE = "dark_style"
     const val CORNER_STYLE = "corner_style"
     const val UI_SCALE = "ui_scale"
@@ -505,7 +508,6 @@ class SettingsRepository(context: Context) {
             asstIndexOps = getBoolean(Keys.ASST_INDEX_OPS, d.asstIndexOps),
             vaultEnabled = getBoolean(Keys.VAULT_ENABLED, d.vaultEnabled),
             vaultFacility = getBoolean(Keys.VAULT_FACILITY, d.vaultFacility),
-            vaultGarage = getBoolean(Keys.VAULT_GARAGE, d.vaultGarage),
             vaultTasks = getBoolean(Keys.VAULT_TASKS, d.vaultTasks),
             vaultNotes = getBoolean(Keys.VAULT_NOTES, d.vaultNotes),
             vaultLearning = getBoolean(Keys.VAULT_LEARNING, d.vaultLearning),
@@ -539,6 +541,7 @@ class SettingsRepository(context: Context) {
             visualStyle = getString(Keys.VISUAL_STYLE, d.visualStyle) ?: d.visualStyle,
             backdrop = getString(Keys.BACKDROP, d.backdrop) ?: d.backdrop,
             backdropIntensity = getInt(Keys.BACKDROP_INTENSITY, d.backdropIntensity).coerceIn(0, 100),
+            cardFrost = getInt(Keys.CARD_FROST, d.cardFrost).coerceIn(0, 100),
             darkStyle = getString(Keys.DARK_STYLE, d.darkStyle) ?: d.darkStyle,
             cornerStyle = getString(Keys.CORNER_STYLE, d.cornerStyle) ?: d.cornerStyle,
             uiScale = getInt(Keys.UI_SCALE, d.uiScale).coerceIn(80, 110),
@@ -550,6 +553,7 @@ class SettingsRepository(context: Context) {
             reduceMotion = getBoolean(Keys.REDUCE_MOTION, d.reduceMotion),
             homeOrder = HomeLayout.order(getString(HomeLayout.ORDER_KEY, "")),
             homeHidden = HomeLayout.cards.map { it.id }.filter { !getBoolean(HomeLayout.showKey(it), true) }.toSet(),
+            nav = NavLayout.parse(getString(NavLayout.TABS_KEY, null), getString(NavLayout.ORDER_KEY, null), getString(NavLayout.HIDDEN_KEY, null), getString(NavLayout.NAMES_KEY, null)),
             notesNewBottom = getBoolean(Keys.NOTES_NEW_BOTTOM, d.notesNewBottom),
             notesCheckedBottom = getBoolean(Keys.NOTES_CHECKED_BOTTOM, d.notesCheckedBottom),
             notesHomeCount = getInt(Keys.NOTES_HOME_COUNT, d.notesHomeCount).coerceIn(2, 12),

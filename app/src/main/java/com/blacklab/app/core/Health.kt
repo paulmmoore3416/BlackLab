@@ -62,7 +62,7 @@ object Health {
         if (!i.backupPassphraseSet) out += Check("backup_pass", "Backup passphrase", Level.INFO,
             "Without a passphrase, backups restore only on this phone. Set one so a new phone can restore them.", "Set passphrase", "settings")
         // Data files
-        if (i.storeProblems.isEmpty() && i.storeReadOnly.isEmpty()) out += Check("stores", "Data files", Level.OK, "Facility, Garage, drive log and recalls read cleanly · database v${i.dbVersion}")
+        if (i.storeProblems.isEmpty() && i.storeReadOnly.isEmpty()) out += Check("stores", "Data files", Level.OK, "Facility data reads cleanly · database v${i.dbVersion}")
         i.storeProblems.forEach { (name, p) -> out += Check("store_$name", name, Level.BAD, p) }
         i.storeReadOnly.forEach { name -> out += Check("store_ro_$name", name, Level.WARN, "Saved by a newer BlackLab, so changes aren't written. Update the app.", "Check for updates", "updates") }
         // Desktop & vault

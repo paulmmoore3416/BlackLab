@@ -171,8 +171,6 @@ class Assistant(private val app: AppContainer) {
 
         // ---- Facility: inspections & PMs — before tasks so "what inspections are due" lands here
         facility(l)?.let { return it }
-        // ---- Garage: the Santa Fe (fuel, service, odometer, what's due) — before tasks so "what's due on the car" lands here
-        garage(t, l)?.let { return it }
 
         // ---- Behavioral Health: rounds, shift, crisis lines, notes (counts only — never names or rooms)
         behavioral(l)?.let { return it }
@@ -227,7 +225,7 @@ class Assistant(private val app: AppContainer) {
         Intents.Id.LIBRARY_SEARCH -> library(m.firstGroup)
         Intents.Id.SKILLS -> facilityOps(m, t)
         Intents.Id.SKILL_USE -> {
-            val r = DesktopAi.ask(t) ?: return Reply("Skills run on your computer, and I can't reach it right now. Plug in the phone or use Wireless debugging, then run ./daddyshome.", source = "Agent skills")
+            val r = DesktopAi.ask(t) ?: return queueAsk(t, "Agent skills")
             Reply(r.text.ifBlank { "Done." }, source = r.source.ifBlank { "Desktop · agent skill" })
         }
         Intents.Id.VAULT_ASK, Intents.Id.SHIFT_PREP, Intents.Id.ROUNDS_START, Intents.Id.PANEL_LOOKUP, Intents.Id.SDS_LOOKUP, Intents.Id.CREDENTIALS -> facilityOps(m, t)
@@ -339,11 +337,27 @@ class Assistant(private val app: AppContainer) {
         return Reply(r.message.ifBlank { "Your computer didn't have an answer for that." }, listOf(Link("Facility", "facility")), source = "Vault", speak = true)
     }
 
+    /**
+     * The computer is away: a request for it waits in the outbox and runs the moment the link is back (USB or
+     * Tailscale). You get a notification with the answer.
+     */
+    private fun queueAsk(text: String, source: String): Reply {
+        if (!s.asstDesktopAi) return Reply("Hand-off to your computer is off. Turn on Desktop AI in Assistant settings.", route = "settings/assistant", source = source)
+        DesktopJobs.enqueue(app, "ask", null, text.take(80), org.json.JSONObject().put("text", text))
+        return Reply("Your computer isn't reachable right now, so I queued that. It runs as soon as the link is back and I'll notify you with the answer.", source = source)
+    }
+
+    /** Queues a save for the computer (vault, private drive) when it's away; returns the reply to show. */
+    private fun queueSave(path: String, body: org.json.JSONObject, what: String): Reply {
+        DesktopJobs.queueCall(app, path, body.put("source", "Phone"), what)
+        return Reply(done("saved for your computer — it goes into $what as soon as the link is back."), source = "Outbox")
+    }
+
     /** "save to my private drive: …" — the computer files it into Google Drive › BlackLab › Paul's Private. */
     private suspend fun privateDrive(said: String): Reply {
-        if (!DesktopAi.usable) return Reply("I can't reach your computer right now — it's the one that saves to your private drive. Plug in the phone or check the desktop link.")
         if (Intents.CLINICAL.containsMatchIn(said))
             return Reply("That sounds like someone's care information — it stays in the Behavioral Health workspace on the phone, not in Drive.")
+        if (!DesktopAi.usable) return queueSave("/phone/vault/drive_save", org.json.JSONObject().put("say", said), "your private drive")
         val r = com.blacklab.app.link.VaultFeed.privateDrive(said)
         return Reply(r.message, source = "Private drive")
     }
@@ -351,10 +365,16 @@ class Assistant(private val app: AppContainer) {
     private suspend fun vault(m: Intents.Match): Reply {
         val V = com.blacklab.app.link.VaultFeed
         if (!s.vaultEnabled) return Reply("The Obsidian vault is off. Turn it on in Settings › Obsidian vault.", route = "settings")
-        if (!DesktopAi.usable) return Reply("I can't reach your computer right now, and the vault lives there. Plug in the phone or check the desktop link.")
         val text = m.groups.drop(1).lastOrNull { it.isNotBlank() }.orEmpty()
         if (m.id in setOf(Intents.Id.VAULT_SAVE, Intents.Id.VAULT_NODE_ADD, Intents.Id.VAULT_LOG) && Intents.CLINICAL.containsMatchIn(text))
             return Reply("That sounds like someone's care information — it stays on the phone and never goes to the vault. Use the Behavioral Health workspace instead.")
+        if (!DesktopAi.usable) return when (m.id) {
+            // saves wait in the outbox; questions need the computer now
+            Intents.Id.VAULT_SAVE -> queueSave("/phone/vault/capture", org.json.JSONObject().put("text", text).put("title", ""), "the vault inbox")
+            Intents.Id.VAULT_NODE_ADD -> queueSave("/phone/vault/node_add", org.json.JSONObject().put("node", m[1]).put("content", m[2]).put("author", "Phone"), "the ${m[1]} node")
+            Intents.Id.VAULT_LOG -> queueSave("/phone/vault/log", org.json.JSONObject().put("title", text).put("detail", "").put("kind", "note"), "today's vault timeline")
+            else -> Reply("I can't reach your computer right now, and the vault lives there. Plug in the phone or check the desktop link.")
+        }
         val r = when (m.id) {
             Intents.Id.VAULT_SAVE -> V.capture(text)
             Intents.Id.VAULT_NODE_ADD -> V.addToNode(m[1], m[2])
@@ -405,7 +425,6 @@ complete <task> | brief me | note <text> | journal <text> | start dictation | st
 nameplate | start focus | search my files for <words> | action items from my last meeting | check email | search drive for <words> |
 android docs <question> | switch to personal/professional | open <screen> | log <n> CEUs for <certification> |
 summarize <today/tomorrow/this week/my recent notes/my open tasks/my journal> as <kind of summary> | let's talk about <topic> |
-log fuel <gallons> gallons <dollars> dollars at <miles> miles | log <service> at <miles> miles | what's due on the car |
 navigate to my next meeting | find a gas station | navigate to <place> |
 desktop <request for the user's computer: open a folder or app, find files on the computer, system status, disk space, save a desktop note>.
 reverse engineer <file> [and <question>] — analyze a program, APK, library or firmware on the computer (REA + Ghidra).
@@ -447,7 +466,6 @@ User: $text"""
 • Reverse engineering (on the computer) — “reverse engineer ~/Downloads/tool.bin and find the license check”, “decompile 0x401000 in tool.bin”, “how do I inspect an APK with REA?”, or any file › ⋮ › Reverse-engineer on computer
 • Behavioral Health — “start rounds”, “when are rounds due?”, “start my shift”, “new peer note”, “SBAR handoff”, “crisis lines”, “grounding”
 • Facility — “what inspections are due?”, “any PMs overdue?”
-• Garage — “log fuel 13.2 gallons $48 at 31,250 miles”, “I got an oil change at 31,000”, “what's due on the car?”
 • Driving — “navigate to my next meeting”, “find a gas station”, “call 555-0100”
 • 🌐 Gmail — “check email”, “search email for invoice”, “draft email to x@y.com about … saying …”
 • 🌐 Drive — “search drive for budget”, “back up to drive”
@@ -880,7 +898,7 @@ User: $text"""
         jobs(t, l)?.let { return it }
         val m = Regex("^(?:on (?:my |the )?(?:desktop|computer|pc|laptop)[,:]?\\s+|(?:desktop|computer)[:,]\\s*|desktop\\s+|(?:ask|tell|have) (?:my |the )?(?:desktop|computer|pc)(?: to)?\\s+)(.+)$", RegexOption.IGNORE_CASE).find(t) ?: return null
         val req = m.groupValues[1].trim()
-        val r = DesktopAi.ask(req) ?: return Reply("I can't reach the computer right now. Plug in the phone (or use Wireless debugging) and run ./daddyshome on the computer.", source = "Desktop AI")
+        val r = DesktopAi.ask(req) ?: return queueAsk(req, "Desktop AI")
         return Reply(r.text.ifBlank { "Done." }, source = r.source.ifBlank { "Desktop" })
     }
 
@@ -1030,116 +1048,7 @@ User: $text"""
             listOf(Link("Facility", "facility")), source = "Facility")
     }
 
-    // ------------------------------------------------------------------ garage & driving
-
-    private fun garage(t: String, l: String): Reply? {
-        val ctx = app.context
-        val g = com.blacklab.app.vehicle.Garage
-        val st = g.load(ctx)
-        if (Regex("^(log|add|record)?\\s*(fuel|gas|fill[- ]?up)|^(i )?(just )?(filled up|got gas|fueled up|put in)").containsMatchIn(l) && Regex("gal").containsMatchIn(l)) {
-            val f = g.parseFuel(t) ?: return Reply("How many gallons? Say something like “log fuel 13 gallons for 48 dollars at 31,250 miles”.")
-            g.addFuel(ctx, f)
-            val stats = g.fuelStats(g.state.value.fuel)
-            return Reply(done("logged ${f.gallons} gal" + (f.cost?.let { " for $${"%.2f".format(it)}" } ?: "") + (f.miles?.let { " at ${g.fmtMiles(it)} mi" } ?: "") + ".") +
-                (stats.lastMpg?.let { " That tank: ${"%.1f".format(it)} mpg." } ?: ""), listOf(Link("Garage", "garage")), source = "Garage")
-        }
-        if (Regex("^(log|record|mark)\\b|^(i )?(just )?(got|had|did)\\b|^(the )?(car|santa fe) (got|had)\\b").containsMatchIn(l) &&
-            Regex("oil|rotat|filter|brake|wiper|battery|coolant|spark|plugs|transmission|differential|transfer case|belt|service").containsMatchIn(l)) {
-            val ids = g.matchItems(t, st.items)
-            if (ids.isEmpty()) return null
-            val miles = Regex("(\\d{1,3}(?:,\\d{3})+|\\d{3,6})\\s*(?:miles|mi\\b|on the clock)|at (\\d{1,3}(?:,\\d{3})+|\\d{3,6})").find(l)?.groupValues?.drop(1)?.firstOrNull { it.isNotBlank() }?.replace(",", "")?.toIntOrNull()
-            val cost = Regex("\\$\\s*(\\d+(?:\\.\\d{1,2})?)|(\\d+(?:\\.\\d{1,2})?) dollars").find(l)?.groupValues?.drop(1)?.firstOrNull { it.isNotBlank() }?.toDoubleOrNull()
-            g.logService(ctx, ids, miles, cost = cost)
-            val names = st.items.filter { it.id in ids }.joinToString(", ") { it.name.lowercase() }
-            val next = g.due(g.state.value).firstOrNull { it.item.id in ids }
-            return Reply(done("logged $names" + (miles?.let { " at ${g.fmtMiles(it)} mi" } ?: "") + ".") + (next?.dueMiles?.let { " Next one around ${g.fmtMiles(it)} mi." } ?: ""),
-                listOf(Link("Garage", "garage")), source = "Garage")
-        }
-        Regex("(?:odometer|mileage|odo)(?: is| reads| at| to| of)? (\\d{1,3}(?:,\\d{3})+|\\d{3,6})").find(l)?.let { r ->
-            val miles = r.groupValues[1].replace(",", "").toInt()
-            g.setOdometer(ctx, miles)
-            return Reply(done("odometer set to ${g.fmtMiles(miles)} mi.") + " " + g.summary(g.state.value).substringAfter(". ", ""), listOf(Link("Garage", "garage")), source = "Garage")
-        }
-        carData(l)?.let { return it }
-        val carTopic = Regex("(oil change|tire rotation|mpg|gas mileage|fuel economy|due on (the|my) (car|santa fe|suv)|car (status|report|health)|how('s| is) (the|my) (car|santa fe))").containsMatchIn(l) ||
-            (Regex("(maintenance|service)").containsMatchIn(l) && Regex("\\b(car|santa fe|vehicle|suv)\\b").containsMatchIn(l))
-        if (carTopic &&
-            Regex("^(when|what|what's|whats|how|is|any|car|santa fe|my car|status|check)").containsMatchIn(l)) {
-            val due = g.due(st).filter { it.status == com.blacklab.app.vehicle.Garage.Status.OVERDUE || it.status == com.blacklab.app.vehicle.Garage.Status.DUE_SOON }.take(3)
-            val extra = if (due.isEmpty()) "" else "\n" + due.joinToString("\n") { "• ${it.item.name} — ${it.describe()}" }
-            val live = com.blacklab.app.vehicle.VehicleLink.summary(ctx)
-            return Reply(g.summary(st) + (if (live.isNotBlank()) " $live" else "") + extra, listOf(Link("Garage", "garage")), source = "Garage")
-        }
-        return null
-    }
-
-    /** Questions answered from what the car itself reported (OBD-II, Bluelink, Android Auto) and the trip log. */
-    private fun carData(l: String): Reply? {
-        val ctx = app.context
-        val T = com.blacklab.app.vehicle.Telemetry
-        val vl = com.blacklab.app.vehicle.VehicleLink
-        val s = vl.load(ctx)
-        val links = listOf(Link("Garage", "garage"))
-        fun fresh(k: String) = s[k]?.let { "${T.format(it)} (${it.source.label}, ${T.ago(it.time)})" }
-        if (Regex("where('?s| is| did i (park|leave))( my)? (car|santa fe|suv|park)|where did i park|find my car").containsMatchIn(l)) {
-            val p = s.parked ?: return Reply("I don't have a parking spot yet — it's saved when a drive ends.", links, source = "Garage")
-            return Reply("Parked at ${p.place.ifBlank { "%.5f, %.5f".format(p.lat, p.lon) }}, ${T.ago(p.time)}.", links, source = "Garage", nav = "${p.lat},${p.lon}")
-        }
-        if (Regex("recalls?\\b|safety (notice|campaign)").containsMatchIn(l)) {
-            val n = com.blacklab.app.vehicle.Nhtsa.load(ctx)
-            val v = com.blacklab.app.vehicle.Garage.load(ctx).vehicle
-            val text = when {
-                n.checkedAt == 0L -> "I haven't checked NHTSA yet — open the Garage and I'll look up recalls for the ${v.year} ${v.model}."
-                n.open.isEmpty() && n.recalls.isEmpty() -> "No recalls are listed for the ${v.year} ${v.make} ${v.model} (checked ${T.ago(n.checkedAt)})."
-                n.open.isEmpty() -> "All ${n.recalls.size} listed recalls are marked done or not for your car."
-                else -> "${n.open.size} recall${if (n.open.size > 1) "s" else ""} to check: " + n.open.joinToString("; ") { "${it.component.lowercase()} (${it.campaign})" } +
-                    ". Recalls are listed by model year, so confirm with the VIN check on nhtsa.gov or your dealer."
-            }
-            return Reply(text, links, source = "NHTSA")
-        }
-        if (Regex("when('?s| is) (my |the )?(next )?(oil change|service|maintenance|tire rotation)|next (oil change|service)|service due").containsMatchIn(l)) {
-            val d = com.blacklab.app.vehicle.ServiceReminders.due(ctx).filter { it.status != com.blacklab.app.vehicle.Garage.Status.UNKNOWN }
-            val pick = d.firstOrNull { l.contains("oil") && it.item.id == "oil" || l.contains("rotation") && it.item.id == "rotate" } ?: d.firstOrNull()
-            return Reply(pick?.let { "${it.item.name}: ${it.describe()}." } ?: "Set the odometer in the Garage and I'll work out what's due.", links, source = "Garage")
-        }
-        if (Regex("check engine|engine light|trouble codes?|dtcs?\\b|diagnostic|error codes?|codes? on (the|my) car").containsMatchIn(l)) {
-            val c = s.activeDtcs
-            val text = when {
-                c.isNotEmpty() -> "${c.size} active code${if (c.size > 1) "s" else ""}: " + c.joinToString("; ") { "${it.code} — ${com.blacklab.app.vehicle.Dtcs.describe(it.code)}" } + "."
-                s["mil"]?.bool == true -> "The check-engine light is on, but no stored codes were read."
-                s["mil"] != null || s["dtc_count"] != null -> "No trouble codes — the check-engine light is off (as of ${T.ago((s["mil"] ?: s["dtc_count"])!!.time)})."
-                else -> "I haven't read the car's codes yet. That needs a Bluetooth OBD-II adapter set up in Garage › Car connection."
-            }
-            return Reply(text, links, source = "Garage")
-        }
-        if (Regex("(how much|what'?s (my|the)) (gas|fuel)|fuel level|gas level|miles (of range|to empty|left)|range (left|remaining)|how far can i (go|drive)").containsMatchIn(l)) {
-            val parts = listOfNotNull(fresh("fuel_pct")?.let { "Fuel $it" }, fresh("range")?.let { "range $it" })
-            return Reply(if (parts.isEmpty()) "The car hasn't reported its fuel level yet — it comes from Android Auto, Bluelink or the OBD-II adapter." else parts.joinToString(", ") + ".", links, source = "Garage")
-        }
-        if (Regex("(is|are) (my|the) (car|doors?|santa fe)( doors?)? locked|did i lock|tire pressure|tyre pressure|car battery|battery voltage|coolant temp").containsMatchIn(l)) {
-            val parts = listOfNotNull(fresh("locked")?.let { "Doors: $it" }, fresh("doors_open")?.takeIf { s["doors_open"]?.text != "None" }?.let { "open: $it" },
-                fresh("tire_warning")?.let { "tire pressure: $it" }, fresh("battery_v")?.let { "battery $it" }, fresh("battery_soc")?.let { "12V charge $it" }, fresh("coolant")?.let { "coolant $it" })
-            return Reply(if (parts.isEmpty()) "I don't have that from the car yet. Set up Bluelink or an OBD-II adapter in Garage › Car connection." else parts.joinToString("; ").replaceFirstChar { it.uppercase() } + ".", links, source = "Garage")
-        }
-        Regex("how (many|far)( miles)? (did|have) i (drive|driven|drove)|miles (did i drive|driven|this (week|month|year)|last (week|month))|business miles|mileage (log|this (week|month|year))|trip log").find(l)?.let {
-            val now = java.time.LocalDate.now()
-            val zone = java.time.ZoneId.systemDefault()
-            val (label, from, to) = when {
-                l.contains("last week") -> Triple("last week", T.weekStart(now.minusWeeks(1)), T.weekStart(now))
-                l.contains("last month") -> Triple("last month", T.monthStart(now.minusMonths(1)), T.monthStart(now))
-                l.contains("year") || l.contains("business") -> Triple("this year", T.yearStart(now), Long.MAX_VALUE)
-                l.contains("today") -> Triple("today", now.atStartOfDay(zone).toInstant().toEpochMilli(), Long.MAX_VALUE)
-                l.contains("week") -> Triple("this week", T.weekStart(now), Long.MAX_VALUE)
-                else -> Triple("this month", T.monthStart(now), Long.MAX_VALUE)
-            }
-            val t = T.totals(s.trips, from, to, s.link.ratePerMile)
-            if (t.trips == 0) return Reply("No drives logged $label.", links, source = "Garage")
-            val biz = t.byPurpose[com.blacklab.app.vehicle.Telemetry.Purpose.BUSINESS] ?: 0.0
-            return Reply("%.1f miles in %d drive%s %s (%s behind the wheel)".format(t.miles, t.trips, if (t.trips == 1) "" else "s", label, T.duration(t.driveSec)) +
-                (if (biz > 0) ", %.1f of them business — about $%,.0f at your rate.".format(biz, t.deductible) else "."), links, source = "Garage")
-        }
-        return null
-    }
+    // ------------------------------------------------------------------ driving
 
 
     private suspend fun navigateNext(): Reply {
