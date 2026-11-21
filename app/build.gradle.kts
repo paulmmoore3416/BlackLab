@@ -46,6 +46,9 @@ android {
 
     buildTypes {
         release {
+            // No git commit stamp (META-INF/version-control-info.textproto): it made the APK change with every commit,
+            // including the commit of its own checksum, so a release could never match the checksum it shipped with.
+            vcsInfo.include = false
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
