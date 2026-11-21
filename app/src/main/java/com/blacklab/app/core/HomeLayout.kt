@@ -22,6 +22,7 @@ object HomeLayout {
         Card("today", "Today", "What's on your calendar today."),
         Card("focus", "Focus tasks", "Tasks due today or added to My Day."),
         Card("learning", "Learning", "Next class, assignments due and certification dates."),
+        Card("projects", "Projects", "Active and blocked projects from the Project Board in Obsidian (needs the computer link)."),
         Card("documents", "Recent documents", "Documents you edited recently."),
         Card("reflect", "Journal prompt", "Today's reflection prompt."),
     )

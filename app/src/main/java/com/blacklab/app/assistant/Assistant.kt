@@ -181,6 +181,10 @@ class Assistant(private val app: AppContainer) {
         // ---- everything else in the grammar: tasks, notes, camera, settings, Google, navigation, Ask my files
         Intents.matches(t, Intents.Phase.LATE).forEach { m -> perform(m, t, l, origin)?.let { return it } }
 
+        // ---- a model picked in the menu (Claude, Gemini, Gemini Nano, a local model) answers everything that isn't a command
+        val picked = s.asstModel.takeIf { Models.providerOf(it) != Models.Provider.AUTO }
+        if (allowNano && picked != null) nano(t, origin, picked)?.let { return it }
+
         // ---- Expert knowledge bases (software, AI, GitHub, everyday topics) — offline, grounded
         knowledgeAnswer(t)?.let { return it }
 
@@ -397,9 +401,10 @@ class Assistant(private val app: AppContainer) {
 
     // ------------------------------------------------------------------ Gemini Nano
 
-    private suspend fun nano(text: String, origin: Origin): Reply? {
+    private suspend fun nano(text: String, origin: Origin, picked: String? = null): Reply? {
         if (Nano.status.value == Nano.Status.UNKNOWN) Nano.refresh()
-        if (!Nano.ready) return null
+        if (picked == null && !Nano.ready) return null
+        val cloud = picked != null && Models.providerOf(picked).let { it == Models.Provider.CLAUDE || it == Models.Provider.GEMINI }
         val today = Time.today()
         val ctx = buildString {
             append("Today is ${Time.longDate(today)}, ${today.year}, ${Time.time(Time.now())}. User: ${s.userName.ifBlank { "the user" }}")
@@ -430,18 +435,74 @@ desktop <request for the user's computer: open a folder or app, find files on th
 reverse engineer <file> [and <question>] — analyze a program, APK, library or firmware on the computer (REA + Ghidra).
 
 If the user's message is a request one of these commands can do, reply with exactly one line: COMMAND: <the command>
-Otherwise answer the user directly in 1-4 sentences, starting with: ANSWER:
+Otherwise answer the user directly ${if (cloud) "— as fully as the question needs, clear and well organized (short Markdown is fine)" else "in 1-4 sentences"}, starting with: ANSWER:
 
-$ctx
+$ctx${if (cloud) recentTurns() else ""}
 User: $text"""
-        val out = Nano.generate(prompt, s.asstNanoTemp / 100f, s.asstNanoTokens) ?: return null
+        var label = Nano.engine
+        val out = if (picked == null) Nano.generate(prompt, s.asstNanoTemp / 100f, s.asstNanoTokens) ?: return null else {
+            val r = generateWith(picked, prompt)
+            if (r.text == null) {
+                // the picked model can't answer right now: say so, then let Auto try so Paul still gets an answer
+                val fallback = if (Nano.ready) Nano.generate(prompt, s.asstNanoTemp / 100f, s.asstNanoTokens) else null
+                if (fallback == null) return Reply("${r.label} couldn't answer: ${r.error}. " +
+                    (if (Models.providerOf(picked) == Models.Provider.CLAUDE) "Claude runs on your computer — check the USB or Tailscale link." else ""), source = r.label)
+                label = "${Nano.engine} (${r.label}: ${r.error})"
+                fallback
+            } else { label = r.label; r.text }
+        }
         val cmd = Regex("COMMAND:\\s*(.+)", RegexOption.IGNORE_CASE).find(out)?.groupValues?.get(1)?.lineSequence()?.first()?.trim()
         if (!cmd.isNullOrBlank()) {
             val r = route(cmd, origin, allowNano = false)
             return r.copy(source = "${Nano.engineShort} → ${r.source}")
         }
         val answer = out.substringAfter("ANSWER:", out).trim().removePrefix("ANSWER").trim()
-        return if (answer.isBlank()) null else Reply(answer, source = Nano.engine)
+        if (answer.isBlank()) return null
+        saveTurn(text, answer, label, picked)
+        return Reply(answer, source = label)
+    }
+
+    private val offRecord = Regex("^\\s*(off the record|private|don'?t save|do not save)\\b", RegexOption.IGNORE_CASE)
+
+    /** The picked model's answer, from wherever it runs. */
+    private suspend fun generateWith(picked: String, prompt: String): DesktopAi.ModelReply = when (Models.providerOf(picked)) {
+        Models.Provider.CLAUDE, Models.Provider.LOCAL -> DesktopAi.generateWith(picked, prompt, s.asstNanoTemp / 100f, maxOf(s.asstNanoTokens, 1500))
+        Models.Provider.GEMINI -> {
+            val m = picked.substringAfter(':')
+            val t = if (Gemini.reachable) Gemini.generate(prompt, s.asstNanoTemp / 100f, maxOf(s.asstNanoTokens, 1500), m) else null
+            DesktopAi.ModelReply(t, Models.label(picked), m, if (t == null) (if (!Gemini.configured) "no Gemini key on this phone" else if (!Gemini.reachable) "no connection" else "no reply") else null)
+        }
+        Models.Provider.NANO -> {
+            val t = if (Nano.onDevice) Nano.generate(prompt, s.asstNanoTemp / 100f, s.asstNanoTokens) else null
+            DesktopAi.ModelReply(t, "Gemini Nano · on-device", "gemini-nano", if (t == null) "Gemini Nano isn't ready on this phone" else null)
+        }
+        Models.Provider.AUTO -> DesktopAi.ModelReply(Nano.generate(prompt, s.asstNanoTemp / 100f, s.asstNanoTokens), Nano.engine, "")
+    }
+
+    /** The last few exchanges, so a cloud model can follow the conversation. */
+    private fun recentTurns(): String {
+        val m = messages.value.dropLast(1).takeLast(8)
+        if (m.size < 2) return ""
+        return "\nEarlier in this conversation:\n" + m.joinToString("\n") { (if (it.user) "User: " else "You: ") + it.text.take(1500) } + "\n"
+    }
+
+    /**
+     * Every model answer goes to the Obsidian vault on the computer (Claude → 70 AI/Claude, Gemini → 70 AI/Gemini, the
+     * local models → 70 AI/Local AI). Waits in the outbox while the computer is away. Never Behavioral Health (that
+     * workspace never reaches this path) and never a turn marked off the record.
+     */
+    private fun saveTurn(request: String, answer: String, label: String, picked: String?) {
+        if (!s.vaultEnabled || offRecord.containsMatchIn(request)) return
+        val provider = when {
+            picked != null -> Models.providerOf(picked).name.lowercase()
+            label.startsWith("Desktop AI") -> "local"
+            label.contains("Nano") -> "nano"
+            label.startsWith("Gemini") -> "gemini"
+            else -> "local"
+        }
+        val body = org.json.JSONObject().put("provider", provider).put("model", picked?.substringAfter(':') ?: label).put("label", label.substringBefore(" (").take(60))
+            .put("surface", "Phone").put("request", request.take(8000)).put("reply", answer.take(20000))
+        DesktopJobs.queueCall(app, "/phone/vault/chat", body, "Saved to your vault: ${request.take(40)}")
     }
 
     // ------------------------------------------------------------------ actions

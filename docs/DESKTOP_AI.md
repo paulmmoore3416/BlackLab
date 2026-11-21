@@ -304,3 +304,40 @@ With Tailscale on both devices, the link works from anywhere, encrypted by WireG
 - `desktop/obsidian/blacklab-graph-fx` is copied into the vault and enabled once. If you turn it off, it stays off.
 - Graph FX settings: signals, pulse, intensity, what counts as recent, time-lapse length, and respecting "reduce motion".
 
+## Claude, Gemini and Obsidian as a second app (companion 1.11.0, BlackLab 5.17)
+
+**Models.** `ai_models.py` is the one catalog behind every model menu (`GET /local/models`, `GET /phone/models`):
+- `claude:opus|sonnet|haiku|fable` runs through your Claude subscription. Each turn is `claude -p --model <alias> --output-format json --no-session-persistence --setting-sources "" --tools "" --strict-mcp-config --system-prompt …`, with the prompt on stdin.
+  - It runs in `~/.cache/blacklab-desktop/claude-chat`, with `ANTHROPIC_API_KEY` removed from its environment.
+  - At most two run at once, with a 180 s timeout.
+  - Earlier turns travel in the prompt.
+  - The companion prefers `~/.npm-global/bin/claude` (or config `claude_cli`) over an older copy on systemd's PATH.
+  - Sign in once by running `claude` in a terminal.
+- `gemini:<model>` uses `secrets.json` → `gemini`. The list comes from Google (cached a day).
+- `local:<model>` is Ollama, with the assistant's tools.
+- `auto` keeps the old behavior: local first, cloud as a fallback.
+- `/local/assistant` and `/phone/ask` take `model`, `history` and (from Obsidian) `note` + `context`.
+- `/phone/generate` takes `model` for the phone's assistant router.
+- Opt in with `claude_vault_tools: true` to let Claude use only `vault_search`, `vault_read`, `vault_recent` and `vault_nodes`. By default vault text never goes to a cloud model.
+
+**Saving.** `vault_ai.py` appends each Claude/Gemini turn to `70 AI/<Provider>/Conversations/YYYY-MM/<Provider> · YYYY-MM-DD.md`.
+- Each note carries `ai_provider`, `ai_models`, `#ai/<provider>`, `cssclasses: [bl-ai-<provider>]` and `up: [[🟠 Claude]]` / `[[🔴 Gemini]]`. The hub notes keep counts and the latest 30 exchanges.
+- The phone posts its turns to `/phone/vault/chat`. They wait in the outbox while the computer is away.
+- Private and clinical turns are refused (`privacy_check`, `vault_safe`).
+- `recall_ai` (an Ollama tool) and `/local/vault/ai_search` search these notes.
+- Claude Code sessions come in through the SessionStart/SessionEnd hooks (`vault_hook.py`, in `~/.claude/settings.json`). Each session note includes the first line of each request and the last reply, each guarded on its own.
+
+**Glow.** `vault_colors.ai_queries()` puts Claude (#FF8C1A) and Gemini (#FF2D3D) first among the graph's color groups. `ai_css()` adds the glowing titles, explorer entries and tags. Graph FX 1.1 draws "AI beacons" under those nodes; see the plugin settings for glow strength and colors.
+
+**Obsidian → phone.** `vault_sync.py` runs every minute (`vault_sync_seconds`) and right before each phone feed is rendered:
+- It harvests checkbox edits in `30 Work/Tasks.md` (lines end in `^t<id>`), new task lines, and work-order `status:` edits.
+- It scans changed notes for trigger tags (#task, #action, #remind, #workorder, #event, #ask/…), meeting action items, and `front :: back` flashcards.
+- It skips managed blocks, `70 AI`, `90 System`, local-only folders, quotes and tables, and notes edited in the last 20 s. Its first pass only starts the clock.
+- Changes become ops in `phone_ops.py` (`~/.cache/blacklab-desktop/phone_ops.json`). The phone gets them in `GET /phone/jobs` → `ops`, applies each one once, and acks with `POST /phone/ops/ack`. Your unconfirmed change wins over the phone's older copy until the phone reports it.
+
+**Hubs and boards.**
+- `vault_hubs.py`: 🏢 Command Center, 🎓 Study Hub, flashcard deck notes, and the daily note's *Today at a glance*.
+- `vault_boards.py`: 🗂️ Project Board, using obsidian-kanban 2.0.51 (pinned and verified in `vault_graph.PLUGINS`). It syncs both ways with project notes' `status:`, and serves `/local/projects` and `/phone/projects`.
+
+**BlackLab Assistant plugin** (`desktop/obsidian/blacklab-assistant`): installed and enabled once by `vault_colors.install_graph_fx` next to Graph FX. It calls `/local/*` with `X-BlackLab: 1`; `app://obsidian.md` is an allowed origin.
+

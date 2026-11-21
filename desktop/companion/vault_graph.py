@@ -50,6 +50,10 @@ PLUGINS = {
         "main.js": "025616a1d0752aa4b0ca01fcd4e71a49b6dbd8284f9a8725f2624d5bba15055a",
         "manifest.json": "d02c3be055973d8e79a0d6fe56f9aa32d71ccbb3cf55d0ce83b0f1c64905a772",
         "styles.css": "ce754cb01a6435e83c0197f765feee866896556f14cff24166bf399c3a329cef"}),
+    "obsidian-kanban": ("mgmeyers/obsidian-kanban", "2.0.51", {  # the Project Board (vault_boards.py)
+        "main.js": "a7e3bd4cf25f9b7f53a841c44ce990db0ef5f7954ebcab17ae6dca80310c39ac",
+        "manifest.json": "24976787097ead467969e014a35654e7a80e4db49a977689a48afadfa15e1854",
+        "styles.css": "ecf6dd31f1727c441cce6f54794b0d3916dcfffc87fa17b855c79ba04a85d9a7"}),
     "obsidian-advanced-uri": ("vinzent03/obsidian-advanced-uri", "2.2.1", {
         "main.js": "8555d9a54de0d5534007047ac1e58dee746f394f9e23fe5740ca5857852477f3",
         "manifest.json": "055795794773ccc952688cb01b24bf9c329ccf23731c2ff8ec9835533e0cb38b",
@@ -97,6 +101,8 @@ PLUGIN_SETTINGS = {
         "currentNode": {"useColor": True, "color": "#2BD9A8", "size": 160, "shape": "circle"},
         "excludedSourcesFolder": ["99 Archive"], "excludedTargetsFolder": ["99 Archive"],
     },
+    "obsidian-kanban": {"new-note-folder": "02 Projects", "new-note-template": "90 System/Templates/Project.md", "lane-width": 300,
+                        "show-checkboxes": False, "date-trigger": "@", "hide-tags-in-title": True, "show-relative-date": True},
     "obsidian-advanced-uri": {"openFileOnWrite": True, "openDailyInNewPane": False, "openFileOnWriteInNewPane": False, "allowEval": False},
 }
 

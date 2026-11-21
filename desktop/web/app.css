@@ -340,3 +340,16 @@ button:not(.ghost):not(.danger):not(.icon-btn) { box-shadow: 0 6px 18px color-mi
   content: ""; position: absolute; left: 0; top: 50%; width: 3px; height: 16px; margin-top: -8px; border-radius: 2px; background: var(--accent);
 }
 :root[data-fluent] .topbar { border-bottom-color: var(--glass-line); }
+
+/* Claude glows orange, Gemini glows red (5.17) */
+:root { --claude: #FF8C1A; --gemini: #FF2D3D; }
+.msg.bot.p-claude { border-left: 3px solid var(--claude); box-shadow: -6px 0 16px -10px var(--claude); }
+.msg.bot.p-gemini { border-left: 3px solid var(--gemini); box-shadow: -6px 0 16px -10px var(--gemini); }
+.msg.bot.p-claude .src { color: var(--claude); }
+.msg.bot.p-gemini .src { color: var(--gemini); }
+.model-pick { gap: 6px; }
+.model-pick select { max-width: 220px; }
+.model-pick[data-provider="claude"] select { border-color: var(--claude); box-shadow: 0 0 10px -3px var(--claude); }
+.model-pick[data-provider="gemini"] select { border-color: var(--gemini); box-shadow: 0 0 10px -3px var(--gemini); }
+optgroup.og-claude { color: var(--claude); }
+optgroup.og-gemini { color: var(--gemini); }

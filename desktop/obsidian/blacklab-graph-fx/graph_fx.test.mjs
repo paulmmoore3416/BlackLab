@@ -32,3 +32,20 @@ test("weighted pick", () => {
   for (let i = 0; i < 1000; i++) counts[T.pickWeighted(cum, i / 1000)]++;
   assert.equal(counts[1], 0); assert.ok(counts[2] > 850);
 });
+test("Claude and Gemini notes are found by frontmatter, tag or folder", () => {
+  assert.equal(T.aiProviderOf("x.md", { ai_provider: "Claude" }, []), "claude");
+  assert.equal(T.aiProviderOf("x.md", { ai_provider: "gemini" }, []), "gemini");
+  assert.equal(T.aiProviderOf("x.md", {}, ["#ai/claude"]), "claude");
+  assert.equal(T.aiProviderOf("x.md", { tags: ["ai/gemini/conversation"] }, []), "gemini");
+  assert.equal(T.aiProviderOf("x.md", { tags: "work ai/claude" }, []), "claude");
+  assert.equal(T.aiProviderOf("70 AI/Claude/Conversations/2026-11/Claude · 2026-11-21.md", null, []), "claude");
+  assert.equal(T.aiProviderOf("70 AI/Agents/Claude Code/2026-11-21 BlackLab abc.md", null, []), "claude");
+  assert.equal(T.aiProviderOf("70 AI/Gemini/🔴 Gemini.md", null, []), "gemini");
+  assert.equal(T.aiProviderOf("70 AI/Conversations/x.md", { ai_provider: "local" }, ["#ai"]), null);
+  assert.equal(T.aiProviderOf("10 Facility/Claude Street boiler.md", null, []), null);
+});
+test("glow colors and breathing", () => {
+  assert.equal(T.hexToRgb("#FF8C1A"), 0xff8c1a); assert.equal(T.hexToRgb("bogus"), 0xff8c1a);
+  assert.equal(T.beaconScale(123, 0, true), 2.8);
+  for (let t = 0; t < 5000; t += 250) { const k = T.beaconScale(t, 1, false); assert.ok(k >= 2.2 - 1e-9 && k <= 3.4 + 1e-9); }
+});

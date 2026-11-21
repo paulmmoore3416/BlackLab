@@ -21,7 +21,8 @@ from pathlib import Path
 
 
 def allowed_origins(host: str, port: int) -> set[str]:
-    return {f"http://{host}:{port}", f"http://localhost:{port}", "https://paulmmoore3416.github.io"}
+    # app://obsidian.md: the BlackLab Assistant plugin in Obsidian desktop (no web page can claim that origin)
+    return {f"http://{host}:{port}", f"http://localhost:{port}", "https://paulmmoore3416.github.io", "app://obsidian.md"}
 
 
 def allowed_hosts(host: str, port: int) -> set[str]:
@@ -229,7 +230,7 @@ SIDE_EFFECT_ASKS["reverse_engineer"] = RE_WORDS
 
 # Tools whose results carry text the user didn't write (files, documents, old chats, web docs, phone data, the vault).
 # Text like that can contain instructions aimed at the model ("open https://…?q=<your notes>").
-READS_CONTENT = {"read_file", "search_documents", "recall_chats", "dev_docs", "phone_command", "find_files", "equipment", "vault_search", "library_search",
+READS_CONTENT = {"read_file", "search_documents", "recall_chats", "recall_ai", "dev_docs", "phone_command", "find_files", "equipment", "vault_search", "library_search",
                  "reverse_engineer",  # strings inside a binary are attacker-chosen text
                  "skill_use", "skills_search", "nightjar_camera", "qdrant_search"}  # agent skills are third-party text
 

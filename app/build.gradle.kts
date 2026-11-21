@@ -27,8 +27,8 @@ android {
         applicationId = "com.blacklab.app"
         minSdk = 35
         targetSdk = 36
-        versionCode = 30
-        versionName = "5.16.0"
+        versionCode = 31
+        versionName = "5.17.0"
         vectorDrawables { useSupportLibrary = true }
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }

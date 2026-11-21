@@ -527,4 +527,7 @@ def shift_prep(v, credentials_due: list[str] | None = None) -> dict:
 
 
 def render_all(v) -> dict:
-    return {"templates": ensure_templates(v), "panels": render_panels(v), "sds": render_sds(v)}
+    import vault_hubs
+    out = {"templates": ensure_templates(v), "panels": render_panels(v), "sds": render_sds(v)}
+    out["command_center"] = vault_hubs.render_command_center(v)
+    return out

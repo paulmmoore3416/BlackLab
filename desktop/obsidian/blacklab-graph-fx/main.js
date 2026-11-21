@@ -6,6 +6,9 @@
  *     of signals to everything it links to. The open note breathes; notes changed today glow softly.
  *  3. 🎞️ Time-lapse — replays the vault being built: notes appear in the order they were created, their links drawing
  *     in, with the date running in the corner. Command: "Play vault time-lapse" (click or Esc to stop).
+ *  4. 🟠🔴 AI beacons — every Claude note glows orange and every Gemini note glows red (frontmatter `ai_provider`, the
+ *     tags #ai/claude / #ai/gemini, or the 70 AI/Claude and 70 AI/Gemini folders), so they stand out at any zoom.
+ *     With "reduce motion" on they glow without pulsing.
  *
  * Read-only: it never moves nodes or changes the graph; it reads positions and colors from the graph's renderer each
  * frame and draws on its own canvas (pointer-events: none). Runs only while a graph is visible; honors "reduce motion".
@@ -16,7 +19,9 @@ let obsidian;
 try { obsidian = require("obsidian"); } catch (_) { obsidian = { Plugin: class {}, PluginSettingTab: class {}, Setting: class {}, Platform: {}, Notice: class {} }; }
 const { Plugin, PluginSettingTab, Setting, Platform, Notice } = obsidian;
 
-const DEFAULTS = { signals: true, pulse: true, intensity: 1.0, maxParticles: 420, recentDays: 7, lapseSeconds: 24, respectReducedMotion: true };
+const DEFAULTS = { signals: true, pulse: true, intensity: 1.0, maxParticles: 420, recentDays: 7, lapseSeconds: 24, respectReducedMotion: true,
+  aiGlow: true, glowStrength: 1.0, claudeColor: "#FF8C1A", geminiColor: "#FF2D3D" };
+const AI_PATHS = { claude: ["70 AI/Claude/", "70 AI/Agents/Claude"], gemini: ["70 AI/Gemini/", "70 AI/Agents/Gemini"] };
 const DAY = 86400000;
 
 // ------------------------------------------------------------------ pure helpers (unit tested in tests/graph_fx.test.mjs)
@@ -66,6 +71,25 @@ function pickWeighted(cum, r) {
 }
 
 function easeOut(t) { return 1 - Math.pow(1 - t, 3); }
+
+/** "claude", "gemini" or null for a note: frontmatter ai_provider first, then tags, then the folder. */
+function aiProviderOf(path, fm, tags) {
+  const p = fm && typeof fm.ai_provider === "string" ? fm.ai_provider.toLowerCase() : "";
+  if (p === "claude" || p === "gemini") return p;
+  const all = [...(tags || []), ...((fm && (Array.isArray(fm.tags) ? fm.tags : typeof fm.tags === "string" ? fm.tags.split(/[ ,]+/) : [])) || [])]
+    .map((t) => String(t).replace(/^#/, "").toLowerCase());
+  for (const k of ["claude", "gemini"]) if (all.some((t) => t === `ai/${k}` || t.startsWith(`ai/${k}/`))) return k;
+  for (const k of ["claude", "gemini"]) if (AI_PATHS[k].some((pre) => (path || "").startsWith(pre))) return k;
+  return null;
+}
+
+function hexToRgb(hex) {
+  const h = String(hex || "").replace("#", "");
+  return /^[0-9a-f]{6}$/i.test(h) ? parseInt(h, 16) : 0xff8c1a;
+}
+
+/** Glow radius multiplier for a beacon at time [now]: breathes between 2.2 and 3.4 (fixed 2.8 when still). */
+function beaconScale(now, phase, still) { return still ? 2.8 : 2.8 + 0.6 * Math.sin(now / 650 + phase); }
 
 // ------------------------------------------------------------------ one overlay per visible graph
 
@@ -144,12 +168,50 @@ class Overlay {
     for (const l of out) this.spawn(l.source === n ? l : { source: n, target: l.source }, 1.6, 1.8, true);
   }
 
+  /** Claude/Gemini nodes, refreshed every 3 s (positions are read live each frame). */
+  beacons(now) {
+    if (!this._bAt || now - this._bAt > 3000) {
+      const r = this.renderer, out = [];
+      for (const n of r.nodes || []) { const p = this.plugin.aiProvider(n.id); if (p) out.push({ n, p, ph: (out.length * 2.399) % 6.283 }); if (out.length >= 1500) break; }
+      this._b = out; this._bAt = now;
+    }
+    return this._b || [];
+  }
+
+  drawBeacons(now, T, still) {
+    const S = this.plugin.settings, ctx = this.ctx;
+    if (!S.aiGlow) return;
+    const col = { claude: hexToRgb(S.claudeColor), gemini: hexToRgb(S.geminiColor) }, pad = 60;
+    ctx.globalCompositeOperation = "lighter";
+    for (const b of this.beacons(now)) {
+      const n = b.n, x = n.x * T.s + T.ox, y = n.y * T.s + T.oy;
+      if (x < -pad || y < -pad || x > T.w + pad || y > T.h + pad) continue;
+      const base = Math.max(3, (n.getSize ? n.getSize() : 8) * T.ns), c = col[b.p], k = S.glowStrength;
+      const rad = base * beaconScale(now, b.ph, still);
+      const g = ctx.createRadialGradient(x, y, base * 0.6, x, y, rad);
+      g.addColorStop(0, rgbToCss(c, Math.min(1, 0.75 * k))); g.addColorStop(0.45, rgbToCss(c, Math.min(1, 0.32 * k))); g.addColorStop(1, rgbToCss(c, 0));
+      ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y, rad, 0, 6.2832); ctx.fill();
+      ctx.strokeStyle = rgbToCss(c, Math.min(1, 0.9 * k)); ctx.lineWidth = Math.max(1, base * 0.22);
+      ctx.beginPath(); ctx.arc(x, y, base * 1.18, 0, 6.2832); ctx.stroke();
+    }
+    ctx.globalCompositeOperation = "source-over";
+  }
+
+  /** Reduce-motion: only the beacons, standing still. */
+  still(now) {
+    const ctx = this.ctx, T = this.xf();
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.clearRect(0, 0, T.w, T.h);
+    this.drawBeacons(now, T, true);
+  }
+
   frame(now, dt) {
     const S = this.plugin.settings, ctx = this.ctx, T = this.xf();
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.clearRect(0, 0, T.w, T.h);
     if (this.lapse) return this.drawLapse(now, T);
     const k = Math.min(3, dt / 16.7), dpr = window.devicePixelRatio || 1;
+    this.drawBeacons(now, T, false);
     ctx.globalCompositeOperation = "lighter";
     if (S.signals) {
       if (!this.pool || now - this.poolAt > 1500) this.buildPool(now, T);
@@ -277,7 +339,7 @@ class Overlay {
 class GraphFx extends Plugin {
   async onload() {
     this.settings = Object.assign({}, DEFAULTS, await this.loadData());
-    this.overlays = new Map(); this.running = false; this._mt = new Map();
+    this.overlays = new Map(); this.running = false; this._mt = new Map(); this._ai = new Map();
     this.reduced = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     this.addSettingTab(new FxSettings(this.app, this));
     this.addRibbonIcon("activity", "Graph FX: signals on/off", () => this.toggle("signals"));
@@ -287,6 +349,8 @@ class GraphFx extends Plugin {
     this.addCommand({ id: "stop-timelapse", name: "Stop vault time-lapse", callback: () => this.overlays.forEach((o) => o.stopLapse()) });
     const changed = (f) => { if (!f || !f.path) return; this._mt.set(f.path, Date.now()); this.overlays.forEach((o) => o.burst(f.path)); };
     this.registerEvent(this.app.vault.on("modify", changed));
+    this.registerEvent(this.app.metadataCache.on("changed", (f) => { if (f && f.path) this._ai.delete(f.path); this.overlays.forEach((o) => { o._bAt = 0; }); }));
+    this.addCommand({ id: "toggle-ai-glow", name: "Toggle Claude/Gemini glow", callback: () => this.toggle("aiGlow") });
     this.registerEvent(this.app.vault.on("create", (f) => setTimeout(() => changed(f), 1200)));  // after the graph adds it
     this.registerEvent(this.app.workspace.on("layout-change", () => this.sync()));
     this.registerEvent(this.app.workspace.on("active-leaf-change", () => this.sync()));
@@ -303,6 +367,17 @@ class GraphFx extends Plugin {
     const t = (f && f.stat && f.stat.mtime) || 0;
     this._mt.set(path, t);
     return t;
+  }
+  aiProvider(path) {
+    if (this._ai.has(path)) return this._ai.get(path);
+    let p = null;
+    try {
+      const f = this.app.vault.getAbstractFileByPath(path);
+      const c = f && this.app.metadataCache.getFileCache(f);
+      p = aiProviderOf(path, c && c.frontmatter, c && c.tags ? c.tags.map((t) => t.tag) : []);
+    } catch (_) { p = aiProviderOf(path, null, []); }
+    this._ai.set(path, p);
+    return p;
   }
   recentNodes(r, now) {
     const out = [];
@@ -330,7 +405,7 @@ class GraphFx extends Plugin {
       for (const o of this.overlays.values()) {
         if (!o.visible()) continue;
         any = true;
-        try { if (this.active() || o.lapse) o.frame(now, dt); else o.ctx.clearRect(0, 0, o.canvas.width, o.canvas.height); } catch (e) { console.warn("Graph FX", e); }
+        try { if (this.active() || o.lapse) o.frame(now, dt); else o.still(now); } catch (e) { console.warn("Graph FX", e); }
       }
       if (!this.overlays.size) { this.running = false; return; }
       // nothing visible: check again in a moment instead of every frame
@@ -341,7 +416,8 @@ class GraphFx extends Plugin {
   async toggle(key) {
     this.settings[key] = !this.settings[key];
     await this.save();
-    new Notice(`Graph FX: ${key === "signals" ? "synapse signals" : "live pulse"} ${this.settings[key] ? "on" : "off"}`);
+    const names = { signals: "synapse signals", pulse: "live pulse", aiGlow: "Claude/Gemini glow" };
+    new Notice(`Graph FX: ${names[key] || key} ${this.settings[key] ? "on" : "off"}`);
   }
   timelapse() {
     this.sync();
@@ -367,9 +443,16 @@ class FxSettings extends PluginSettingTab {
     new Setting(containerEl).setName("🎞️ Time-lapse length (seconds)")
       .addSlider((s) => s.setLimits(8, 120, 2).setValue(p.settings.lapseSeconds).setDynamicTooltip().onChange(async (v) => { p.settings.lapseSeconds = v; await p.save(); }))
       .addButton((b) => b.setButtonText("Play now").onClick(() => p.timelapse()));
+    tog("🟠🔴 Claude & Gemini glow", "Claude notes glow orange and Gemini notes glow red on the graph.", "aiGlow");
+    new Setting(containerEl).setName("Glow strength")
+      .addSlider((s) => s.setLimits(0.3, 1.6, 0.1).setValue(p.settings.glowStrength).setDynamicTooltip().onChange(async (v) => { p.settings.glowStrength = v; await p.save(); }));
+    const color = (name, key) => new Setting(containerEl).setName(name)
+      .addColorPicker((c) => c.setValue(p.settings[key]).onChange(async (v) => { p.settings[key] = v; await p.save(); }));
+    color("Claude color", "claudeColor");
+    color("Gemini color", "geminiColor");
     tog("Respect “reduce motion”", "Pause signals and pulses when the system asks for less motion (the time-lapse still plays on request).", "respectReducedMotion");
   }
 }
 
 module.exports = GraphFx;
-module.exports.__test = { rgbToCss, birthOf, schedule, revealAt, activity, pickWeighted, easeOut, DEFAULTS };
+module.exports.__test = { rgbToCss, birthOf, schedule, revealAt, activity, pickWeighted, easeOut, aiProviderOf, hexToRgb, beaconScale, DEFAULTS };

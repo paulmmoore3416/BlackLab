@@ -2,6 +2,35 @@
 
 All notable changes to BlackLab are documented here. The project follows [Semantic Versioning](https://semver.org/).
 
+## [5.17.0] — 2026-11-21 (companion 1.11.0)
+
+Claude and Gemini inside BlackLab, every conversation in your Obsidian vault, and Obsidian working hand in hand with BlackLab.
+
+### Added
+- **Pick the model.** A model menu at the top of the assistant on the phone, in BlackLab Desktop and in Obsidian. **★ Claude** (Opus, Sonnet, Haiku, Fable) and **★ Gemini** come first, followed by your computer's local models, Gemini Nano and Auto. Commands like tasks, calendar and work orders still run first; the model you picked answers everything else, and can still trigger commands.
+- **Claude through your Claude subscription.** No API key and no extra bill. The desktop companion runs Claude Code headless for each message (`claude -p`, with no tools, no MCP servers and no saved session). The phone reaches it over USB or Tailscale. Labels follow the real model the subscription serves (for example "Claude Opus 5.5"). Claude never sees your vault unless you set `claude_vault_tools: true`, which allows only the read-only vault tools.
+- **Gemini, picked by name.** The phone lists the Gemini models your key can use (newest first) and calls them directly. The desktop does the same when `secrets.json` has a `gemini` key.
+- **Every conversation saved to the vault.** Claude in `70 AI/Claude` (one note per day plus the 🟠 Claude hub) and Gemini, including Gemini Nano, in `70 AI/Gemini` (🔴 Gemini). The phone's local-model answers go to `70 AI/Local AI`. Claude Code sessions are saved in `70 AI/Agents/Claude Code` through the session hooks. Clinical and off-the-record turns are never saved, and keys and identifiers are scrubbed.
+- **Glowing on the graph.** Claude notes are orange and Gemini notes are red, ahead of every other color group. The new Graph FX 1.1 draws a pulsing glow (a steady glow when "reduce motion" is on). Titles, explorer entries and tags glow too.
+- **The local AI learns from them.** A new `recall_ai` tool ("what did Claude say about the chiller?"), and the notes are in kb-core recall and vault search (`ai_provider:`, `#ai/claude`, `#ai/gemini`).
+- **BlackLab Assistant for Obsidian** (a new plugin, installed by the companion). A sidebar chat with the same model menu. It can ask about the open note, summarize it, pull out action items, make flashcards or answer about a selection, and can insert a reply into the note as a callout.
+- **Trigger notes.** In any note, end a line with `#task`, `#remind`, `#workorder` or `#event` and it reaches BlackLab within a minute (the tag becomes `#…/sent`). `#ask/claude`, `#ask/gemini` and `#ask/local` answer right under the line. An Inbox note with `blacklab: task|workorder|event|remind` is sent whole.
+- **Two-way tasks.** Check a box in `30 Work/Tasks.md` and the task is done on your phone. Type a new `- [ ] …` line under a list and it's added there. Set a work order note's `status: done` and the work order is closed.
+- **Facility Command Center** (`10 Facility/🏢 Command Center.md`): overdue and due PMs, open work orders, today's rounds, the Bases views, panels and SDS.
+- **Today at a glance** on the daily note: the morning brief, tasks due, open work orders, PMs due, and today's Claude and Gemini conversations.
+- **Meeting pipeline.** Unchecked lines under "## Action items" in a meeting note become Follow-ups tasks on the phone.
+- **Study Hub** (`40 Learning/🎓 Study Hub.md`) with courses, assignments due, credentials and flashcard decks. Each phone deck is a note of `front :: back` cards; cards you add in Obsidian (in any note tagged `#flashcards`) go to the phone.
+- **Project Board** (`02 Projects/🗂️ Project Board.md`), a Kanban board using the pinned, verified obsidian-kanban 2.0.51. Drag a card and the project's `status:` follows; add a card and a project note is created. Active and blocked projects show on a new **Projects** Home card and in the desktop app's new **Projects** view.
+
+### Changed
+- The companion prefers your own Claude Code install over an older system-wide copy.
+- Project notes written from git repos keep the status you give them.
+
+### Tests
+- Companion: model catalog and headless Claude flags (no API key, no tools, vault opt-in is read-only), Gemini listing and calls, vault saving and privacy, phone ops, two-way tasks (including upgrading from a Tasks note without ids), trigger tags, meeting actions, flashcards, hubs, the project board.
+- Phone: `ModelsTest` (menu order, Claude needs the computer, model labels).
+- Obsidian plugins: Graph FX glow detection; the Assistant plugin's menu, history and note context.
+
 ## [5.16.0] — 2026-11-21 (companion 1.10.0)
 
 Autopilot: the computer looks after itself overnight and tells you how it went the first time you open BlackLab in the morning.

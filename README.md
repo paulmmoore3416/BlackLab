@@ -48,6 +48,11 @@ Optimized for the **Google Pixel 10 Pro XL** and newer (Android 15+).
 - Online extras: Gmail, Google Drive, Google Keep, Google developer docs; ElevenLabs voice with an offline fallback
 - Keys are encrypted with a hardware-backed Keystore key and never backed up or synced
 
+### ✦ Claude & Gemini, your pick (5.17)
+- **A model menu everywhere:** phone, desktop and Obsidian. ★ **Claude** (Opus, Sonnet, Haiku, Fable) through your Claude subscription on the computer, with no API key. ★ **Gemini** straight from the phone. Plus your local Ollama models, Gemini Nano and Auto
+- **Every conversation is saved to your vault.** Claude notes glow **orange** and Gemini notes glow **red** on the graph, so you and your local AI find them at a glance (`recall_ai`: *"what did Claude say about the chiller?"*)
+- **Obsidian works with BlackLab both ways:** the BlackLab Assistant sidebar; `#task`, `#workorder`, `#event`, `#remind` and `#ask/claude` trigger tags; two-way Tasks; a Facility Command Center; a daily *Today at a glance*; meeting action items become tasks; a Study Hub with two-way flashcards; and a Kanban Project Board that shows on BlackLab's Home screen
+
 ### 🕸️ Second brain: Obsidian vault, agent skills & facility ops
 - **Living Obsidian vault** on your computer: everything you do on the phone and desktop (tasks, work orders, facility logs, meetings, journal, recordings) becomes linked notes. Nodes for every area of your life and work, a living graph, an offline reference library, and an Atlas of every file on the computer. Any AI with the vault MCP server can read and write it, under the same privacy rules
 - **Ask my notes:** *"what do my notes say about the boiler vendor?"* — semantic recall (kb-core) answered by your local model, with the notes it used

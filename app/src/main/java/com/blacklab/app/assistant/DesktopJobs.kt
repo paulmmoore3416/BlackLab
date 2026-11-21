@@ -179,6 +179,70 @@ object DesktopJobs {
         }
         _jobs.value = active
         if (done.isNotEmpty()) DesktopAi.request("POST", "/phone/jobs/ack", JSONObject().put("ids", JSONArray(done)), 15_000)
+        j.optJSONArray("ops")?.let { if (it.length() > 0) applyOps(app, it) }
+    }
+
+    // ---------------------------------------------------------------- Obsidian → phone (5.17)
+
+    /**
+     * Changes made in Obsidian, carried out here: a box checked in Tasks.md, a new task line, a #task / #workorder /
+     * #event / #remind trigger tag, a flashcard written as `front :: back`. Each op is applied once (its id is
+     * remembered) and acked, so the computer stops sending it.
+     */
+    private suspend fun applyOps(app: AppContainer, ops: JSONArray) {
+        val p = prefs(app.context)
+        val seen = p.getString("ops_seen", "")!!.split(',').filter { it.isNotBlank() }.toMutableList()
+        val acked = JSONArray()
+        val failed = JSONArray()
+        var applied = 0
+        for (i in 0 until ops.length()) {
+            val o = ops.optJSONObject(i) ?: continue
+            val id = o.optString("id")
+            if (id.isBlank()) continue
+            if (id in seen) { acked.put(id); continue }
+            val r = runCatching { applyOp(app, o) }
+            if (r.isSuccess) { applied++; seen += id; acked.put(id) }
+            else { failed.put(JSONObject().put("id", id).put("error", r.exceptionOrNull()?.message ?: "failed")); acked.put(id) }
+        }
+        p.edit().putString("ops_seen", seen.takeLast(800).joinToString(",")).apply()
+        if (acked.length() > 0) DesktopAi.request("POST", "/phone/ops/ack", JSONObject().put("ids", acked).put("failed", failed), 15_000)
+        if (applied > 0) {
+            Notifications.simple(app.context, 7280, Notifications.CH_DESKTOP, "From Obsidian", "$applied change${if (applied == 1) "" else "s"} from your vault applied", "tasks")
+            app.appScope.launch { runCatching { com.blacklab.app.link.VaultFeed.sync(app, force = true) } }
+        }
+    }
+
+    internal suspend fun applyOp(app: AppContainer, o: JSONObject) {
+        when (o.optString("op")) {
+            "task.complete", "task.reopen" -> {
+                val t = app.db.tasks().get(o.optLong("task_id")) ?: error("task ${o.optLong("task_id")} isn't on the phone any more")
+                TaskOps.setCompleted(app, t, o.optString("op") == "task.complete")
+            }
+            "task.add" -> {
+                val profile = runCatching { Profile.valueOf(o.optString("profile", "PROFESSIONAL")) }.getOrDefault(Profile.PROFESSIONAL)
+                val listName = o.optString("list").ifBlank { "Tasks" }
+                val lists = app.db.tasks().lists(profile.name)
+                val listId = (lists.firstOrNull { it.name.equals(listName, true) }
+                    ?: lists.firstOrNull { it.name.equals("Tasks", true) })?.id
+                val parsed = QuickParse.parse(o.optString("title") + (o.optString("due").takeIf { it.isNotBlank() }?.let { " by $it" } ?: ""))
+                val due = o.optString("due").takeIf { it.isNotBlank() }?.let { runCatching { LocalDate.parse(it).toEpochDay() }.getOrNull() } ?: parsed.dueDay?.toEpochDay()
+                TaskOps.save(app, TaskEntity(profile = profile.name, listId = listId, title = parsed.title.ifBlank { o.optString("title") }.take(140),
+                    notes = o.optString("notes"), dueDay = due, dueMinute = parsed.dueMinute, tags = listOf(o.optString("tags"), "obsidian").filter { it.isNotBlank() }.joinToString(", ")))
+            }
+            "command" -> app.assistant.handle(o.optString("text"), com.blacklab.app.assistant.Origin.DESKTOP)
+            "card.add" -> {
+                val ed = app.db.education()
+                val name = o.optString("deck").ifBlank { "Obsidian" }.take(80)
+                val deck = ed.allDecks().firstOrNull { it.name.equals(name, true) }
+                val deckId = deck?.id ?: ed.insertDeck(com.blacklab.app.data.DeckEntity(profile = app.settings.current.activeProfile.name, name = name))
+                val front = o.optString("front").trim()
+                if (front.isBlank()) error("empty card")
+                if (ed.allCards().none { it.deckId == deckId && it.front.equals(front, true) })
+                    ed.insertCard(com.blacklab.app.data.FlashcardEntity(deckId = deckId, front = front.take(500), back = o.optString("back").take(1000), dueDay = LocalDate.now().toEpochDay()))
+            }
+            "project.status" -> {} // the Home card reads /phone/projects
+            else -> error("unknown op ${o.optString("op")}")
+        }
     }
 
     // ---------------------------------------------------------------- results
