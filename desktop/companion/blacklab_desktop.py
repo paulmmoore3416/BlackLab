@@ -1652,6 +1652,9 @@ class Handler(SimpleHTTPRequestHandler):
         if not self.host_ok():
             return self.reply(403, {"error": "forbidden"})
         route = urllib.parse.urlsplit(self.path).path
+        if route == "/config.js":  # the Web OAuth client ID from the private config.json, never the public repo
+            text = guards.config_js_with_client_id((WEB_DIR / "config.js").read_text(), load_json(CONFIG_DIR / "config.json", {}).get("google_client_id"))
+            return self.reply(200, raw=text.encode(), ctype="application/javascript; charset=utf-8")
         if route == "/phone/jobs":
             if not self.phone_guard():
                 return

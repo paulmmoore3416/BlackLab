@@ -256,3 +256,16 @@ def tool_guard(name: str, request: str, args=None, tainted: bool = False, autono
                     "Tell the user the link instead of opening it.")
     return None
 
+
+
+WEB_CLIENT_ID_RE = re.compile(r"\d+-[a-z0-9]+\.apps\.googleusercontent\.com", re.I)
+
+
+def config_js_with_client_id(text: str, client_id: str | None) -> str:
+    """BlackLab Desktop's config.js as the companion serves it: the Google Web OAuth client ID comes from the
+    private config.json ("google_client_id"), so it never has to live in the public repo. Only a well-formed
+    client ID is ever inserted, and only where the public file leaves it blank."""
+    cid = (client_id or "").strip()
+    if not WEB_CLIENT_ID_RE.fullmatch(cid):
+        return text
+    return re.sub(r"googleClientId:\s*''", "googleClientId: '" + cid + "'", text, count=1)

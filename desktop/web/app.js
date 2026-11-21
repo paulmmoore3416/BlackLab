@@ -174,7 +174,8 @@ function clientIdProblem(v) {
 }
 const Cloud = {
   client: null,
-  get savedClientId() { return LS.get('googleClientId', '') || CFG.googleClientId || ''; },
+  // a valid ID saved in this browser wins; a broken one (e.g. an API key pasted by mistake) gives way to the configured ID
+  get savedClientId() { const ls = LS.get('googleClientId', ''); return ls && !clientIdProblem(ls) ? ls : (CFG.googleClientId || ls || ''); },
   get clientId() { const v = this.savedClientId; return clientIdProblem(v) ? '' : v; },
   get valid() { return !!S.google.token && Date.now() < S.google.exp; },
   init() {

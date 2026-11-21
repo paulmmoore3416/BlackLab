@@ -114,3 +114,19 @@ class Tools(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class ConfigJs(unittest.TestCase):
+    TEXT = "window.BLACKLAB_CONFIG = {\n  googleClientId: '',\n  companionUrl: 'http://127.0.0.1:8770',\n};\n"
+
+    def test_fills_a_blank_client_id(self):
+        out = guards.config_js_with_client_id(self.TEXT, "123456789012-abc123.apps.googleusercontent.com")
+        self.assertIn("googleClientId: '123456789012-abc123.apps.googleusercontent.com'", out)
+
+    def test_ignores_anything_that_is_not_a_client_id(self):
+        for bad in ("", None, "AIzaSyExample", "1-a.apps.googleusercontent.com'; alert(1); '", "x.apps.googleusercontent.com"):
+            self.assertEqual(guards.config_js_with_client_id(self.TEXT, bad), self.TEXT)
+
+    def test_keeps_a_client_id_already_in_the_file(self):
+        text = self.TEXT.replace("''", "'111-pub.apps.googleusercontent.com'")
+        self.assertEqual(guards.config_js_with_client_id(text, "222-mine.apps.googleusercontent.com"), text)
