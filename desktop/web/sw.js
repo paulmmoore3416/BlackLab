@@ -1,5 +1,5 @@
 // Offline shell: the UI opens without a connection and shows the last synced snapshot.
-const CACHE = 'blacklab-desktop-v7';
+const CACHE = 'blacklab-desktop-v8';
 const SHELL = ['./', 'index.html', 'app.css', 'app.js', 'config.js', 'data.js', 'knowledge.js', 'fx.js', 'icon.png', 'icon-192.png', 'icon-maskable.png', 'manifest.webmanifest'];
 self.addEventListener('install', (e) => { e.waitUntil(caches.open(CACHE).then((c) => c.addAll(SHELL)).then(() => self.skipWaiting())); });
 self.addEventListener('activate', (e) => {

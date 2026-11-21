@@ -453,6 +453,9 @@ Welcome. You're an AI working in Paul's BlackLab vault. Please:
    card numbers — not even redacted. The vault refuses clinical text; don't try to rephrase around it.
 7. **Leave it better.** Fix a broken link, add a missing summary, propose (don't impose) structure in `00 Inbox`.
 8. **Sign off kindly.** Your last log line can say what you'd do next. Paul reads these.
+9. **Claude and Gemini live in their own glowing notes.** Every conversation with Claude is in `70 AI/Claude` (🟠, hub
+   [[🟠 Claude]]) and with Gemini in `70 AI/Gemini` (🔴, hub [[🔴 Gemini]]), found by `ai_provider:`, #ai/claude and
+   #ai/gemini. Don't move them; link to them.
 """
 
 

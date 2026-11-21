@@ -219,8 +219,9 @@ class PrivateDrive:
         return {"uploaded": done, "failed": failed}
 
     def _claude_upload(self, title: str, text: str, folder_id: str) -> tuple[bool, str]:
-        exe = self.config.get("claude_cli") or shutil.which("claude") or str(Path.home() / ".npm-global" / "bin" / "claude")
-        if not Path(exe).exists():
+        import ai_models
+        exe = ai_models.find_claude(self.config) or ""
+        if not exe or not Path(exe).exists():
             return False, "Claude Code isn't installed"
         payload = json.dumps({"title": title, "parentId": folder_id, "textContent": text, "contentMimeType": "text/markdown"}, ensure_ascii=False)
         prompt = ("Upload exactly one file to Google Drive with the create_file tool, using these arguments verbatim "

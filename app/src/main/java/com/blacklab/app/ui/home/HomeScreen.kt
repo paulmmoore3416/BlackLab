@@ -97,6 +97,9 @@ fun HomeScreen() {
     val rec by RecorderService.state.collectAsStateWithLifecycle()
     val bh = com.blacklab.app.ui.bh.bhState()
     val facState by remember { com.blacklab.app.facility.Facility.load(app.context); com.blacklab.app.facility.Facility.state }.collectAsStateWithLifecycle()
+    var projects by remember { mutableStateOf(com.blacklab.app.link.Projects.cached(app.context)) }
+    val deskState by com.blacklab.app.assistant.DesktopAi.status.collectAsStateWithLifecycle()
+    androidx.compose.runtime.LaunchedEffect(deskState.state) { com.blacklab.app.link.Projects.refresh(app)?.let { projects = it } }
     val facOpen = remember(facState, today) { com.blacklab.app.facility.Facility.due(facState).filter { it.status != com.blacklab.app.facility.Facility.Status.OK } }
     val weather by com.blacklab.app.assistant.Weather.report.collectAsStateWithLifecycle()
     val bhNow = com.blacklab.app.ui.bh.rememberTicker(30_000)
@@ -314,6 +317,27 @@ fun HomeScreen() {
                                 else -> "On shift" + (bh.activeShift?.let { " · ${it.type}" } ?: "")
                             }, Modifier.weight(1f), fontWeight = FontWeight.SemiBold)
                             Text(if (bh.census.isNotEmpty()) "${bh.census.size} on census" else "Shift Hub", style = MaterialTheme.typography.labelLarge)
+                        }
+                    }
+                }
+            }
+            "projects" -> {
+                // Projects: the Obsidian Project Board's active and blocked cards (hidden when there are none)
+                val live = projects.filter { it.status == "active" || it.status == "blocked" }
+                if (live.isNotEmpty()) item {
+                    Surface(onClick = { shell.go("settings") }, shape = RoundedCornerShape(16.dp), color = MaterialTheme.colorScheme.surfaceContainer,
+                        modifier = Modifier.fillMaxWidth().padding(top = 12.dp)) {
+                        Column(Modifier.padding(14.dp)) {
+                            Text("Projects · ${live.count { it.status == "active" }} active" + live.count { it.status == "blocked" }.let { if (it > 0) " · $it blocked" else "" },
+                                fontWeight = FontWeight.SemiBold)
+                            live.take(5).forEach { p ->
+                                Row(Modifier.padding(top = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+                                    Box(Modifier.size(8.dp).clip(CircleShape).background(if (p.status == "blocked") Color(0xFFEF5350) else Color(0xFF66BB6A)))
+                                    Spacer(Modifier.width(8.dp))
+                                    Text(p.name, Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+                                    if (p.due.isNotBlank()) Text("due ${p.due}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                }
+                            }
                         }
                     }
                 }

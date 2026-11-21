@@ -153,6 +153,26 @@ object DesktopAi {
         }
     }
 
+    data class ModelReply(val text: String?, val label: String, val model: String, val error: String? = null)
+
+    /**
+     * One prompt to a model the user picked in the assistant's menu — Claude (through the computer's Claude
+     * subscription) or one of the computer's local models. Never throws: a failure comes back as [ModelReply.error].
+     */
+    suspend fun generateWith(modelId: String, prompt: String, temperature: Float, maxTokens: Int, timeoutMs: Long = 200_000): ModelReply {
+        if (!usable && probe().state != State.ONLINE) return ModelReply(null, Models.label(modelId), modelId, "your computer isn't reachable")
+        return withContext(Dispatchers.IO) {
+            runCatching {
+                val j = callAny("POST", "/phone/generate", JSONObject().put("prompt", prompt).put("temperature", temperature.toDouble())
+                    .put("max_tokens", maxTokens).put("model", modelId), timeoutMs.toInt())
+                val text = j.optString("text").trim().takeIf { it.isNotBlank() }
+                val model = j.optString("model")
+                ModelReply(text, j.optString("label").ifBlank { if (modelId.startsWith("claude:")) Models.prettyClaude(model) else model.ifBlank { Models.label(modelId) } }, model,
+                    if (text == null) "no reply" else null)
+            }.getOrElse { e -> ModelReply(null, Models.label(modelId), modelId, e.message ?: e.javaClass.simpleName) }
+        }
+    }
+
     data class DesktopReply(val text: String, val source: String)
 
     /** Hands a request to the desktop assistant itself (files, apps, system status on the computer). */
@@ -233,7 +253,7 @@ object DesktopAi {
             val code = c.responseCode
             if (code == 401 || code == 403) throw SecurityException("rejected")
             val text = (if (code in 200..299) c.inputStream else c.errorStream)?.bufferedReader()?.use { it.readText() }.orEmpty()
-            if (code !in 200..299) throw IllegalStateException("HTTP $code")
+            if (code !in 200..299) throw IllegalStateException(runCatching { JSONObject(text).optString("error") }.getOrNull()?.takeIf { it.isNotBlank() } ?: "HTTP $code")
             return JSONObject(text.ifBlank { "{}" })
         } finally {
             c.disconnect()

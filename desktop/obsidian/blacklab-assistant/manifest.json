@@ -1,0 +1,9 @@
+{
+  "id": "blacklab-assistant",
+  "name": "BlackLab Assistant",
+  "version": "1.0.0",
+  "minAppVersion": "1.5.0",
+  "description": "Your BlackLab assistant in the sidebar: pick Claude, Gemini or a local model, ask about the open note, and every conversation is saved to the vault.",
+  "author": "BlackLab",
+  "isDesktopOnly": false
+}

@@ -50,8 +50,11 @@ import guards  # noqa: E402  (every safety rule: HTTP, paths, privacy, tool call
 import reverse  # noqa: E402  (reverse engineering with REA + Ghidra, read-only — unit tested)
 import vault as vaultlib  # noqa: E402  (the Obsidian vault: notes, timeline, AI registry, git)
 import audit  # noqa: E402  (the hash-chained activity ledger — unit tested)
+import ai_models  # noqa: E402  (Claude via the subscription CLI, Gemini, local models — one catalog)
+import vault_ai  # noqa: E402  (every Claude/Gemini conversation in the vault, glowing on the graph)
+import phone_ops  # noqa: E402  (Obsidian edits the phone carries out: tasks, commands, flashcards)
 
-VERSION = "1.9.0"
+VERSION = "1.11.0"
 HOST, PORT = "127.0.0.1", int(os.environ.get("BLACKLAB_DESKTOP_PORT", "8770"))
 HOME = Path.home()
 WEB_DIR = Path(__file__).resolve().parent.parent / "web"
@@ -93,6 +96,8 @@ VAULT_ON = CONFIG.get("vault", True) is not False
 VAULT = vaultlib.Vault(_cfg_dir("vault_dir", "~/Obsidian/BlackLab"), CACHE_DIR / "vault", CONFIG.get("timezone", "America/Chicago"))
 LEDGER = audit.Ledger(CACHE_DIR / "vault" / "ledger.jsonl")
 VAULT.ledger = LEDGER
+OPS = phone_ops.Ops(CACHE_DIR / "phone_ops.json")
+VAULT.queue_op = lambda op, key=None: OPS.queue(op, key)  # Obsidian edits → the phone (two-way tasks, triggers, cards)
 
 
 def ensure_phone_token() -> str:
@@ -197,6 +202,25 @@ def ollama_models(include_embed=False):
         return [m["name"] for m in tags.get("models", []) if include_embed or "embed" not in m["name"]]
     except Exception:
         return []
+
+
+MODELS = ai_models.Models(CONFIG, SECRETS, CACHE_DIR, ollama_models=lambda: ollama_models())
+
+
+def surface_of(origin: str) -> str:
+    """'Phone assistant (Pixel 10 Pro XL)' → 'Phone'; 'BlackLab Desktop (this computer)' → 'Desktop'."""
+    o = (origin or "").lower()
+    return "Obsidian" if "obsidian" in o else "Phone" if "phone" in o else "Trigger note" if "trigger" in o else "Desktop"
+
+
+def save_ai_turn(provider: str, model: str, label: str, origin: str, request: str, reply: str, when=None):
+    """Claude and Gemini turns go to their own glowing notes in the vault (local turns are mirrored from Chat History)."""
+    if not VAULT_ON or provider not in ("claude", "gemini"):
+        return
+    try:
+        vault_ai.record(VAULT, provider, model, surface_of(origin), request, reply, when=when, label=label)
+    except Exception as e:  # never let the vault break a reply
+        print(f"ai turn not saved to the vault: {e}", file=sys.stderr, flush=True)
 
 
 def default_model(models):
@@ -1134,6 +1158,19 @@ def tool_vault_search(args):
                                                      + f"\n  {h['text'][:400]}" for h in hits)
 
 
+@logged_tool("recall_ai")
+def tool_recall_ai(args):
+    a = args if isinstance(args, dict) else {"query": str(args or "")}
+    hits = vault_ai.search(VAULT, a.get("query", ""), a.get("provider") or "", 5)
+    if not hits:
+        return "No saved Claude or Gemini conversation matches that."
+    out = []
+    for h in hits:
+        text = vault_ai.read_exchange(VAULT, h["note"], h["anchor"], 1800) or h.get("topic", "")
+        out.append(f"• [[{h['note']}]] ({h['provider']}, {h.get('model') or ''})\n{text}")
+    return "\n\n".join(out)
+
+
 @logged_tool("skills_search")
 def tool_skills_search(args):
     import agent_skills
@@ -1322,6 +1359,8 @@ TOOLS = [
                                       "parameters": {"type": "object", "properties": {"query": {"type": "string", "description": "A tag like RTU-4, a serial, or words like 'R-22' or 'chiller'; 'all' lists everything"}}, "required": ["query"]}}},
     {"type": "function", "function": {"name": "vault_search", "description": "Search the user's Obsidian vault (their second brain: facility assets and logs, projects, meetings, daily timelines, notes).",
                                       "parameters": {"type": "object", "properties": {"query": {"type": "string"}}, "required": ["query"]}}},
+    {"type": "function", "function": {"name": "recall_ai", "description": "Look up what Claude or Gemini told the user before (every conversation with them is saved in the vault). Use when the user mentions Claude, Gemini, or 'what did the AI say about…'.",
+                                      "parameters": {"type": "object", "properties": {"query": {"type": "string"}, "provider": {"type": "string", "enum": ["claude", "gemini", ""]}}, "required": ["query"]}}},
     {"type": "function", "function": {"name": "vault_write", "description": "Save a note into the user's Obsidian vault (00 Inbox unless a folder is named). Only when the user asks to save, note or log something there.",
                                       "parameters": {"type": "object", "properties": {"title": {"type": "string"}, "text": {"type": "string"}, "folder": {"type": "string"}}, "required": ["text"]}}},
     {"type": "function", "function": {"name": "library_search", "description": "Search the offline reference library (~50 GB: Wikipedia, Stack Exchange, LibreTexts, Wikibooks, iFixit, MedlinePlus, Ready.gov, USDA canning, survival and field manuals) for facts and how-tos.",
@@ -1363,7 +1402,7 @@ def run_tool(name, args, phone):
     fns = {"system_status": tool_system_status, "find_files": tool_find_files, "read_file": tool_read_file, "open_path": tool_open_path,
            "open_url": tool_open_url, "launch_app": tool_launch_app, "desktop_note": tool_desktop_note, "dev_docs": tool_dev_docs,
            "recall_chats": tool_recall_chats, "search_documents": tool_search_documents, "equipment": tool_equipment,
-           "vault_search": tool_vault_search, "vault_write": tool_vault_write, "library_search": tool_library_search,
+           "vault_search": tool_vault_search, "vault_write": tool_vault_write, "recall_ai": tool_recall_ai, "library_search": tool_library_search,
            "reverse_engineer": tool_reverse_engineer, "skills_search": tool_skills_search, "skill_use": tool_skill_use,
            "execute_command": tool_execute_command, "nightjar_camera": tool_nightjar_camera, "qdrant_search": tool_qdrant_search}
     try:
@@ -1403,6 +1442,7 @@ def ollama_chat(text, model, phone, history=(), use_memory=True, rounds=4, seed=
               "Answer arithmetic, unit conversions and general questions directly, with no tools. "
               + ("Use phone_command only for things in the BlackLab phone app the user asked about (tasks, calendar, notes, journal, recordings, email, Drive). " if phone else "")
               + "Use search_documents for questions about the user's own documents or files, and recall_chats when they refer to an earlier conversation. "
+              "Every conversation the user has had with Claude and Gemini is saved in the vault: use recall_ai when they ask what Claude or Gemini said. "
               "For reverse engineering (binaries, apps, APKs, firmware, decompiling, 'what does this program do') use reverse_engineer: one step at a time, "
               "reusing addresses from earlier results, and say which evidence each claim comes from. Never write, rewrite or 'simplify' code yourself: "
               "quote only code a tool returned; if you haven't seen the code, call find_code or say you haven't. Only analyze software the user owns or may examine. "
@@ -1458,9 +1498,16 @@ def ollama_chat(text, model, phone, history=(), use_memory=True, rounds=4, seed=
 
 def assistant(body):
     """Every request is one task in the task log, whichever path answers it."""
-    origin = body.get("origin") or "BlackLab Desktop (this computer)"
+    origin = str(body.get("origin") or "BlackLab Desktop (this computer)")[:80]
     private, text = privacy_check(body.get("text") or "", bool(body.get("private")))
-    body = {**body, "text": text, "history": [] if private else recent_turns(origin), "private": private}
+    # the Obsidian sidebar sends the open note as context: the model sees it, the saved turn links to it
+    note, context = str(body.get("note") or "")[:120], str(body.get("context") or "")[:40000]
+    if context and privacy_check(context)[0]:
+        private = True
+    sent = [(str(u)[:4000], str(a)[:4000]) for u, a in (body.get("history") or [])[-6:] if isinstance(u, str) and isinstance(a, str)] if isinstance(body.get("history"), list) else []
+    model_text = text + (f"\n\n---\nContext — the note “{note or 'untitled'}” from Paul's Obsidian vault:\n\n{context}" if context else "")
+    shown = text + (f" (about [[{note}]])" if note else "")
+    body = {**body, "text": model_text, "history": [] if private else (sent or recent_turns(origin)), "private": private}
     with task_log(text, origin, private) as log:
         started = dt.datetime.now()
         out = _assistant(body)
@@ -1469,9 +1516,11 @@ def assistant(body):
         if private:
             out = {**out, "source": (out.get("source") or "Desktop") + " · private, not saved"}
             return out
-        remember_turn(origin, text, out.get("text", ""))
+        remember_turn(origin, shown, out.get("text", ""))
+        if out.get("provider") in ("claude", "gemini") and not out.get("error"):
+            save_ai_turn(out["provider"], out.get("model", ""), out.get("label", ""), origin, shown, out.get("text", ""), started)
         try:
-            archive_chat(text, out.get("text", ""), origin, out.get("source", ""), started,
+            archive_chat(shown, out.get("text", ""), origin, out.get("source", ""), started,
                          [st["title"] for st in (log.steps if log else []) if st["kind"] == "tool"])
         except Exception as e:  # never let the archive break a reply
             print(f"chat not archived: {e}", file=sys.stderr, flush=True)
@@ -1484,16 +1533,22 @@ def _assistant(body):
     phone = resolve_phone(body.get("phone"))
     if not text:
         return {"text": ""}
-    if target != "phone":
+    if target != "phone" and not body.get("context"):
         r = desktop_rules(text, phone)
         if r:
             task_step("rules", "Handled by the desktop rules (no AI needed)")
             return {"text": r[0], "source": r[1]}
-    looks_phone = bool(PHONE_WORDS.search(text))
+    chosen = str(body.get("model") or CONFIG.get("assistant_model") or "auto")
+    cloud = ai_models.provider_of(chosen) in ("claude", "gemini")
+    looks_phone = bool(PHONE_WORDS.search(text)) and not body.get("context") and not cloud  # a chosen model answers; phone words in a note don't relay
     if phone and (target == "phone" or (target == "auto" and looks_phone)):
         task_step("relay", "Sent to the phone's assistant")
         r = phone_call(phone, "/api/assistant", {"text": text})
         return {"text": r.get("text", ""), "source": "Phone · " + r.get("source", ""), "links": r.get("links", [])}
+    if ai_models.provider_of(chosen) in ("claude", "gemini"):
+        return cloud_turn(chosen, text, body.get("history") or (), body.get("origin") or "")
+    if ai_models.provider_of(chosen) == "local":
+        body = {**body, "model": ai_models.model_of(chosen)}
     models = ollama_models()
     if models:
         model = body.get("model") if body.get("model") in models else default_model(models)
@@ -1518,6 +1573,17 @@ def _assistant(body):
             "source": "Desktop · rules"}
 
 
+def cloud_turn(model_id: str, text: str, history, origin: str) -> dict:
+    """One turn with Claude (the subscription CLI) or Gemini. An error comes back as the reply, never as silence."""
+    label = MODELS.label(model_id)
+    task_step("model", f"Asked {label}", f"{len(history or ())} earlier turn(s) + request")
+    try:
+        r = MODELS.chat(model_id, text, history, surface=surface_of(origin))
+    except Exception as e:  # noqa: BLE001 — the reason is shown to Paul
+        return {"text": f"{label} couldn't answer: {e}", "source": label, "error": True, "provider": ai_models.provider_of(model_id)}
+    return {"text": r["text"], "source": r["source"], "provider": r["provider"], "model": r["model"], "label": label if r["provider"] == "gemini" else ai_models.pretty_claude(r["model"])}
+
+
 def gemini_text(prompt: str, temperature=0.3, max_tokens=400) -> str | None:
     """Cloud fallback when Ollama is down: the Gemini API with the key in secrets.json ("gemini")."""
     key = SECRETS.get("gemini")
@@ -1538,14 +1604,20 @@ def gemini_text(prompt: str, temperature=0.3, max_tokens=400) -> str | None:
 
 
 def phone_generate(body):
-    """Raw generation for the phone's AI features (assistant router, summaries, Talk, Ask my files)."""
+    """Raw generation for the phone's AI features (assistant router, summaries, Talk, Ask my files).
+    With "model": "claude:…" or "gemini:…" the phone's chosen cloud model answers instead (the phone saves the turn)."""
+    chosen = str(body.get("model") or "")
+    if ai_models.provider_of(chosen) in ("claude", "gemini"):
+        r = MODELS.generate(chosen, str(body.get("prompt", ""))[:60000], float(body.get("temperature", 0.3)), max(int(body.get("max_tokens", 900)), 900))
+        return {"text": r["text"], "model": r["model"], "label": r["label"], "provider": r["provider"]}
     models = ollama_models()
     if not models:
         text = gemini_text(str(body.get("prompt", "")), float(body.get("temperature", 0.3)), int(body.get("max_tokens", 320)))
         if text:
             return {"text": text, "model": "gemini (cloud)"}
         raise RuntimeError("Ollama isn't running")
-    model = default_model(models)
+    want = ai_models.model_of(chosen) if ai_models.provider_of(chosen) == "local" else ""
+    model = want if want in models else default_model(models)
     r = http_json(f"{OLLAMA}/api/generate", {
         "model": model, "prompt": str(body.get("prompt", ""))[:24000], "stream": False, "think": False, "keep_alive": keep_alive(),
         "options": {"temperature": float(body.get("temperature", 0.3)), "num_predict": int(body.get("max_tokens", 320)), "num_ctx": num_ctx()},
@@ -1559,7 +1631,7 @@ def phone_ask(body):
     who = PHONE.get("model") or "phone"
     phone = resolve_phone()
     r = assistant({"text": body.get("text", ""), "target": "desktop", "phone": phone, "origin": f"Phone assistant ({who})",
-                   "private": bool(body.get("private"))})
+                   "private": bool(body.get("private")), "model": body.get("model")})
     return {"text": r.get("text", ""), "source": "Desktop · " + r.get("source", "")}
 
 
@@ -1652,10 +1724,23 @@ class Handler(SimpleHTTPRequestHandler):
         if not self.host_ok():
             return self.reply(403, {"error": "forbidden"})
         route = urllib.parse.urlsplit(self.path).path
+        if route == "/config.js":  # the Web OAuth client ID from the private config.json, never the public repo
+            text = guards.config_js_with_client_id((WEB_DIR / "config.js").read_text(), load_json(CONFIG_DIR / "config.json", {}).get("google_client_id"))
+            return self.reply(200, raw=text.encode(), ctype="application/javascript; charset=utf-8")
         if route == "/phone/jobs":
             if not self.phone_guard():
                 return
-            return self.reply(200, {"jobs": agents.pending_for_phone(), "whisper": agents.whisper_ready()})
+            return self.reply(200, {"jobs": agents.pending_for_phone(), "whisper": agents.whisper_ready(), "ops": OPS.pending()})
+        if route in ("/phone/models", "/local/models"):
+            if not (self.phone_guard() if route.startswith("/phone/") else self.guard()):
+                return
+            return self.reply(200, {"models": MODELS.catalog(), "default": CONFIG.get("assistant_model", "auto"),
+                                    "saved": vault_ai.json_summary(VAULT) if VAULT_ON else None})
+        if route in ("/phone/projects", "/local/projects"):
+            if not (self.phone_guard() if route.startswith("/phone/") else self.guard()):
+                return
+            import vault_boards
+            return self.reply(200, vault_boards.summary(VAULT) if VAULT_ON else {"projects": []})
         if route in ("/local/jobs", "/local/equipment"):
             if not self.guard():
                 return
@@ -1681,7 +1766,9 @@ class Handler(SimpleHTTPRequestHandler):
                                         "folders": {"ai": str(AI_DIR), "downloads": str(DOWNLOADS_DIR), "documents": str(DOCS_DIR),
                                                     "chat_history": str(CHAT_DIR) if CONFIG.get("chat_history", True) is not False else None},
                                         "task_logs": str(TASK_LOG_DIR) if CONFIG.get("task_logs", True) is not False else None,
-                                        "agents": agents.status(), "vault": VAULT.status() if VAULT_ON else None, "reverse": reverse.status()})
+                                        "agents": agents.status(), "vault": VAULT.status() if VAULT_ON else None, "reverse": reverse.status(),
+                                        "sync": {"last": SYNC_RUN["last"], "error": SYNC_RUN["error"], "ops_waiting": OPS.count()},
+                                        "claude": bool(MODELS.claude_exe()), "gemini": bool(SECRETS.get("gemini"))})
             return self.reply(404, {"error": "unknown"})
         return super().do_GET()
 
@@ -1700,6 +1787,17 @@ class Handler(SimpleHTTPRequestHandler):
                 return self.reply(400, {"error": str(e)})
             except Exception as e:
                 return self.reply(500, {"error": str(e)})
+        if route == "/phone/ops/ack":
+            if not self.phone_guard():
+                return
+            try:
+                body = json.loads(self.rfile.read(min(int(self.headers.get("Content-Length") or 0), 200_000)) or b"{}")
+                n = OPS.ack([str(i) for i in body.get("ids", [])][:500])
+                for f in (body.get("failed") or [])[:50]:  # ops the phone couldn't apply (a task deleted on the phone, …)
+                    VAULT.errors = (VAULT.errors + [f"phone op {f.get('id')}: {str(f.get('error'))[:120]}"])[-20:]
+                return self.reply(200, {"ok": True, "acked": n})
+            except Exception as e:
+                return self.reply(400, {"error": str(e)})
         if route in ("/phone/upload", "/phone/jobs", "/phone/jobs/ack", "/phone/context"):
             if not self.phone_guard():
                 return
@@ -1767,6 +1865,10 @@ class Handler(SimpleHTTPRequestHandler):
                 return self.reply(200, {"message": msg})
             if self.path == "/local/notify":
                 return self.reply(200, agents.public(agents.notice(str(body.get("title", "BlackLab")), str(body.get("text", "")))))
+            if self.path == "/local/health":  # the nightly system check → the phone shows it the next time BlackLab opens
+                j = agents.health_report(body)
+                LEDGER.record("This computer", "health:report", source="autopilot", metadata={"status": body.get("status")})
+                return self.reply(200, {"ok": True, "id": j["id"]})
             if self.path == "/local/jobs":
                 upload = None
                 if body.get("path"):
@@ -1906,6 +2008,14 @@ def _vault_op(op: str, body: dict, who: str) -> dict:
         return {"ok": True, "message": "Copying the vault to the phone now."}
     elif op == "history":
         return {"ok": True, "commits": v.history(int(body.get("n") or 20))}
+    elif op == "chat":  # a turn the phone had with Claude, Gemini, Gemini Nano or a local model
+        private, _ = privacy_check(str(body.get("request") or ""), bool(body.get("private")))
+        if private:
+            return {"ok": False, "error": "private: not saved"}
+        return vault_ai.record(v, str(body.get("provider") or ""), str(body.get("model") or ""), str(body.get("surface") or who),
+                               str(body.get("request") or ""), str(body.get("reply") or ""), label=str(body.get("label") or ""))
+    elif op == "ai_search":
+        return {"ok": True, "results": vault_ai.search(v, body.get("query", ""), body.get("provider") or "", int(body.get("limit") or 8))}
     elif op == "ask":  # "what do my notes say about …": semantic recall through kb-core, an answer from the local model
         import vault_recall
         local = who != "Phone" or CONFIG.get("phone_recall_local", False) is True
@@ -1959,6 +2069,61 @@ VAULT_PROJECTS = [Path(os.path.expanduser(p)) for p in CONFIG.get("vault_project
 VAULT_WATCH = [Path(os.path.expanduser(p)) for p in CONFIG.get("vault_watch", ["~/Desktop", "~/Documents", "~/Downloads"])]
 
 
+def _template(name: str) -> str | None:
+    try:
+        return VAULT.path(f"90 System/Templates/{name}.md").read_text(encoding="utf-8")
+    except (OSError, ValueError):
+        return None
+
+
+SYNC_RUN = {"last": 0, "report": {}, "error": ""}
+
+
+def trigger_ask(model_id: str, prompt: str, rel: str) -> tuple[str, str]:
+    """#ask/claude, #ask/gemini, #ask/local in a note: (answer, label). The turn is saved like any other."""
+    p = ai_models.provider_of(model_id)
+    if p == "gemini" and not ai_models.model_of(model_id):
+        gem = [e for e in MODELS.gemini_entries() if e["available"]]
+        if not gem:
+            raise RuntimeError("no Gemini key on this computer")
+        model_id = gem[0]["id"]
+    elif p == "gemini" and ai_models.model_of(model_id) in ("pro", "flash"):
+        want = ai_models.model_of(model_id)
+        gem = [e for e in MODELS.gemini_entries() if e["available"] and want in e["id"]]
+        model_id = gem[0]["id"] if gem else model_id
+    if p == "local":
+        answer = local_generate(prompt, max_tokens=900)
+        return answer, f"Local AI · {default_model(ollama_models())}"
+    r = MODELS.chat(model_id, prompt, surface="Trigger note in Obsidian", extra_system="Your answer is written into the note as a callout.")
+    label = ai_models.pretty_claude(r["model"]) if r["provider"] == "claude" else MODELS.label(model_id)
+    save_ai_turn(r["provider"], r["model"], label, "Trigger note (Obsidian)", f"[{rel}] " + prompt[:4000], r["text"])
+    return r["text"], label
+
+
+def sync_keeper():
+    """Every minute: your Obsidian edits reach the phone (tasks, work orders, trigger tags, flashcards, the project board)."""
+    import vault_boards
+    import vault_sync
+    time.sleep(20)
+    while True:
+        try:
+            v = VAULT
+            rep = {"tasks": vault_sync.harvest_tasks(v, v.queue_op),
+                   "triggers": vault_sync.scan_triggers(v, v.queue_op, ask=trigger_ask if CONFIG.get("vault_ask_tags", True) is not False else None)}
+            b = vault_boards.sync(v, _template("Project"))
+            rep["board"] = {k: b[k] for k in ("moved", "created")}
+            for e in rep["triggers"].get("errors", []):
+                v.errors = (v.errors + [f"ask: {e}"])[-20:]
+            busy = any(rep["tasks"].values()) or any(rep["triggers"].get(k) for k in ("commands", "asks", "cards")) or b["moved"] or b["created"]
+            if busy:
+                LEDGER.record("Obsidian", "vault:sync", source="sync", metadata={k: rep[k] for k in ("tasks",)} | {"triggers": {k: rep["triggers"][k] for k in ("commands", "asks", "cards")}})
+                v.commit("Obsidian → BlackLab sync", min_gap=120)
+            SYNC_RUN.update(last=time.time(), report=rep, error="")
+        except Exception as e:  # noqa: BLE001 — never let this thread die
+            SYNC_RUN.update(last=time.time(), error=str(e)[:300])
+        time.sleep(int(CONFIG.get("vault_sync_seconds", 60)))
+
+
 def vault_pass(force=False):
     """One full desktop pass: meetings, briefs, task logs, conversations, projects, new files, Home, a commit."""
     v = VAULT
@@ -2002,7 +2167,9 @@ def vault_pass(force=False):
                 threading.Thread(target=private_drive().flush, daemon=True).start()  # retry anything that waited
         except Exception as e:
             v.errors = (v.errors + [f"private drive: {e}"])[-20:]
-        for label, fn in (("facility", lambda: __import__("facility_ops").render_all(v)),
+        for label, fn in (("ai hubs", lambda: vault_ai.ensure_hubs(v)),
+                          ("project board", lambda: __import__("vault_boards").sync(v, _template("Project"))),
+                          ("facility", lambda: __import__("facility_ops").render_all(v)),
                           ("skills", lambda: __import__("agent_skills").render(v)),
                           ("credentials", lambda: __import__("vault_credentials").render(v)),
                           ("ledger", lambda: audit.render(v, LEDGER))):
@@ -2280,6 +2447,8 @@ KEEP_WARM = {"last": "", "at": 0}
 def keep_warm_keeper():
     """Keeps the assistant's model loaded while ./daddyshome has pinned it (see keep_warm.py)."""
     import keep_warm
+    while agents.C is None:  # main() starts this thread before agents.setup(); mining_active needs it
+        time.sleep(1)
     while True:
         try:
             # ./daddyshome --stop edits config.json without restarting us: follow the file, not the copy from startup
@@ -2305,6 +2474,7 @@ def main():
     threading.Thread(target=tailnet_keeper, daemon=True, name="tailnet").start()
     if VAULT_ON:
         threading.Thread(target=vault_keeper, daemon=True, name="vault").start()
+        threading.Thread(target=sync_keeper, daemon=True, name="vault-sync").start()
         if CONFIG.get("atlas", True) is not False:
             threading.Thread(target=atlas_keeper, daemon=True, name="atlas").start()
     if CONFIG.get("library", True) is not False:

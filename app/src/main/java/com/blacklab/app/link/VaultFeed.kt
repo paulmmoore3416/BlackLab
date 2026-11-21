@@ -186,6 +186,14 @@ object VaultFeed {
                             .put("due", a.dueAt?.let { java.time.Instant.ofEpochMilli(it).atZone(zone).toLocalDate().toString() } ?: JSONObject.NULL))
                     }
                 })
+                .put("decks", JSONArray().apply {
+                    val cards = ed.allCards().groupBy { it.deckId }
+                    ed.allDecks().forEach { d ->
+                        put(JSONObject().put("id", d.id).put("name", d.name).put("profile", d.profile).put("cards", JSONArray().apply {
+                            cards[d.id].orEmpty().take(2000).forEach { c -> put(JSONObject().put("front", c.front.take(500)).put("back", c.back.take(1000)).put("dueDay", c.dueDay)) }
+                        }))
+                    }
+                })
                 .put("certs", JSONArray().apply {
                     ed.allCerts().forEach { c ->
                         put(JSONObject().put("name", c.name).put("issuer", c.issuer).put("status", c.status.lowercase().replace('_', ' '))

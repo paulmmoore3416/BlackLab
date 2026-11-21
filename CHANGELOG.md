@@ -2,6 +2,53 @@
 
 All notable changes to BlackLab are documented here. The project follows [Semantic Versioning](https://semver.org/).
 
+## [5.17.0] — 2026-11-21 (companion 1.11.0)
+
+Claude and Gemini inside BlackLab, every conversation in your Obsidian vault, and Obsidian working hand in hand with BlackLab.
+
+### Added
+- **Pick the model.** A model menu at the top of the assistant on the phone, in BlackLab Desktop and in Obsidian. **★ Claude** (Opus, Sonnet, Haiku, Fable) and **★ Gemini** come first, followed by your computer's local models, Gemini Nano and Auto. Commands like tasks, calendar and work orders still run first; the model you picked answers everything else, and can still trigger commands.
+- **Claude through your Claude subscription.** No API key and no extra bill. The desktop companion runs Claude Code headless for each message (`claude -p`, with no tools, no MCP servers and no saved session). The phone reaches it over USB or Tailscale. Labels follow the real model the subscription serves (for example "Claude Opus 5.5"). Claude never sees your vault unless you set `claude_vault_tools: true`, which allows only the read-only vault tools.
+- **Gemini, picked by name.** The phone lists the Gemini models your key can use (newest first) and calls them directly. The desktop does the same when `secrets.json` has a `gemini` key.
+- **Every conversation saved to the vault.** Claude in `70 AI/Claude` (one note per day plus the 🟠 Claude hub) and Gemini, including Gemini Nano, in `70 AI/Gemini` (🔴 Gemini). The phone's local-model answers go to `70 AI/Local AI`. Claude Code sessions are saved in `70 AI/Agents/Claude Code` through the session hooks. Clinical and off-the-record turns are never saved, and keys and identifiers are scrubbed.
+- **Glowing on the graph.** Claude notes are orange and Gemini notes are red, ahead of every other color group. The new Graph FX 1.1 draws a pulsing glow (a steady glow when "reduce motion" is on). Titles, explorer entries and tags glow too.
+- **The local AI learns from them.** A new `recall_ai` tool ("what did Claude say about the chiller?"), and the notes are in kb-core recall and vault search (`ai_provider:`, `#ai/claude`, `#ai/gemini`).
+- **BlackLab Assistant for Obsidian** (a new plugin, installed by the companion). A sidebar chat with the same model menu. It can ask about the open note, summarize it, pull out action items, make flashcards or answer about a selection, and can insert a reply into the note as a callout.
+- **Trigger notes.** In any note, end a line with `#task`, `#remind`, `#workorder` or `#event` and it reaches BlackLab within a minute (the tag becomes `#…/sent`). `#ask/claude`, `#ask/gemini` and `#ask/local` answer right under the line. An Inbox note with `blacklab: task|workorder|event|remind` is sent whole.
+- **Two-way tasks.** Check a box in `30 Work/Tasks.md` and the task is done on your phone. Type a new `- [ ] …` line under a list and it's added there. Set a work order note's `status: done` and the work order is closed.
+- **Facility Command Center** (`10 Facility/🏢 Command Center.md`): overdue and due PMs, open work orders, today's rounds, the Bases views, panels and SDS.
+- **Today at a glance** on the daily note: the morning brief, tasks due, open work orders, PMs due, and today's Claude and Gemini conversations.
+- **Meeting pipeline.** Unchecked lines under "## Action items" in a meeting note become Follow-ups tasks on the phone.
+- **Study Hub** (`40 Learning/🎓 Study Hub.md`) with courses, assignments due, credentials and flashcard decks. Each phone deck is a note of `front :: back` cards; cards you add in Obsidian (in any note tagged `#flashcards`) go to the phone.
+- **Project Board** (`02 Projects/🗂️ Project Board.md`), a Kanban board using the pinned, verified obsidian-kanban 2.0.51. Drag a card and the project's `status:` follows; add a card and a project note is created. Active and blocked projects show on a new **Projects** Home card and in the desktop app's new **Projects** view.
+
+### Changed
+- The companion prefers your own Claude Code install over an older system-wide copy.
+- Project notes written from git repos keep the status you give them.
+
+### Tests
+- Companion: model catalog and headless Claude flags (no API key, no tools, vault opt-in is read-only), Gemini listing and calls, vault saving and privacy, phone ops, two-way tasks (including upgrading from a Tasks note without ids), trigger tags, meeting actions, flashcards, hubs, the project board.
+- Phone: `ModelsTest` (menu order, Claude needs the computer, model labels).
+- Obsidian plugins: Graph FX glow detection; the Assistant plugin's menu, history and note context.
+
+## [5.16.0] — 2026-11-21 (companion 1.10.0)
+
+Autopilot: the computer looks after itself overnight and tells you how it went the first time you open BlackLab in the morning.
+
+### Added
+- **Overnight system check.** At 03:00 Central the computer checks the desktop AI end to end (Ollama, the assistant model answering a test question, keep-warm, jobs, Whisper), the phone link (shared key, last check-in, Tailscale on both ends, USB), BlackLab's services (companion, vault sync, recall memory, cameras), the system (memory, swap, drive SMART, GPU, temperatures, failed units, log errors, updates), storage (free space, what was freed since the last scan, Trash, biggest folders) and your data (configs, signing key, release checksum, the code repo, vault notes, vault history, sync conflicts). It fixes what it safely can and writes a report to *BlackLab AI › Documents › System Health*.
+- **The report on your phone.** The first time BlackLab opens after the check, it shows the result: healthy, needs a look or problems found, each issue with its fix, and what was fixed automatically. The full report is saved under Documents › System Health. A notification comes only when something's wrong.
+- **Nightly restart and BlackLab-only mode.** The computer restarts at 04:00 (after the check) and comes back with only BlackLab and the services it uses running; other projects stay off. `./daddyshome` runs by itself at every power-on, and the after-restart check adds how it came back to the same report. A watchdog keeps the companion answering and a plugged-in phone linked every 5 minutes. Install: `desktop/autopilot/install.sh`, then `sudo desktop/autopilot/install-system.sh` once for the restart.
+- **Vault history repair.** `desktop/autopilot/repair-vault-git.sh` fixes the vault's git history after a crash or power cut (backs up `.git` first and never touches notes).
+
+### Fixed
+- **Vault versions stopped saving after a crash.** Empty git objects left by an interrupted write meant no vault version was saved after Nov 14. The nightly check now catches this.
+- **A folder named like a note stopped the vault graph.** Folders ending in `.md` are skipped by every vault scan.
+- **Keep-warm reported an error for its first minute after every start.** It no longer runs before the jobs module is ready.
+
+### Tests
+- The report hand-off (one per night, the after-restart copy replaces an undelivered one), the report builder, and the phone's report parsing and show-once rule.
+
 ## [5.15.0] — 2026-11-21 (companion 1.9.0)
 
 Office work on the phone: PowerPoint decks that look like PowerPoint (with a presenter mode), Excel workbooks that keep every format and formula, Microsoft 365 and Teams. Plus a Microsoft-style Fluent glass look, sections you arrange yourself, and a desktop link that keeps working when the computer is away.
@@ -20,7 +67,7 @@ Office work on the phone: PowerPoint decks that look like PowerPoint (with a pre
 
 ### Changed
 - **New BlackLab logo.** The low-poly Labrador is now the app icon, including the themed (monochrome) icon, the splash screen, the status-bar icon, onboarding and the drawer. It's also on BlackLab Desktop's window, the web app and PWA icons, and the README. Brand files are in `docs/brand/`.
-- **Reproducible release builds.** The APK no longer carries Google Play's encrypted dependency-metadata block, which came out different on every build. The same code now always gives the same APK and checksum.
+- **Reproducible release builds.** The APK no longer carries Google Play's encrypted dependency-metadata block (different on every build) or a git commit stamp (different on every commit). The same code now always gives the same APK and checksum.
 - **A steadier desktop link.** When one route drops mid-session, the phone switches to the other (USB ⇄ Tailscale) and retries. One slow reply no longer marks the computer offline. The phone re-checks the moment Wi-Fi, cellular or Tailscale changes and when you open the app. Tailscale gets a longer wake-up timeout over cellular.
 - **The vault keeps program documents whole.** Notes in `02 Projects/` marked `blacklab_reference: program` (business plans, policy packages, financial models) are indexed in full for the AI. Paragraphs with a filled-in identifier are still dropped, and everything is still scrubbed. Before, the clinical-word guard dropped 60–86 % of them.
 - **Veteran Initiative in the vault.** The master presentation (with speaker notes), financial model v2, funding workbook, calculators and the 00–20 package are in `02 Projects/Veteran Initiative/` for the desktop AI and the phone's vault questions. They're also in the phone's Library under Professional › Veteran Initiative.

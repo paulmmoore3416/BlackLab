@@ -117,6 +117,9 @@ data class Settings(
     /** Gemini API (cloud): OFF, FALLBACK (only when the desktop and Gemini Nano can't) or PREFER (before Gemini Nano). */
     val asstCloudAi: String = "FALLBACK",
     val asstGeminiModel: String = "gemini-2.5-flash",
+    /** The assistant's chosen model: "auto", "claude:opus|sonnet|haiku|fable" (on the computer, your Claude subscription),
+     *  "gemini:<model>" (Gemini API from the phone), "nano:on-device" or "local:<ollama model>" (the computer). */
+    val asstModel: String = "auto",
     /** Picovoice wake word. */
     val wakeWord: Boolean = false,
     val wakeKeyword: String = "JARVIS",
@@ -311,6 +314,7 @@ object Keys {
     const val ASST_DESKTOP_JOBS = "asst_desktop_jobs"
     const val ASST_CLOUD_AI = "asst_cloud_ai"
     const val ASST_GEMINI_MODEL = "asst_gemini_model"
+    const val ASST_MODEL = "asst_model"
     const val WAKE_WORD = "wake_word"
     const val WAKE_KEYWORD = "wake_keyword"
     const val WAKE_SENSITIVITY = "wake_sensitivity"
@@ -493,6 +497,7 @@ class SettingsRepository(context: Context) {
             asstDesktopJobs = getBoolean(Keys.ASST_DESKTOP_JOBS, d.asstDesktopJobs),
             asstCloudAi = getString(Keys.ASST_CLOUD_AI, d.asstCloudAi) ?: d.asstCloudAi,
             asstGeminiModel = getString(Keys.ASST_GEMINI_MODEL, d.asstGeminiModel) ?: d.asstGeminiModel,
+            asstModel = getString(Keys.ASST_MODEL, d.asstModel) ?: d.asstModel,
             wakeWord = getBoolean(Keys.WAKE_WORD, d.wakeWord),
             wakeKeyword = getString(Keys.WAKE_KEYWORD, d.wakeKeyword) ?: d.wakeKeyword,
             wakeSensitivity = getInt(Keys.WAKE_SENSITIVITY, d.wakeSensitivity).coerceIn(10, 95),

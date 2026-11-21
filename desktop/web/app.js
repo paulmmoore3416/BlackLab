@@ -174,7 +174,8 @@ function clientIdProblem(v) {
 }
 const Cloud = {
   client: null,
-  get savedClientId() { return LS.get('googleClientId', '') || CFG.googleClientId || ''; },
+  // a valid ID saved in this browser wins; a broken one (e.g. an API key pasted by mistake) gives way to the configured ID
+  get savedClientId() { const ls = LS.get('googleClientId', ''); return ls && !clientIdProblem(ls) ? ls : (CFG.googleClientId || ls || ''); },
   get clientId() { const v = this.savedClientId; return clientIdProblem(v) ? '' : v; },
   get valid() { return !!S.google.token && Date.now() < S.google.exp; },
   init() {
@@ -391,7 +392,7 @@ async function ask(text) {
   try {
     let r = null;
     if (Companion.ok && target !== 'phone') {
-      r = await Companion.req('/local/assistant', { text, target, model: S.ui.model || undefined, phone: S.mode === 'phone' ? { url: Phone.url, token: Phone.token } : null });
+      r = await Companion.req('/local/assistant', { text, target, model: S.ui.model || undefined, history: chatHistory(), phone: S.mode === 'phone' ? { url: Phone.url, token: Phone.token } : null });
     } else if (S.mode === 'phone') {
       r = await Phone.req('/api/assistant', { body: { text } });
     } else if (S.mode === 'cloud') {
@@ -400,12 +401,36 @@ async function ask(text) {
     } else {
       r = { text: localAssistant(text) || 'Not connected to the phone. Pair it under Connect, sign in with Google, or start the desktop companion.', source: 'This browser' };
     }
-    pushChat({ user: false, text: r.text, source: r.source, links: r.links || [] });
+    pushChat({ user: false, text: r.text, source: r.source, links: r.links || [], provider: r.provider || providerOf(r.source), error: !!r.error });
     if (S.ui.speak) speak(r.text);
     if (S.mode === 'phone') setTimeout(() => loadFromPhone().catch(() => {}), 400);
   } catch (e) {
     pushChat({ user: false, text: 'Hit a snag: ' + e.message, source: 'Error' });
   }
+}
+
+/** 'claude' / 'gemini' / 'local' for a model id or a reply's source label — they get their own colors. */
+function providerOf(x) {
+  const s = String(x || '').toLowerCase();
+  return s.startsWith('claude') || /\bclaude\b/.test(s) ? 'claude' : s.startsWith('gemini') || /\bgemini\b/.test(s) ? 'gemini' : s.startsWith('local') ? 'local' : '';
+}
+/** The last few completed turns, so Claude and Gemini can follow the conversation. */
+function chatHistory() {
+  const out = [];
+  const c = S.chat.slice(0, -1);
+  for (let i = 0; i + 1 < c.length; i++) if (c[i].user && !c[i + 1].user && !c[i + 1].error) out.push([c[i].text, c[i + 1].text]);
+  return out.slice(-6);
+}
+/** The dropdown: ★ Claude and ★ Gemini first, then local models and Auto (from the companion's /local/models). */
+function modelOptions() {
+  const cat = S.models?.models || [];
+  if (!cat.length) return `<option value="">${S.companion ? 'Loading models…' : 'Start the companion for models'}</option>`;
+  const groups = [['claude', '★ Claude'], ['gemini', '★ Gemini'], ['local', 'Local · this computer'], ['auto', 'Auto']];
+  const cur = S.ui.model || 'auto';
+  return groups.map(([p, label]) => {
+    const items = cat.filter((m) => m.provider === p);
+    return items.length ? `<optgroup label="${label}" class="og-${p}">${items.map((m) => `<option value="${esc(m.id)}" ${m.id === cur || (p === 'local' && cur === m.label) ? 'selected' : ''} ${m.available ? '' : 'disabled'} title="${esc(m.note || '')}">${esc(m.label)}${m.available ? '' : ' — unavailable'}</option>`).join('')}</optgroup>` : '';
+  }).join('');
 }
 
 let audio = null;
@@ -442,6 +467,7 @@ const NAV = [
   { id: 'files', label: 'Phone files', ico: '▤' },
   { id: 'bh', label: 'Behavioral Health', ico: '✚' },
   { id: 'facility', label: 'Facility', ico: '⌸' },
+  { id: 'projects', label: 'Projects', ico: '▥' },
   { id: 'vault', label: 'Obsidian vault', ico: '◈' },
   { sep: true },
   { id: 'health', label: 'Health', ico: '♡' },
@@ -908,6 +934,7 @@ Views.assistant = () => `<div class="chat">
   <div class="target">
     <span class="muted small" style="align-self:center">Send to:</span>
     ${[['auto', 'Auto'], ['phone', 'Phone'], ['desktop', 'Desktop']].map(([k, l]) => `<span class="chip ${S.ui.target === k ? 'accent' : 'btn'}" data-target="${k}">${l}</span>`).join('')}
+    ${Companion.ok ? `<label class="row small muted model-pick" data-provider="${providerOf(S.ui.model)}">Model <select id="modelSel">${modelOptions()}</select></label>` : ''}
     <span class="spacer"></span>
     <label class="row small muted"><span class="switch"><input type="checkbox" id="speakT" ${S.ui.speak ? 'checked' : ''}><span></span></span>Speak replies</label>
     <button class="ghost small" id="clearChat">Clear</button>
@@ -922,7 +949,7 @@ Views.assistant = () => `<div class="chat">
 function renderChatLog() {
   const log = $('#chatLog'); if (!log) return;
   const msgs = S.chat.length ? S.chat : [{ user: false, text: `Hey${D.info.user?.name ? ' ' + D.info.user.name.split(' ')[0] : ''}! Ask me anything — I can run your phone's BlackLab (tasks, calendar, notes, recorder, files, email) and, with the desktop companion, this computer too.`, source: '' }];
-  log.innerHTML = msgs.map((m) => `<div class="msg ${m.user ? 'user' : 'bot'}">${esc(m.text)}${!m.user && m.source ? `<span class="src">${esc(m.source)}</span>` : ''}${(m.links || []).filter((l) => l.url).length ? `<div class="links">${m.links.filter((l) => l.url).map((l) => `<a class="chip btn" href="${esc(l.url)}" target="_blank" rel="noopener">${esc(l.label)}</a>`).join('')}</div>` : ''}</div>`).join('');
+  log.innerHTML = msgs.map((m) => `<div class="msg ${m.user ? 'user' : 'bot'}${!m.user && (m.provider || providerOf(m.source)) ? ' p-' + (m.provider || providerOf(m.source)) : ''}">${esc(m.text)}${!m.user && m.source ? `<span class="src">${esc(m.source)}</span>` : ''}${(m.links || []).filter((l) => l.url).length ? `<div class="links">${m.links.filter((l) => l.url).map((l) => `<a class="chip btn" href="${esc(l.url)}" target="_blank" rel="noopener">${esc(l.label)}</a>`).join('')}</div>` : ''}</div>`).join('');
   log.scrollTop = log.scrollHeight;
 }
 Views.assistant.bind = () => {
@@ -935,6 +962,9 @@ Views.assistant.bind = () => {
   $$('[data-target]').forEach((c) => c.onclick = () => { S.ui.target = c.dataset.target; saveUi(); render(); });
   $$('[data-q]').forEach((c) => c.onclick = () => { if (c.dataset.q.endsWith(' ')) { input.value = c.dataset.q; input.focus(); } else ask(c.dataset.q); });
   $('#speakT').onchange = (e) => { S.ui.speak = e.target.checked; saveUi(); };
+  const ms = $('#modelSel');
+  if (ms) ms.onchange = () => { S.ui.model = ms.value; saveUi(); render(); };
+  if (Companion.ok && !S.models) Companion.req('/local/models').then((r) => { S.models = r; if (!S.ui.model && r.default) S.ui.model = r.default; if (S.view === 'assistant') render(); }).catch(() => { S.models = { models: [] }; });
   $('#clearChat').onclick = async () => { S.chat = []; LS.set('chat', []); if (S.mode === 'phone') await Phone.req('/api/assistant/clear', { body: {} }).catch(() => {}); renderChatLog(); };
   const mic = $('#micBtn');
   if (mic) mic.onclick = () => {
@@ -1074,6 +1104,27 @@ Views.settings.bind = () => {
 
 // ---------------- desktop tools (companion)
 // ---------------------------------------------------------------- Obsidian vault (the companion's second brain)
+// ---------------- projects (the Project Board in Obsidian, two-way)
+const LANE_CHIP = { active: 'accent', blocked: 'danger', planning: '', idea: '', done: 'ok' };
+Views.projects = () => {
+  if (!S.companion) return `<div class="view-inner"><h1>Projects</h1><div class="card" style="margin-top:16px"><p class="muted">Projects live in your Obsidian vault on this computer. Start the desktop companion, then reload.</p></div></div>`;
+  const p = S.projects;
+  if (!p) return `<div class="view-inner"><h1>Projects</h1><div class="card" style="margin-top:16px"><span class="muted">Loading…</span></div></div>`;
+  const c = p.counts || {};
+  const lanes = [['active', '🚀 Active'], ['blocked', '⛔ Blocked'], ['planning', '📐 Planning'], ['idea', '💡 Ideas'], ['done', '✅ Done']];
+  return `<div class="view-inner"><div class="hero"><div><h1>Projects</h1><div class="muted">From the Project Board in Obsidian — drag a card there (or change a note's <span class="mono">status:</span>) and it moves here.</div></div>
+    <button data-pact="board">Open the board in Obsidian</button></div>
+    <div class="grid g3">${lanes.slice(0, 3).map(([k, l]) => `<div class="tile"><span class="k">${l}</span><span class="v">${Number(c[k] || 0)}</span></div>`).join('')}</div>
+    <div class="grid g2" style="margin-top:16px">${lanes.map(([k, l]) => {
+      const items = (p.projects || []).filter((x) => x.status === k);
+      return `<div class="card"><h2>${l}<span class="spacer"></span><span class="chip">${items.length}</span></h2>${items.length ? `<ul class="list">${items.map((x) => `<li><span class="t">${esc(x.name)}</span>${x.release ? `<span class="chip">${esc(x.release)}</span>` : ''}${x.due ? `<span class="meta">due ${esc(x.due)}</span>` : ''}<span class="chip ${LANE_CHIP[k] || ''}">${esc(k)}</span></li>`).join('')}</ul>` : '<div class="empty">Nothing here.</div>'}</div>`;
+    }).join('')}</div></div>`;
+};
+Views.projects.bind = () => {
+  if (S.companion && !S.projects) Companion.req('/local/projects').then((r) => { S.projects = r; if (S.view === 'projects') render(); }).catch(() => { S.projects = { projects: [], counts: {} }; });
+  $$('[data-pact]').forEach((b) => b.onclick = () => Companion.req('/local/vault/show', { query: '🗂️ Project Board' }).catch(() => {}));
+};
+
 Views.vault = () => {
   const c = S.companion;
   if (!c) return `<div class="view-inner"><h1>Obsidian vault</h1><div class="card" style="margin-top:16px"><p class="muted">The vault lives on this computer and is run by the desktop companion. Start it, then reload.</p></div></div>`;

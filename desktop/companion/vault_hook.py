@@ -4,8 +4,11 @@
   vault_hook.py start   SessionStart: reminds the session to sign the AI Registry and log its work (vault MCP tools),
                         and puts "session started" on today's timeline.
   vault_hook.py end     SessionEnd: writes a session note in 70 AI/Agents/Claude Code/ — project, duration, files
-                        changed, commits made, tool counts — and a timeline line. Prompts and replies are never copied
-                        (they can hold anything, passwords included); only what changed on disk is recorded.
+                        changed, commits made, tool counts, what was asked (the first line of each request) and the
+                        session's last reply — and a timeline line. The note is tagged #ai/claude, so it glows orange on
+                        the graph with every other Claude conversation. Every request and the reply pass guards.vault_safe
+                        one by one: anything clinical or off the record is left out and keys, passwords and identifiers
+                        are scrubbed.
 
 Never fails the session: any error is swallowed and the hook exits 0.
 """
@@ -65,6 +68,7 @@ def end(data: dict):
     proj = project_name(cwd)
     sid = (data.get("session_id") or "session")[:8]
     files, tools = Counter(), Counter()
+    asked, last_reply = [], ""
     first = last = None
     tp = data.get("transcript_path")
     if tp and Path(tp).is_file():
@@ -79,6 +83,16 @@ def end(data: dict):
                     first = first or ts
                     last = ts
                 content = (e.get("message") or {}).get("content")
+                if e.get("type") == "user" and not e.get("isMeta"):
+                    t = content if isinstance(content, str) else " ".join(c.get("text", "") for c in content if isinstance(c, dict) and c.get("type") == "text") \
+                        if isinstance(content, list) else ""
+                    t = t.strip()
+                    if t and not t.startswith(("<", "Caveat:")):
+                        asked.append(t.splitlines()[0][:200])
+                if e.get("type") == "assistant" and isinstance(content, list):
+                    txt = " ".join(c.get("text", "") for c in content if isinstance(c, dict) and c.get("type") == "text").strip()
+                    if txt:
+                        last_reply = txt
                 if e.get("type") != "assistant" or not isinstance(content, list):
                     continue
                 for c in content:
@@ -114,10 +128,31 @@ def end(data: dict):
     if commits:
         lines += [f"## Commits ({len(commits)})", ""] + [f"- `{c.split(' ', 1)[0]}` {c.split(' ', 1)[1] if ' ' in c else ''}" for c in commits] + [""]
     lines += ["## Tools", "", ", ".join(f"{k} ×{v}" for k, v in tools.most_common(20)), ""]
+    safe_asked, safe_reply = _safe_lines(asked[:40]), _safe_lines([last_reply[:2000]]) if last_reply else []
+    if safe_asked:
+        lines += ["## What you asked", ""] + [f"- {a}" for a in safe_asked] + [""]
+    if safe_reply:
+        lines += ["## How it ended", ""] + ["> " + l if l.strip() else ">" for l in safe_reply[0].splitlines()] + [""]
+    lines += ["#ai/claude #ai/claude-code", ""]
     note = f"70 AI/Agents/Claude Code/{day} {proj} {sid}.md"
     companion("write", {"path": note, "content": "\n".join(lines), "mode": "append", "author": "Claude Code (hook)"})
     companion("log", {"kind": "agent", "title": f"Claude Code session · {proj}: {len(files)} files, {len(commits)} commits",
                       "source": "Claude Code", "links": [proj, Path(note).stem]})
+
+
+def _safe_lines(items: list[str]) -> list[str]:
+    """Each piece on its own through the vault's guard: a clinical line is dropped, not the whole note."""
+    try:
+        sys.path.insert(0, str(Path(__file__).resolve().parent))
+        import guards
+    except Exception:
+        return []
+    out = []
+    for t in items:
+        ok, clean = guards.vault_safe(t)
+        if ok and clean.strip():
+            out.append(clean.replace("[[", "(").replace("]]", ")"))
+    return out
 
 
 def main():

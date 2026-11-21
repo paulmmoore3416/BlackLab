@@ -649,6 +649,8 @@ def render(v) -> dict:
     root = v.root
     notes = []
     for p in root.rglob("*.md"):
+        if not p.is_file():  # a folder can be named like a note (e.g. saned.install.md)
+            continue
         parts = p.relative_to(root).parts
         if parts[0] in (".obsidian", ".git", NODES_DIR, "99 Archive") or p.name.startswith(".") or parts[:2] == ("90 System", "Templates"):
             continue

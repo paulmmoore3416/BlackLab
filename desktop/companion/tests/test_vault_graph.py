@@ -58,8 +58,8 @@ class GraphTest(unittest.TestCase):
             G.fetch_plugin("breadcrumbs", lambda url: b"tampered")
         r = G.apply(self.v, fetch=lambda url: b"tampered")
         self.assertIn("checksum", r["plugins_error"])
-        # only BlackLab's own Graph FX (bundled in the repo, no download) — no downloaded plugin that failed its checksum
-        self.assertEqual(["blacklab-graph-fx"], json.loads(self.v.path(".obsidian/community-plugins.json").read_text()), "nothing enabled that isn't installed")
+        # only BlackLab's own plugins (bundled in the repo, no download) — no downloaded plugin that failed its checksum
+        self.assertEqual(["blacklab-graph-fx", "blacklab-assistant"], json.loads(self.v.path(".obsidian/community-plugins.json").read_text()), "nothing enabled that isn't installed")
         self.assertTrue(self.v.path(".obsidian/plugins/blacklab-graph-fx/main.js").exists())
         self.assertFalse(self.v.path(".obsidian/plugins/breadcrumbs/main.js").exists())
         for pid, (repo, tag, files) in G.PLUGINS.items():
@@ -176,7 +176,7 @@ class GraphTest(unittest.TestCase):
         for pid, (repo, tag, files) in G.PLUGINS.items():
             for name in files:
                 real[f"https://github.com/{repo}/releases/download/{tag}/{name}"] = None
-        self.assertEqual(9, len(real))
+        self.assertEqual(12, len(real))
 
 
 if __name__ == "__main__":

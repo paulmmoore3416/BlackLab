@@ -79,6 +79,8 @@ def doc_text(rel: str, text: str) -> str:
 def notes(root) -> dict[str, float]:
     out = {}
     for p in root.rglob("*.md"):
+        if not p.is_file():  # a folder can be named like a note (e.g. saned.install.md)
+            continue
         rel = p.relative_to(root).as_posix()
         if rel.split("/", 1)[0] in SKIP_TOP:
             continue

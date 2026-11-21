@@ -61,6 +61,7 @@ class Vault:
         self.state_dir = Path(state_dir)
         self.name = self.root.name
         self.lock = threading.RLock()
+        self.queue_op = None  # set by the companion: queues a change for the phone (phone_ops.Ops.queue)
         self.dirty: set[str] = set()
         self.last_commit = 0.0
         self.last_sync: dict[str, float] = {}
@@ -260,6 +261,11 @@ class Vault:
         lines = [f"# {d.strftime('%A, %B')} {d.day}, {d.year}", ""]
         prev, nxt = d - dt.timedelta(days=1), d + dt.timedelta(days=1)
         lines.append(f"← [[{prev.isoformat()}]] · [[Home]] · [[{nxt.isoformat()}]] →")
+        try:
+            import vault_hubs
+            lines += vault_hubs.dashboard(self, d)
+        except Exception as e:  # the timeline matters more than the dashboard
+            self.errors = (self.errors + [f"dashboard: {e}"])[-20:]
         if agenda is None:
             agenda = self._state(f"agenda/{d.isoformat()}.json", None)
         else:
@@ -497,14 +503,21 @@ class Vault:
         return len(written)
 
     def _tasks(self, tasks: list, feed: dict) -> int:
+        import vault_sync
         base = FOLDERS["work"]
         written = set()
+        vault_sync.harvest_tasks(self, self.queue_op)  # your Obsidian edits first, so this render doesn't undo them
+        tasks = vault_sync.apply_overrides(self, tasks)
         asset_names = [self.safe_name(a.get("name")) for a in (feed.get("facility") or {}).get("assets", [])]
         by_list: dict[str, list] = {}
         for t in tasks:
             by_list.setdefault(f"{t.get('profile', '').title()} · {t.get('list') or 'Tasks'}", []).append(t)
-        lines = ["# ✅ Tasks", "", "_Mirrored from BlackLab. Check items off in the app — edits here are kept in your notes below, not sent back._", ""]
+        lines = ["# ✅ Tasks", "", "_Two-way with BlackLab: check a box here and it's done on your phone; type a new `- [ ] …` line under a list "
+                 "and it's added there (an hourglass shows until the phone has it). Or tag a line anywhere with #task._", ""]
+        adds = vault_sync.pending_adds(self) if self.queue_op else []
         open_n = 0
+        for a in adds:
+            by_list.setdefault(f"{a['profile'].title()} · {a['list']}", [])
         for lst, items in sorted(by_list.items()):
             lines += [f"## {lst}", ""]
             for t in sorted(items, key=lambda t: (t.get("completed", False), t.get("due") or "9999", -(t.get("priority") or 0))):
@@ -514,7 +527,8 @@ class Vault:
                 title = self._clean(t.get("title", ""))
                 links = [n for n in asset_names if n and n.lower() in title.lower()]
                 lines.append(f"- [{'x' if t.get('completed') else ' '}] {title}{pri}{due}" + "".join(f" [[{n}]]" for n in links)
-                             + (" #workorder" if t.get("workorder") else ""))
+                             + (" #workorder" if t.get("workorder") else "") + (f" ^t{t['id']}" if t.get("id") is not None else ""))
+            lines += [f"- [ ] {a['title']} ⏳" for a in adds if f"{a['profile'].title()} · {a['list']}" == lst]
             lines.append("")
         rel = f"{base}/Tasks.md"
         self.write_managed(rel, {"type": "tasks", "open": open_n, "total": len(tasks), "tags": ["work/tasks"]}, "\n".join(lines))
@@ -531,9 +545,13 @@ class Vault:
                     f"- **Due:** {t['due']}" if t.get("due") else "", f"- **Asset:** " + ", ".join(f"[[{n}]]" for n in links) if links else "",
                     "", self._clean(t.get("notes", ""))]
             self.write_managed(wrel, {"type": "work-order", "status": "done" if t.get("completed") else "open", "due": t.get("due") or "",
-                                      "tags": ["work/workorder", "facility"]}, "\n".join(l for l in body if l is not None))
+                                      "task_id": str(t.get("id", "")), "tags": ["work/workorder", "facility"]}, "\n".join(l for l in body if l is not None))
             written.add(wrel)
         self._collection("tasks", written)
+        vault_sync.remember_rendered(self, tasks)
+        import vault_hubs
+        vault_hubs.remember_tasks(self, tasks)
+        self.render_day(self.now().date())
         return len(written)
 
     def _events(self, events: list, feed: dict) -> int:
@@ -630,6 +648,14 @@ class Vault:
                 body += ["", self._clean(c["notes"])]
             self.write_managed(rel, {"type": "certification", "status": c.get("status", ""), "expires": c.get("expires") or "", "tags": ["learning/cert"]}, "\n".join(body))
             written.add(rel)
+        import vault_hubs
+        if l.get("decks") is not None:
+            vault_hubs.render_decks(self, l["decks"])
+            written |= {f"{vault_hubs.DECKS_DIR}/{self.safe_name(d.get('name'), 'Deck')}.md" for d in l["decks"]}
+        else:  # an older phone that doesn't send decks: keep the deck notes it can't see
+            written |= {r for r in self._state("collections.json", {}).get("learning", []) if r.startswith(vault_hubs.DECKS_DIR + "/")}
+        vault_hubs.render_study_hub(self, l)
+        written.add(vault_hubs.STUDY_REL)
         self._collection("learning", written)
         return len(written)
 
@@ -734,7 +760,10 @@ class Vault:
                     days.add(d)
                     lines.append(f"- `{h}` [[{d}]] {s.replace('[', '(').replace(']', ')')}")
             rel = f"{FOLDERS['projects']}/{name}.md"
-            if self.write_managed(rel, {"type": "project", "status": "active", "branch": branch, "release": tag, "repo": web, "tags": ["project"]}, "\n".join(lines)):
+            have = self.path(rel).read_text(encoding="utf-8", errors="replace") if self.path(rel).exists() else ""
+            m = re.search(r"(?m)^status:\s*[\"']?([^\"'\n]+)", self.split_frontmatter(have)[0] and "\n".join(self.split_frontmatter(have)[0]) or "")
+            status = m.group(1).strip() if m else "active"  # once it's on the Project Board, the status is Paul's
+            if self.write_managed(rel, {"type": "project", "status": status, "branch": branch, "release": tag, "repo": web, "tags": ["project"]}, "\n".join(lines)):
                 n += 1
             # New commits on today's timeline
             today = self.now().date().isoformat()
@@ -848,6 +877,8 @@ class Vault:
             return []
         hits = []
         for p in self.root.rglob("*.md"):
+            if not p.is_file():  # a folder can be named like a note (e.g. saned.install.md)
+                continue
             if ".obsidian" in p.parts or ".git" in p.parts or FOLDERS["archive"] in p.parts:
                 continue
             try:

@@ -90,9 +90,20 @@ def _rgb_int(hex_color: str) -> int:
     return int(hex_color.lstrip("#"), 16)
 
 
+# Claude and Gemini outrank every other group: wherever their notes live, they're orange and red (and Graph FX makes
+# them glow). The local AI finds them by the same keys: `ai_provider`, #ai/claude, #ai/gemini.
+AI_GLOW = {"claude": "#FF8C1A", "gemini": "#FF2D3D"}
+AI_GLOW_PATHS = {"claude": ["70 AI/Claude", "70 AI/Agents/Claude Code", "70 AI/Agents/Claude"], "gemini": ["70 AI/Gemini", "70 AI/Agents/Gemini"]}
+
+
+def ai_queries() -> dict[str, str]:
+    return {p: " OR ".join([f'path:"{f}"' for f in AI_GLOW_PATHS[p]] + [f'["ai_provider":{p}]', f"tag:#ai/{p}"]) for p in AI_GLOW}
+
+
 def graph_groups() -> list[dict]:
     """Obsidian colors a note by the first group it matches: most specific first."""
     groups = [{"query": f'file:"{VN.NEXUS}"', "color": {"a": 1, "rgb": 0xFFFFFF}}]
+    groups += [{"query": q, "color": {"a": 1, "rgb": _rgb_int(AI_GLOW[p])}} for p, q in ai_queries().items()]
     sc = subnode_colors()
     for s in _subnodes():
         if s["id"] in sc:
@@ -181,6 +192,7 @@ def css() -> str:
             c, rgb = f"var(--bl-{nid})", f"var(--bl-{nid}-rgb)"
             out.append(f'a.tag[href="#{tag}"], a.tag[href^="#{tag}/"], .cm-hashtag.cm-tag-{tag} {{ color: {c}; background-color: rgba({rgb}, .14); border-color: rgba({rgb}, .4); }}')
     out.append('a.tag[href="#untrusted"] { color: #FF5252; background-color: rgba(255, 82, 82, .14); }')
+    out += ai_css()
     # callouts: > [!facility] …
     for n in ns:
         out.append(f'.callout[data-callout="{n["id"]}"] {{ --callout-color: var(--bl-{n["id"]}-rgb); --callout-icon: lucide-hexagon; }}')
@@ -189,11 +201,36 @@ def css() -> str:
     return "\n".join(out) + "\n"
 
 
+def ai_css() -> list[str]:
+    """Claude glows orange, Gemini glows red: note titles, headings, explorer entries and tag pills."""
+    out = [":root { " + " ".join(f"--bl-ai-{p}: {c}; --bl-ai-{p}-rgb: {rgb_triplet(c)};" for p, c in AI_GLOW.items()) + " }",
+           "@keyframes bl-ai-breathe { 0%, 100% { filter: drop-shadow(0 0 2px rgba(var(--bl-glow-rgb), .55)); } "
+           "50% { filter: drop-shadow(0 0 9px rgba(var(--bl-glow-rgb), .95)); } }"]
+    for p in AI_GLOW:
+        k, c, rgb = f".bl-ai-{p}", f"var(--bl-ai-{p})", f"var(--bl-ai-{p}-rgb)"
+        out += [f"{k} {{ --bl-c: {c}; --bl-rgb: {rgb}; --bl-glow-rgb: {rgb}; --link-color: {c}; --checkbox-color: {c}; --blockquote-border-color: {c}; --hr-color: rgba({rgb}, .4); }}",
+                f"{k} .inline-title, {k} .markdown-rendered h1, {k} .cm-header-1 {{ color: {c}; text-shadow: 0 0 10px rgba({rgb}, .85), 0 0 22px rgba({rgb}, .45); }}",
+                f"{k} .markdown-rendered h2, {k} .cm-header-2 {{ color: {c}; text-shadow: 0 0 8px rgba({rgb}, .55); }}",
+                f"{k} .markdown-rendered blockquote {{ border-left-color: {c}; box-shadow: -6px 0 14px -8px rgba({rgb}, .9); }}",
+                f"{k} .view-header-title {{ color: {c}; text-shadow: 0 0 8px rgba({rgb}, .8); }}"]
+        for f in AI_GLOW_PATHS[p]:
+            q = f.replace('"', '\\"')
+            out += [f'.nav-folder-title[data-path="{q}"], .nav-folder-title[data-path^="{q}/"], .nav-file-title[data-path^="{q}/"] '
+                    f'{{ color: {c} !important; text-shadow: 0 0 6px rgba({rgb}, .75); }}',
+                    f'.nav-folder-title[data-path="{q}"] .nav-folder-title-content::before {{ content: "●"; color: {c}; margin-right: .4em; '
+                    f'--bl-glow-rgb: {rgb}; animation: bl-ai-breathe 2.6s ease-in-out infinite; display: inline-block; }}']
+        out.append(f'a.tag[href="#ai/{p}"], a.tag[href^="#ai/{p}/"], .cm-hashtag.cm-tag-ai{p} {{ color: {c} !important; background-color: rgba({rgb}, .16) !important; '
+                   f'border: 1px solid rgba({rgb}, .6); box-shadow: 0 0 8px rgba({rgb}, .55); }}')
+        out.append(f'.callout[data-callout="{p}"] {{ --callout-color: {rgb}; --callout-icon: lucide-sparkles; box-shadow: 0 0 14px -4px rgba({rgb}, .8); }}')
+    out.append("@media (prefers-reduced-motion: reduce) { .nav-folder-title-content::before { animation: none !important; } }")
+    return out
+
+
 def extended_graph_settings() -> dict:
     """Folder hulls for top-level folders (node colors) and tag arcs."""
     folder_colors = [{"type": f, "color": n["color"]} for n in nodes() for f in n["folders"] if "/" not in f]
     folder_colors += [{"type": f, "color": c} for f, c in EXTRA_FOLDERS]
-    tag_colors = []
+    tag_colors = [{"type": f"ai/{p}", "color": c} for p, c in AI_GLOW.items()]
     for tag, nid in TAG_NODES.items():
         col = next((n["color"] for n in nodes() if n["id"] == nid), None)
         if col:
@@ -249,29 +286,40 @@ def apply(v) -> dict:
 
 
 FX_ID = "blacklab-graph-fx"
-FX_SRC = Path(__file__).resolve().parent.parent / "obsidian" / FX_ID
+OWN_PLUGINS = ("blacklab-graph-fx", "blacklab-assistant")  # BlackLab's own plugins (desktop/obsidian/<id> in the repo)
+PLUGINS_SRC = Path(__file__).resolve().parent.parent / "obsidian"
+FX_SRC = PLUGINS_SRC / FX_ID
 
 
 def install_graph_fx(v) -> str:
-    """BlackLab's own graph animations (desktop/obsidian/blacklab-graph-fx): copied when they change, enabled once."""
-    if not FX_SRC.is_dir():
-        return "missing"
-    d = v.path(f".obsidian/plugins/{FX_ID}")
-    d.mkdir(parents=True, exist_ok=True)
-    changed = False
-    for name in ("manifest.json", "main.js", "styles.css"):
-        src = (FX_SRC / name).read_bytes()
-        dst = d / name
-        if not dst.exists() or dst.read_bytes() != src:
-            dst.write_bytes(src)
-            changed = True
+    """BlackLab's own plugins (Graph FX, the Assistant): copied when they change, each enabled once.
+    Returns one word per plugin, e.g. "blacklab-graph-fx current, blacklab-assistant updated"."""
     cp = v.path(".obsidian/community-plugins.json")
     try:
         enabled = json.loads(cp.read_text()) if cp.exists() else []
     except ValueError:
         enabled = []
     st = v._state("graph_fx.json", {})
-    if FX_ID not in enabled and not st.get("enabled_once"):  # enable once; if Paul turns it off, it stays off
-        v._write(".obsidian/community-plugins.json", json.dumps(enabled + [FX_ID], indent=2) + "\n")
-        v._save_state("graph_fx.json", {"enabled_once": True})
-    return "updated" if changed else "current"
+    report = []
+    for pid in OWN_PLUGINS:
+        src_dir = PLUGINS_SRC / pid
+        if not src_dir.is_dir():
+            report.append(f"{pid} missing")
+            continue
+        d = v.path(f".obsidian/plugins/{pid}")
+        d.mkdir(parents=True, exist_ok=True)
+        changed = False
+        for name in ("manifest.json", "main.js", "styles.css"):
+            src = (src_dir / name).read_bytes()
+            dst = d / name
+            if not dst.exists() or dst.read_bytes() != src:
+                dst.write_bytes(src)
+                changed = True
+        key = "enabled_once" if pid == FX_ID else f"enabled_once:{pid}"
+        if pid not in enabled and not st.get(key):  # enable once; if Paul turns it off, it stays off
+            enabled.append(pid)
+            v._write(".obsidian/community-plugins.json", json.dumps(enabled, indent=2) + "\n")
+            st[key] = True
+            v._save_state("graph_fx.json", st)
+        report.append(f"{pid} {'updated' if changed else 'current'}")
+    return ", ".join(report)

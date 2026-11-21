@@ -22,6 +22,7 @@ import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
@@ -118,6 +119,9 @@ fun AssistantScreen(startListening: Boolean = false) {
     var nameplateNote by remember { mutableStateOf<File?>(null) }
     val listState = rememberLazyListState()
     val online = remember(messages.size) { ctx.isOnline() }
+    val models by com.blacklab.app.assistant.Models.entries.collectAsStateWithLifecycle()
+    val desk by com.blacklab.app.assistant.DesktopAi.status.collectAsStateWithLifecycle()
+    LaunchedEffect(desk.state) { com.blacklab.app.assistant.Models.refresh(app) }
 
     fun send(text: String) {
         if (text.isBlank()) return
@@ -213,7 +217,7 @@ fun AssistantScreen(startListening: Boolean = false) {
     Scaffold(
         topBar = {
             BlTopBar(s.asstName, subtitle = listOf(
-                if (Nano.ready) Nano.engineShort else "Rules engine",
+                if (s.asstModel != com.blacklab.app.assistant.Models.AUTO) com.blacklab.app.assistant.Models.label(s.asstModel) else if (Nano.ready) Nano.engineShort else "Rules engine",
                 if (online && !s.asstOfflineOnly) "online" else "offline",
                 if (speaking) "speaking…" else null,
             ).filterNotNull().joinToString(" · "), onBack = { shell.back() }) {
@@ -235,6 +239,7 @@ fun AssistantScreen(startListening: Boolean = false) {
         },
     ) { pad ->
         Column(Modifier.padding(pad).fillMaxSize().imePadding()) {
+            ModelBar(s.asstModel, models) { id -> app.settings.update { putString(com.blacklab.app.core.Keys.ASST_MODEL, id) } }
             if (nano == Nano.Status.DOWNLOADABLE || nano == Nano.Status.DOWNLOADING) {
                 Surface(color = MaterialTheme.colorScheme.primary.copy(alpha = 0.10f), modifier = Modifier.fillMaxWidth()) {
                     Row(Modifier.padding(horizontal = 16.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -336,6 +341,66 @@ private fun Welcome(name: String, user: String) {
     }
 }
 
+/** Claude glows orange, Gemini glows red — in the menu, the replies and the vault. */
+val ClaudeOrange = androidx.compose.ui.graphics.Color(0xFFFF8C1A)
+val GeminiRed = androidx.compose.ui.graphics.Color(0xFFFF2D3D)
+
+private fun providerColor(source: String): androidx.compose.ui.graphics.Color? = when {
+    source.contains("Claude", ignoreCase = true) -> ClaudeOrange
+    source.contains("Gemini", ignoreCase = true) -> GeminiRed
+    else -> null
+}
+
+private fun groupColor(p: com.blacklab.app.assistant.Models.Provider): androidx.compose.ui.graphics.Color? = when (p) {
+    com.blacklab.app.assistant.Models.Provider.CLAUDE -> ClaudeOrange
+    com.blacklab.app.assistant.Models.Provider.GEMINI, com.blacklab.app.assistant.Models.Provider.NANO -> GeminiRed
+    else -> null
+}
+
+/** The model menu: ★ Claude and ★ Gemini first, each in its color; what can't answer right now says why. */
+@Composable
+private fun ModelBar(current: String, models: List<com.blacklab.app.assistant.Models.Entry>, onPick: (String) -> Unit) {
+    var open by remember { mutableStateOf(false) }
+    val M = com.blacklab.app.assistant.Models
+    val cur = models.firstOrNull { it.id == current }
+    val tint = groupColor(M.providerOf(current)) ?: MaterialTheme.colorScheme.primary
+    Box(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp)) {
+        Surface(onClick = { open = true }, shape = RoundedCornerShape(14.dp), color = tint.copy(alpha = 0.12f),
+            border = androidx.compose.foundation.BorderStroke(1.dp, tint.copy(alpha = 0.7f))) {
+            Row(Modifier.padding(horizontal = 12.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                Box(Modifier.size(10.dp).clip(CircleShape).background(tint))
+                Spacer(Modifier.width(8.dp))
+                Column(Modifier.weight(1f)) {
+                    Text(cur?.label ?: M.label(current), fontWeight = FontWeight.SemiBold, color = groupColor(M.providerOf(current)) ?: MaterialTheme.colorScheme.onSurface)
+                    Text(if (current == M.AUTO) "BlackLab picks the model" else cur?.let { if (it.available) it.note else "unavailable — ${it.note}" } ?: "",
+                        style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1,
+                        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+                }
+                Icon(Icons.Rounded.ExpandMore, "Choose a model")
+            }
+        }
+        DropdownMenu(open, { open = false }) {
+            models.groupBy { it.provider }.forEach { (p, items) ->
+                Text(p.group, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold,
+                    color = groupColor(p) ?: MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp))
+                items.forEach { e ->
+                    DropdownMenuItem(
+                        text = {
+                            Column {
+                                Text(e.label, color = if (!e.available) MaterialTheme.colorScheme.onSurfaceVariant else groupColor(e.provider) ?: MaterialTheme.colorScheme.onSurface,
+                                    fontWeight = if (e.id == current) FontWeight.Bold else null)
+                                if (e.note.isNotBlank()) Text(e.note, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                        },
+                        leadingIcon = { if (e.id == current) Icon(Icons.Rounded.Check, null, tint = groupColor(e.provider) ?: MaterialTheme.colorScheme.primary) else Spacer(Modifier.size(24.dp)) },
+                        onClick = { open = false; onPick(e.id) },
+                    )
+                }
+            }
+        }
+    }
+}
+
 @Composable
 private fun Bubble(m: Msg, onLink: (com.blacklab.app.assistant.Link) -> Unit) {
     Column(Modifier.fillMaxWidth(), horizontalAlignment = if (m.user) Alignment.End else Alignment.Start) {
@@ -346,7 +411,8 @@ private fun Bubble(m: Msg, onLink: (com.blacklab.app.assistant.Link) -> Unit) {
         ) {
             Column(Modifier.padding(horizontal = 14.dp, vertical = 10.dp)) {
                 Text(m.text, style = MaterialTheme.typography.bodyMedium)
-                if (!m.user && m.source.isNotBlank()) Text(m.source, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 4.dp))
+                if (!m.user && m.source.isNotBlank()) Text(m.source, style = MaterialTheme.typography.labelSmall, color = providerColor(m.source) ?: MaterialTheme.colorScheme.onSurfaceVariant,
+                    fontWeight = if (providerColor(m.source) != null) FontWeight.SemiBold else null, modifier = Modifier.padding(top = 4.dp))
                 if (m.user && m.source != "phone" && m.source.isNotBlank()) Text("from ${m.source}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
