@@ -54,7 +54,7 @@ import ai_models  # noqa: E402  (Claude via the subscription CLI, Gemini, local 
 import vault_ai  # noqa: E402  (every Claude/Gemini conversation in the vault, glowing on the graph)
 import phone_ops  # noqa: E402  (Obsidian edits the phone carries out: tasks, commands, flashcards)
 
-VERSION = "1.11.0"
+VERSION = "1.12.0"
 HOST, PORT = "127.0.0.1", int(os.environ.get("BLACKLAB_DESKTOP_PORT", "8770"))
 HOME = Path.home()
 WEB_DIR = Path(__file__).resolve().parent.parent / "web"
@@ -1741,6 +1741,12 @@ class Handler(SimpleHTTPRequestHandler):
                 return
             import vault_boards
             return self.reply(200, vault_boards.summary(VAULT) if VAULT_ON else {"projects": []})
+        if route == "/local/dashboard/live":  # the Home Lab page's live block, refreshed by the Obsidian plugin while it's open
+            if not self.guard():
+                return
+            import vault_web
+            return self.reply(200, {"html": vault_web.homelab_live(vault_web.collect_system()), "at": time.time(),
+                                    "running": DASH_RUN["running"], "message": DASH_RUN["message"]})
         if route in ("/local/jobs", "/local/equipment"):
             if not self.guard():
                 return
@@ -1851,6 +1857,8 @@ class Handler(SimpleHTTPRequestHandler):
         try:
             if self.path == "/local/assistant":
                 return self.reply(200, assistant(body))
+            if self.path == "/local/dashboard":
+                return self.reply(200, dashboard_action(str(body.get("action", ""))))
             if self.path == "/local/adb/forward":
                 ok, msg = adb_forward(int(body.get("port", 8765)))
                 return self.reply(200 if ok else 409, {"ok": ok, "message": msg, "error": None if ok else msg})
@@ -2100,6 +2108,52 @@ def trigger_ask(model_id: str, prompt: str, rel: str) -> tuple[str, str]:
     return r["text"], label
 
 
+def dashboards_pass(pages=None) -> dict:
+    """The website-style dashboards in 05 Dashboards (vault_web.py). Each file is written only when it changes."""
+    import vault_web
+    with VAULT.lock:
+        r = vault_web.apply(VAULT, pages=tuple(pages or vault_web.PAGES))
+    for k, val in r.items():
+        if isinstance(val, str) and val.startswith("error"):
+            VAULT.errors = (VAULT.errors + [f"dashboard {k}: {val}"])[-20:]
+    return r
+
+
+DASH_RUN = {"running": "", "last": None, "message": ""}
+
+
+def dashboard_action(action: str) -> dict:
+    """A button on a dashboard page (Obsidian on this computer → the BlackLab Assistant plugin → POST /local/dashboard)."""
+    import vault_web
+    if action not in vault_web.ACTIONS:
+        return {"ok": False, "error": f"unknown action {action!r}"}
+    if DASH_RUN["running"]:
+        return {"ok": False, "error": f"still working on {DASH_RUN['running']}"}
+    LEDGER.record("Obsidian", f"dashboard:{action}", source="dashboard")
+
+    def work():
+        DASH_RUN["running"] = action
+        try:
+            if action == "refresh":
+                dashboards_pass()
+            elif action == "vault_pass":
+                vault_pass(force=True)
+            elif action == "atlas":
+                atlas_pass(force=True)
+            elif action == "health_scan":
+                script = Path(__file__).resolve().parent.parent / "autopilot" / "blacklab_health.py"
+                subprocess.run([sys.executable, str(script), "--manual"], capture_output=True, text=True, timeout=600)
+                dashboards_pass()
+            DASH_RUN["message"] = f"{action} done"
+        except Exception as e:
+            DASH_RUN["message"] = f"{action} failed: {e}"[:300]
+        finally:
+            DASH_RUN.update(running="", last=time.time())
+    threading.Thread(target=work, daemon=True, name=f"dash-{action}").start()
+    return {"ok": True, "message": {"refresh": "Refreshing the dashboards…", "vault_pass": "Full vault pass started…",
+                                    "atlas": "Rebuilding the Atlas (a few minutes)…", "health_scan": "Running the system check (about a minute)…"}[action]}
+
+
 def sync_keeper():
     """Every minute: your Obsidian edits reach the phone (tasks, work orders, trigger tags, flashcards, the project board)."""
     import vault_boards
@@ -2118,6 +2172,8 @@ def sync_keeper():
             if busy:
                 LEDGER.record("Obsidian", "vault:sync", source="sync", metadata={k: rep[k] for k in ("tasks",)} | {"triggers": {k: rep["triggers"][k] for k in ("commands", "asks", "cards")}})
                 v.commit("Obsidian → BlackLab sync", min_gap=120)
+            if CONFIG.get("dashboards", True) is not False:
+                rep["dashboards"] = dashboards_pass(pages=("today",))
             SYNC_RUN.update(last=time.time(), report=rep, error="")
         except Exception as e:  # noqa: BLE001 — never let this thread die
             SYNC_RUN.update(last=time.time(), error=str(e)[:300])
@@ -2172,7 +2228,8 @@ def vault_pass(force=False):
                           ("facility", lambda: __import__("facility_ops").render_all(v)),
                           ("skills", lambda: __import__("agent_skills").render(v)),
                           ("credentials", lambda: __import__("vault_credentials").render(v)),
-                          ("ledger", lambda: audit.render(v, LEDGER))):
+                          ("ledger", lambda: audit.render(v, LEDGER)),
+                          ("dashboards", lambda: dashboards_pass() if CONFIG.get("dashboards", True) is not False else None)):
             try:
                 fn()
             except Exception as e:

@@ -25,3 +25,6 @@
 .bl-asst-form { display: grid; grid-template-columns: 1fr auto; gap: 6px; align-items: end; }
 .bl-asst-input { grid-column: 1 / -1; width: 100%; resize: vertical; min-height: 3.2em; }
 .bl-asst-with { font-size: var(--font-ui-smaller); color: var(--text-muted); }
+/* the 05 Dashboards widgets (filled in by this plugin; the page styles live in the blacklab-web CSS snippet) */
+.bl-web .blw-form textarea, .bl-web .blw-form input { background: var(--background-primary); border: 1px solid var(--background-modifier-border); padding: 8px 10px; }
+.bl-web .blw-answer p:first-child { margin-top: 0; } .bl-web .blw-answer p:last-child { margin-bottom: 0; }
