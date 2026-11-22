@@ -20,6 +20,9 @@ import kotlinx.coroutines.launch
 object LinkWatch {
     fun stores(): List<JsonStore<*>> = listOf(Facility.store)
 
+    /** JsonStores that stay on the phone on purpose: never watched, never part of the desktop snapshot. */
+    val LOCAL_ONLY = setOf("Terminal hosts")  // SSH hosts and quick commands (5.18) — device-local, like known_hosts
+
     /**
      * Calls [onChange] when any of [sources] changes; each source's current value is skipped. Bursts are throttled to one call per [minGapMs], and the last change of a burst always gets a call.
      */

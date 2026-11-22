@@ -473,6 +473,7 @@ const NAV = [
   { id: 'health', label: 'Health', ico: '♡' },
   { id: 'appearance', label: 'Appearance', ico: '◐' },
   { id: 'settings', label: 'Settings', ico: '⚙' },
+  { id: 'terminal', label: 'Terminal', ico: '›_' },
   { id: 'desktop', label: 'Desktop tools', ico: '⌂' },
   { id: 'connect', label: 'Connect', ico: '⇄' },
 ];
@@ -1536,6 +1537,7 @@ function render(soft) {
   const v = Views[S.view] || Views.dashboard;
   $('#crumb').textContent = NAV.find((n) => n.id === S.view)?.label || 'Dashboard';
   if (soft && S.view === 'assistant') { renderChatLog(); return; }
+  if (soft && S.view === 'terminal' && document.getElementById('termBox')) return; // never wipe a live terminal on a refresh
   if (soft && document.activeElement && $('#view').contains(document.activeElement) && /INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName) && S.view !== 'settings') return;
   $('#view').innerHTML = v();
   v.bind?.();

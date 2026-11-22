@@ -58,6 +58,19 @@ PLUGINS = {
         "main.js": "8555d9a54de0d5534007047ac1e58dee746f394f9e23fe5740ca5857852477f3",
         "manifest.json": "055795794773ccc952688cb01b24bf9c329ccf23731c2ff8ec9835533e0cb38b",
         "styles.css": "f302a82f135abe50bcbb56523cbe97ab405290a43585821b8e52df4ede4f4417"}),
+    # companion 1.12 — the website-style dashboards (vault_web.py)
+    "dataview": ("blacksmithgu/obsidian-dataview", "0.5.70", {  # live tables/lists from note properties in your own sections
+        "main.js": "6bb1cf7010afad830e73575fca0e2bfbd3279c562e3d9d24f2d2f45161eb7d00",
+        "manifest.json": "9235db47112da81b85591c79ecb9ae2574e5e72207056e976472f90616286185",
+        "styles.css": "3306dd9032e00f989ba7233a37fd255bc4d3f4340cee661762e952f3f6aa1de9"}),
+    "obsidian-meta-bind-plugin": ("mProjectsCode/obsidian-meta-bind-plugin", "1.5.1", {  # buttons, toggles, sliders, inputs in notes
+        "main.js": "d328bfaa4d1f48259074b28f249a9f911ea34327e7e1123d8a1f2afc3e9784b3",
+        "manifest.json": "3c1dff1e36a17811851f3c7446b875cf901288b73261caea61bc0d440d3c4325",
+        "styles.css": "97069e183224c55428fe0b983d42435aa2cd4ac14d0f50186138b4751ad55d61"}),
+    "homepage": ("mirnovov/obsidian-homepage", "4.6.0", {  # opens 05 Dashboards/☀️ Today when Obsidian starts
+        "main.js": "9c6c5eb0914a1d507ae391ddb9ef05eeffcd56b730ed6679a7755c72fcaba2f6",
+        "manifest.json": "519783c5a913d4e3591b1cc9896d84bc8d5e4a210cf032d92fabe0ceaf6d731c",
+        "styles.css": "bf346def46e6626446c54983f7e6ce4775b84b01159cd046301e9be5c3407589"}),
 }
 
 LINK_COLORS = {"up": "#8A93A6", "synapses": "#FFB020", "related": "#2BD9A8", "same": "#AB7CFF", "next": "#64B5F6", "prev": "#64B5F6"}
@@ -104,6 +117,16 @@ PLUGIN_SETTINGS = {
     "obsidian-kanban": {"new-note-folder": "02 Projects", "new-note-template": "90 System/Templates/Project.md", "lane-width": 300,
                         "show-checkboxes": False, "date-trigger": "@", "hide-tags-in-title": True, "show-relative-date": True},
     "obsidian-advanced-uri": {"openFileOnWrite": True, "openDailyInNewPane": False, "openFileOnWriteInNewPane": False, "allowEval": False},
+    # JavaScript from notes stays OFF: AIs, the phone and agents all write notes, and DataviewJS / Meta Bind JS would run
+    # that text as code on this computer. Plain Dataview queries (DQL) and Meta Bind fields/buttons need no JS.
+    "dataview": {"enableDataviewJs": False, "enableInlineDataviewJs": False, "renderNullAs": "—", "taskCompletionTracking": True,
+                 "refreshEnabled": True, "refreshInterval": 2500, "warnOnEmptyResult": False, "showResultCount": True},
+    "obsidian-meta-bind-plugin": {"enableJs": False, "devMode": False, "ignoreCodeBlockRestrictions": False, "enableSyntaxHighlighting": True,
+                                  "enableEditorRightClickMenu": True},
+    "homepage": {"version": 5, "separateMobile": False, "homepages": {"Main Homepage": {
+        "value": "05 Dashboards/☀️ Today", "kind": "File", "openOnStartup": True, "openMode": "Keep open notes", "manualOpenMode": "Keep open notes",
+        "view": "Reading view", "revertView": True, "openWhenEmpty": True, "openOnNewTab": False, "refreshDataview": False, "autoCreate": False,
+        "autoScroll": False, "pin": False, "commands": [], "alwaysApply": False, "hideReleaseNotes": False}}},
 }
 
 

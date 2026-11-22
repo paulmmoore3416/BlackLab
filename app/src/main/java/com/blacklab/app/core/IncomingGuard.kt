@@ -20,6 +20,7 @@ object IncomingGuard {
         val r = route.trim()
         if (r.isEmpty() || r.length > 200) return false
         if (r.contains("path=", ignoreCase = true) || r.contains("://") || r.contains("..")) return false
+        if (r.startsWith("ssh/")) return false  // other apps may open the Terminal list, never a connection (5.18)
         return r.all { it.isLetterOrDigit() || it in "/?=&_-.,%" }
     }
 

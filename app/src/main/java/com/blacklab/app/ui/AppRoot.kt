@@ -140,6 +140,7 @@ private fun navIcons(route: String): Pair<ImageVector, ImageVector> = when (rout
     "bh" -> Icons.Rounded.Diversity3 to Icons.Rounded.Diversity3
     "timeline" -> Icons.Rounded.Timeline to Icons.Rounded.Timeline
     "signatures" -> Icons.Rounded.Draw to Icons.Rounded.Draw
+    "ssh" -> Icons.Rounded.Terminal to Icons.Rounded.Terminal
     "library" -> Icons.Outlined.FolderOpen to Icons.Rounded.Folder
     "create" -> Icons.Rounded.AddCircle to Icons.Rounded.AddCircle
     "brainstorm" -> Icons.Rounded.Lightbulb to Icons.Rounded.Lightbulb
@@ -385,6 +386,8 @@ private fun NavGraph(nav: androidx.navigation.NavHostController) {
             com.blacklab.app.ui.viewer.FileViewerScreen(Uri.decode(it.arguments?.getString("path") ?: ""), it.arguments?.getBoolean("text") ?: false, it.arguments?.getBoolean("sign") ?: false)
         }
         screen("signatures") { com.blacklab.app.ui.signature.SignaturesScreen() }
+        screen("ssh") { com.blacklab.app.ui.ssh.SshHostsScreen() }
+        screen("ssh/{id}") { com.blacklab.app.ui.ssh.SshTerminalScreen(Uri.decode(it.arguments?.getString("id") ?: "")) }
         screen("player?path={path}", arguments = listOf(navArgument("path") { defaultValue = "" })) {
             com.blacklab.app.ui.music.PlayFileScreen(Uri.decode(it.arguments?.getString("path") ?: ""))
         }

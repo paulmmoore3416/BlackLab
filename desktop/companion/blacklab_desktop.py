@@ -25,6 +25,7 @@ import contextlib
 import csv
 import datetime as dt
 import functools
+import getpass
 import hashlib
 import html as htmllib
 import hmac
@@ -54,7 +55,7 @@ import ai_models  # noqa: E402  (Claude via the subscription CLI, Gemini, local 
 import vault_ai  # noqa: E402  (every Claude/Gemini conversation in the vault, glowing on the graph)
 import phone_ops  # noqa: E402  (Obsidian edits the phone carries out: tasks, commands, flashcards)
 
-VERSION = "1.11.0"
+VERSION = "1.14.0"
 HOST, PORT = "127.0.0.1", int(os.environ.get("BLACKLAB_DESKTOP_PORT", "8770"))
 HOME = Path.home()
 WEB_DIR = Path(__file__).resolve().parent.parent / "web"
@@ -798,7 +799,63 @@ def answer_from_docs(question: str) -> tuple[str, str]:
 # ---------------------------------------------------------------- desktop tools
 
 @logged_tool("system_status")
+def monitor_snapshot() -> dict:
+    """monitor.snapshot with everything the companion knows (no AI involved — works when Ollama is down)."""
+    import monitor
+    import vault_recall
+    import vault_web
+    rc = {}
+    try:
+        rc = vault_recall.status(VAULT, CONFIG) if VAULT_ON else {}
+    except Exception:
+        pass
+    lib = {}  # library.status() can re-read the Kiwix catalog; the report doesn't need it
+    return monitor.snapshot(vault_web.collect_system(), load_json(vault_web.HEALTH_LATEST, {}), chat_model=str(CONFIG.get("model") or ""),
+                            recall=rc, vault={"errors": list(VAULT.errors)} if VAULT_ON else {}, phone_last_seen=PHONE["last_seen"], library=lib,
+                            syncthing=monitor.syncthing_status())
+
+
+def status_report() -> str:
+    import monitor
+    return monitor.report(monitor_snapshot())
+
+
+MONITOR = {"last": None, "error": ""}
+
+
+def monitor_keeper():
+    """Every 5 minutes while Paul is away (or home): new problems and recoveries become one phone notification each
+    check — never a repeat. Bad problems alert at once; warnings only when they last two checks."""
+    import monitor
+    time.sleep(90)  # let the stack settle after a restart
+    while True:
+        try:
+            snap = monitor_snapshot()
+            probs = monitor.problems(snap)
+            st = load_json(CACHE_DIR / "monitor.json", {})
+            new, cleared = monitor.changes(st, probs)
+            CACHE_DIR.mkdir(parents=True, exist_ok=True)
+            (CACHE_DIR / "monitor.json").write_text(json.dumps(st))
+            MONITOR.update(last=time.time(), error="", open=len(st.get("open", {})))
+            if CONFIG.get("monitor_alerts", True) is not False and (new or cleared):
+                bad = any(p["severity"] == "bad" for p in new)
+                title = ("🔴 " if bad else "🟡 " if new else "🟢 ") + ("Computer needs attention" if new else "Computer recovered")
+                text = "\n".join([("🔴 " if p["severity"] == "bad" else "🟡 ") + p["text"] for p in new] + [f"✅ cleared: {k}" for k in cleared])
+                agents.notice(title, text + "\n\nAsk “on my computer, status report” for the full picture.", origin="BlackLab Desktop (monitor)")
+                LEDGER.record("This computer", "monitor:alert", source="monitor", metadata={"new": [p["key"] for p in new], "cleared": cleared})
+        except Exception as e:  # noqa: BLE001 — never let this thread die
+            MONITOR.update(last=time.time(), error=str(e)[:200])
+        time.sleep(int(CONFIG.get("monitor_seconds", 300)))
+
+
 def tool_system_status(_=None):
+    try:
+        return status_report()
+    except Exception:
+        return tool_system_status_basic()
+
+
+def tool_system_status_basic(_=None):
     du = shutil.disk_usage(HOME)
     mem = {}
     try:
@@ -1038,6 +1095,20 @@ def tool_nightjar_camera(args):
 
 
 @logged_tool("qdrant_search")
+@logged_tool("knowledge_search")
+def tool_knowledge_search(args):
+    """kb-core over the vault and the reference library; the passages, each with where it came from."""
+    import vault_recall
+    q = (args.get("query") if isinstance(args, dict) else str(args or "")).strip()
+    if not q:
+        return "No query given."
+    r = vault_recall.ask(VAULT, q, 6, local=True, config=CONFIG, reference=True)
+    hits = r.get("results") or []
+    if not hits:
+        return "Nothing in the notes or the reference library matches that."
+    return "\n\n".join(("📘 " + h["title"] if h.get("kind") == "reference" else f"📝 [[{h['title']}]]") + f"\n{h['text'][:900]}" for h in hits)
+
+
 def tool_qdrant_search(args):
     query = args.get("query") if isinstance(args, dict) else str(args or "")
     if not query.strip():
@@ -1230,6 +1301,9 @@ def private_drive():
 def desktop_rules(text: str, phone):
     t = text.strip()
     low = t.lower()
+    import monitor
+    if re.match(monitor.STATUS_WORDS, low.strip(" .!")):  # "status report", "is everything ok at home?" — no AI needed
+        return status_report(), "Desktop · status"
     import drive_private
     parsed = drive_private.parse(t)
     if parsed:
@@ -1344,7 +1418,7 @@ def desktop_rules(text: str, phone):
 TOOLS = [
     {"type": "function", "function": {"name": "phone_command", "description": "Run a command in the BlackLab phone app: tasks, reminders, calendar, notes, journal, recorder, dictation, files search, email, Drive, briefing, education.",
                                       "parameters": {"type": "object", "properties": {"command": {"type": "string", "description": "Plain-English command, e.g. 'add task call vendor tomorrow 9am'"}}, "required": ["command"]}}},
-    {"type": "function", "function": {"name": "system_status", "description": "Disk, memory, load, battery and phone connection of this computer.", "parameters": {"type": "object", "properties": {}}}},
+    {"type": "function", "function": {"name": "system_status", "description": "Full health of this computer: problems first, then services, the AI (Ollama and loaded models), both GPUs, memory, disk, vault recall, the phone's vault sync and last night's system check.", "parameters": {"type": "object", "properties": {}}}},
     {"type": "function", "function": {"name": "find_files", "description": "Find files in the user's home folder by name.", "parameters": {"type": "object", "properties": {"query": {"type": "string"}}, "required": ["query"]}}},
     {"type": "function", "function": {"name": "read_file", "description": "Read a text file from the user's home folder.", "parameters": {"type": "object", "properties": {"path": {"type": "string"}}, "required": ["path"]}}},
     {"type": "function", "function": {"name": "open_path", "description": "Open a file or folder in the user's home with the default app.", "parameters": {"type": "object", "properties": {"path": {"type": "string"}}, "required": ["path"]}}},
@@ -1363,6 +1437,8 @@ TOOLS = [
                                       "parameters": {"type": "object", "properties": {"query": {"type": "string"}, "provider": {"type": "string", "enum": ["claude", "gemini", ""]}}, "required": ["query"]}}},
     {"type": "function", "function": {"name": "vault_write", "description": "Save a note into the user's Obsidian vault (00 Inbox unless a folder is named). Only when the user asks to save, note or log something there.",
                                       "parameters": {"type": "object", "properties": {"title": {"type": "string"}, "text": {"type": "string"}, "folder": {"type": "string"}}, "required": ["text"]}}},
+    {"type": "function", "function": {"name": "knowledge_search", "description": "Semantic search (meaning, not just words) across the user's notes AND the reference library of government standards and guides: OSHA 29 CFR 1910/1926/1904, CMS emergency preparedness (Appendix Z), Life Safety Code survey guidance (Appendix I), psychiatric hospital rules (Appendix AA, 42 CFR 482), FEMA P-1019 emergency power, EPA building air quality, VA mental-health facility design, NIST cybersecurity/OT/AI frameworks, IRS publications, the FAR, DOE O&M. Use it for compliance, code, safety, maintenance and 'what does the regulation say' questions; cite the document titles it returns.",
+                                      "parameters": {"type": "object", "properties": {"query": {"type": "string"}}, "required": ["query"]}}},
     {"type": "function", "function": {"name": "library_search", "description": "Search the offline reference library (~50 GB: Wikipedia, Stack Exchange, LibreTexts, Wikibooks, iFixit, MedlinePlus, Ready.gov, USDA canning, survival and field manuals) for facts and how-tos.",
                                       "parameters": {"type": "object", "properties": {"query": {"type": "string"}}, "required": ["query"]}}},
     {"type": "function", "function": {"name": "reverse_engineer", "description": (
@@ -1403,6 +1479,7 @@ def run_tool(name, args, phone):
            "open_url": tool_open_url, "launch_app": tool_launch_app, "desktop_note": tool_desktop_note, "dev_docs": tool_dev_docs,
            "recall_chats": tool_recall_chats, "search_documents": tool_search_documents, "equipment": tool_equipment,
            "vault_search": tool_vault_search, "vault_write": tool_vault_write, "recall_ai": tool_recall_ai, "library_search": tool_library_search,
+           "knowledge_search": tool_knowledge_search,
            "reverse_engineer": tool_reverse_engineer, "skills_search": tool_skills_search, "skill_use": tool_skill_use,
            "execute_command": tool_execute_command, "nightjar_camera": tool_nightjar_camera, "qdrant_search": tool_qdrant_search}
     try:
@@ -1632,7 +1709,8 @@ def phone_ask(body):
     phone = resolve_phone()
     r = assistant({"text": body.get("text", ""), "target": "desktop", "phone": phone, "origin": f"Phone assistant ({who})",
                    "private": bool(body.get("private")), "model": body.get("model")})
-    return {"text": r.get("text", ""), "source": "Desktop · " + r.get("source", "")}
+    src = r.get("source", "")
+    return {"text": r.get("text", ""), "source": src if src.startswith("Desktop") else "Desktop · " + src}
 
 
 
@@ -1704,6 +1782,13 @@ class Handler(SimpleHTTPRequestHandler):
             return False
         return True
 
+    def _term_ok(self) -> bool:
+        import terminal
+        if terminal.origin_ok(self.headers.get("Origin"), PORT):
+            return True
+        self.reply(403, {"error": "The terminal only opens from BlackLab Desktop on this computer"})
+        return False
+
     def phone_guard(self) -> bool:
         """/phone/* is for the BlackLab app only: our Host, no browser Origin, and the shared key."""
         if not guards.phone_request_ok(self.headers.get("Host"), self.headers.get("Origin"), self.headers.get("Authorization"),
@@ -1741,6 +1826,25 @@ class Handler(SimpleHTTPRequestHandler):
                 return
             import vault_boards
             return self.reply(200, vault_boards.summary(VAULT) if VAULT_ON else {"projects": []})
+        if route.startswith("/local/term/"):  # BlackLab Desktop's Terminal view (terminal.py) — this computer's page only
+            if not self.guard() or not self._term_ok():
+                return
+            q = urllib.parse.parse_qs(urllib.parse.urlsplit(self.path).query)
+            try:
+                if route == "/local/term/hosts":
+                    import terminal
+                    return self.reply(200, {"hosts": terminal.hosts(CONFIG, TAILNET.get("url", ""), os.uname().nodename), "open": TERMS().status()})
+                if route == "/local/term/read":
+                    return self.reply(200, TERMS().get(q.get("id", [""])[0]).read(int(q.get("since", ["0"])[0] or 0)))
+            except KeyError as e:
+                return self.reply(404, {"error": str(e).strip("'")})
+            return self.reply(404, {"error": "unknown"})
+        if route == "/local/dashboard/live":  # the Home Lab page's live block, refreshed by the Obsidian plugin while it's open
+            if not self.guard():
+                return
+            import vault_web
+            return self.reply(200, {"html": vault_web.homelab_live(vault_web.collect_system()), "at": time.time(),
+                                    "running": DASH_RUN["running"], "message": DASH_RUN["message"]})
         if route in ("/local/jobs", "/local/equipment"):
             if not self.guard():
                 return
@@ -1753,7 +1857,9 @@ class Handler(SimpleHTTPRequestHandler):
                 return
             models = ollama_models()
             return self.reply(200, {"ok": True, "ollama": bool(models), "model": default_model(models), "models": models, "version": VERSION,
-                                    "host": os.uname().nodename, "keep_alive": str(CONFIG.get("keep_alive", "30m"))})
+                                    "host": os.uname().nodename, "keep_alive": str(CONFIG.get("keep_alive", "30m")),
+                                    # 1.14: what the phone's Terminal needs to SSH in over Tailscale (Tailscale SSH: no keys)
+                                    "ssh": {"tailnet": TAILNET.get("url", ""), "user": getpass.getuser(), "name": os.uname().nodename}})
         if self.path.startswith("/local/"):
             if not self.guard():
                 return
@@ -1851,6 +1957,12 @@ class Handler(SimpleHTTPRequestHandler):
         try:
             if self.path == "/local/assistant":
                 return self.reply(200, assistant(body))
+            if self.path == "/local/dashboard":
+                return self.reply(200, dashboard_action(str(body.get("action", ""))))
+            if self.path.startswith("/local/term/"):
+                if not self._term_ok():
+                    return
+                return self.reply(*term_op(self.path.removeprefix("/local/term/"), body))
             if self.path == "/local/adb/forward":
                 ok, msg = adb_forward(int(body.get("port", 8765)))
                 return self.reply(200 if ok else 409, {"ok": ok, "message": msg, "error": None if ok else msg})
@@ -2100,6 +2212,52 @@ def trigger_ask(model_id: str, prompt: str, rel: str) -> tuple[str, str]:
     return r["text"], label
 
 
+def dashboards_pass(pages=None) -> dict:
+    """The website-style dashboards in 05 Dashboards (vault_web.py). Each file is written only when it changes."""
+    import vault_web
+    with VAULT.lock:
+        r = vault_web.apply(VAULT, pages=tuple(pages or vault_web.PAGES))
+    for k, val in r.items():
+        if isinstance(val, str) and val.startswith("error"):
+            VAULT.errors = (VAULT.errors + [f"dashboard {k}: {val}"])[-20:]
+    return r
+
+
+DASH_RUN = {"running": "", "last": None, "message": ""}
+
+
+def dashboard_action(action: str) -> dict:
+    """A button on a dashboard page (Obsidian on this computer → the BlackLab Assistant plugin → POST /local/dashboard)."""
+    import vault_web
+    if action not in vault_web.ACTIONS:
+        return {"ok": False, "error": f"unknown action {action!r}"}
+    if DASH_RUN["running"]:
+        return {"ok": False, "error": f"still working on {DASH_RUN['running']}"}
+    LEDGER.record("Obsidian", f"dashboard:{action}", source="dashboard")
+
+    def work():
+        DASH_RUN["running"] = action
+        try:
+            if action == "refresh":
+                dashboards_pass()
+            elif action == "vault_pass":
+                vault_pass(force=True)
+            elif action == "atlas":
+                atlas_pass(force=True)
+            elif action == "health_scan":
+                script = Path(__file__).resolve().parent.parent / "autopilot" / "blacklab_health.py"
+                subprocess.run([sys.executable, str(script), "--manual"], capture_output=True, text=True, timeout=600)
+                dashboards_pass()
+            DASH_RUN["message"] = f"{action} done"
+        except Exception as e:
+            DASH_RUN["message"] = f"{action} failed: {e}"[:300]
+        finally:
+            DASH_RUN.update(running="", last=time.time())
+    threading.Thread(target=work, daemon=True, name=f"dash-{action}").start()
+    return {"ok": True, "message": {"refresh": "Refreshing the dashboards…", "vault_pass": "Full vault pass started…",
+                                    "atlas": "Rebuilding the Atlas (a few minutes)…", "health_scan": "Running the system check (about a minute)…"}[action]}
+
+
 def sync_keeper():
     """Every minute: your Obsidian edits reach the phone (tasks, work orders, trigger tags, flashcards, the project board)."""
     import vault_boards
@@ -2118,6 +2276,8 @@ def sync_keeper():
             if busy:
                 LEDGER.record("Obsidian", "vault:sync", source="sync", metadata={k: rep[k] for k in ("tasks",)} | {"triggers": {k: rep["triggers"][k] for k in ("commands", "asks", "cards")}})
                 v.commit("Obsidian → BlackLab sync", min_gap=120)
+            if CONFIG.get("dashboards", True) is not False:
+                rep["dashboards"] = dashboards_pass(pages=("today",))
             SYNC_RUN.update(last=time.time(), report=rep, error="")
         except Exception as e:  # noqa: BLE001 — never let this thread die
             SYNC_RUN.update(last=time.time(), error=str(e)[:300])
@@ -2172,7 +2332,8 @@ def vault_pass(force=False):
                           ("facility", lambda: __import__("facility_ops").render_all(v)),
                           ("skills", lambda: __import__("agent_skills").render(v)),
                           ("credentials", lambda: __import__("vault_credentials").render(v)),
-                          ("ledger", lambda: audit.render(v, LEDGER))):
+                          ("ledger", lambda: audit.render(v, LEDGER)),
+                          ("dashboards", lambda: dashboards_pass() if CONFIG.get("dashboards", True) is not False else None)):
             try:
                 fn()
             except Exception as e:
@@ -2200,6 +2361,8 @@ def recall_pass():
         import vault_recall
         t0 = time.time()
         RECALL_RUN["last"] = r = vault_recall.index(VAULT, CONFIG, budget_s=float(CONFIG.get("recall_budget_s", 240)))
+        if CONFIG.get("recall_reference", True) is not False:  # the reference library (95 Library/*/Files), a few documents per pass
+            r["reference"] = vault_recall.index_reference(VAULT, CONFIG, budget_s=float(CONFIG.get("recall_reference_budget_s", 300)))
         if r.get("sent") or r.get("removed"):
             LEDGER.record("BlackLab", "recall:index", target="kb-core", source="companion", duration_ms=int((time.time() - t0) * 1000),
                           metadata={"sent": r.get("sent", 0), "removed": r.get("removed", 0), "pending": r.get("pending", 0)})
@@ -2297,6 +2460,78 @@ def atlas_keeper():
 _KIWIX = {"proc": None}
 
 
+_TERMS = None
+
+
+def TERMS():
+    global _TERMS
+    if _TERMS is None:
+        import terminal
+        _TERMS = terminal.Manager()
+    return _TERMS
+
+
+def term_op(op: str, body: dict) -> tuple[int, dict]:
+    """POST /local/term/{open,write,resize,close} — see terminal.py. Returns (HTTP code, JSON)."""
+    import base64
+    import terminal
+    try:
+        if op == "open":
+            hosts = {h["id"]: h for h in terminal.hosts(CONFIG, TAILNET.get("url", ""), os.uname().nodename)}
+            t = hosts.get(str(body.get("host_id") or "")) or terminal.parse_target(str(body.get("target") or ""), getpass.getuser())
+            t = {k: t[k] for k in ("user", "host", "port")}
+            s = TERMS().open(t, int(body.get("cols") or 100), int(body.get("rows") or 30))
+            LEDGER.record("This computer", "terminal:open", target=f"{t['user']}@{t['host']}:{t['port']}", source="desktop UI")
+            return 200, {"ok": True, "id": s.id, "target": f"{t['user']}@{t['host']}" + (f":{t['port']}" if t["port"] != 22 else "")}
+        s = TERMS().get(body.get("id"))
+        if op == "write":
+            data = base64.b64decode(str(body.get("data") or ""), validate=True)
+            if len(data) > 65536:
+                return 413, {"error": "too much at once"}
+            s.write(data)
+        elif op == "resize":
+            s.resize(int(body.get("cols") or 80), int(body.get("rows") or 24))
+        elif op == "close":
+            TERMS().close(s.id)
+        else:
+            return 404, {"error": "unknown"}
+        return 200, {"ok": True}
+    except KeyError as e:
+        return 404, {"error": str(e).strip("'")}
+    except (ValueError, OSError) as e:
+        return 400, {"error": str(e)}
+
+
+FEEDS_RUN = {"last": None, "report": {}, "docs": None}
+
+
+def feeds_keeper():
+    """Public data feeds (feeds.py) every 15 minutes — each feed keeps its own pace — and, once a day, any reference
+    document that's missing or was amended (eCFR) is downloaded again and its library card refreshed."""
+    import feeds
+    import library
+    time.sleep(120)
+    while True:
+        try:
+            if CONFIG.get("feeds", True) is not False and VAULT_ON:
+                with VAULT.lock:
+                    rep = feeds.run(VAULT, CONFIG)
+                FEEDS_RUN.update(last=time.time(), report=rep)
+                if time.time() - (FEEDS_RUN["docs"] or 0) > 86400:
+                    FEEDS_RUN["docs"] = time.time()
+                    log = []
+                    library.download_docs(VAULT.root, log=log.append)
+                    if any(l.startswith("✓") for l in log):
+                        with VAULT.lock:
+                            library.write_cards(VAULT)
+                        VAULT.log("file", "Reference library updated", "; ".join(log)[:400], source="BlackLab Desktop", links=["◆ Knowledge Library"])
+                if rep:
+                    VAULT.commit("Feeds: " + ", ".join(rep), min_gap=600)
+        except Exception as e:  # noqa: BLE001
+            FEEDS_RUN.update(last=time.time(), report={"error": str(e)[:200]})
+        time.sleep(900)
+
+
 def library_keeper():
     """Runs kiwix-serve (127.0.0.1 only) once the reader is installed and books are registered; restarts it if it stops."""
     import library
@@ -2352,7 +2587,8 @@ def phone_vault_pass(serial: str, force=False):
         with VAULT.lock:
             PHONE_VAULT["last"] = phone_vault.sync(adb_path(), serial, VAULT.root, CONFIG.get("phone_vault_dir", "/sdcard/Documents/BlackLab"),
                                                    CACHE_DIR / "phone-vault.json", on_pull=pulled,
-                                                   include_local=CONFIG.get("phone_vault_local", False) is True)
+                                                   include_local=CONFIG.get("phone_vault_local", False) is True,
+                                                   mirror_settings=CONFIG.get("phone_mirror_settings", True) is not False)
             VAULT.commit("Phone sync (Obsidian on the phone)" if PHONE_VAULT["last"]["pulled"] else "", min_gap=0 if PHONE_VAULT["last"]["pulled"] else 300)
         PHONE_VAULT["error"] = None
     except Exception as e:
@@ -2471,6 +2707,8 @@ def main():
     threading.Thread(target=keep_usb_link, daemon=True).start()
     threading.Thread(target=memory_keeper, daemon=True).start()
     threading.Thread(target=keep_warm_keeper, daemon=True, name="keep-warm").start()
+    threading.Thread(target=monitor_keeper, daemon=True, name="monitor").start()
+    threading.Thread(target=feeds_keeper, daemon=True, name="feeds").start()
     threading.Thread(target=tailnet_keeper, daemon=True, name="tailnet").start()
     if VAULT_ON:
         threading.Thread(target=vault_keeper, daemon=True, name="vault").start()

@@ -26,6 +26,7 @@ object NavLayout {
         Section("bh", "Behavioral Health", "Work", "Shift hub, rounds, peer support."),
         Section("timeline", "Timeline & handoff", "Work", "Your day and the ops handoff."),
         Section("signatures", "Signatures", "Work", "Sign documents."),
+        Section("ssh", "Terminal", "Work", "SSH to your computer and servers over Tailscale."),
         Section("library", "Library", "Files", "Every file in your BlackLab folder."),
         Section("create", "Create & Edit", "Files", "Photo, video, audio and PDF tools."),
         Section("brainstorm", "Brainstorm", "Files", "OneNote-style notebooks."),

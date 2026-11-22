@@ -8,8 +8,12 @@ class IncomingGuardTest {
 
     @Test fun ownDeepLinksStillWork() {
         listOf("home", "task/0", "task/42", "note/7", "page/3", "event/12", "course/5", "journal/new", "dictation", "recorder",
-            "settings", "updates", "nowplaying", "education", "assistant", "assistant?listen=true", "brainstorm?tab=notes")
+            "settings", "updates", "nowplaying", "education", "assistant", "assistant?listen=true", "brainstorm?tab=notes", "ssh")
             .forEach { assertTrue(it, IncomingGuard.routeAllowed(it)) }
+    }
+
+    @Test fun otherAppsCannotOpenAnSshSession() {
+        listOf("ssh/blacklab-desktop", "ssh/h1234", "ssh/").forEach { assertFalse(it, IncomingGuard.routeAllowed(it)) }
     }
 
     @Test fun routesCannotPointAtFiles() {

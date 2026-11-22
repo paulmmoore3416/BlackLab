@@ -6,6 +6,8 @@
                                    add an "After the restart" section to tonight's report and send it again
     blacklab_health.py --watch     every few minutes: keep the companion answering and the phone linked
     blacklab_health.py --print     run the full scan and print it (sends nothing)
+    blacklab_health.py --manual    run the full scan now and save it as the latest report (the dashboard's
+                                   "Run system check" button); the phone isn't sent anything
 
 The report is written to ~/Desktop/BlackLab AI/Documents/System Health/ and handed to the BlackLab Desktop
 companion (POST /local/health), which passes it to the phone; BlackLab shows it the first time it opens.
@@ -827,6 +829,7 @@ def main():
     g.add_argument("--boot", action="store_true")
     g.add_argument("--watch", action="store_true")
     g.add_argument("--print", action="store_true")
+    g.add_argument("--manual", action="store_true", help="scan now and save it as the latest report (not sent to the phone)")
     g.add_argument("--enforce", action="store_true", help="BlackLab-only mode now (stop other projects)")
     g.add_argument("--publish-latest", action="store_true", help="send the last saved report to the companion again")
     a = ap.parse_args()
@@ -854,6 +857,9 @@ def main():
         rep = build_report(s, "nightly")
         if a.print:
             print(rep["text"])
+            return
+        if a.manual:
+            print(f"manual scan: {rep['status']} ({rep['counts']}) → {save_and_publish(dict(rep, kind='manual'), send=False)}")
             return
         path = save_and_publish(rep)
         print(f"nightly scan: {rep['status']} ({rep['counts']}) → {path}")

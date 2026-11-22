@@ -35,3 +35,25 @@ test("note context drops frontmatter and BlackLab markers", () => {
   assert.match(T.noteContext("x".repeat(50), 10), /trimmed/);
   assert.equal(T.providerOf("claude:opus"), "claude"); assert.equal(T.providerOf("??"), "auto");
 });
+
+test("dashboard buttons only run the known actions", () => {
+  for (const a of ["refresh", "vault_pass", "health_scan", "atlas"]) assert.ok(T.isDashAction(a));
+  for (const a of ["", "rm -rf", "restart", null, "refresh "]) assert.equal(T.isDashAction(a), false);
+});
+test("only the companion's own pages may load in a frame", () => {
+  assert.ok(T.frameAllowed("http://127.0.0.1:8780/"));
+  assert.ok(T.frameAllowed("http://127.0.0.1:8770/index.html"));
+  for (const u of ["https://example.com/", "http://127.0.0.1:9000/", "http://127.0.0.1:8780.evil.com/", "javascript:alert(1)", ""]) assert.equal(T.frameAllowed(u), false);
+});
+test("ask answers list their source notes", () => {
+  const t = T.answerText({ answer: "Filters every 90 days.", sources: ["10 Facility/Assets/AHU-2.md", "30 Work/Tasks.md"] });
+  assert.match(t, /Filters every 90 days\./);
+  assert.match(t, /\[\[AHU-2\]\] · \[\[Tasks\]\]/);
+  assert.equal(T.answerText({ error: "kb-core is down" }), "⚠️ kb-core is down");
+  assert.equal(T.answerText(null), "No answer.");
+});
+test("capture titles come from the first line", () => {
+  assert.equal(T.captureTitle("# Call the elevator vendor\nabout the permit"), "Call the elevator vendor");
+  assert.equal(T.captureTitle("   "), "Capture");
+  assert.equal(T.captureTitle("x".repeat(80)).length, 58);
+});

@@ -656,6 +656,11 @@ class Vault:
             written |= {r for r in self._state("collections.json", {}).get("learning", []) if r.startswith(vault_hubs.DECKS_DIR + "/")}
         vault_hubs.render_study_hub(self, l)
         written.add(vault_hubs.STUDY_REL)
+        names = {c.get("id"): " ".join(x for x in (c.get("code"), c.get("title")) if x) for c in l.get("courses", [])}
+        self._save_state("dash/learning.json", {  # for the Learning Hub dashboard (vault_web)
+            "courses": [n for n in names.values() if n],
+            "assignments": [{"title": a.get("title", ""), "kind": a.get("kind", ""), "due": a.get("due") or "", "status": a.get("status", ""),
+                             "course": names.get(a.get("courseId"), "")} for a in l.get("assignments", [])][:200]})
         self._collection("learning", written)
         return len(written)
 

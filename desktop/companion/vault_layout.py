@@ -567,6 +567,9 @@ The BlackLab desktop companion (`desktop/companion/`, systemd user service, port
 | `vault_max_nodes` | 500 | Safety cap for agent-created nodes |
 | `atlas_path_rules` | `[]` | Your own folder → node rules, e.g. `[["Desktop/Certs", ["learning"], 25]]` |
 | `phone_vault_local` | false | Also copy the Atlas, imported vaults and people & topics to the phone (its shared storage) |
+| `phone_mirror_settings` | true | The phone's Obsidian mirrors the desktop's settings, plugins, theme, snippets and graph (only the layout stays per device) |
+| `monitor_alerts` | true | Phone notifications when something on this computer breaks or recovers (checked every `monitor_seconds`, 300) |
+| `feeds` | true | Public data feeds into the vault: weather alerts, regulatory updates, security advisories, disaster declarations |
 
 ## State (`~/.cache/blacklab-desktop/vault/`)
 `atlas.json` (one record per file: signature, sha256, kind, nodes, guide kind) · `atlas_text/` (safe extracted text) · `entities.json` · `related.json` + `related_local.json` · `collections.json` (what each writer wrote, for archiving) · `timeline/`.

@@ -6,6 +6,10 @@
  *    note travels as context; the saved conversation links back to it, so the graph shows what was discussed where.
  *  • Every exchange is saved by the BlackLab Desktop companion: Claude in 70 AI/Claude (glowing orange), Gemini in
  *    70 AI/Gemini (glowing red). Replies can be inserted into the note or copied.
+ *  • The website-style dashboards in 05 Dashboards come alive here: buttons (data-bl-action) ask the companion to
+ *    refresh, run a vault pass, a system check or an Atlas rebuild; quick capture and "ask your vault" boxes
+ *    (data-bl-widget); the offline library in a frame; and Home Lab's live block (data-bl-live), refreshed every 15 s
+ *    while it is on screen. On the phone (no companion) the pages stay readable and say what works on the computer.
  *
  * Talks only to the companion on this computer (http://127.0.0.1:8770, X-BlackLab header). Installed and kept current by
  * the companion from desktop/obsidian/blacklab-assistant in the BlackLab repo.
@@ -13,9 +17,10 @@
 "use strict";
 let obsidian;
 try { obsidian = require("obsidian"); } catch (_) {
-  obsidian = { Plugin: class {}, ItemView: class {}, PluginSettingTab: class {}, Setting: class {}, Notice: class {}, MarkdownRenderer: {}, requestUrl: null, Platform: {} };
+  obsidian = { Plugin: class {}, ItemView: class {}, PluginSettingTab: class {}, Setting: class {}, Notice: class {}, MarkdownRenderer: {}, requestUrl: null, Platform: {},
+    sanitizeHTMLToDom: null };
 }
-const { Plugin, ItemView, PluginSettingTab, Setting, Notice, MarkdownRenderer, requestUrl, Platform } = obsidian;
+const { Plugin, ItemView, PluginSettingTab, Setting, Notice, MarkdownRenderer, requestUrl, Platform, sanitizeHTMLToDom } = obsidian;
 
 const VIEW = "blacklab-assistant";
 const DEFAULTS = { url: "http://127.0.0.1:8770", model: "claude:sonnet", history: 6, sendNote: true };
@@ -63,6 +68,29 @@ const PROMPTS = {
   flashcards: () => "Make 10–20 flashcards from this note, one per line, exactly as `front :: back` (no numbering, no extra text).",
   actions: () => "List the action items in this note as a Markdown checklist (`- [ ] …`), each with an owner and a date if the note says so.",
 };
+
+// ------------------------------------------------------------------ dashboards (05 Dashboards — desktop/companion/vault_web.py)
+
+const DASH_ACTIONS = ["refresh", "vault_pass", "health_scan", "atlas"];
+const LIVE_MS = 15000;
+const FRAME_OK = /^http:\/\/127\.0\.0\.1:(8780|8770)\//;  // only the companion's own pages go in a frame
+
+function isDashAction(a) { return DASH_ACTIONS.includes(String(a || "")); }
+function frameAllowed(src) { return FRAME_OK.test(String(src || "")); }
+
+/** The text to show for a /local/vault/ask answer: the answer, then the notes it came from. */
+function answerText(r) {
+  if (!r) return "No answer.";
+  if (r.error) return "⚠️ " + r.error;
+  const src = (r.sources || []).slice(0, 5).map((p) => "[[" + String(p).replace(/\.md$/, "").split("/").pop() + "]]");
+  return String(r.answer || "Nothing in your notes answers that.").trim() + (src.length ? "\n\nFrom: " + src.join(" · ") : "");
+}
+
+/** A capture title from its first line (the companion makes it a safe file name). */
+function captureTitle(text) {
+  const first = String(text || "").trim().split("\n")[0].replace(/[#*`>\[\]]/g, "").trim();
+  return (first.length > 60 ? first.slice(0, 57) + "…" : first) || "Capture";
+}
 
 // ------------------------------------------------------------------ the sidebar
 
@@ -187,8 +215,91 @@ class BlackLabAssistant extends Plugin {
       this.open().then((v) => v && v.send("Help me with this:\n\n" + sel, "About the selection:\n" + sel.slice(0, 300)));
     } });
     this.addSettingTab(new AssistantSettings(this.app, this));
+    this.registerMarkdownPostProcessor((el, ctx) => this.dashboard(el, ctx));
   }
-  onunload() {}
+  onunload() { (this.timers || []).forEach((t) => window.clearInterval(t)); }
+
+  /** Wires up the interactive parts of a dashboard page (they are plain placeholders in the note). */
+  dashboard(el, ctx) {
+    const web = el.matches && el.matches(".bl-web") ? el : el.querySelector && el.querySelector(".bl-web");
+    if (!web) return;
+    const desktop = !Platform.isMobile;
+    web.querySelectorAll("[data-bl-action]").forEach((b) => {
+      if (!desktop) { b.setAttr("disabled", "true"); b.setAttr("title", "Works in Obsidian on the computer"); return; }
+      b.addEventListener("click", async (e) => {
+        e.preventDefault();
+        const action = b.getAttribute("data-bl-action");
+        if (!isDashAction(action)) return;
+        b.addClass("is-busy");
+        try { const r = await this.api("POST", "/local/dashboard", { action }); new Notice(r.ok ? r.message : "⚠️ " + r.error); }
+        catch (err) { new Notice("BlackLab Desktop isn't answering: " + err.message); }
+        finally { window.setTimeout(() => b.removeClass("is-busy"), 1500); }
+      });
+    });
+    if (!desktop) return;
+    web.querySelectorAll("[data-bl-widget]").forEach((w) => this.widget(w, ctx));
+    web.querySelectorAll("[data-bl-live]").forEach((box) => this.live(box));
+  }
+
+  widget(w, ctx) {
+    const kind = w.getAttribute("data-bl-widget");
+    if (kind === "capture") {
+      const form = w.createDiv("blw-form");
+      const box = form.createEl("textarea", { attr: { rows: 2, placeholder: "A thought, a task, a link…  (Ctrl+Enter saves to 00 Inbox)" } });
+      const go = form.createEl("button", { cls: "blw-btn blw-accent", text: "Capture" });
+      const save = async () => {
+        const text = box.value.trim();
+        if (!text) return;
+        go.addClass("is-busy");
+        try { await this.api("POST", "/local/vault/capture", { text, title: captureTitle(text), source: "Obsidian dashboard" }); box.value = ""; new Notice("Saved to 00 Inbox"); }
+        catch (err) { new Notice("Couldn't save: " + err.message); }
+        finally { go.removeClass("is-busy"); }
+      };
+      go.onclick = save;
+      box.addEventListener("keydown", (e) => { if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) { e.preventDefault(); save(); } });
+    } else if (kind === "ask") {
+      const form = w.createDiv("blw-form");
+      const q = form.createEl("input", { type: "text", attr: { placeholder: "What do my notes say about…" } });
+      const go = form.createEl("button", { cls: "blw-btn blw-info", text: "Ask" });
+      const out = w.createDiv("blw-answer");
+      const ask = async () => {
+        const query = q.value.trim();
+        if (!query) return;
+        go.addClass("is-busy"); out.setText("Thinking… (local AI, your notes only)");
+        try {
+          const r = await this.api("POST", "/local/vault/ask", { query, answer: true, limit: 5 });
+          out.empty();
+          await MarkdownRenderer.render(this.app, answerText(r), out, (ctx && ctx.sourcePath) || "", this);
+        } catch (err) { out.setText("⚠️ " + err.message); }
+        finally { go.removeClass("is-busy"); }
+      };
+      go.onclick = ask;
+      q.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); ask(); } });
+    } else if (kind === "frame") {
+      const src = w.getAttribute("data-src");
+      if (!frameAllowed(src)) return;
+      const open = w.createEl("button", { cls: "blw-btn blw-info", text: "Open the library here" });
+      open.onclick = () => { open.remove(); w.createEl("iframe", { cls: "blw-frame", attr: { src, sandbox: "allow-scripts allow-same-origin allow-forms" } }); };
+    } else {
+      return;
+    }
+    w.addClass("is-ready");
+  }
+
+  live(box) {
+    this.timers = this.timers || [];
+    const tick = async () => {
+      if (!box.isConnected) { window.clearInterval(timer); this.timers = this.timers.filter((t) => t !== timer); return; }
+      if (!box.offsetParent) return;  // not on screen
+      try {
+        const r = await this.api("GET", "/local/dashboard/live");
+        if (r && r.html && sanitizeHTMLToDom) box.replaceChildren(sanitizeHTMLToDom(r.html));
+      } catch (_) { /* the companion is restarting; the snapshot stays */ }
+    };
+    const timer = window.setInterval(tick, LIVE_MS);
+    this.timers.push(timer);
+    tick();
+  }
   async save() { await this.saveData(this.settings); }
 
   async open() {
@@ -251,4 +362,4 @@ class AssistantSettings extends PluginSettingTab {
 }
 
 module.exports = BlackLabAssistant;
-module.exports.__test = { groupModels, pickModel, providerOf, historyPairs, noteContext, PROMPTS, DEFAULTS };
+module.exports.__test = { groupModels, pickModel, providerOf, historyPairs, noteContext, PROMPTS, DEFAULTS, isDashAction, frameAllowed, answerText, captureTitle };

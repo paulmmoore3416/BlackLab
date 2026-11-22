@@ -176,7 +176,7 @@ class GraphTest(unittest.TestCase):
         for pid, (repo, tag, files) in G.PLUGINS.items():
             for name in files:
                 real[f"https://github.com/{repo}/releases/download/{tag}/{name}"] = None
-        self.assertEqual(12, len(real))
+        self.assertEqual(21, len(real))  # 7 pinned plugins × main.js, manifest.json, styles.css
 
 
 if __name__ == "__main__":
