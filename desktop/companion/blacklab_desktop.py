@@ -25,6 +25,7 @@ import contextlib
 import csv
 import datetime as dt
 import functools
+import getpass
 import hashlib
 import html as htmllib
 import hmac
@@ -54,7 +55,7 @@ import ai_models  # noqa: E402  (Claude via the subscription CLI, Gemini, local 
 import vault_ai  # noqa: E402  (every Claude/Gemini conversation in the vault, glowing on the graph)
 import phone_ops  # noqa: E402  (Obsidian edits the phone carries out: tasks, commands, flashcards)
 
-VERSION = "1.13.0"
+VERSION = "1.14.0"
 HOST, PORT = "127.0.0.1", int(os.environ.get("BLACKLAB_DESKTOP_PORT", "8770"))
 HOME = Path.home()
 WEB_DIR = Path(__file__).resolve().parent.parent / "web"
@@ -1781,6 +1782,13 @@ class Handler(SimpleHTTPRequestHandler):
             return False
         return True
 
+    def _term_ok(self) -> bool:
+        import terminal
+        if terminal.origin_ok(self.headers.get("Origin"), PORT):
+            return True
+        self.reply(403, {"error": "The terminal only opens from BlackLab Desktop on this computer"})
+        return False
+
     def phone_guard(self) -> bool:
         """/phone/* is for the BlackLab app only: our Host, no browser Origin, and the shared key."""
         if not guards.phone_request_ok(self.headers.get("Host"), self.headers.get("Origin"), self.headers.get("Authorization"),
@@ -1818,6 +1826,19 @@ class Handler(SimpleHTTPRequestHandler):
                 return
             import vault_boards
             return self.reply(200, vault_boards.summary(VAULT) if VAULT_ON else {"projects": []})
+        if route.startswith("/local/term/"):  # BlackLab Desktop's Terminal view (terminal.py) — this computer's page only
+            if not self.guard() or not self._term_ok():
+                return
+            q = urllib.parse.parse_qs(urllib.parse.urlsplit(self.path).query)
+            try:
+                if route == "/local/term/hosts":
+                    import terminal
+                    return self.reply(200, {"hosts": terminal.hosts(CONFIG, TAILNET.get("url", ""), os.uname().nodename), "open": TERMS().status()})
+                if route == "/local/term/read":
+                    return self.reply(200, TERMS().get(q.get("id", [""])[0]).read(int(q.get("since", ["0"])[0] or 0)))
+            except KeyError as e:
+                return self.reply(404, {"error": str(e).strip("'")})
+            return self.reply(404, {"error": "unknown"})
         if route == "/local/dashboard/live":  # the Home Lab page's live block, refreshed by the Obsidian plugin while it's open
             if not self.guard():
                 return
@@ -1836,7 +1857,9 @@ class Handler(SimpleHTTPRequestHandler):
                 return
             models = ollama_models()
             return self.reply(200, {"ok": True, "ollama": bool(models), "model": default_model(models), "models": models, "version": VERSION,
-                                    "host": os.uname().nodename, "keep_alive": str(CONFIG.get("keep_alive", "30m"))})
+                                    "host": os.uname().nodename, "keep_alive": str(CONFIG.get("keep_alive", "30m")),
+                                    # 1.14: what the phone's Terminal needs to SSH in over Tailscale (Tailscale SSH: no keys)
+                                    "ssh": {"tailnet": TAILNET.get("url", ""), "user": getpass.getuser(), "name": os.uname().nodename}})
         if self.path.startswith("/local/"):
             if not self.guard():
                 return
@@ -1936,6 +1959,10 @@ class Handler(SimpleHTTPRequestHandler):
                 return self.reply(200, assistant(body))
             if self.path == "/local/dashboard":
                 return self.reply(200, dashboard_action(str(body.get("action", ""))))
+            if self.path.startswith("/local/term/"):
+                if not self._term_ok():
+                    return
+                return self.reply(*term_op(self.path.removeprefix("/local/term/"), body))
             if self.path == "/local/adb/forward":
                 ok, msg = adb_forward(int(body.get("port", 8765)))
                 return self.reply(200 if ok else 409, {"ok": ok, "message": msg, "error": None if ok else msg})
@@ -2431,6 +2458,48 @@ def atlas_keeper():
 
 
 _KIWIX = {"proc": None}
+
+
+_TERMS = None
+
+
+def TERMS():
+    global _TERMS
+    if _TERMS is None:
+        import terminal
+        _TERMS = terminal.Manager()
+    return _TERMS
+
+
+def term_op(op: str, body: dict) -> tuple[int, dict]:
+    """POST /local/term/{open,write,resize,close} — see terminal.py. Returns (HTTP code, JSON)."""
+    import base64
+    import terminal
+    try:
+        if op == "open":
+            hosts = {h["id"]: h for h in terminal.hosts(CONFIG, TAILNET.get("url", ""), os.uname().nodename)}
+            t = hosts.get(str(body.get("host_id") or "")) or terminal.parse_target(str(body.get("target") or ""), getpass.getuser())
+            t = {k: t[k] for k in ("user", "host", "port")}
+            s = TERMS().open(t, int(body.get("cols") or 100), int(body.get("rows") or 30))
+            LEDGER.record("This computer", "terminal:open", target=f"{t['user']}@{t['host']}:{t['port']}", source="desktop UI")
+            return 200, {"ok": True, "id": s.id, "target": f"{t['user']}@{t['host']}" + (f":{t['port']}" if t["port"] != 22 else "")}
+        s = TERMS().get(body.get("id"))
+        if op == "write":
+            data = base64.b64decode(str(body.get("data") or ""), validate=True)
+            if len(data) > 65536:
+                return 413, {"error": "too much at once"}
+            s.write(data)
+        elif op == "resize":
+            s.resize(int(body.get("cols") or 80), int(body.get("rows") or 24))
+        elif op == "close":
+            TERMS().close(s.id)
+        else:
+            return 404, {"error": "unknown"}
+        return 200, {"ok": True}
+    except KeyError as e:
+        return 404, {"error": str(e).strip("'")}
+    except (ValueError, OSError) as e:
+        return 400, {"error": str(e)}
 
 
 FEEDS_RUN = {"last": None, "report": {}, "docs": None}

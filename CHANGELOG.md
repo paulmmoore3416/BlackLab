@@ -2,6 +2,29 @@
 
 All notable changes to BlackLab are documented here. The project follows [Semantic Versioning](https://semver.org/).
 
+## [5.18.0] — 2026-11-22 (companion 1.14.0)
+
+A terminal in BlackLab on the phone and the desktop, plus remote check-ups, website-style dashboards in Obsidian and a reference library the desktop AI can quote.
+
+### Added
+- **Terminal on the phone** (side menu › Terminal). SSH to your BlackLab computer over Tailscale, with nothing to type: the computer is added automatically from the desktop link, and Tailscale SSH signs the phone in without passwords or keys. You get a full terminal (xterm.js in the app, colors, scrollback, resizing) and a key bar for Esc, Tab, Ctrl, Alt, the arrows and common symbols. **Quick commands** (⚡) cover a status report, services, the companion log, GPUs, AI models, disk and memory, vault sync and waiting updates; restarting BlackLab Desktop asks first. You can add your own commands and other servers (`user@host[:port]`). Sessions stay open when you leave the screen.
+- **Host keys checked like OpenSSH.** A new server's fingerprint is shown once for you to trust. If the key ever changes, BlackLab refuses to connect and tells you why. Tailscale's "approve this sign-in" link opens with one tap.
+- **Terminal in BlackLab Desktop** (new Terminal view). The companion runs OpenSSH for the page. It is locked to this computer: other origins, including the github.io copy of the app, and the Tailscale listener are refused. Sessions can be re-attached, and saved hosts come from `ssh_hosts` in the private config.
+- **Check on the computer from anywhere** (companion 1.13). Ask the phone assistant "on my computer, status report" and get services, the AI, GPUs, disk, memory, recall, vault sync and the last system check. No AI is involved, so it still answers when Ollama is down. The phone also gets a notification when something on the computer breaks or recovers (checked every 5 minutes, warnings only after two checks in a row).
+- **Dashboards that look like websites** (companion 1.12). In `05 Dashboards` in Obsidian: ☀️ Today (the startup page), 🏢 Facility Command, 🎓 Learning Hub and 🖥️ Home Lab, with live stats, action buttons, quick capture and "ask your vault". Pinned, checksum-verified Dataview, Meta Bind and Homepage plugins, with JavaScript from notes kept off.
+- **Reference library in the AI's memory.** 16 more public-domain government references: CMS Appendices Z, I and AA; 42 CFR 482; 29 CFR 1904; FEMA P-1019 emergency power; CISA resilient power; EPA building air quality; the VA mental-health facility design guide; NIST CSF 2.0, SP 800-82r3 and the AI RMF; IRS Pubs 17 and 946; Ready.gov; and the NASA systems engineering handbook. They are indexed for meaning search, and the new `knowledge_search` tool lets the desktop AI quote them.
+- **Public data feeds into the vault.** National Weather Service alerts (requested for the whole state, so no location is sent), Federal Register rules that touch facilities, life safety and behavioral health, CISA's exploited-vulnerability list checked against software you run, FEMA disaster declarations, and eCFR amendment checks that refresh library documents.
+- **Phone Obsidian matches the desktop.** The phone mirrors the desktop's Obsidian settings, plugins, theme and graph. With Syncthing over Tailscale, the vault syncs continuously in both directions.
+- **Headless setup.** `desktop/autopilot/headless.sh` (run with sudo) boots to the console, turns on Tailscale SSH, keeps Ollama local-only with a smaller context cache, and benchmarks how to place the models across both GPUs.
+
+### Security
+- Other apps can open BlackLab's Terminal list but never start an SSH session.
+- The desktop terminal never runs a shell on the computer. The destination is validated and passed after `--`, and agent, X11 and port forwarding are all off.
+
+### Tests
+- Phone: `SshClientTest` runs against a real in-process SSH server (the Tailscale-style no-password sign-in, banners, trust on first use, a changed host key refused, passwords, commands and an interactive shell). `SshHostsTest` covers address checks and injection attempts. A guard test checks that other apps can't open SSH routes.
+- Companion: `test_terminal`, `test_monitor`, `test_feeds` and `test_vault_web`.
+
 ## [5.17.0] — 2026-11-21 (companion 1.11.0)
 
 Claude and Gemini inside BlackLab, every conversation in your Obsidian vault, and Obsidian working hand in hand with BlackLab.

@@ -27,8 +27,8 @@ android {
         applicationId = "com.blacklab.app"
         minSdk = 35
         targetSdk = 36
-        versionCode = 31
-        versionName = "5.17.0"
+        versionCode = 32
+        versionName = "5.18.0"
         vectorDrawables { useSupportLibrary = true }
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -158,6 +158,10 @@ dependencies {
     implementation("androidx.glance:glance-appwidget:1.2.0")
     implementation("androidx.glance:glance-material3:1.2.0") // widgets in your palette colors
 
+    // Terminal (5.18): SSH over Tailscale — JSch, the maintained mwiede fork (pure Java, BSD-3; uses the app's Bouncy Castle
+    // for Ed25519/X25519). The terminal itself is xterm.js 6.0.0 bundled in assets/terminal (MIT).
+    implementation("com.github.mwiede:jsch:2.28.8")
+
     // QR codes for Brainstorm Live Share links
     implementation("com.google.zxing:core:3.5.4")
 
@@ -188,6 +192,9 @@ dependencies {
 
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.json:json:20260814")
+    // An in-process SSH server for the Terminal tests (JVM only, never in the app)
+    testImplementation("org.apache.sshd:sshd-core:2.20.1")
+    testImplementation("org.slf4j:slf4j-nop:2.0.20")
 
     // On-device tests (run on the emulator locally and in CI)
     androidTestImplementation("androidx.test.ext:junit:1.2.1")

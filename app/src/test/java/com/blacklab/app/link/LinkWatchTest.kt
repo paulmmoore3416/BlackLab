@@ -64,6 +64,7 @@ class LinkWatchTest {
         val declared = src.walkTopDown().filter { it.extension == "kt" }
             .flatMap { Regex("""JsonStore\("([^"]+)"""").findAll(it.readText()).map { m -> m.groupValues[1] } }
             .toSet()
-        assertEquals(declared, LinkWatch.stores().map { it.name }.toSet())
+        assertEquals(declared - LinkWatch.LOCAL_ONLY, LinkWatch.stores().map { it.name }.toSet())
+        assertEquals("every phone-only store still exists", LinkWatch.LOCAL_ONLY, LinkWatch.LOCAL_ONLY.intersect(declared))
     }
 }

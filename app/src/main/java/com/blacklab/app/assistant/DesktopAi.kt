@@ -197,6 +197,18 @@ object DesktopAi {
     }
 
 
+    /** How to SSH into the BlackLab computer (5.18 Terminal): its Tailscale address, login name and host name, from
+     *  /phone/status. Null when the computer isn't reachable or its companion is older than 1.14. */
+    data class SshInfo(val tailnetUrl: String, val user: String, val name: String)
+
+    suspend fun sshInfo(): SshInfo? = withContext(Dispatchers.IO) {
+        if (!enabled || token() == null) return@withContext null
+        runCatching {
+            val j = callAny("GET", "/phone/status", null, 6_000).optJSONObject("ssh") ?: return@runCatching null
+            SshInfo(j.optString("tailnet"), j.optString("user"), j.optString("name")).takeIf { it.tailnetUrl.isNotBlank() && it.user.isNotBlank() }
+        }.getOrNull()
+    }
+
     /** For DesktopJobs: one authenticated call to the companion (throws on failure). */
     internal fun request(method: String, path: String, body: JSONObject?, timeoutMs: Int): JSONObject = callAny(method, path, body, timeoutMs)
 
