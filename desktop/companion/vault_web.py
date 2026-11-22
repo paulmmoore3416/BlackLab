@@ -269,6 +269,7 @@ def render_today(v, ctx: dict, health: dict) -> str:
     w = ctx.get("weather") or {}
     weather = safe(w.get("summary")) or "No weather from the phone yet."
     alerts = [safe(a if isinstance(a, str) else a.get("title") or a.get("event") or "") for a in (w.get("alerts") or [])]
+    alerts += [a["event"] for a in v._state("feeds/weather.json", {}).get("alerts", []) if a.get("event") and a["event"] not in alerts]
     phone_at = ctx.get("received")
     pills = [pill(f"System · {health.get('status', 'no report').upper()}", health_tone(health.get("status")))]
     if phone_at:
@@ -410,8 +411,17 @@ def render_facility(v, ctx: dict) -> str:
         card("Rounds today", rounds_body, "🚶"),
         card("Credentials due", rows([esc(c) for c in creds[:8]]) or empty("Everything current."), "🏅", "", link("40 Learning/🏅 Credentials", "All →", "blw-card-link")),
         card("References", refs, "📚", "blw-span-2"),
+        card("Regulatory watch", _regulatory(v), "📜", "blw-span-3", link("80 Knowledge/Feeds/📜 Regulatory Watch", "All →", "blw-card-link")),
     ]
     return page("facility", head, tiles, sections)
+
+
+def _regulatory(v) -> str:
+    docs = v._state("feeds/regulatory.json", {}).get("documents", [])
+    if not docs:
+        return empty("No new OSHA, CMS, EPA, VA, DOE or SAMHSA rules in the last 45 days (checked twice a day).")
+    return rows([f'<span class="blw-time">{esc(d["date"][5:])}</span> ' + pill(d["kind"], "warn" if d["kind"].startswith("Final") else "info") + " "
+                 + link(f"80 Knowledge/Regulatory/{d['note']}", d["title"][:120]) + f' <small class="blw-muted">{esc(d["agency"][:60])}</small>' for d in docs[:8]])
 
 
 # ---------------------------------------------------------------- 3: Learning Hub
@@ -665,10 +675,26 @@ def render_homelab(v, s: dict, health: dict) -> str:
         card("AI models", model_rows, "🧠", "blw-span-2"),
         card("Actions", actions, "🕹️"),
         card("Last system check", check, "🩺", "blw-span-2", link("◆ IT, Networking & Systems", "Node →", "blw-card-link")),
+        card("Security advisories", _security(v), "🛡️", "blw-span-2", link("80 Knowledge/Feeds/🛡️ Security Advisories", "All →", "blw-card-link")),
+        card("Check from anywhere", rows([
+            "Phone assistant: <b>“on my computer, status report”</b> — works even if the AI is down",
+            "Alerts come to the phone by themselves when something breaks or recovers (checked every 5 min)",
+            f"SSH over Tailscale: <code>ssh {esc(os.environ.get('USER', 'paul'))}@{esc(s.get('host', 'this-computer'))}</code>",
+            "This page on the phone: Obsidian › 05 Dashboards › 🖥️ Home Lab"]), "📡"),
         card("Links", '<div class="blw-chips">' + ext("http://127.0.0.1:8770/", "BlackLab Desktop", "blw-chip") + ext(KIWIX + "/", "Offline library", "blw-chip")
              + link("85 Atlas/🖥️ This Computer", "🖥️ This Computer", "blw-chip") + link("90 System/Graph Health", "🩺 Graph Health", "blw-chip") + "</div>", "🔗"),
     ]
     return page("homelab", head, tiles, sections)
+
+
+def _security(v) -> str:
+    sec = v._state("feeds/security.json", {})
+    ours = sec.get("ours", [])
+    if not sec:
+        return empty("The CISA feed hasn't run yet.")
+    head = (f'<div class="blw-banner blw-{"warn" if ours else "ok"}"><b>{len(ours)} exploited vulnerabilit{"y" if len(ours) == 1 else "ies"} name software you run</b>'
+            f'<span>{sec.get("recent", 0)} added to CISA\'s catalog in the last 45 days</span></div>')
+    return head + rows([f'{pill(x["hit"], "warn")} <b>{esc(x["what"])}</b> <small class="blw-muted">{esc(x["cve"])} · added {esc(x["added"])}</small>' for x in ours[:6]])
 
 
 # ---------------------------------------------------------------- write everything

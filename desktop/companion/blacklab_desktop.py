@@ -54,7 +54,7 @@ import ai_models  # noqa: E402  (Claude via the subscription CLI, Gemini, local 
 import vault_ai  # noqa: E402  (every Claude/Gemini conversation in the vault, glowing on the graph)
 import phone_ops  # noqa: E402  (Obsidian edits the phone carries out: tasks, commands, flashcards)
 
-VERSION = "1.12.0"
+VERSION = "1.13.0"
 HOST, PORT = "127.0.0.1", int(os.environ.get("BLACKLAB_DESKTOP_PORT", "8770"))
 HOME = Path.home()
 WEB_DIR = Path(__file__).resolve().parent.parent / "web"
@@ -798,7 +798,63 @@ def answer_from_docs(question: str) -> tuple[str, str]:
 # ---------------------------------------------------------------- desktop tools
 
 @logged_tool("system_status")
+def monitor_snapshot() -> dict:
+    """monitor.snapshot with everything the companion knows (no AI involved — works when Ollama is down)."""
+    import monitor
+    import vault_recall
+    import vault_web
+    rc = {}
+    try:
+        rc = vault_recall.status(VAULT, CONFIG) if VAULT_ON else {}
+    except Exception:
+        pass
+    lib = {}  # library.status() can re-read the Kiwix catalog; the report doesn't need it
+    return monitor.snapshot(vault_web.collect_system(), load_json(vault_web.HEALTH_LATEST, {}), chat_model=str(CONFIG.get("model") or ""),
+                            recall=rc, vault={"errors": list(VAULT.errors)} if VAULT_ON else {}, phone_last_seen=PHONE["last_seen"], library=lib,
+                            syncthing=monitor.syncthing_status())
+
+
+def status_report() -> str:
+    import monitor
+    return monitor.report(monitor_snapshot())
+
+
+MONITOR = {"last": None, "error": ""}
+
+
+def monitor_keeper():
+    """Every 5 minutes while Paul is away (or home): new problems and recoveries become one phone notification each
+    check — never a repeat. Bad problems alert at once; warnings only when they last two checks."""
+    import monitor
+    time.sleep(90)  # let the stack settle after a restart
+    while True:
+        try:
+            snap = monitor_snapshot()
+            probs = monitor.problems(snap)
+            st = load_json(CACHE_DIR / "monitor.json", {})
+            new, cleared = monitor.changes(st, probs)
+            CACHE_DIR.mkdir(parents=True, exist_ok=True)
+            (CACHE_DIR / "monitor.json").write_text(json.dumps(st))
+            MONITOR.update(last=time.time(), error="", open=len(st.get("open", {})))
+            if CONFIG.get("monitor_alerts", True) is not False and (new or cleared):
+                bad = any(p["severity"] == "bad" for p in new)
+                title = ("🔴 " if bad else "🟡 " if new else "🟢 ") + ("Computer needs attention" if new else "Computer recovered")
+                text = "\n".join([("🔴 " if p["severity"] == "bad" else "🟡 ") + p["text"] for p in new] + [f"✅ cleared: {k}" for k in cleared])
+                agents.notice(title, text + "\n\nAsk “on my computer, status report” for the full picture.", origin="BlackLab Desktop (monitor)")
+                LEDGER.record("This computer", "monitor:alert", source="monitor", metadata={"new": [p["key"] for p in new], "cleared": cleared})
+        except Exception as e:  # noqa: BLE001 — never let this thread die
+            MONITOR.update(last=time.time(), error=str(e)[:200])
+        time.sleep(int(CONFIG.get("monitor_seconds", 300)))
+
+
 def tool_system_status(_=None):
+    try:
+        return status_report()
+    except Exception:
+        return tool_system_status_basic()
+
+
+def tool_system_status_basic(_=None):
     du = shutil.disk_usage(HOME)
     mem = {}
     try:
@@ -1038,6 +1094,20 @@ def tool_nightjar_camera(args):
 
 
 @logged_tool("qdrant_search")
+@logged_tool("knowledge_search")
+def tool_knowledge_search(args):
+    """kb-core over the vault and the reference library; the passages, each with where it came from."""
+    import vault_recall
+    q = (args.get("query") if isinstance(args, dict) else str(args or "")).strip()
+    if not q:
+        return "No query given."
+    r = vault_recall.ask(VAULT, q, 6, local=True, config=CONFIG, reference=True)
+    hits = r.get("results") or []
+    if not hits:
+        return "Nothing in the notes or the reference library matches that."
+    return "\n\n".join(("📘 " + h["title"] if h.get("kind") == "reference" else f"📝 [[{h['title']}]]") + f"\n{h['text'][:900]}" for h in hits)
+
+
 def tool_qdrant_search(args):
     query = args.get("query") if isinstance(args, dict) else str(args or "")
     if not query.strip():
@@ -1230,6 +1300,9 @@ def private_drive():
 def desktop_rules(text: str, phone):
     t = text.strip()
     low = t.lower()
+    import monitor
+    if re.match(monitor.STATUS_WORDS, low.strip(" .!")):  # "status report", "is everything ok at home?" — no AI needed
+        return status_report(), "Desktop · status"
     import drive_private
     parsed = drive_private.parse(t)
     if parsed:
@@ -1344,7 +1417,7 @@ def desktop_rules(text: str, phone):
 TOOLS = [
     {"type": "function", "function": {"name": "phone_command", "description": "Run a command in the BlackLab phone app: tasks, reminders, calendar, notes, journal, recorder, dictation, files search, email, Drive, briefing, education.",
                                       "parameters": {"type": "object", "properties": {"command": {"type": "string", "description": "Plain-English command, e.g. 'add task call vendor tomorrow 9am'"}}, "required": ["command"]}}},
-    {"type": "function", "function": {"name": "system_status", "description": "Disk, memory, load, battery and phone connection of this computer.", "parameters": {"type": "object", "properties": {}}}},
+    {"type": "function", "function": {"name": "system_status", "description": "Full health of this computer: problems first, then services, the AI (Ollama and loaded models), both GPUs, memory, disk, vault recall, the phone's vault sync and last night's system check.", "parameters": {"type": "object", "properties": {}}}},
     {"type": "function", "function": {"name": "find_files", "description": "Find files in the user's home folder by name.", "parameters": {"type": "object", "properties": {"query": {"type": "string"}}, "required": ["query"]}}},
     {"type": "function", "function": {"name": "read_file", "description": "Read a text file from the user's home folder.", "parameters": {"type": "object", "properties": {"path": {"type": "string"}}, "required": ["path"]}}},
     {"type": "function", "function": {"name": "open_path", "description": "Open a file or folder in the user's home with the default app.", "parameters": {"type": "object", "properties": {"path": {"type": "string"}}, "required": ["path"]}}},
@@ -1363,6 +1436,8 @@ TOOLS = [
                                       "parameters": {"type": "object", "properties": {"query": {"type": "string"}, "provider": {"type": "string", "enum": ["claude", "gemini", ""]}}, "required": ["query"]}}},
     {"type": "function", "function": {"name": "vault_write", "description": "Save a note into the user's Obsidian vault (00 Inbox unless a folder is named). Only when the user asks to save, note or log something there.",
                                       "parameters": {"type": "object", "properties": {"title": {"type": "string"}, "text": {"type": "string"}, "folder": {"type": "string"}}, "required": ["text"]}}},
+    {"type": "function", "function": {"name": "knowledge_search", "description": "Semantic search (meaning, not just words) across the user's notes AND the reference library of government standards and guides: OSHA 29 CFR 1910/1926/1904, CMS emergency preparedness (Appendix Z), Life Safety Code survey guidance (Appendix I), psychiatric hospital rules (Appendix AA, 42 CFR 482), FEMA P-1019 emergency power, EPA building air quality, VA mental-health facility design, NIST cybersecurity/OT/AI frameworks, IRS publications, the FAR, DOE O&M. Use it for compliance, code, safety, maintenance and 'what does the regulation say' questions; cite the document titles it returns.",
+                                      "parameters": {"type": "object", "properties": {"query": {"type": "string"}}, "required": ["query"]}}},
     {"type": "function", "function": {"name": "library_search", "description": "Search the offline reference library (~50 GB: Wikipedia, Stack Exchange, LibreTexts, Wikibooks, iFixit, MedlinePlus, Ready.gov, USDA canning, survival and field manuals) for facts and how-tos.",
                                       "parameters": {"type": "object", "properties": {"query": {"type": "string"}}, "required": ["query"]}}},
     {"type": "function", "function": {"name": "reverse_engineer", "description": (
@@ -1403,6 +1478,7 @@ def run_tool(name, args, phone):
            "open_url": tool_open_url, "launch_app": tool_launch_app, "desktop_note": tool_desktop_note, "dev_docs": tool_dev_docs,
            "recall_chats": tool_recall_chats, "search_documents": tool_search_documents, "equipment": tool_equipment,
            "vault_search": tool_vault_search, "vault_write": tool_vault_write, "recall_ai": tool_recall_ai, "library_search": tool_library_search,
+           "knowledge_search": tool_knowledge_search,
            "reverse_engineer": tool_reverse_engineer, "skills_search": tool_skills_search, "skill_use": tool_skill_use,
            "execute_command": tool_execute_command, "nightjar_camera": tool_nightjar_camera, "qdrant_search": tool_qdrant_search}
     try:
@@ -1632,7 +1708,8 @@ def phone_ask(body):
     phone = resolve_phone()
     r = assistant({"text": body.get("text", ""), "target": "desktop", "phone": phone, "origin": f"Phone assistant ({who})",
                    "private": bool(body.get("private")), "model": body.get("model")})
-    return {"text": r.get("text", ""), "source": "Desktop · " + r.get("source", "")}
+    src = r.get("source", "")
+    return {"text": r.get("text", ""), "source": src if src.startswith("Desktop") else "Desktop · " + src}
 
 
 
@@ -2257,6 +2334,8 @@ def recall_pass():
         import vault_recall
         t0 = time.time()
         RECALL_RUN["last"] = r = vault_recall.index(VAULT, CONFIG, budget_s=float(CONFIG.get("recall_budget_s", 240)))
+        if CONFIG.get("recall_reference", True) is not False:  # the reference library (95 Library/*/Files), a few documents per pass
+            r["reference"] = vault_recall.index_reference(VAULT, CONFIG, budget_s=float(CONFIG.get("recall_reference_budget_s", 300)))
         if r.get("sent") or r.get("removed"):
             LEDGER.record("BlackLab", "recall:index", target="kb-core", source="companion", duration_ms=int((time.time() - t0) * 1000),
                           metadata={"sent": r.get("sent", 0), "removed": r.get("removed", 0), "pending": r.get("pending", 0)})
@@ -2354,6 +2433,36 @@ def atlas_keeper():
 _KIWIX = {"proc": None}
 
 
+FEEDS_RUN = {"last": None, "report": {}, "docs": None}
+
+
+def feeds_keeper():
+    """Public data feeds (feeds.py) every 15 minutes — each feed keeps its own pace — and, once a day, any reference
+    document that's missing or was amended (eCFR) is downloaded again and its library card refreshed."""
+    import feeds
+    import library
+    time.sleep(120)
+    while True:
+        try:
+            if CONFIG.get("feeds", True) is not False and VAULT_ON:
+                with VAULT.lock:
+                    rep = feeds.run(VAULT, CONFIG)
+                FEEDS_RUN.update(last=time.time(), report=rep)
+                if time.time() - (FEEDS_RUN["docs"] or 0) > 86400:
+                    FEEDS_RUN["docs"] = time.time()
+                    log = []
+                    library.download_docs(VAULT.root, log=log.append)
+                    if any(l.startswith("✓") for l in log):
+                        with VAULT.lock:
+                            library.write_cards(VAULT)
+                        VAULT.log("file", "Reference library updated", "; ".join(log)[:400], source="BlackLab Desktop", links=["◆ Knowledge Library"])
+                if rep:
+                    VAULT.commit("Feeds: " + ", ".join(rep), min_gap=600)
+        except Exception as e:  # noqa: BLE001
+            FEEDS_RUN.update(last=time.time(), report={"error": str(e)[:200]})
+        time.sleep(900)
+
+
 def library_keeper():
     """Runs kiwix-serve (127.0.0.1 only) once the reader is installed and books are registered; restarts it if it stops."""
     import library
@@ -2409,7 +2518,8 @@ def phone_vault_pass(serial: str, force=False):
         with VAULT.lock:
             PHONE_VAULT["last"] = phone_vault.sync(adb_path(), serial, VAULT.root, CONFIG.get("phone_vault_dir", "/sdcard/Documents/BlackLab"),
                                                    CACHE_DIR / "phone-vault.json", on_pull=pulled,
-                                                   include_local=CONFIG.get("phone_vault_local", False) is True)
+                                                   include_local=CONFIG.get("phone_vault_local", False) is True,
+                                                   mirror_settings=CONFIG.get("phone_mirror_settings", True) is not False)
             VAULT.commit("Phone sync (Obsidian on the phone)" if PHONE_VAULT["last"]["pulled"] else "", min_gap=0 if PHONE_VAULT["last"]["pulled"] else 300)
         PHONE_VAULT["error"] = None
     except Exception as e:
@@ -2528,6 +2638,8 @@ def main():
     threading.Thread(target=keep_usb_link, daemon=True).start()
     threading.Thread(target=memory_keeper, daemon=True).start()
     threading.Thread(target=keep_warm_keeper, daemon=True, name="keep-warm").start()
+    threading.Thread(target=monitor_keeper, daemon=True, name="monitor").start()
+    threading.Thread(target=feeds_keeper, daemon=True, name="feeds").start()
     threading.Thread(target=tailnet_keeper, daemon=True, name="tailnet").start()
     if VAULT_ON:
         threading.Thread(target=vault_keeper, daemon=True, name="vault").start()

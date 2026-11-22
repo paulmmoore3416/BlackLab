@@ -174,7 +174,7 @@ def vault_safe_passages(text: str) -> tuple[str, int]:
 # guard — never out of the identifier guard — when it lives under a reference folder and its frontmatter says
 # `blacklab_reference: program`. Paragraphs that carry a filled-in identifier (MRN: 1234, DOB: 3/4/71…) are still
 # dropped and every secret/identifier redaction still runs.
-REFERENCE_DIRS = ("02 Projects/",)
+REFERENCE_DIRS = ("02 Projects/", "80 Knowledge/Regulatory/", "80 Knowledge/Feeds/")  # program material, public regulations
 REFERENCE_FLAG_RE = re.compile(r"\A---\n(?:.*\n)*?blacklab_reference:\s*[\"']?program[\"']?\s*\n(?:.*\n)*?---\n")
 PATIENT_RECORD_RE = re.compile(r"(?i)\b(mrn|medical record(?: number)?|patient (?:id|name|initials)|date of birth|dob|ssn|"
                                r"social security(?: number)?)\b\s*[:#=]\s*(?![_\s|]|$)\S")
@@ -232,7 +232,8 @@ SIDE_EFFECT_ASKS["reverse_engineer"] = RE_WORDS
 # Text like that can contain instructions aimed at the model ("open https://…?q=<your notes>").
 READS_CONTENT = {"read_file", "search_documents", "recall_chats", "recall_ai", "dev_docs", "phone_command", "find_files", "equipment", "vault_search", "library_search",
                  "reverse_engineer",  # strings inside a binary are attacker-chosen text
-                 "skill_use", "skills_search", "nightjar_camera", "qdrant_search"}  # agent skills are third-party text
+                 "skill_use", "skills_search", "nightjar_camera", "qdrant_search",  # agent skills are third-party text
+                 "knowledge_search", "system_check"}  # notes + reference documents; status text echoes service and file names
 
 
 def url_host(u: str) -> str:
