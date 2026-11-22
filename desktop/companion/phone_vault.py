@@ -23,6 +23,9 @@ SKIP_TOP = {".git", ".trash"}
 # config "phone_vault_local": true copies them too.
 LOCAL_TOP = {"85 Atlas", "86 Imported", "87 Entities", "88 Drive", "89 Mobile"}
 PHONE_LOCAL = ("workspace", "workspace-mobile", "cache")  # .obsidian files the phone keeps for itself
+# Archived entity cards from the first extractor include names that differ only in case ("TypeScript" / "typescript");
+# phone storage is case-insensitive, so they can never sync there. They stay on the computer.
+DESKTOP_ONLY = ("99 Archive/87 Entities",)
 MARKER = ".blacklab-sync"
 
 
@@ -40,6 +43,7 @@ def stignore_rules(include_local: bool = False) -> str:
     lines += [f"/{t}" for t in sorted(SKIP_TOP)]
     if not include_local:
         lines += [f"/{t}" for t in sorted(LOCAL_TOP)]
+    lines += [f"/{d}" for d in DESKTOP_ONLY]
     lines += [f"/.obsidian/{x}*" for x in PHONE_LOCAL]
     lines += ["!/.stglobalignore", "!.gitignore", "!/.obsidian", ".*"]
     return "\n".join(lines) + "\n"
@@ -67,6 +71,8 @@ def local_files(root: Path, include_local: bool = False) -> list[str]:
         if rel.parts[0] in SKIP_TOP or (rel.parts[0] in LOCAL_TOP and not include_local) or p.name.startswith(".") and p.name != ".gitignore":
             continue
         if rel.parts[0] == ".obsidian" and any(p.stem.startswith(x) for x in PHONE_LOCAL):
+            continue
+        if any(rel.as_posix().startswith(d + "/") for d in DESKTOP_ONLY):
             continue
         out.append(rel.as_posix())
     return sorted(out)
