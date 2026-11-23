@@ -43,7 +43,7 @@ jobs:
       - name: Desktop web + Obsidian plugin tests
         run: |
           node --version
-          node --test desktop/web/tests/views.test.mjs desktop/obsidian/blacklab-graph-fx/graph_fx.test.mjs desktop/obsidian/blacklab-assistant/assistant.test.mjs
+          node --test desktop/web/tests/views.test.mjs desktop/web/tests/terminal_ime.test.mjs desktop/obsidian/blacklab-graph-fx/graph_fx.test.mjs desktop/obsidian/blacklab-assistant/assistant.test.mjs
 
   build:
     name: Build & unit tests

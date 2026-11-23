@@ -8,7 +8,10 @@ import android.content.Intent
 import android.net.Uri
 import android.os.Handler
 import android.os.Looper
+import android.text.InputType
 import android.util.Base64
+import android.view.inputmethod.EditorInfo
+import android.view.inputmethod.InputConnection
 import android.webkit.JavascriptInterface
 import android.webkit.WebResourceRequest
 import android.webkit.WebResourceResponse
@@ -34,11 +37,14 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.Send
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.Bolt
 import androidx.compose.material.icons.rounded.Computer
 import androidx.compose.material.icons.rounded.ContentPaste
 import androidx.compose.material.icons.rounded.Delete
+import androidx.compose.material.icons.rounded.EditNote
+import androidx.compose.material.icons.rounded.History
 import androidx.compose.material.icons.rounded.Dns
 import androidx.compose.material.icons.rounded.LinkOff
 import androidx.compose.material.icons.rounded.Lock
@@ -67,15 +73,25 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.listSaver
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.toMutableStateList
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.input.KeyboardCapitalization
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -340,7 +356,8 @@ private class TermView(private val live: Terminals.Live) {
     }
 }
 
-private class TermBridge(private val live: Terminals.Live, private val view: TermView, private val onKeys: (ctrl: Boolean?, alt: Boolean?) -> Unit) {
+private class TermBridge(private val live: Terminals.Live, private val view: TermView, private val onKeys: (ctrl: Boolean?, alt: Boolean?) -> Unit,
+                         private val onFont: (Int) -> Unit) {
     @JavascriptInterface fun onReady(cols: Int, rows: Int) {
         view.cols = cols; view.rows = rows
         view.onReady()
@@ -353,14 +370,42 @@ private class TermBridge(private val live: Terminals.Live, private val view: Ter
     }
     @JavascriptInterface fun onCtrl(on: Boolean) = onKeys(on, null)
     @JavascriptInterface fun onAlt(on: Boolean) = onKeys(null, on)
+    /** A pinch changed the text size. */
+    @JavascriptInterface fun onFont(px: Int) = onFont.invoke(px)
+}
+
+/**
+ * The terminal's WebView, asking for a plain keyboard: no suggestions, autocorrect or composing (the same trick
+ * Termux uses — Android keyboards treat it like a visible password field). With composing on, Gboard keeps the whole
+ * line "in progress" and rewrites it as you type, which a terminal can only see as the line arriving again and again.
+ * Full-keyboard typing (suggestions, voice) lives in the compose box under the terminal instead.
+ */
+private class TermWebView(c: Context) : WebView(c) {
+    override fun onCreateInputConnection(outAttrs: EditorInfo): InputConnection? {
+        val ic = super.onCreateInputConnection(outAttrs)
+        outAttrs.inputType = PLAIN_KEYBOARD
+        outAttrs.imeOptions = (outAttrs.imeOptions and EditorInfo.IME_MASK_ACTION.inv()) or EditorInfo.IME_ACTION_NONE or
+            EditorInfo.IME_FLAG_NO_ENTER_ACTION or EditorInfo.IME_FLAG_NO_EXTRACT_UI or EditorInfo.IME_FLAG_NO_FULLSCREEN or
+            EditorInfo.IME_FLAG_NO_PERSONALIZED_LEARNING
+        return ic
+    }
+
+    companion object {
+        /** Text, visible-password variation (no suggestions/composing), no caps, keeps Return as a key. */
+        const val PLAIN_KEYBOARD =
+            InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD or InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS or
+                InputType.TYPE_TEXT_FLAG_MULTI_LINE
+    }
 }
 
 @SuppressLint("SetJavaScriptEnabled")
 @Composable
-private fun TerminalView(live: Terminals.Live, view: TermView, onKeys: (Boolean?, Boolean?) -> Unit, modifier: Modifier) {
+private fun TerminalView(live: Terminals.Live, view: TermView, font: Int, awake: Boolean, onKeys: (Boolean?, Boolean?) -> Unit, onFont: (Int) -> Unit,
+                         modifier: Modifier) {
     val ctx = LocalContext.current
+    val main = remember { Handler(Looper.getMainLooper()) }
     AndroidView(modifier = modifier, factory = { c ->
-        WebView(c).apply {
+        TermWebView(c).apply {
             if (com.blacklab.app.BuildConfig.DEBUG) WebView.setWebContentsDebuggingEnabled(true)
             // AndroidView hosts views as WRAP_CONTENT, and a WRAP_CONTENT WebView collapses 100%-height pages to 0 px
             // (xterm then measures one row). Fill the space Compose gives it.
@@ -392,11 +437,14 @@ private fun TerminalView(live: Terminals.Live, view: TermView, onKeys: (Boolean?
                     return WebResourceResponse("text/plain", "utf-8", 403, "Blocked", emptyMap(), ByteArrayInputStream(ByteArray(0)))
                 }
             }
-            addJavascriptInterface(TermBridge(live, view, onKeys), "Android")
+            addJavascriptInterface(TermBridge(live, view, onKeys) { px -> main.post { onFont(px) } }, "Android")
             view.webView = this
             live.sink = { view.feed(it) }
-            loadUrl("https://bl.local/terminal.html")
+            loadUrl("https://bl.local/terminal.html?font=$font")
         }
+    }, update = { wv ->
+        // Reading a long reply shouldn't lock the phone mid-way; a dropped session lets the screen sleep as usual.
+        wv.keepScreenOn = awake
     }, onRelease = { wv ->
         if (view.webView === wv) { view.webView = null; live.sink = null }
         wv.removeJavascriptInterface("Android")
@@ -424,7 +472,20 @@ fun SshTerminalScreen(hostId: String) {
     val view = remember(host.id) { TermView(live) }
     var ctrl by remember { mutableStateOf(false) }
     var alt by remember { mutableStateOf(false) }
-    var font by remember { mutableStateOf(13) }
+    // The size on screen lives here and changes at once; the store only remembers it (it saves in the background, so
+    // reading it back for the next tap would lag behind quick taps or a pinch).
+    var font by remember { mutableIntStateOf(state.fontSize) }
+    fun saveFont(px: Int) {
+        val v = px.coerceIn(SshHosts.MIN_FONT, SshHosts.MAX_FONT)
+        font = v
+        scope.launch(Dispatchers.IO) { SshHosts.store.update(Terminals.storeFile(ctx)) { it.copy(fontSize = v) } }
+    }
+    fun stepFont(by: Int) { val v = (font + by).coerceIn(SshHosts.MIN_FONT, SshHosts.MAX_FONT); if (v != font) { view.js("bl.font($v)"); saveFont(v) } }
+    // The compose box keeps its text (and what was sent) through a rotation or a trip to another app. Sent lines stay
+    // in memory only, never on disk: a compose box can hold things you wouldn't want saved.
+    var composeOpen by rememberSaveable { mutableStateOf(false) }
+    var draft by rememberSaveable { mutableStateOf("") }
+    val sentLines = rememberSaveable(saver = listSaver(save = { it.toList() }, restore = { it.toMutableStateList() })) { mutableStateListOf<String>() }
     var menu by remember { mutableStateOf(false) }
     var commands by remember { mutableStateOf(false) }
     var running by remember { mutableStateOf<SshHosts.Command?>(null) }
@@ -475,8 +536,8 @@ fun SshTerminalScreen(hostId: String) {
                     val clip = (ctx.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager).primaryClip?.getItemAt(0)?.coerceToText(ctx)?.toString()
                     if (!clip.isNullOrEmpty()) view.js("bl.text(" + org.json.JSONObject.quote(clip) + ")")
                 })
-                DropdownMenuItem(text = { Text("Bigger text") }, leadingIcon = { Icon(Icons.Rounded.TextIncrease, null) }, onClick = { font = (font + 1).coerceAtMost(28); view.js("bl.font($font)") })
-                DropdownMenuItem(text = { Text("Smaller text") }, leadingIcon = { Icon(Icons.Rounded.TextDecrease, null) }, onClick = { font = (font - 1).coerceAtLeast(8); view.js("bl.font($font)") })
+                DropdownMenuItem(text = { Text("Bigger text") }, leadingIcon = { Icon(Icons.Rounded.TextIncrease, null) }, onClick = { stepFont(+1) })
+                DropdownMenuItem(text = { Text("Smaller text") }, leadingIcon = { Icon(Icons.Rounded.TextDecrease, null) }, onClick = { stepFont(-1) })
                 DropdownMenuItem(text = { Text("Reconnect") }, leadingIcon = { Icon(Icons.Rounded.Refresh, null) }, onClick = {
                     menu = false; live.close("Reconnecting…"); Terminals.connect(ctx, live)
                 })
@@ -511,9 +572,18 @@ fun SshTerminalScreen(hostId: String) {
                 }
                 else -> {}
             }
-            TerminalView(live, view, onKeys = { c, a -> c?.let { ctrl = it }; a?.let { alt = it } }, modifier = Modifier.weight(1f).fillMaxWidth())
-            KeyBar(ctrl, alt, onKey = { view.js("bl.key('$it')") }, onText = { view.js("bl.text(" + org.json.JSONObject.quote(it) + ")") },
-                onCtrl = { ctrl = !ctrl; view.js("bl.ctrl($ctrl)") }, onAlt = { alt = !alt; view.js("bl.alt($alt)") })
+            TerminalView(live, view, font, awake = phase is Terminals.Phase.Connected, onKeys = { c, a -> c?.let { ctrl = it }; a?.let { alt = it } },
+                onFont = ::saveFont,
+                modifier = Modifier.weight(1f).fillMaxWidth())
+            KeyBar(ctrl, alt, composeOpen, onKey = { view.js("bl.key('$it')") }, onText = { view.js("bl.text(" + org.json.JSONObject.quote(it) + ")") },
+                onCtrl = { ctrl = !ctrl; view.js("bl.ctrl($ctrl)") }, onAlt = { alt = !alt; view.js("bl.alt($alt)") },
+                onCompose = { composeOpen = !composeOpen; if (!composeOpen) view.js("bl.focus()") })
+            if (composeOpen) ComposeBar(draft, { draft = it }, sentLines,
+                onSend = {
+                    view.js("bl.line(" + org.json.JSONObject.quote(draft) + ", true)")
+                    if (draft.isNotBlank()) { sentLines.remove(draft); sentLines.add(0, draft); while (sentLines.size > MAX_SENT) sentLines.removeAt(sentLines.lastIndex) }
+                    draft = ""
+                })
         }
     }
 
@@ -595,20 +665,64 @@ fun SshTerminalScreen(hostId: String) {
     }
 }
 
+/** How many sent compose-box lines the ⟲ menu keeps. */
+private const val MAX_SENT = 20
+
 @Composable
-private fun KeyBar(ctrl: Boolean, alt: Boolean, onKey: (String) -> Unit, onText: (String) -> Unit, onCtrl: () -> Unit, onAlt: () -> Unit) {
+private fun KeyBar(ctrl: Boolean, alt: Boolean, composing: Boolean, onKey: (String) -> Unit, onText: (String) -> Unit, onCtrl: () -> Unit, onAlt: () -> Unit,
+                   onCompose: () -> Unit) {
     Row(Modifier.fillMaxWidth().background(Color(0xFF121821)).horizontalScroll(rememberScrollState()).padding(horizontal = 4.dp, vertical = 4.dp),
         horizontalArrangement = Arrangement.spacedBy(4.dp)) {
         @Composable fun k(label: String, active: Boolean = false, onClick: () -> Unit) = TextButton(onClick = onClick,
-            modifier = Modifier.background(if (active) Color(0x552BD9A8) else Color(0xFF18202B), MaterialTheme.shapes.small)) {
-            Text(label, color = if (active) Color(0xFF2BD9A8) else Color(0xFFE7ECF3), fontFamily = FontFamily.Monospace, fontSize = 13.sp)
+            modifier = Modifier.heightIn(min = 44.dp).background(if (active) Color(0x552BD9A8) else Color(0xFF18202B), MaterialTheme.shapes.small)) {
+            Text(label, color = if (active) Color(0xFF2BD9A8) else Color(0xFFE7ECF3), fontFamily = FontFamily.Monospace, fontSize = 15.sp)
+        }
+        // The compose box first: it is where long messages (to Claude, say) are easiest to type.
+        TextButton(onClick = onCompose, modifier = Modifier.heightIn(min = 44.dp)
+            .background(if (composing) Color(0x552BD9A8) else Color(0xFF18202B), MaterialTheme.shapes.small)) {
+            Icon(Icons.Rounded.EditNote, "Compose box", tint = if (composing) Color(0xFF2BD9A8) else Color(0xFFE7ECF3))
         }
         k("Esc") { onKey("esc") }
         k("Tab") { onKey("tab") }
         k("Ctrl", ctrl, onCtrl)
         k("Alt", alt, onAlt)
+        k("^C") { onKey("ctrlc") }
         k("←") { onKey("left") }; k("↑") { onKey("up") }; k("↓") { onKey("down") }; k("→") { onKey("right") }
         listOf("|", "/", "-", "~", "$", "*", ":", "\"", "'", "&", ">").forEach { s -> k(s) { onText(s) } }
         k("Home") { onKey("home") }; k("End") { onKey("end") }; k("PgUp") { onKey("pgup") }; k("PgDn") { onKey("pgdn") }
+    }
+}
+
+/**
+ * Type with the full keyboard — suggestions, autocorrect, voice typing — and send the finished text to the terminal in
+ * one go. The terminal itself takes plain keys only, so this is the place for prose.
+ */
+@Composable
+private fun ComposeBar(text: String, onText: (String) -> Unit, sent: List<String>, onSend: () -> Unit) {
+    val focus = remember { FocusRequester() }
+    LaunchedEffect(Unit) { runCatching { focus.requestFocus() } }
+    var recent by remember { mutableStateOf(false) }
+    Row(Modifier.fillMaxWidth().background(Color(0xFF121821)).padding(start = 4.dp, end = 4.dp, bottom = 6.dp),
+        verticalAlignment = Alignment.CenterVertically) {
+        // Recently sent: pick one to put it back in the box (to send again, or fix and send)
+        Box {
+            IconButton(onClick = { recent = true }, enabled = sent.isNotEmpty()) {
+                Icon(Icons.Rounded.History, "Recently sent", tint = if (sent.isNotEmpty()) Color(0xFFE7ECF3) else Color(0xFF5B6676))
+            }
+            DropdownMenu(recent, { recent = false }) {
+                sent.forEach { line ->
+                    DropdownMenuItem(text = { Text(line, maxLines = 2, overflow = TextOverflow.Ellipsis) },
+                        onClick = { recent = false; onText(line); runCatching { focus.requestFocus() } })
+                }
+            }
+        }
+        OutlinedTextField(text, onText, modifier = Modifier.weight(1f).focusRequester(focus), maxLines = 5,
+            placeholder = { Text("Type or dictate, then send", color = Color(0xFF8D99AB)) },
+            textStyle = MaterialTheme.typography.bodyLarge.copy(color = Color(0xFFE7ECF3)),
+            keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences, autoCorrectEnabled = true))
+        // Send types the text and presses Return (an empty box just presses Return)
+        IconButton(onClick = onSend) {
+            Icon(Icons.AutoMirrored.Rounded.Send, "Send", tint = if (text.isNotBlank()) Color(0xFF2BD9A8) else Color(0xFF5B6676))
+        }
     }
 }

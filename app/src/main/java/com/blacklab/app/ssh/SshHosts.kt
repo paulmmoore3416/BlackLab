@@ -19,9 +19,13 @@ object SshHosts {
 
     data class Command(val id: String, val label: String, val command: String, val confirm: Boolean = false, val builtIn: Boolean = false)
 
-    data class State(val hosts: List<Host> = emptyList(), val commands: List<Command> = emptyList(), val lastHost: String = "")
+    data class State(val hosts: List<Host> = emptyList(), val commands: List<Command> = emptyList(), val lastHost: String = "", val fontSize: Int = DEFAULT_FONT)
 
     const val DESKTOP_ID = "blacklab-desktop"
+    /** Terminal text size in CSS px (pinch or ⋮ › Bigger/Smaller text changes it; it is remembered for every host). */
+    const val DEFAULT_FONT = 14
+    const val MIN_FONT = 8
+    const val MAX_FONT = 28
 
     /** Built-in quick commands for the BlackLab computer (read-only except the two restarts, which ask first). */
     val BUILT_IN = listOf(
@@ -82,6 +86,7 @@ object SshHosts {
         .put("hosts", JSONArray(s.hosts.map { JSONObject().put("id", it.id).put("name", it.name).put("host", it.host).put("port", it.port).put("user", it.user).put("auto", it.auto) }))
         .put("commands", JSONArray(s.commands.map { JSONObject().put("id", it.id).put("label", it.label).put("command", it.command).put("confirm", it.confirm) }))
         .put("lastHost", s.lastHost)
+        .put("fontSize", s.fontSize)
 
     fun fromJson(o: JSONObject): State {
         val hosts = o.optJSONArray("hosts")?.let { a -> (0 until a.length()).mapNotNull { i ->
@@ -90,7 +95,7 @@ object SshHosts {
         val cmds = o.optJSONArray("commands")?.let { a -> (0 until a.length()).mapNotNull { i ->
             a.optJSONObject(i)?.let { c -> Command(c.optString("id"), c.optString("label"), c.optString("command"), c.optBoolean("confirm")) }
         } }.orEmpty().filter { it.id.isNotBlank() && it.command.isNotBlank() }
-        return State(hosts, cmds, o.optString("lastHost"))
+        return State(hosts, cmds, o.optString("lastHost"), o.optInt("fontSize", DEFAULT_FONT).coerceIn(MIN_FONT, MAX_FONT))
     }
 
     val store = JsonStore("Terminal hosts", version = 1, empty = { State() }, decode = ::fromJson, encode = ::toJson)

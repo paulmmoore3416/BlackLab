@@ -6,8 +6,11 @@
 <link rel="stylesheet" href="https://bl.local/xterm.css">
 <style>
   html, body { margin: 0; height: 100%; background: #0B0E13; overflow: hidden; }
-  #t { position: fixed; inset: 4px 2px 2px 6px; }  /* pinned to the viewport, not to a body whose height may collapse */
+  #t { position: fixed; inset: 4px 2px 2px 6px; overflow: hidden; }  /* pinned to the viewport, not to a body whose height may collapse */
+  /* terminal.js does all touch scrolling and pinching itself; the browser panning the viewport as well made scrolls jumpy */
+  #t, #t .xterm, #t .xterm-viewport { touch-action: none; overscroll-behavior: none; }
   .xterm .xterm-viewport { scrollbar-width: thin; }
+  #t .xterm { will-change: transform; }
 </style>
 </head><body><div id="t"></div>
 <script src="https://bl.local/xterm.js"></script>
