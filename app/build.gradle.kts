@@ -100,7 +100,7 @@ ksp {
 }
 
 dependencies {
-    val composeBom = platform("androidx.compose:compose-bom:2026.09.00")
+    val composeBom = platform("androidx.compose:compose-bom:2026.11.01")
     implementation(composeBom)
     implementation("androidx.compose.ui:ui")
     implementation("androidx.compose.ui:ui-graphics")
@@ -128,7 +128,7 @@ dependencies {
     implementation(platform("org.jetbrains.kotlinx:kotlinx-serialization-bom:1.8.1"))
 
     // 1.6+: Extensions (Night/Portrait/HDR) keep working after CameraX ≤1.5 support ends on 2026-11-01
-    val camerax = "1.6.2"
+    val camerax = "1.7.0"
     implementation("androidx.camera:camera-core:$camerax")
     implementation("androidx.camera:camera-camera2:$camerax")
     implementation("androidx.camera:camera-lifecycle:$camerax")
