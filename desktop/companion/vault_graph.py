@@ -495,7 +495,7 @@ def update_related(v, notes: dict, embed, state: dict, k=3, exclude=None, only=N
     # notes with the same title count as linked (never pair a template's copies)
     linked = {}
     for r in names:
-        own = {pool[x]["title"] for x in ours_rel.get(r, [])}
+        own = {pool[x]["title"] for x in ours_rel.get(r, []) if x in pool}  # a related note may have moved or gone
         targets = {x for t in (pool[r]["links"] - own) for x in by_title.get(t, ())}
         linked[r] = targets | (by_title.get(pool[r]["title"], set()) - {r})
     sims = similarity_matrix([cache[r]["v"] for r in names])

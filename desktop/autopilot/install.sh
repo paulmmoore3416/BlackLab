@@ -5,6 +5,7 @@
 #                                   waits for Ollama, runs ./daddyshome, then the after-restart check
 #   blacklab-nightly-scan.timer     03:00 (America/Chicago) full system check → report on the phone
 #   blacklab-watchdog.timer         every 5 min: companion answering, plugged-in phone linked
+#   blacklab-backup.timer           03:30 encrypted restic backup (blacklab-backup.sh; result in the next check)
 #
 # Lingering (loginctl enable-linger) makes these run at boot without anyone logging in.
 # The 04:00 restart needs root: run  sudo desktop/autopilot/install-system.sh  once.
@@ -17,8 +18,8 @@ PY="/usr/bin/python3"
 SCAN_TIME="$(python3 -c 'import json,os;print(json.load(open(os.path.expanduser("~/.config/blacklab-desktop/autopilot.json"))).get("scan_time","03:00"))' 2>/dev/null || echo 03:00)"
 
 if [ "${1:-}" = "--uninstall" ]; then
-  systemctl --user disable --now blacklab-boot.service blacklab-nightly-scan.timer blacklab-watchdog.timer 2>/dev/null || true
-  rm -f "$UNITS"/blacklab-{boot,nightly-scan,watchdog}.{service,timer}
+  systemctl --user disable --now blacklab-boot.service blacklab-nightly-scan.timer blacklab-watchdog.timer blacklab-backup.timer 2>/dev/null || true
+  rm -f "$UNITS"/blacklab-{boot,nightly-scan,watchdog,backup}.{service,timer}
   systemctl --user daemon-reload
   echo "Autopilot removed (other projects you turned off stay off until you re-enable them)."
   exit 0
@@ -98,9 +99,35 @@ AccuracySec=30s
 WantedBy=timers.target
 UNIT
 
+cat > "$UNITS/blacklab-backup.service" <<UNIT
+[Unit]
+Description=BlackLab autopilot: nightly encrypted backup (restic)
+
+[Service]
+Type=oneshot
+Nice=10
+IOSchedulingClass=idle
+TimeoutStartSec=25min
+ExecStart=$HERE/blacklab-backup.sh
+UNIT
+
+cat > "$UNITS/blacklab-backup.timer" <<UNIT
+[Unit]
+Description=BlackLab autopilot: nightly backup at 03:30 Central (after the check, before the restart)
+
+[Timer]
+OnCalendar=*-*-* 03:30:00 America/Chicago
+Persistent=true
+AccuracySec=1min
+
+[Install]
+WantedBy=timers.target
+UNIT
+
 systemctl --user daemon-reload
-systemctl --user enable blacklab-boot.service blacklab-nightly-scan.timer blacklab-watchdog.timer
-systemctl --user start blacklab-nightly-scan.timer blacklab-watchdog.timer
+systemctl --user enable blacklab-boot.service blacklab-nightly-scan.timer blacklab-watchdog.timer blacklab-backup.timer
+systemctl --user start blacklab-nightly-scan.timer blacklab-watchdog.timer blacklab-backup.timer
+[ -s "$HOME/.config/blacklab-backup/password" ] || "$HERE/blacklab-backup.sh" --init
 loginctl show-user "$USER" -p Linger | grep -q yes || loginctl enable-linger "$USER" || echo "Run: loginctl enable-linger $USER (so this starts at boot without logging in)"
 echo "Autopilot installed:"
 systemctl --user list-timers blacklab-nightly-scan.timer blacklab-watchdog.timer --no-pager | head -4
