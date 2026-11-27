@@ -182,6 +182,18 @@ class PhonePayloadTest(unittest.TestCase):
         self.assertIn("steps", ops["live"][0])
         self.assertNotIn("report_md", ops["nightly_review"])
 
+    def test_jobs_carry_no_results_and_private_titles_hidden(self):
+        ops = ops_with([])
+        ops["jobs"] = [{"id": "a", "kind": "ask", "title": "summarize the budget", "status": "done", "progress": "Done", "origin": "Phone",
+                        "private": False, "result": {"text": "long answer"}, "error": None},
+                       {"id": "b", "kind": "ask", "title": "patient note", "status": "running", "progress": "Asked the model", "origin": "Phone",
+                        "private": True, "result": None, "error": "ValueError: patient chart missing"}]
+        jobs = O.phone_payload(ops, "")["jobs"]
+        self.assertNotIn("result", jobs[0])
+        self.assertEqual(jobs[0]["title"], "summarize the budget")
+        self.assertEqual((jobs[1]["title"], jobs[1]["progress"], jobs[1]["error"]), ("(private)", "", "failed"))
+        self.assertNotIn("patient", json.dumps(jobs))
+
     def test_report_capped(self):
         out = O.phone_payload(ops_with([]), "x" * 20_000)
         md = out["nightly_review"]["report_md"]

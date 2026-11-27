@@ -103,6 +103,7 @@ def review_health(setup: dict, state: dict, now: float, installed_at: float | No
 ADVISOR_CHOICES = ("auto", "off", "claude:opus")
 REPORT_CAP = 12_000
 PHONE_PRIVATE_KEYS = ("request", "origin", "started", "job", "private")
+JOB_KEYS = ("id", "kind", "title", "status", "progress", "created", "started", "finished", "origin", "private", "error")
 
 
 def phone_payload(ops: dict, report_md: str) -> dict:
@@ -117,6 +118,9 @@ def phone_payload(ops: dict, report_md: str) -> dict:
             t = {**{k: t.get(k) for k in PHONE_PRIVATE_KEYS}, "request": "(private)", "private": True}
         live.append({**t, "step_count": len(steps)})
     out["live"] = live
+    # jobs: what the phone shows and matches on, never the result (its own results already come via /phone/jobs)
+    out["jobs"] = [{k: j.get(k) for k in JOB_KEYS} | ({"title": "(private)", "progress": "", "error": "failed" if j.get("error") else None} if j.get("private") else {})
+                   for j in out.get("jobs") or [] if isinstance(j, dict)]
     md = report_md or ""
     nr = out.get("nightly_review") if isinstance(out.get("nightly_review"), dict) else {}
     out["nightly_review"] = {**nr, "report_md": md if len(md) <= REPORT_CAP else md[:REPORT_CAP] + "\n\n…(cut)"}
