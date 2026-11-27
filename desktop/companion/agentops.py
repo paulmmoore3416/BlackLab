@@ -155,3 +155,17 @@ def review_start(running: bool, enabled: bool) -> dict:
     if not enabled:
         return {"started": False, "note": "The nightly review is off in autopilot.json"}
     return {"started": True, "note": "Review started"}
+
+
+def brief_item(forks: dict, advisor: dict, review: dict, now: float) -> dict:
+    """The morning brief's 'Desktop AI' data: yesterday's fork/advisor counts and the last review's verdict."""
+    y = day(now - 86400)
+    fy = next((d for d in (forks or {}).get("days") or [] if isinstance(d, dict) and d.get("day") == y), {})
+    ay = next((d for d in (advisor or {}).get("days") or [] if isinstance(d, dict) and d.get("day") == y), {})
+    at = (review or {}).get("at")
+    last = None
+    if isinstance(at, (int, float)):
+        last = {"status": str(review.get("status") or ""), "verdict": str(review.get("summary") or "")[:200],
+                "when": time.strftime("%Y-%m-%d %H:%M", time.localtime(at))}
+    return {"yesterday_fork_decisions": sum(counts(fy, ("sharp", "split")).values()),
+            "yesterday_advisor_consults": sum(counts(ay, ("plan", "repeat", "done")).values()), "last_review": last}

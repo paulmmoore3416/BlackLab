@@ -222,5 +222,24 @@ class PhoneControlsTest(Tmp):
         self.assertEqual(O.review_start(running=False, enabled=False), {"started": False, "note": "The nightly review is off in autopilot.json"})
         self.assertEqual(O.review_start(running=False, enabled=True), {"started": True, "note": "Review started"})
 
+
+class BriefItemTest(unittest.TestCase):
+    def test_brief_item_counts_yesterday(self):
+        now = time.time()
+        y, today = O.day(now - DAY), O.day(now)
+        forks = {"days": [{"day": y, "sharp": 3, "split": 1}, {"day": today, "sharp": 9, "split": 9}]}
+        adv = {"days": [{"day": y, "plan": 2, "repeat": 0, "done": 0}]}
+        review = {"at": now - 3 * 3600, "status": "Reviewed", "summary": "No findings."}
+        item = O.brief_item(forks, adv, review, now)
+        self.assertEqual(item["yesterday_fork_decisions"], 4)
+        self.assertEqual(item["yesterday_advisor_consults"], 2)
+        self.assertEqual(item["last_review"]["status"], "Reviewed")
+        self.assertEqual(item["last_review"]["verdict"], "No findings.")
+        self.assertRegex(item["last_review"]["when"], r"^\d{4}-\d{2}-\d{2} \d{2}:\d{2}$")
+
+    def test_brief_item_without_review(self):
+        item = O.brief_item({}, {}, {}, time.time())
+        self.assertEqual((item["yesterday_fork_decisions"], item["yesterday_advisor_consults"], item["last_review"]), (0, 0, None))
+
 if __name__ == "__main__":
     unittest.main()

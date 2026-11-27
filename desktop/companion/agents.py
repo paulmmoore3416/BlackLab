@@ -795,6 +795,9 @@ def run_brief(j: dict) -> dict:
     now = dt.datetime.now()
     meetings = _recent_docs(MEETINGS_DIR, 1)
     data = {
+        # first, so it survives the 22,000-character cut below
+        "desktop_ai": C.agentops.brief_item(C.router.STATS.snapshot(), C.advisor.LOG.snapshot(),
+                                            C.load_json(C.CACHE_DIR / "nightly-review.json", {}), time.time()),
         "today": now.strftime("%A, %B %d %Y"), "stale_note": stale,
         "weather": ctx.get("weather"), "events": ctx.get("events", []), "tasks_due_or_overdue": [t for t in ctx.get("tasks_open", []) if t.get("due") and t["due"] <= now.date().isoformat()],
         "tasks_soon": [t for t in ctx.get("tasks_open", []) if t.get("due") and now.date().isoformat() < t["due"] <= (now.date() + dt.timedelta(days=3)).isoformat()],
@@ -810,7 +813,8 @@ def run_brief(j: dict) -> dict:
                     "high-priority work orders and equipment with repeat failures, then today's deadlines, then meetings. "
                     "Sections, skipping any that are empty: '## Top 3 today' (ranked, one line each with why), "
                     "'## Weather prep' (alerts with the checklist), '## Schedule', '## Due and overdue', '## Work orders', '## Equipment watch', "
-                    "'## From yesterday's meetings', '## Study'. Be specific and short; never invent items that aren't in the data.\n\n"
+                    "'## From yesterday's meetings', '## Study', '## Desktop AI' (one or two lines from desktop_ai: last night's code review "
+                    "verdict and yesterday's fork decisions and advisor consults). Be specific and short; never invent items that aren't in the data.\n\n"
                     + json.dumps(data, ensure_ascii=False, default=str)[:22000], max_tokens=1200, temperature=0.3)
     body += "\n\n" + _practice_questions(ctx)
     body = clean_md(body)
