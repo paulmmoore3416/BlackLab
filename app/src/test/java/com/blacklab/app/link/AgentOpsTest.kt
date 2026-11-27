@@ -62,6 +62,23 @@ class AgentOpsTest {
         assertEquals("Idle · m · updated 15 min ago", AgentOps.summary(stale, online = true, now = now))
     }
 
+    @Test fun agentOpsWidgetLines() {
+        assertEquals(listOf("Offline", "—", "Review: —"), AgentOps.widgetLines(null, online = false, now = now))
+        assertEquals(listOf("Working · 2 tasks", "5 decisions · 2 consults today", "Review: no findings"),
+            AgentOps.widgetLines(AgentOps.parse(fixture(), now), online = true, now = now))
+    }
+
+    @Test fun reviewLabels() {
+        val r = AgentOps.parse(fixture(), now).review
+        assertEquals("no findings", AgentOps.reviewLabel(r))
+        assertEquals("findings", AgentOps.reviewLabel(r.copy(summary = "2 finding(s): …")))
+        assertEquals("missed", AgentOps.reviewLabel(r.copy(health = "missed")))
+        assertEquals("failed", AgentOps.reviewLabel(r.copy(status = "Failed", health = "failed")))
+        assertEquals("off", AgentOps.reviewLabel(r.copy(enabled = false)))
+        assertEquals("skipped", AgentOps.reviewLabel(r.copy(status = "Skipped")))
+        assertEquals("tonight", AgentOps.reviewLabel(r.copy(status = "")))
+    }
+
     @Test fun notFoundMeansOldCompanion() {
         assertEquals("Update the companion on your computer (needs 1.15.2)", AgentOps.errorFor(404))
         assertEquals("Update the companion on your computer (needs 1.15.2)", AgentOps.errorMessage(IllegalStateException("HTTP 404")))

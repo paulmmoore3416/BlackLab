@@ -72,13 +72,13 @@ fun statusColor(s: AgentOps.Status): Color = when (s) {
     AgentOps.Status.OFFLINE -> Color(0xFF9E9E9E)
 }
 
-/** Chip text and colour for the review: Reviewed / Skipped / Failed / Missed / Off / waiting. */
-fun reviewChip(r: AgentOps.Review): Pair<String, Color> = when {
-    !r.enabled -> "Review off" to Color(0xFF9E9E9E)
-    r.health == "missed" -> "Review missed" to OpsRed
-    r.status == "Failed" || r.health == "failed" -> "Review failed" to OpsRed
-    r.status == "Reviewed" -> (if (r.summary.startsWith("No findings")) "Review: no findings" else "Review: findings") to (if (r.summary.startsWith("No findings")) OpsGreen else OpsAmber)
-    r.status == "Skipped" -> "Review skipped" to Color(0xFF90A4AE)
+/** Chip text and colour for the review, from AgentOps.reviewLabel. */
+fun reviewChip(r: AgentOps.Review): Pair<String, Color> = when (val l = AgentOps.reviewLabel(r)) {
+    "no findings" -> "Review: no findings" to OpsGreen
+    "findings" -> "Review: findings" to OpsAmber
+    "missed", "failed" -> "Review $l" to OpsRed
+    "off" -> "Review off" to Color(0xFF9E9E9E)
+    "skipped" -> "Review skipped" to Color(0xFF90A4AE)
     else -> "Review tonight" to Color(0xFF90A4AE)
 }
 

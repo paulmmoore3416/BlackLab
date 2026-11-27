@@ -114,6 +114,23 @@ object AgentOps {
         }
     }
 
+    /** The review in a word or two: no findings / findings / failed / missed / skipped / off / tonight. */
+    fun reviewLabel(r: Review): String = when {
+        !r.enabled -> "off"
+        r.health == "missed" -> "missed"
+        r.status == "Failed" || r.health == "failed" -> "failed"
+        r.status == "Reviewed" -> if (r.summary.startsWith("No findings")) "no findings" else "findings"
+        r.status == "Skipped" -> "skipped"
+        else -> "tonight"
+    }
+
+    /** The widget's three lines (also what decides whether the widget and tile need redrawing). */
+    fun widgetLines(s: Snapshot?, online: Boolean, now: Long): List<String> = listOf(
+        summary(s, online, now),
+        s?.let { "${it.forksToday} decisions · ${it.consultsToday} consults today" } ?: "—",
+        "Review: " + (s?.let { reviewLabel(it.review) } ?: "—"),
+    )
+
     fun errorFor(code: Int): String = if (code == 404) OLD_COMPANION else "HTTP $code"
 
     fun errorMessage(e: Throwable): String = when {
@@ -146,13 +163,21 @@ object AgentOps {
                     val at = System.currentTimeMillis()
                     val s = parse(j, at)
                     app.context.getSharedPreferences(PREFS, 0).edit().putString("last", j.toString()).putLong("at", at).apply()
+                    val before = widgetLines(_snapshot.value, true, at)
                     _snapshot.value = s
                     _error.value = ""
+                    if (widgetLines(s, true, at) != before) notifySurfaces(app.context)
                     true
                 },
                 onFailure = { _error.value = errorMessage(it); false },
             )
         }
+    }
+
+    /** Redraws the Home-screen widget and asks the Quick Settings tile to refresh (called only when what they show changes). */
+    suspend fun notifySurfaces(c: Context) {
+        runCatching { com.blacklab.app.widgets.AgentOpsWidget.refresh(c) }
+        runCatching { com.blacklab.app.assistant.AgentOpsTile.requestUpdate(c) }
     }
 
     /** "Run review now": the computer reviews the commits since the last review (read-only Claude Code). */
