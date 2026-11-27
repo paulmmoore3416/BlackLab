@@ -154,5 +154,73 @@ class ReviewPanelTest(unittest.TestCase):
         self.assertIn("2 days", missed["note"])
 
 
+
+def ops_with(live):
+    return {"version": "1.15.2", "live": live, "nightly_review": {"status": "Reviewed", "summary": "No findings."}, "advisor": {}, "forks": {}}
+
+
+class PhonePayloadTest(unittest.TestCase):
+    PRIVATE = {"request": "(private)", "origin": "Phone", "started": "2026-11-27T18:00:00", "job": "j1", "private": True,
+               "steps": [{"kind": "guard", "title": "Clinical content: kept local", "at": "18:00:01"}, {"kind": "tool", "title": "x", "at": "18:00:02"}]}
+
+    def test_private_live_task_has_no_steps(self):
+        out = O.phone_payload(ops_with([self.PRIVATE]), "")
+        self.assertEqual(set(out["live"][0]), {"request", "origin", "started", "job", "private", "step_count"})
+        self.assertEqual(out["live"][0]["step_count"], 2)
+        self.assertNotIn("Clinical", json.dumps(out))
+
+    def test_public_live_task_keeps_steps(self):
+        pub = {**self.PRIVATE, "private": False, "request": "find files named budget",
+               "steps": [{"kind": "tool", "title": "find_files", "at": "18:00:01"}]}
+        out = O.phone_payload(ops_with([pub]), "")
+        self.assertEqual(out["live"][0]["steps"][0]["title"], "find_files")
+        self.assertEqual(out["live"][0]["step_count"], 1)
+
+    def test_does_not_change_the_desktop_payload(self):
+        ops = ops_with([self.PRIVATE])
+        O.phone_payload(ops, "report")
+        self.assertIn("steps", ops["live"][0])
+        self.assertNotIn("report_md", ops["nightly_review"])
+
+    def test_report_capped(self):
+        out = O.phone_payload(ops_with([]), "x" * 20_000)
+        md = out["nightly_review"]["report_md"]
+        self.assertLessEqual(len(md), 12_010)
+        self.assertTrue(md.endswith("…(cut)"))
+        self.assertEqual(O.phone_payload(ops_with([]), "short")["nightly_review"]["report_md"], "short")
+
+
+class PhoneControlsTest(Tmp):
+    def test_advisor_label(self):
+        self.assertEqual(O.ADVISOR_CHOICES, ("auto", "off", "claude:opus"))
+        self.assertEqual(O.advisor_label("auto"), "auto")
+        self.assertEqual(O.advisor_label("claude:opus"), "claude:opus")
+        self.assertEqual(O.advisor_label("local:qwen3:32b"), "custom: local:qwen3:32b")
+
+    def test_write_config_key_preserves_others(self):
+        self.p.write_text(json.dumps({"a": 1, "advisor": "auto"}))
+        self.p.write_text(json.dumps({"a": 1, "b": 2, "advisor": "auto"}))  # edited on disk (./daddyshome) after the companion loaded it
+        self.assertEqual(O.write_config_key(self.p, "advisor", "off"), {"a": 1, "b": 2, "advisor": "off"})
+        self.assertEqual(json.loads(self.p.read_text()), {"a": 1, "b": 2, "advisor": "off"})
+        self.assertEqual(os.stat(self.p).st_mode & 0o777, 0o600)
+
+    def test_report_path(self):
+        vault = Path(self.dir.name) / "vault"
+        note = vault / "70 AI" / "r.md"
+        note.parent.mkdir(parents=True)
+        note.write_text("# r")
+        self.assertEqual(O.report_path({"report": "70 AI/r"}, vault), note)
+        fallback = Path(self.dir.name) / "fallback.md"
+        fallback.write_text("# f")
+        self.assertEqual(O.report_path({"report": str(fallback)}, vault), fallback)
+        self.assertIsNone(O.report_path({"report": "70 AI/missing"}, vault))
+        self.assertIsNone(O.report_path({}, vault))
+        self.assertIsNone(O.report_path({"report": "../../etc/passwd"}, vault))  # never outside the vault
+
+    def test_review_refused_while_running(self):
+        self.assertEqual(O.review_start(running=True, enabled=True), {"started": False, "note": "A review is already running"})
+        self.assertEqual(O.review_start(running=False, enabled=False), {"started": False, "note": "The nightly review is off in autopilot.json"})
+        self.assertEqual(O.review_start(running=False, enabled=True), {"started": True, "note": "Review started"})
+
 if __name__ == "__main__":
     unittest.main()

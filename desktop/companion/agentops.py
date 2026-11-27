@@ -96,3 +96,62 @@ def review_health(setup: dict, state: dict, now: float, installed_at: float | No
     if state.get("status") == "Failed":
         return {"state": "failed", "note": str(state.get("summary") or "failed")[:200]}
     return {"state": "ok", "note": ""}
+
+
+# ---------------------------------------------------------------- the phone (companion 1.15.2: /phone/agentops)
+
+ADVISOR_CHOICES = ("auto", "off", "claude:opus")
+REPORT_CAP = 12_000
+PHONE_PRIVATE_KEYS = ("request", "origin", "started", "job", "private")
+
+
+def phone_payload(ops: dict, report_md: str) -> dict:
+    """The Agent Ops payload for the phone: a copy, with private live tasks reduced to who/when/how many steps (step
+    titles can carry tool reasons or clinical-content notes, and the phone shows them on the lock screen), plus the
+    latest review report so the phone can render it without another call."""
+    out = json.loads(json.dumps(ops, default=str))
+    live = []
+    for t in out.get("live") or []:
+        steps = t.get("steps") or []
+        if t.get("private"):
+            t = {**{k: t.get(k) for k in PHONE_PRIVATE_KEYS}, "request": "(private)", "private": True}
+        live.append({**t, "step_count": len(steps)})
+    out["live"] = live
+    md = report_md or ""
+    nr = out.get("nightly_review") if isinstance(out.get("nightly_review"), dict) else {}
+    out["nightly_review"] = {**nr, "report_md": md if len(md) <= REPORT_CAP else md[:REPORT_CAP] + "\n\n…(cut)"}
+    return out
+
+
+def advisor_label(setting: str) -> str:
+    s = str(setting or "auto")
+    return s if s in ADVISOR_CHOICES else f"custom: {s}"
+
+
+def write_config_key(path, key: str, value) -> dict:
+    """Set one key in config.json, re-reading the file first (./daddyshome edits it too) and keeping every other key."""
+    cfg = load(path, {})
+    cfg[key] = value
+    save(path, cfg)
+    return cfg
+
+
+def report_path(state: dict, vault_root) -> Path | None:
+    """Where the review's report lives: a vault note (relative, '.md' added) or the fallback file the script wrote."""
+    rel = str((state or {}).get("report") or "")
+    if not rel:
+        return None
+    p = Path(rel)
+    if p.is_absolute():
+        return p if p.suffix == ".md" and p.is_file() else None
+    root = Path(vault_root).resolve()
+    note = (root / (rel if rel.endswith(".md") else rel + ".md")).resolve()
+    return note if note.is_relative_to(root) and note.is_file() else None
+
+
+def review_start(running: bool, enabled: bool) -> dict:
+    if running:
+        return {"started": False, "note": "A review is already running"}
+    if not enabled:
+        return {"started": False, "note": "The nightly review is off in autopilot.json"}
+    return {"started": True, "note": "Review started"}

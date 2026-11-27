@@ -60,7 +60,7 @@ import phone_ops  # noqa: E402  (Obsidian edits the phone carries out: tasks, co
 import advisor  # noqa: E402  (the reviewer model on call: plan / repeated error / done — unit tested)
 import router  # noqa: E402  (the fork layer: which tool, retry or stop, decided in code — unit tested)
 
-VERSION = "1.15.1"
+VERSION = "1.15.2"
 HOST, PORT = "127.0.0.1", int(os.environ.get("BLACKLAB_DESKTOP_PORT", "8770"))
 HOME = Path.home()
 WEB_DIR = Path(__file__).resolve().parent.parent / "web"
@@ -313,6 +313,7 @@ class TaskLog:
         self.steps: list[dict] = []
         self.files: list[tuple[str, str]] = []
         self.reply, self.source, self.error = "", "", None
+        self.job = ""  # the background job's id when a job opened this log (the phone's live task notification)
 
     def step(self, kind: str, title: str, detail="", seconds: float | None = None):
         self.steps.append({"at": dt.datetime.now(), "kind": kind, "title": title, "detail": _short(detail) if detail else "", "seconds": seconds})
@@ -1813,7 +1814,7 @@ def agent_ops() -> dict:
     except Exception:
         loaded = []
     live = [{"request": "(private)" if log.private else " ".join(log.request.split())[:120], "origin": log.origin,
-             "started": log.started.isoformat(timespec="seconds"),
+             "started": log.started.isoformat(timespec="seconds"), "job": getattr(log, "job", ""), "private": bool(log.private),
              "steps": [{"kind": st["kind"], "title": st["title"][:100], "at": st["at"].strftime("%H:%M:%S")} for st in log.steps[-8:]]}
             for log in list(LIVE.values())]
     jobs = sorted(agents.JOBS.values(), key=lambda j: j["created"], reverse=True)[:10]
@@ -1822,7 +1823,41 @@ def agent_ops() -> dict:
                         "model": "" if mode == "off" else (f"Claude {which}" if mode == "claude" else (which or main) + ("" if which else " · fresh context")),
                         "claude_jobs": str(CONFIG.get("claude_advisor") or ""), "max_calls": advisor.MAX_CALLS, **advisor.LOG.snapshot()},
             "forks": router.STATS.snapshot(), "live": live, "jobs": [agents.public(j) for j in jobs],
-            "tasks": recent_tasks(), "nightly_review": nightly_review_panel(), "claude_code": claude_code_setup()}
+            "tasks": recent_tasks(), "nightly_review": nightly_review_panel(), "claude_code": claude_code_setup(),
+            "review_now": load_json(CACHE_DIR / "review-now.json", {}),
+            "controls": {"advisor": str(CONFIG.get("advisor", "auto")), "advisor_label": agentops.advisor_label(CONFIG.get("advisor", "auto")),
+                         "advisor_choices": list(agentops.ADVISOR_CHOICES), "review_running": review_running()}}
+
+
+REVIEW_UNITS = ("blacklab-nightly-review.service", "blacklab-review-now.service")
+_REPORT = {"path": None, "mtime": 0.0, "text": ""}
+
+
+def review_running() -> bool:
+    try:
+        out = subprocess.run(["systemctl", "--user", "is-active", *REVIEW_UNITS], capture_output=True, text=True, timeout=5).stdout
+    except (OSError, subprocess.SubprocessError):
+        return False
+    return any(x.strip() in ("active", "activating") for x in out.splitlines())
+
+
+def review_report_md(state: dict) -> str:
+    """The latest review report's Markdown for the phone, re-read only when the file changes (the screen polls every 2 s)."""
+    p = agentops.report_path(state, VAULT.root)
+    if p is None:
+        return ""
+    try:
+        m = p.stat().st_mtime
+        if _REPORT["path"] != p or _REPORT["mtime"] != m:
+            _REPORT.update(path=p, mtime=m, text=p.read_text(errors="replace"))
+    except OSError:
+        return ""
+    return _REPORT["text"]
+
+
+def phone_agent_ops() -> dict:
+    ops = agent_ops()
+    return agentops.phone_payload(ops, review_report_md(ops.get("nightly_review") or {}))
 
 
 def nightly_review_panel() -> dict:
@@ -2025,6 +2060,10 @@ class Handler(SimpleHTTPRequestHandler):
             if not self.guard():
                 return
             return self.reply(200, agent_ops())
+        if route == "/phone/agentops":  # the phone's Agent Ops screen, Home card, widget and tile (1.15.2)
+            if not self.phone_guard():
+                return
+            return self.reply(200, phone_agent_ops())
         if route in ("/local/jobs", "/local/equipment"):
             if not self.guard():
                 return
@@ -2073,6 +2112,27 @@ class Handler(SimpleHTTPRequestHandler):
                 return self.reply(400, {"error": str(e)})
             except Exception as e:
                 return self.reply(500, {"error": str(e)})
+        if route in ("/phone/agentops/review", "/phone/agentops/advisor"):
+            if not self.phone_guard():
+                return
+            try:
+                body = json.loads(self.rfile.read(min(int(self.headers.get("Content-Length") or 0), 10_000)) or b"{}")
+            except ValueError:
+                return self.reply(400, {"error": "bad JSON"})
+            if route.endswith("/review"):
+                setup = agentops.review_setup(load_json(CONFIG_DIR / "autopilot.json", {}) or {})
+                r = agentops.review_start(review_running(), setup["enabled"])
+                if r["started"]:
+                    try:
+                        subprocess.run(["systemctl", "--user", "start", "--no-block", "blacklab-review-now.service"], check=True, capture_output=True, timeout=10)
+                    except (OSError, subprocess.SubprocessError) as e:
+                        r = {"started": False, "note": f"Couldn't start the review: {e}"[:200]}
+                return self.reply(200, r)
+            v = body.get("advisor") if isinstance(body, dict) else None
+            if v not in agentops.ADVISOR_CHOICES:
+                return self.reply(400, {"error": "advisor must be one of " + ", ".join(agentops.ADVISOR_CHOICES)})
+            CONFIG["advisor"] = agentops.write_config_key(CONFIG_DIR / "config.json", "advisor", v)["advisor"]
+            return self.reply(200, {"ok": True, "advisor": v})
         if route == "/phone/ops/ack":
             if not self.phone_guard():
                 return

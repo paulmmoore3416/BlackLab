@@ -191,6 +191,8 @@ def _worker():
         _progress(j, "Starting")
         try:
             with C.task_log(f"Background job ({j['kind']}): {j['title']}", j["origin"], j["private"]) as log:
+                if log is not None:
+                    log.job = jid  # links the live task to its job (the phone's live notification)
                 if j["kind"] in ("brief", "weekly", "ask", "reverse"):
                     rebalance()  # text jobs want the main model whole
                 j["result"] = RUNNERS[j["kind"]](j)
