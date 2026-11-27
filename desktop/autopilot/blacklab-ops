@@ -40,6 +40,12 @@ def bar(sharp: int, split: int, width: int) -> str:
     return GREEN + "█" * full + DIM + "░" * (width - full) + RESET
 
 
+def spark(values: list[int]) -> str:
+    """One block per day, scaled to the busiest day ("▁" is a quiet day, a space is none)."""
+    top = max(values or [0])
+    return "".join(" " if not v else "▁▂▃▄▅▆▇█"[min(7, (v * 8 - 1) // top)] for v in values) if top else ""
+
+
 def clock(sec) -> str:
     return dt.datetime.fromtimestamp(sec).strftime("%H:%M:%S") if sec else ""
 
@@ -60,13 +66,19 @@ def render(d: dict, w: int) -> str:
     out.append(f"{DIM}GPUs: {clip(loaded or 'nothing loaded', w - 6)}{RESET}")
 
     out.append(section("ADVISOR · on call", w))
-    out.append(f"plan {tot.get('plan', 0)} · repeat {tot.get('repeat', 0)} · done {tot.get('done', 0)}   {DIM}max {a.get('max_calls', 3)}/task{RESET}"
+    today = sum((a.get("today") or {}).values())
+    trend = spark([x.get("plan", 0) + x.get("repeat", 0) + x.get("done", 0) for x in a.get("days") or []])
+    out.append(f"plan {tot.get('plan', 0)} · repeat {tot.get('repeat', 0)} · done {tot.get('done', 0)}   {DIM}today {today}"
+               + (f" · 14 days {RESET}{PURPLE}{trend}{RESET}{DIM}" if trend else "") + f" · max {a.get('max_calls', 3)}/task{RESET}"
                + (f"   {DIM}Claude jobs → {a['claude_jobs']}{RESET}" if a.get("claude_jobs") else ""))
     for x in list(a.get("recent") or [])[-4:][::-1]:
         tag = f"{RED}unavailable{RESET}" if x.get("error") else (f"{DIM}nothing to add{RESET}" if x.get("silent") else clip(x.get("advice") or "(private task)", w - 24))
         out.append(f"{DIM}{clock(x.get('at'))}{RESET} {PURPLE}{x.get('stage', ''):<6}{RESET} {tag}")
 
-    out.append(section(f"FORK LAYER · {f.get('total', 0)} decisions", w))
+    out.append(section(f"FORK LAYER · {f.get('total', 0)} decisions · {f.get('today', 0)} today", w))
+    trend = spark([x.get("sharp", 0) + x.get("split", 0) for x in f.get("days") or []])
+    if trend:
+        out.append(f"{DIM}last 14 days{RESET} {GREEN}{trend}{RESET}")
     bw = max(8, min(30, w - 34))
     for k, v in (f.get("forks") or {}).items():
         n = v["sharp"] + v["split"]
@@ -93,12 +105,21 @@ def render(d: dict, w: int) -> str:
         ok = GREEN if t.get("status") == "Done" else ORANGE
         out.append(f"{DIM}{(t.get('started') or '')[11:19]}{RESET} {ok}{(t.get('status') or '')[:4]:<4}{RESET} {clip(t.get('request'), w - 15)}")
 
-    out.append(section("CLAUDE CODE · NIGHTLY REVIEW", w))
-    out.append(f"advisor {cc.get('advisor') or 'off'} · effort {cc.get('effort') or 'default'} · subagents {', '.join(cc.get('subagents') or []) or 'none'}")
+    su, hl = nr.get("setup") or {}, nr.get("health") or {}
+    out.append(section("NIGHTLY CODE REVIEW", w))
+    if su:
+        who = str(su.get("model", "sonnet")).title() + (f" · {str(su['advisor']).title()} advises" if su.get("advisor") else " · no advisor")
+        out.append(f"{who} · {su.get('time', '02:30')} · read-only" if su.get("enabled") else f"{DIM}off{RESET}")
     if nr.get("at"):
-        out.append(f"{DIM}{dt.datetime.fromtimestamp(nr['at']):%a %H:%M}{RESET} {nr.get('status', '')}: {clip(nr.get('summary'), w - 22)}")
-    else:
-        out.append(f"{DIM}no nightly review yet (02:30, only on days with commits){RESET}")
+        ok = RED if nr.get("status") == "Failed" else GREEN if nr.get("status") == "Reviewed" else DIM
+        out.append(f"{DIM}{dt.datetime.fromtimestamp(nr['at']):%a %H:%M}{RESET} {ok}{nr.get('status', '')}{RESET}: {clip(nr.get('summary'), w - 22)}")
+    state = hl.get("state")
+    if state in ("missed", "failed"):
+        out.append(f"{RED}⚠ {'missed' if state == 'missed' else 'failed'}:{RESET} {clip(hl.get('note'), w - 12)}")
+    elif state == "waiting" or (not nr.get("at") and not hl):
+        out.append(f"{DIM}{hl.get('note') or 'no nightly review yet (02:30)'}{RESET}")
+    out.append(f"{DIM}interactive Claude Code: advisor {cc.get('advisor') or 'off'} · effort {cc.get('effort') or 'default'}"
+               f" · subagents {', '.join(cc.get('subagents') or []) or 'none'}{RESET}")
     return "\n".join(clip_ansi(line, w) for line in out)
 
 

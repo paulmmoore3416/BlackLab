@@ -27,6 +27,8 @@ import threading
 import time
 from typing import Callable
 
+import agentops
+
 STAGES = ("plan", "repeat", "done")
 MAX_CALLS = 3
 SIDE_EFFECTS = frozenset({"vault_write", "desktop_note", "execute_command", "launch_app", "open_url", "open_path", "phone_command"})
@@ -108,18 +110,52 @@ def needs_done_check(used, rounds_used: int = 0) -> bool:
 class Log:
     """The last consultations, for the Agent Ops view (no request text: only stage, model, timing and the advice)."""
 
+    FIELDS = ("at", "stage", "model", "seconds", "advice", "silent", "error")
+
     def __init__(self, keep: int = 30):
         self._lock = threading.Lock()
         self.keep, self.items, self.total = keep, [], {s: 0 for s in STAGES}
+        self.days: dict[str, dict[str, int]] = {}
+        self.path = None
+
+    def attach(self, path):
+        """Load the saved totals and feed, and keep saving there (survives the 04:00 restart)."""
+        saved = agentops.load(path, {})
+        with self._lock:
+            old = agentops.counts(saved.get("total"), STAGES)
+            for s in STAGES:
+                self.total[s] += old[s]
+            for d, c in (saved.get("days") if isinstance(saved.get("days"), dict) else {}).items():
+                mine, prev = self.days.setdefault(str(d), {s: 0 for s in STAGES}), agentops.counts(c, STAGES)
+                for s in STAGES:
+                    mine[s] += prev[s]
+            self.days = agentops.keep_days(self.days)
+            items = saved.get("items") if isinstance(saved.get("items"), list) else []
+            old_items = [{k: x.get(k) for k in self.FIELDS} for x in items if isinstance(x, dict) and x.get("stage") in STAGES]
+            self.items = (old_items + self.items)[-self.keep:]
+            self.path = path
+            data = self._data()
+        agentops.save(path, data)
+
+    def _data(self) -> dict:
+        return {"total": self.total, "days": self.days, "items": [{k: x.get(k) for k in self.FIELDS} for x in self.items]}
 
     def add(self, item: dict):
         with self._lock:
             self.items = (self.items + [item])[-self.keep:]
             self.total[item["stage"]] = self.total.get(item["stage"], 0) + 1
+            d = self.days.setdefault(agentops.day(item.get("at") or time.time()), {s: 0 for s in STAGES})
+            d[item["stage"]] = d.get(item["stage"], 0) + 1
+            self.days = agentops.keep_days(self.days)
+            if self.path is not None:
+                agentops.save(self.path, self._data())
 
     def snapshot(self) -> dict:
         with self._lock:
-            return {"total": dict(self.total), "recent": list(self.items[-10:])}
+            today = self.days.get(agentops.day(time.time()), {})
+            return {"total": dict(self.total), "today": {s: today.get(s, 0) for s in STAGES},
+                    "days": agentops.series(self.days, STAGES, time.time()),
+                    "recent": list(self.items[-10:])}
 
 
 LOG = Log()

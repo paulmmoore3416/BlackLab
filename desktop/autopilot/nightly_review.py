@@ -32,6 +32,7 @@ from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE.parent / "companion"))
+import agentops  # noqa: E402
 import ai_models  # noqa: E402
 import guards  # noqa: E402
 
@@ -128,7 +129,8 @@ def review(repo: Path, cfg: dict, since: str, dry: bool) -> dict:
     log, patch = day_changes(repo, since)
     if not log:
         return {"repo": name, "status": "Skipped", "summary": f"no commits since {since}"}
-    model, adv = cfg.get("review_model", "sonnet"), ai_models.advisor_for(cfg.get("review_model", "sonnet"), cfg.get("review_advisor", "opus"))
+    setup = agentops.review_setup(cfg)  # the same model/advisor the Agent Ops panel shows
+    model, adv = setup["model"], setup["advisor"] or None
     prompt = build_prompt(name, log, patch, since)
     if dry:
         print(prompt)
@@ -163,6 +165,15 @@ def review(repo: Path, cfg: dict, since: str, dry: bool) -> dict:
     return {"repo": name, "status": "Reviewed", "summary": summary, "report": rel, "model": who, "advisor": adv or ""}
 
 
+def pick(results: list[dict]) -> dict:
+    """The result the panel shows: a failure first (so it can't hide behind another repo's success), then a review."""
+    for status in ("Failed", "Reviewed"):
+        hit = next((r for r in results if r["status"] == status), None)
+        if hit:
+            return hit
+    return results[0] if results else {"status": "Skipped", "summary": "no repositories"}
+
+
 def main() -> int:
     cfg = load_conf()
     dry = "--dry-run" in sys.argv
@@ -176,12 +187,18 @@ def main() -> int:
         if not (repo / ".git").exists():
             results.append({"repo": repo.name, "status": "Skipped", "summary": "not a git repository"})
             continue
-        results.append(review(repo, cfg, since, dry))
+        try:
+            results.append(review(repo, cfg, since, dry))
+        except Exception as e:  # noqa: BLE001 — record it, so a crash at 02:30 shows up instead of vanishing
+            results.append({"repo": repo.name, "status": "Failed", "summary": f"{type(e).__name__}: {e}"[:200]})
     for r in results:
         print(f"{r['repo']}: {r['status']} — {r['summary']}" + (f" ({r['report']})" if r.get("report") else ""))
     if not dry:
-        main_r = next((r for r in results if r["status"] == "Reviewed"), results[0] if results else {"status": "Skipped", "summary": "no repositories"})
+        main_r = pick(results)
         save_state(**main_r, all=results)
+        for r in results:
+            if r["status"] == "Failed":
+                companion("/local/notify", {"title": f"Nightly code review failed · {r['repo']}", "text": r["summary"]})
     return 1 if any(r["status"] == "Failed" for r in results) else 0
 
 

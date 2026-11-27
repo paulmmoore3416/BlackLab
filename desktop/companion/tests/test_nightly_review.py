@@ -37,6 +37,33 @@ class NightlyReviewTest(unittest.TestCase):
             r = N.review(Path(d), {}, "24 hours ago", dry=False)
         self.assertEqual(r["status"], "Skipped")
 
+    def test_a_failure_is_what_the_panel_shows(self):
+        ok, bad, skip = {"repo": "a", "status": "Reviewed"}, {"repo": "b", "status": "Failed"}, {"repo": "c", "status": "Skipped"}
+        self.assertIs(N.pick([ok, bad, skip]), bad)
+        self.assertIs(N.pick([skip, ok]), ok)
+        self.assertIs(N.pick([skip]), skip)
+        self.assertEqual(N.pick([])["status"], "Skipped")
+
+    def test_a_crash_is_recorded_not_lost(self):
+        saved, sent = {}, []
+        with tempfile.TemporaryDirectory() as d:
+            subprocess.run(["git", "init", "-q", d], check=True)
+            orig = (N.load_conf, N.review, N.save_state, N.companion, sys.argv)
+            N.load_conf = lambda: {"review_repos": [d]}
+            N.review = lambda *a, **k: (_ for _ in ()).throw(RuntimeError("boom"))
+            N.save_state = lambda **kw: saved.update(kw)
+            N.companion = lambda path, body: sent.append((path, body))
+            sys.argv = ["nightly_review.py"]
+            try:
+                rc = N.main()
+            finally:
+                N.load_conf, N.review, N.save_state, N.companion, sys.argv = orig
+        self.assertEqual(rc, 1)
+        self.assertEqual(saved["status"], "Failed")
+        self.assertIn("boom", saved["summary"])
+        self.assertEqual(sent[0][0], "/local/notify")
+        self.assertIn("failed", sent[0][1]["title"])
+
     def test_binaries_and_keystores_excluded(self):
         for x in ("*.apk", "keystore", "releases", "local.properties"):
             self.assertIn(f":(exclude){x}", N.EXCLUDE)

@@ -1304,10 +1304,20 @@ const opsBar = (sharp, split) => {
   const n = sharp + split; const pct = n ? Math.round((100 * sharp) / n) : 0;
   return `<div class="ops-bar" title="${sharp} decided in code · ${split} left to a model"><span style="width:${pct}%"></span></div><span class="small ${pct >= 80 ? '' : 'muted'}">${n ? (sharp / n).toFixed(2) + (pct >= 80 ? ' sharp' : ' split') : '—'}</span>`;
 };
+const opsSpark = (vals) => {
+  const top = Math.max(0, ...(vals || []));
+  return top ? (vals || []).map((v) => (v ? '▁▂▃▄▅▆▇█'[Math.min(7, Math.floor((v * 8 - 1) / top))] : ' ')).join('') : '';
+};
 const opsClock = (sec) => (sec ? new Date(sec * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : '');
 function opsBody(d) {
   const a = d.advisor || {}; const f = d.forks || {}; const cc = d.claude_code || {}; const nr = d.nightly_review || {};
   const tot = a.total || {}; const calls = (tot.plan || 0) + (tot.repeat || 0) + (tot.done || 0);
+  const aToday = Object.values(a.today || {}).reduce((x, y) => x + y, 0);
+  const aSpark = opsSpark((a.days || []).map((x) => (x.plan || 0) + (x.repeat || 0) + (x.done || 0)));
+  const fSpark = opsSpark((f.days || []).map((x) => (x.sharp || 0) + (x.split || 0)));
+  const su = nr.setup || {}; const hl = nr.health || {};
+  const reviewWho = su.enabled === false ? 'Off' : `${esc((su.model || 'sonnet').replace(/^./, (c) => c.toUpperCase()))}${su.advisor ? ' · ' + esc(su.advisor.replace(/^./, (c) => c.toUpperCase())) + ' advises' : ' · no advisor'} · ${esc(su.time || '02:30')} · read-only`;
+  const reviewWarn = hl.state === 'missed' || hl.state === 'failed' ? `<div class="notice">⚠ ${hl.state === 'missed' ? 'Missed' : 'Failed'}: ${esc(hl.note || '')}</div>` : '';
   const forkRows = Object.entries(f.forks || {}).map(([k, v]) => `<div class="ops-fork"><span>${esc(k.replace(/_/g, ' '))}</span>${opsBar(v.sharp, v.split)}<span class="small muted">${v.sharp + v.split}</span></div>`).join('')
     || '<div class="small muted">No decisions yet. They appear as the desktop AI works.</div>';
   const feed = (a.recent || []).slice().reverse().map((x) => `<div class="ops-feed"><span class="mono small muted">${esc(opsClock(x.at))}</span>
@@ -1322,9 +1332,9 @@ function opsBody(d) {
       <div class="tile"><span class="k">Worker</span><span class="v" style="font-size:18px">${esc(d.model || '—')}</span>
         <span class="s">${(d.loaded || []).map((m) => esc(m.name) + ' · ' + esc(m.vram_gb) + ' GB').join('<br>') || 'nothing loaded on the GPUs'}</span></div>
       <div class="tile"><span class="k">Advisor · on call</span><span class="v" style="font-size:18px">${esc(a.mode === 'off' ? 'off' : a.model || '—')}</span>
-        <span class="s">${calls} consult(s): plan ${tot.plan || 0} · repeat ${tot.repeat || 0} · done ${tot.done || 0} · max ${esc(a.max_calls)} per task${a.claude_jobs ? '<br>Claude jobs: advisor ' + esc(a.claude_jobs) : ''}</span></div>
+        <span class="s">${calls} consult(s), ${aToday} today${aSpark ? ` <span class="mono ops-spark" title="consults per day, last 14 days">${esc(aSpark)}</span>` : ''}<br>plan ${tot.plan || 0} · repeat ${tot.repeat || 0} · done ${tot.done || 0} · max ${esc(a.max_calls)} per task${a.claude_jobs ? '<br>Claude jobs: advisor ' + esc(a.claude_jobs) : ''}</span></div>
       <div class="tile"><span class="k">Fork layer</span><span class="v" style="font-size:18px">${esc(f.total || 0)} decisions</span>
-        <span class="s">sharp = settled in code · split = a model decides</span></div>
+        <span class="s">${esc(f.today || 0)} today${fSpark ? ` <span class="mono ops-spark" title="decisions per day, last 14 days">${esc(fSpark)}</span>` : ''}<br>sharp = settled in code · split = a model decides</span></div>
     </div>
     <div class="grid g2" style="margin-top:16px">
       <div class="card"><h2>Fork layer</h2><div class="stack">${forkRows}</div></div>
@@ -1335,12 +1345,13 @@ function opsBody(d) {
     <div class="card" style="margin-top:16px"><h2>Session log</h2>
       ${tasks ? `<table class="table"><tr><th>Time</th><th>From</th><th>Request</th><th>Answered by</th><th>Status</th><th>Tools</th></tr>${tasks}</table>` : '<div class="small muted">No tasks logged yet.</div>'}</div>
     <div class="grid g2" style="margin-top:16px">
-      <div class="card"><h2>Claude Code on this computer</h2><div class="stack small">
+      <div class="card"><h2>Claude Code on this computer <span class="chip">interactive sessions</span></h2><div class="stack small">
         <div>Advisor: <b>${esc(cc.advisor || 'off')}</b>${cc.advisor_disabled ? ' <span class="chip warn">disabled by CLAUDE_CODE_DISABLE_ADVISOR_TOOL</span>' : ''} · effort <b>${esc(cc.effort || 'default')}</b></div>
         <div>Subagents: ${(cc.subagents || []).map((n) => `<span class="chip">${esc(n)}</span>`).join(' ') || '<span class="muted">none</span>'}</div></div></div>
       <div class="card"><h2>Nightly review</h2><div class="stack small">
-        ${nr.at ? `<div>${esc(nr.status || '')} · ${esc(new Date(nr.at * 1000).toLocaleString())}</div><div class="muted">${esc(nr.summary || '')}</div>${nr.report ? `<div class="mono muted">${esc(nr.report)}</div>` : ''}`
-          : '<div class="muted">No review yet. It runs at 02:30 when the day had commits (Sonnet works, Opus advises).</div>'}</div></div>
+        ${su.model || su.enabled === false ? `<div><b>${reviewWho}</b></div>` : ''}${reviewWarn}
+        ${nr.at ? `<div><span class="chip ${nr.status === 'Failed' ? 'warn' : nr.status === 'Reviewed' ? 'accent' : ''}">${esc(nr.status || '')}</span> ${esc(new Date(nr.at * 1000).toLocaleString())}</div><div class="muted">${esc(nr.summary || '')}</div>${nr.report ? `<div class="mono muted">${esc(nr.report)}</div>` : ''}`
+          : `<div class="muted">${esc(hl.state === 'waiting' ? hl.note : 'No review yet.')} It reviews the day's commits and records a skip on days without any.</div>`}</div></div>
     </div>
     <p class="muted small" style="margin-top:12px">The same view in a terminal, also over SSH from the phone: <code>desktop/autopilot/blacklab-ops</code></p>`;
 }

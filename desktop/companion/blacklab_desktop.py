@@ -54,12 +54,13 @@ import reverse  # noqa: E402  (reverse engineering with REA + Ghidra, read-only 
 import vault as vaultlib  # noqa: E402  (the Obsidian vault: notes, timeline, AI registry, git)
 import audit  # noqa: E402  (the hash-chained activity ledger — unit tested)
 import ai_models  # noqa: E402  (Claude via the subscription CLI, Gemini, local models — one catalog)
+import agentops  # noqa: E402  (Agent Ops counts that survive restarts, the nightly review's panel — unit tested)
 import vault_ai  # noqa: E402  (every Claude/Gemini conversation in the vault, glowing on the graph)
 import phone_ops  # noqa: E402  (Obsidian edits the phone carries out: tasks, commands, flashcards)
 import advisor  # noqa: E402  (the reviewer model on call: plan / repeated error / done — unit tested)
 import router  # noqa: E402  (the fork layer: which tool, retry or stop, decided in code — unit tested)
 
-VERSION = "1.15.0"
+VERSION = "1.15.1"
 HOST, PORT = "127.0.0.1", int(os.environ.get("BLACKLAB_DESKTOP_PORT", "8770"))
 HOME = Path.home()
 WEB_DIR = Path(__file__).resolve().parent.parent / "web"
@@ -1821,8 +1822,19 @@ def agent_ops() -> dict:
                         "model": "" if mode == "off" else (f"Claude {which}" if mode == "claude" else (which or main) + ("" if which else " · fresh context")),
                         "claude_jobs": str(CONFIG.get("claude_advisor") or ""), "max_calls": advisor.MAX_CALLS, **advisor.LOG.snapshot()},
             "forks": router.STATS.snapshot(), "live": live, "jobs": [agents.public(j) for j in jobs],
-            "tasks": recent_tasks(), "nightly_review": load_json(CACHE_DIR / "nightly-review.json", {}),
-            "claude_code": claude_code_setup()}
+            "tasks": recent_tasks(), "nightly_review": nightly_review_panel(), "claude_code": claude_code_setup()}
+
+
+def nightly_review_panel() -> dict:
+    """The nightly review's last result plus its own setup (autopilot.json) and whether it is actually running."""
+    state = load_json(CACHE_DIR / "nightly-review.json", {})
+    state = state if isinstance(state, dict) else {}
+    setup = agentops.review_setup(load_json(CONFIG_DIR / "autopilot.json", {}) or {})
+    timer = HOME / ".config" / "systemd" / "user" / "blacklab-nightly-review.timer"
+    installed = timer.stat().st_mtime if timer.exists() else None
+    health = agentops.review_health(setup, state, time.time(), installed) if installed or not setup["enabled"] \
+        else {"state": "missed", "note": "the timer isn't installed: run desktop/autopilot/install.sh"}
+    return {**state, "setup": setup, "health": health}
 
 
 def gemini_text(prompt: str, temperature=0.3, max_tokens=400) -> str | None:
@@ -2885,6 +2897,8 @@ def main():
             threading.Thread(target=atlas_keeper, daemon=True, name="atlas").start()
     if CONFIG.get("library", True) is not False:
         threading.Thread(target=library_keeper, daemon=True, name="library").start()
+    router.STATS.attach(CACHE_DIR / "agentops-forks.json")  # Agent Ops counts outlive the 04:00 restart
+    advisor.LOG.attach(CACHE_DIR / "agentops-advisor.json")
     agents.setup(sys.modules[__name__])
     reverse.setup(sys.modules[__name__])
     global OPEN_FOLDER_RE

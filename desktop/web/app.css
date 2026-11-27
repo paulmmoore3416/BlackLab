@@ -360,3 +360,6 @@ optgroup.og-gemini { color: var(--gemini); }
 .ops-bar span { display: block; height: 100%; background: var(--accent); border-radius: 999px; }
 .ops-feed { display: grid; grid-template-columns: 70px auto 1fr auto; gap: 10px; align-items: start; }
 .ops-live { margin-top: 8px; background: var(--surface-2); }
+
+/* agent ops: 14-day trend next to a count */
+.ops-spark { letter-spacing: 1px; color: var(--accent, currentColor); white-space: pre; }

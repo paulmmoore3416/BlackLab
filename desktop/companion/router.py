@@ -19,6 +19,8 @@ import re
 import threading
 import time
 
+import agentops
+
 SHARP = 0.9  # at or above: decided in code; below: left to a model
 SEEDABLE = frozenset({"find_files", "recall_chats", "equipment", "search_documents"})  # read-only tools only
 
@@ -58,23 +60,61 @@ _NOISE = re.compile(r"(?:/[\w.\-~]+)+|0x[0-9a-f]+|\d+(?:\.\d+)?", re.I)
 
 
 class Stats:
-    """Counts of sharp vs split decisions per fork, plus the last few, for the Agent Ops view."""
+    """Counts of sharp vs split decisions per fork, per day, plus the last few, for the Agent Ops view.
+    attach(path) loads the saved counts and keeps saving there, so they outlive the 04:00 restart."""
+
+    KEYS = ("sharp", "split")
 
     def __init__(self):
         self._lock = threading.Lock()
         self.counts: dict[str, dict[str, int]] = {}
+        self.days: dict[str, dict[str, int]] = {}
         self.recent: list[dict] = []
+        self.path = None
+        self.clock = time.time
+
+    def attach(self, path):
+        saved = agentops.load(path, {})
+        with self._lock:
+            for fork, c in (saved.get("counts") if isinstance(saved.get("counts"), dict) else {}).items():
+                mine, old = self.counts.setdefault(str(fork), {"sharp": 0, "split": 0}), agentops.counts(c, self.KEYS)
+                for k in self.KEYS:
+                    mine[k] += old[k]
+            for d, c in (saved.get("days") if isinstance(saved.get("days"), dict) else {}).items():
+                mine, old = self.days.setdefault(str(d), {"sharp": 0, "split": 0}), agentops.counts(c, self.KEYS)
+                for k in self.KEYS:
+                    mine[k] += old[k]
+            self.days = agentops.keep_days(self.days)
+            old_recent = [x for x in saved.get("recent") or [] if isinstance(x, dict)] if isinstance(saved.get("recent"), list) else []
+            self.recent = (old_recent + self.recent)[-20:]
+            self.path = path
+            data = self._data()
+        agentops.save(path, data)
+
+    def _data(self) -> dict:
+        # On disk, never the detail: which_tool's details carry the tool arguments (a search query can come from a private
+        # request). Memory keeps them for the live view; the file keeps only when, which fork and how it went.
+        return {"counts": self.counts, "days": self.days,
+                "recent": [{k: x.get(k) for k in ("at", "fork", "sharp", "p")} for x in self.recent]}
 
     def note(self, fork: str, sharp: bool, detail: str = "", p: float | None = None):
+        key = "sharp" if sharp else "split"
         with self._lock:
-            c = self.counts.setdefault(fork, {"sharp": 0, "split": 0})
-            c["sharp" if sharp else "split"] += 1
-            self.recent = (self.recent + [{"at": time.time(), "fork": fork, "sharp": sharp, "p": p, "detail": detail[:120]}])[-20:]
+            now = self.clock()
+            self.counts.setdefault(fork, {"sharp": 0, "split": 0})[key] += 1
+            self.days.setdefault(agentops.day(now), {"sharp": 0, "split": 0})[key] += 1
+            self.days = agentops.keep_days(self.days)
+            self.recent = (self.recent + [{"at": now, "fork": fork, "sharp": sharp, "p": p, "detail": detail[:120]}])[-20:]
+            if self.path is not None:
+                agentops.save(self.path, self._data())  # a few hundred bytes, under the lock so writes stay in order
 
     def snapshot(self) -> dict:
         with self._lock:
             total = sum(c["sharp"] + c["split"] for c in self.counts.values())
+            today = self.days.get(agentops.day(self.clock()), {"sharp": 0, "split": 0})
             return {"total": total, "forks": {k: {**v, "sharp_rate": round(v["sharp"] / max(1, v["sharp"] + v["split"]), 2)} for k, v in self.counts.items()},
+                    "today": today["sharp"] + today["split"],
+                    "days": agentops.series(self.days, self.KEYS, self.clock()),
                     "recent": list(self.recent[-8:])}
 
 
