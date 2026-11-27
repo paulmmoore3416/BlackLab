@@ -99,6 +99,7 @@ fun HomeScreen() {
     val facState by remember { com.blacklab.app.facility.Facility.load(app.context); com.blacklab.app.facility.Facility.state }.collectAsStateWithLifecycle()
     var projects by remember { mutableStateOf(com.blacklab.app.link.Projects.cached(app.context)) }
     val deskState by com.blacklab.app.assistant.DesktopAi.status.collectAsStateWithLifecycle()
+    val ops by com.blacklab.app.link.AgentOps.snapshot.collectAsStateWithLifecycle()
     androidx.compose.runtime.LaunchedEffect(deskState.state) { com.blacklab.app.link.Projects.refresh(app)?.let { projects = it } }
     val facOpen = remember(facState, today) { com.blacklab.app.facility.Facility.due(facState).filter { it.status != com.blacklab.app.facility.Facility.Status.OK } }
     val weather by com.blacklab.app.assistant.Weather.report.collectAsStateWithLifecycle()
@@ -336,6 +337,33 @@ fun HomeScreen() {
                                     Spacer(Modifier.width(8.dp))
                                     Text(p.name, Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
                                     if (p.due.isNotBlank()) Text("due ${p.due}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            "agentops" -> {
+                // Desktop AI (5.19): working / idle / offline, today's numbers with a 14-day trend, last night's code review
+                if (s.asstDesktopAi) item {
+                    val online = deskState.state == com.blacklab.app.assistant.DesktopAi.State.ONLINE
+                    val st = com.blacklab.app.link.AgentOps.status(ops, online)
+                    val dot = com.blacklab.app.ui.agentops.statusColor(st)
+                    Surface(onClick = { shell.go("agentops") }, shape = RoundedCornerShape(16.dp), color = MaterialTheme.colorScheme.surfaceContainer,
+                        modifier = Modifier.fillMaxWidth().padding(top = 12.dp)) {
+                        Column(Modifier.padding(14.dp)) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Box(Modifier.size(10.dp).clip(CircleShape).background(dot))
+                                Spacer(Modifier.width(10.dp))
+                                Text("Desktop AI · " + com.blacklab.app.link.AgentOps.summary(ops, online, System.currentTimeMillis()), fontWeight = FontWeight.SemiBold,
+                                    modifier = Modifier.weight(1f), maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+                                ops?.let { o -> com.blacklab.app.ui.agentops.reviewChip(o.review).let { (t, c) -> com.blacklab.app.ui.components.Pill(t, c) } }
+                            }
+                            ops?.let { o ->
+                                Row(Modifier.padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                                    Text("${o.forksToday} decisions · ${o.consultsToday} consults today", style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.weight(1f))
+                                    com.blacklab.app.ui.agentops.Sparkline(o.forkDays, Modifier.width(84.dp).height(20.dp), com.blacklab.app.ui.agentops.OpsGreen)
                                 }
                             }
                         }

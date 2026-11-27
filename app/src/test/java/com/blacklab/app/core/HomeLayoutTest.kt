@@ -7,6 +7,14 @@ import org.junit.Test
 class HomeLayoutTest {
     private val defaults = HomeLayout.cards.map { it.id }
 
+    @Test fun agentopsCardFollowsProjects() {
+        val d = HomeLayout.order("")
+        assertEquals(d.indexOf("projects") + 1, d.indexOf("agentops"))
+        // a layout saved before 5.19 gets the Desktop AI card right after its Projects card
+        val saved = HomeLayout.order(defaults.filter { it != "agentops" }.reversed().joinToString(","))
+        assertEquals(saved.indexOf("projects") + 1, saved.indexOf("agentops"))
+    }
+
     @Test fun blankMeansDefaultOrder() {
         assertEquals(defaults, HomeLayout.order(""))
         assertEquals(defaults, HomeLayout.order(null))
