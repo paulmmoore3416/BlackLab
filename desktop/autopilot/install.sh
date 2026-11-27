@@ -5,6 +5,7 @@
 #                                   waits for Ollama, runs ./daddyshome, then the after-restart check
 #   blacklab-nightly-review.timer   02:30 Claude Code reviews the day's commits, read-only (Sonnet works, Opus advises;
 #                                   only on days with commits; report in the vault, summary on the phone — nightly_review.py)
+#   blacklab-review-now.service     on demand (no timer): the phone's "Run review now" — only commits since the last review
 #   blacklab-nightly-scan.timer     03:00 (America/Chicago) full system check → report on the phone
 #   blacklab-watchdog.timer         every 5 min: companion answering, plugged-in phone linked
 #   blacklab-kb-maintenance.timer   03:20 kb-core maintenance (keeps vault/library search fast)
@@ -22,8 +23,8 @@ SCAN_TIME="$(python3 -c 'import json,os;print(json.load(open(os.path.expanduser(
 REVIEW_TIME="$(python3 -c 'import json,os;print(json.load(open(os.path.expanduser("~/.config/blacklab-desktop/autopilot.json"))).get("review_time","02:30"))' 2>/dev/null || echo 02:30)"
 
 if [ "${1:-}" = "--uninstall" ]; then
-  systemctl --user disable --now blacklab-boot.service blacklab-nightly-scan.timer blacklab-watchdog.timer blacklab-backup.timer blacklab-kb-maintenance.timer blacklab-nightly-review.timer 2>/dev/null || true
-  rm -f "$UNITS"/blacklab-{boot,nightly-scan,watchdog,backup,kb-maintenance,nightly-review}.{service,timer}
+  systemctl --user disable --now blacklab-boot.service blacklab-nightly-scan.timer blacklab-watchdog.timer blacklab-backup.timer blacklab-kb-maintenance.timer blacklab-nightly-review.timer blacklab-review-now.service 2>/dev/null || true
+  rm -f "$UNITS"/blacklab-{boot,nightly-scan,watchdog,backup,kb-maintenance,nightly-review,review-now}.{service,timer}
   systemctl --user daemon-reload
   echo "Autopilot removed (other projects you turned off stay off until you re-enable them)."
   exit 0
@@ -144,6 +145,20 @@ Nice=10
 TimeoutStartSec=28min
 Environment=PATH=$HOME/.npm-global/bin:$HOME/.local/bin:/usr/local/bin:/usr/bin:/bin
 ExecStart=$PY $HERE/nightly_review.py
+UNIT
+
+cat > "$UNITS/blacklab-review-now.service" <<UNIT
+[Unit]
+Description=BlackLab autopilot: on-demand code review (phone "Run review now"; only commits since the last review)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+Nice=10
+TimeoutStartSec=28min
+Environment=PATH=$HOME/.npm-global/bin:$HOME/.local/bin:/usr/local/bin:/usr/bin:/bin
+ExecStart=$PY $HERE/nightly_review.py --on-demand
 UNIT
 
 cat > "$UNITS/blacklab-nightly-review.timer" <<UNIT

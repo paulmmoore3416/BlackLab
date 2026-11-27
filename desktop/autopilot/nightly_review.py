@@ -9,6 +9,8 @@ the repository for context and nothing else: no shell, no edits, no MCP servers,
     nightly_review.py              review the last day's commits (skips quietly when there are none)
     nightly_review.py --dry-run    print the prompt it would send, call nothing
     nightly_review.py --since "3 days ago"
+    nightly_review.py --on-demand  only commits since the last review; result in review-now.json, its own vault note
+                                   (the phone's "Run review now" starts blacklab-review-now.service, which runs this)
 
 ~/.config/blacklab-desktop/autopilot.json:
     "nightly_review": true         false turns it off
@@ -38,6 +40,7 @@ import guards  # noqa: E402
 
 CONF = Path.home() / ".config" / "blacklab-desktop" / "autopilot.json"
 STATE = Path.home() / ".cache" / "blacklab-desktop" / "nightly-review.json"
+NOW_STATE = Path.home() / ".cache" / "blacklab-desktop" / "review-now.json"  # on-demand runs (phone "Run review now")
 FALLBACK_DIR = Path.home() / ".cache" / "blacklab-desktop" / "nightly-reviews"
 PORT = int(os.environ.get("BLACKLAB_DESKTOP_PORT", "8770"))
 MAX_DIFF = 90_000
@@ -79,13 +82,48 @@ def git(repo: Path, *args: str) -> str:
     return subprocess.run(["git", "-C", str(repo), *args], capture_output=True, text=True, timeout=60).stdout
 
 
-def day_changes(repo: Path, since: str) -> tuple[str, str]:
-    """(one line per commit, patch text) for non-merge commits since `since`; ('', '') when there are none."""
-    log = git(repo, "log", f"--since={since}", "--no-merges", "--format=%h %ad %s", "--date=format:%m-%d %H:%M")
+def head_of(repo: Path) -> str:
+    return git(repo, "rev-parse", "HEAD").strip()
+
+
+def since_for(repo: Path, heads: dict, on_demand: bool) -> tuple[str, str | None]:
+    """(since, base): what to review. base is the head the last review covered, when it is still in HEAD's history.
+    On demand: everything after base (a day when there is no base). Nightly: the last day, minus what base covered."""
+    base = heads.get(repo.name) if isinstance(heads, dict) else None
+    if base and subprocess.run(["git", "-C", str(repo), "merge-base", "--is-ancestor", base, "HEAD"], capture_output=True, timeout=60).returncode != 0:
+        base = None
+    if on_demand and base:
+        return "", base
+    return "24 hours ago", base
+
+
+def day_changes(repo: Path, since: str, base: str | None = None) -> tuple[str, str]:
+    """(one line per commit, patch text) for non-merge commits since `since` and after `base`; ('', '') when none."""
+    sel = ([f"--since={since}"] if since else []) + ([f"{base}..HEAD"] if base else [])
+    log = git(repo, "log", *sel, "--no-merges", "--format=%h %ad %s", "--date=format:%m-%d %H:%M")
     if not log.strip():
         return "", ""
-    patch = git(repo, "log", f"--since={since}", "--no-merges", "-p", "--format=commit %h %s", "--", ".", *EXCLUDE)
+    patch = git(repo, "log", *sel, "--no-merges", "-p", "--format=commit %h %s", "--", ".", *EXCLUDE)
     return log.strip(), patch
+
+
+def note_name(repo: str, on_demand: bool, now: dt.datetime) -> str:
+    """Nightly: one note a day. On demand: its own note, so it never replaces the nightly one."""
+    return f"{now:%Y-%m-%d %H%M} {repo} (on demand)" if on_demand else f"{now:%Y-%m-%d} {repo}"
+
+
+def read_heads() -> dict:
+    """The head each repository was last reviewed at, from both state files (the newer run wins)."""
+    states = []
+    for path in (STATE, NOW_STATE):
+        try:
+            states.append(json.loads(path.read_text()))
+        except (OSError, ValueError):
+            pass
+    heads: dict = {}
+    for st in sorted((x for x in states if isinstance(x, dict)), key=lambda x: x.get("at") or 0):
+        heads.update(st.get("heads") if isinstance(st.get("heads"), dict) else {})
+    return heads
 
 
 def build_prompt(name: str, log: str, patch: str, since: str = "24 hours ago") -> str:
@@ -118,20 +156,22 @@ def companion(path: str, body: dict) -> dict | None:
         return None
 
 
-def save_state(**kw):
-    STATE.parent.mkdir(parents=True, exist_ok=True)
-    STATE.write_text(json.dumps({"at": time.time(), **kw}, indent=2))
-    os.chmod(STATE, 0o600)
+def save_state(path: Path, **kw):
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps({"at": time.time(), **kw}, indent=2))
+    os.chmod(path, 0o600)
 
 
-def review(repo: Path, cfg: dict, since: str, dry: bool) -> dict:
-    name = repo.name
-    log, patch = day_changes(repo, since)
+def review(repo: Path, cfg: dict, since: str, base: str | None = None, dry: bool = False, on_demand: bool = False) -> dict:
+    name, head = repo.name, head_of(repo)
+    log, patch = day_changes(repo, since, base)
     if not log:
-        return {"repo": name, "status": "Skipped", "summary": f"no commits since {since}"}
+        note = "Nothing new since the last review" if on_demand else f"no commits since {since}"
+        return {"repo": name, "status": "Skipped", "summary": note, "head": head if base else None}
+    since = since or f"the last review ({base[:7]})"
     setup = agentops.review_setup(cfg)  # the same model/advisor the Agent Ops panel shows
     model, adv = setup["model"], setup["advisor"] or None
-    prompt = build_prompt(name, log, patch, since)
+    prompt = build_prompt(name, log, patch, since + (f", after the last review ({base[:7]})" if base and "last review" not in since else ""))
     if dry:
         print(prompt)
         return {"repo": name, "status": "Dry run", "summary": f"{len(log.splitlines())} commit(s), prompt {len(prompt):,} characters"}
@@ -149,20 +189,20 @@ def review(repo: Path, cfg: dict, since: str, dry: bool) -> dict:
         return {"repo": name, "status": "Failed", "summary": err[:200]}
     who = ai_models.pretty_claude(canonical) if canonical else model
     day = dt.date.today().isoformat()
-    note = (f"# Nightly review · {name} · {day}\n\n"
+    note = (f"# {'On-demand' if on_demand else 'Nightly'} review · {name} · {day}\n\n"
             f"_{len(log.splitlines())} commit(s) since {since} · {who}" + (f" with the {adv.title()} advisor" if adv else "")
             + f" · {time.time() - t0:.0f} s · read-only_\n\n" + text.strip() + "\n\n## Commits\n\n" + "\n".join(f"- `{x}`" for x in log.splitlines()) + "\n")
-    rel = f"70 AI/Agents/Claude Code/Nightly reviews/{day} {name}"
+    rel = f"70 AI/Agents/Claude Code/Nightly reviews/{note_name(name, on_demand, dt.datetime.now())}"
     w = companion("/local/vault/write", {"path": rel, "content": note, "mode": "replace", "author": "Claude Code (nightly review)"})
     if not (w and w.get("ok")):
         FALLBACK_DIR.mkdir(parents=True, exist_ok=True)
-        p = FALLBACK_DIR / f"{day}-{name}.md"
+        p = FALLBACK_DIR / (note_name(name, on_demand, dt.datetime.now()).replace(" ", "-") + ".md")
         p.write_text(note)
         os.chmod(p, 0o600)
         rel = str(p)
     summary = verdict(text) or "Reviewed."
-    companion("/local/notify", {"title": f"Nightly code review · {name}", "text": summary})
-    return {"repo": name, "status": "Reviewed", "summary": summary, "report": rel, "model": who, "advisor": adv or ""}
+    companion("/local/notify", {"title": f"{'On-demand' if on_demand else 'Nightly'} code review · {name}", "text": summary})
+    return {"repo": name, "status": "Reviewed", "summary": summary, "report": rel, "model": who, "advisor": adv or "", "head": head}
 
 
 def pick(results: list[dict]) -> dict:
@@ -177,10 +217,12 @@ def pick(results: list[dict]) -> dict:
 def main() -> int:
     cfg = load_conf()
     dry = "--dry-run" in sys.argv
+    on_demand = "--on-demand" in sys.argv
     if cfg.get("nightly_review", True) is False and not dry:
         print("nightly review is off (autopilot.json \"nightly_review\": false)")
         return 0
-    since = sys.argv[sys.argv.index("--since") + 1] if "--since" in sys.argv else "24 hours ago"
+    forced = sys.argv[sys.argv.index("--since") + 1] if "--since" in sys.argv else None
+    heads = read_heads()
     repos = [Path(os.path.expanduser(p)) for p in cfg.get("review_repos", [str(HERE.parent.parent)])]
     results = []
     for repo in repos:
@@ -188,17 +230,19 @@ def main() -> int:
             results.append({"repo": repo.name, "status": "Skipped", "summary": "not a git repository"})
             continue
         try:
-            results.append(review(repo, cfg, since, dry))
+            since, base = (forced, None) if forced else since_for(repo, heads, on_demand)
+            results.append(review(repo, cfg, since, base, dry=dry, on_demand=on_demand))
         except Exception as e:  # noqa: BLE001 — record it, so a crash at 02:30 shows up instead of vanishing
             results.append({"repo": repo.name, "status": "Failed", "summary": f"{type(e).__name__}: {e}"[:200]})
     for r in results:
         print(f"{r['repo']}: {r['status']} — {r['summary']}" + (f" ({r['report']})" if r.get("report") else ""))
     if not dry:
         main_r = pick(results)
-        save_state(**main_r, all=results)
+        heads.update({r["repo"]: r["head"] for r in results if r.get("head")})
+        save_state(NOW_STATE if on_demand else STATE, **main_r, all=results, heads=heads, on_demand=on_demand)
         for r in results:
             if r["status"] == "Failed":
-                companion("/local/notify", {"title": f"Nightly code review failed · {r['repo']}", "text": r["summary"]})
+                companion("/local/notify", {"title": f"{'On-demand' if on_demand else 'Nightly'} code review failed · {r['repo']}", "text": r["summary"]})
     return 1 if any(r["status"] == "Failed" for r in results) else 0
 
 

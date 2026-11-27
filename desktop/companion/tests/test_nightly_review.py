@@ -1,4 +1,6 @@
 """The nightly code review (desktop/autopilot/nightly_review.py). Run:  python3 -m unittest discover -s desktop/companion/tests"""
+import datetime as dt
+import json
 import subprocess
 import sys
 import tempfile
@@ -51,7 +53,7 @@ class NightlyReviewTest(unittest.TestCase):
             orig = (N.load_conf, N.review, N.save_state, N.companion, sys.argv)
             N.load_conf = lambda: {"review_repos": [d]}
             N.review = lambda *a, **k: (_ for _ in ()).throw(RuntimeError("boom"))
-            N.save_state = lambda **kw: saved.update(kw)
+            N.save_state = lambda path, **kw: saved.update(kw)
             N.companion = lambda path, body: sent.append((path, body))
             sys.argv = ["nightly_review.py"]
             try:
@@ -63,6 +65,90 @@ class NightlyReviewTest(unittest.TestCase):
         self.assertIn("boom", saved["summary"])
         self.assertEqual(sent[0][0], "/local/notify")
         self.assertIn("failed", sent[0][1]["title"])
+
+    @staticmethod
+    def repo(d, *msgs):
+        subprocess.run(["git", "init", "-q", d], check=True)
+        shas = []
+        for i, m in enumerate(msgs):
+            Path(d, f"f{i}.txt").write_text(m)
+            subprocess.run(["git", "-C", d, "add", "."], check=True)
+            subprocess.run(["git", "-C", d, "-c", "user.name=t", "-c", "user.email=t@t", "commit", "-qm", m], check=True)
+            shas.append(subprocess.run(["git", "-C", d, "rev-parse", "HEAD"], capture_output=True, text=True).stdout.strip())
+        return shas
+
+    def test_on_demand_reviews_only_new_commits(self):
+        with tempfile.TemporaryDirectory() as d:
+            a, _b = self.repo(d, "first change", "second change")
+            since, base = N.since_for(Path(d), {Path(d).name: a}, on_demand=True)
+            log, _patch = N.day_changes(Path(d), since, base)
+        self.assertIn("second change", log)
+        self.assertNotIn("first change", log)
+
+    def test_on_demand_without_a_recorded_head_uses_a_day(self):
+        with tempfile.TemporaryDirectory() as d:
+            self.repo(d, "only")
+            self.assertEqual(N.since_for(Path(d), {}, on_demand=True), ("24 hours ago", None))
+            self.assertEqual(N.since_for(Path(d), {Path(d).name: "0" * 40}, on_demand=True), ("24 hours ago", None))  # not an ancestor
+
+    def test_nightly_skips_commits_already_reviewed(self):
+        with tempfile.TemporaryDirectory() as d:
+            a, _b = self.repo(d, "reviewed on demand", "new tonight")
+            since, base = N.since_for(Path(d), {Path(d).name: a}, on_demand=False)
+            log, _ = N.day_changes(Path(d), since, base)
+        self.assertEqual(since, "24 hours ago")
+        self.assertIn("new tonight", log)
+        self.assertNotIn("reviewed on demand", log)
+
+    def test_nothing_new_skips_without_claude(self):
+        with tempfile.TemporaryDirectory() as d:
+            (head,) = self.repo(d, "only")
+            orig = N.ai_models.find_claude
+            N.ai_models.find_claude = lambda *_a: (_ for _ in ()).throw(AssertionError("Claude must not be called"))
+            try:
+                r = N.review(Path(d), {}, *N.since_for(Path(d), {Path(d).name: head}, True), dry=False, on_demand=True)
+            finally:
+                N.ai_models.find_claude = orig
+        self.assertEqual((r["status"], r["summary"], r["head"]), ("Skipped", "Nothing new since the last review", head))
+
+    def test_on_demand_never_touches_nightly_state(self):
+        with tempfile.TemporaryDirectory() as d, tempfile.TemporaryDirectory() as cache:
+            (head,) = self.repo(d, "only")
+            nightly, now = Path(cache, "nightly-review.json"), Path(cache, "review-now.json")
+            nightly.write_text(json.dumps({"status": "Reviewed", "summary": "keep me", "heads": {Path(d).name: head}}))
+            orig = (N.load_conf, N.STATE, N.NOW_STATE, N.companion, sys.argv)
+            N.load_conf, N.STATE, N.NOW_STATE = (lambda: {"review_repos": [d]}), nightly, now
+            N.companion, sys.argv = (lambda *_a: None), ["nightly_review.py", "--on-demand"]
+            try:
+                N.main()
+            finally:
+                N.load_conf, N.STATE, N.NOW_STATE, N.companion, sys.argv = orig
+            self.assertEqual(json.loads(nightly.read_text())["summary"], "keep me")
+            saved = json.loads(now.read_text())
+        self.assertEqual(saved["summary"], "Nothing new since the last review")
+        self.assertEqual(saved["heads"][Path(d).name], head)
+
+    def test_heads_recorded_after_a_review(self):
+        saved = {}
+        with tempfile.TemporaryDirectory() as d:
+            self.repo(d, "x")
+            orig = (N.load_conf, N.review, N.save_state, N.companion, sys.argv)
+            N.load_conf = lambda: {"review_repos": [d]}
+            N.review = lambda repo, *a, **k: {"repo": repo.name, "status": "Reviewed", "summary": "No findings.", "head": "abc123"}
+            N.save_state = lambda path, **kw: saved.update(kw, path=path)
+            N.companion, sys.argv = (lambda *_a: None), ["nightly_review.py"]
+            try:
+                N.main()
+            finally:
+                N.load_conf, N.review, N.save_state, N.companion, sys.argv = orig
+            name = Path(d).name
+        self.assertEqual(saved["heads"][name], "abc123")
+        self.assertEqual(saved["path"], N.STATE)
+
+    def test_note_names(self):
+        t = dt.datetime(2026, 11, 27, 14, 5)
+        self.assertEqual(N.note_name("BlackLab", True, t), "2026-11-27 1405 BlackLab (on demand)")
+        self.assertEqual(N.note_name("BlackLab", False, t), "2026-11-27 BlackLab")
 
     def test_binaries_and_keystores_excluded(self):
         for x in ("*.apk", "keystore", "releases", "local.properties"):
