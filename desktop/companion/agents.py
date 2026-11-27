@@ -851,7 +851,8 @@ def run_weekly(j: dict) -> dict:
 
 def run_ask(j: dict) -> dict:
     text = j["params"].get("text") or j["title"]
-    r = C.assistant({"text": text, "target": "desktop", "phone": None, "origin": j["origin"], "private": j["private"], "rounds": 8})
+    # plan_check: a long job gets the advisor before it starts (and the Claude advisor when a Claude model runs it)
+    r = C.assistant({"text": text, "target": "desktop", "phone": None, "origin": j["origin"], "private": j["private"], "rounds": 8, "plan_check": True})
     return {"text": r.get("text", ""), "source": r.get("source", ""), "notify": {"title": "Your computer finished: " + text[:60], "text": r.get("text", "")[:300]}}
 
 

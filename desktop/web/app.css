@@ -353,3 +353,10 @@ button:not(.ghost):not(.danger):not(.icon-btn) { box-shadow: 0 6px 18px color-mi
 .model-pick[data-provider="gemini"] select { border-color: var(--gemini); box-shadow: 0 0 10px -3px var(--gemini); }
 optgroup.og-claude { color: var(--claude); }
 optgroup.og-gemini { color: var(--gemini); }
+
+/* Agent Ops (companion 1.15) */
+.ops-fork { display: grid; grid-template-columns: 110px 1fr 70px 40px; gap: 10px; align-items: center; }
+.ops-bar { height: 10px; border-radius: 999px; background: var(--surface-3); overflow: hidden; }
+.ops-bar span { display: block; height: 100%; background: var(--accent); border-radius: 999px; }
+.ops-feed { display: grid; grid-template-columns: 70px auto 1fr auto; gap: 10px; align-items: start; }
+.ops-live { margin-top: 8px; background: var(--surface-2); }

@@ -37,6 +37,7 @@ GEMINI_SKIP = re.compile(r"(embedding|aqa|imagen|veo|tts|image|live|audio|learnl
 VAULT_READ_TOOLS = ["mcp__blacklab-vault__vault_search", "mcp__blacklab-vault__vault_read", "mcp__blacklab-vault__vault_recent",
                     "mcp__blacklab-vault__vault_nodes"]
 PROVIDERS = ("claude", "gemini", "local", "nano", "auto")
+ADVISOR_RANK = {"haiku": 1, "sonnet": 2, "opus": 3, "fable": 4}  # Claude Code: the advisor must rank at or above the main model
 _claude_slots = threading.BoundedSemaphore(2)
 
 
@@ -58,6 +59,24 @@ def provider_of(model_id: str | None) -> str:
 
 def model_of(model_id: str | None) -> str:
     return (model_id or "").split(":", 1)[1] if ":" in (model_id or "") else ""
+
+
+def claude_family(name: str | None) -> str:
+    """'opus' / 'claude-opus-5-5' → 'opus'; '' when it isn't a Claude model name."""
+    m = re.match(r"^(?:claude-)?(haiku|sonnet|opus|fable)\b", (name or "").strip().lower())
+    return m.group(1) if m else ""
+
+
+def advisor_for(main: str, advisor: str | None) -> str | None:
+    """The --advisor value to pass, or None: unset, not a Claude model, or ranked below the main model (Claude Code
+    would only warn and run without it; dropping it here keeps the reply's label honest)."""
+    a = (advisor or "").strip().lower()
+    if not a or a in ("off", "none") or not re.fullmatch(r"(?:haiku|sonnet|opus|fable|claude-[a-z0-9-]+)", a):
+        return None
+    fa, fm = claude_family(a), claude_family(main)
+    if not fa or not fm or ADVISOR_RANK[fa] < ADVISOR_RANK[fm]:
+        return None
+    return a
 
 
 def pretty_claude(canonical: str) -> str:
@@ -196,8 +215,9 @@ class Models:
 
     # ---------------------------------------------------------------- calls
 
-    def claude(self, alias: str, prompt: str, system: str, timeout: int = 180) -> tuple[str, str]:
-        """(reply, real model name). Raises RuntimeError with a readable reason."""
+    def claude(self, alias: str, prompt: str, system: str, timeout: int = 180, advisor: str | None = None) -> tuple[str, str]:
+        """(reply, real model name). Raises RuntimeError with a readable reason. advisor: Claude Code's advisor model
+        (1.15), passed as --advisor when it may advise this model (advisor_for)."""
         exe = self.claude_exe()
         if not exe:
             raise RuntimeError("Claude Code isn't installed on this computer (npm i -g @anthropic-ai/claude-code, then `claude` to sign in)")
@@ -205,6 +225,8 @@ class Models:
             raise RuntimeError(f"unknown Claude model: {alias}")
         args = [exe, "-p", "--model", alias, "--output-format", "json", "--no-session-persistence", "--setting-sources", "",
                 "--system-prompt", system]
+        if adv := advisor_for(alias, advisor):
+            args += ["--advisor", adv]
         if self.config.get("claude_vault_tools") is True:
             mcp = self._vault_mcp_config()
             args += ["--tools", "", "--strict-mcp-config", "--mcp-config", str(mcp), "--allowedTools", *VAULT_READ_TOOLS]
@@ -263,13 +285,16 @@ class Models:
             raise RuntimeError(f"Gemini returned no text ({reason})")
         return out
 
-    def chat(self, model_id: str, text: str, history=(), surface: str = "BlackLab", extra_system: str = "") -> dict:
-        """One cloud turn: {'text', 'source', 'provider', 'model'}. Local and auto are the caller's job (tools live there)."""
+    def chat(self, model_id: str, text: str, history=(), surface: str = "BlackLab", extra_system: str = "", advisor: str | None = None) -> dict:
+        """One cloud turn: {'text', 'source', 'provider', 'model'}. Local and auto are the caller's job (tools live there).
+        advisor: a Claude advisor for this turn (long background jobs; config "claude_advisor")."""
         p, m = provider_of(model_id), model_of(model_id)
         if p == "claude":
             label = self.label(model_id)
-            reply, canonical = self.claude(m, transcript(history, text), system_prompt(surface, label, extra_system))
-            return {"text": reply, "source": f"{pretty_claude(canonical)} · your Claude subscription", "provider": "claude", "model": canonical}
+            adv = advisor_for(m, advisor)
+            reply, canonical = self.claude(m, transcript(history, text), system_prompt(surface, label, extra_system), advisor=adv)
+            return {"text": reply, "source": f"{pretty_claude(canonical)} · your Claude subscription" + (f" · advisor {adv.title()}" if adv else ""),
+                    "provider": "claude", "model": canonical}
         if p == "gemini":
             label = self.label(model_id)
             reply = self.gemini(m, text, history, system_prompt(surface, label, extra_system))

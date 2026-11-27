@@ -1,0 +1,146 @@
+#!/usr/bin/env python3
+"""blacklab-ops — the Agent Ops view in a terminal (companion 1.15). Works over SSH from the phone's Terminal.
+
+    desktop/autopilot/blacklab-ops           live, refreshes every 2 s (Ctrl+C to quit)
+    desktop/autopilot/blacklab-ops --once    print once and exit (scripts, small screens)
+
+Reads http://127.0.0.1:8770/local/agentops from the companion on this computer. Read-only: changes nothing.
+Fits the width it gets, from a phone (≈45 columns) to a full monitor.
+"""
+from __future__ import annotations
+
+import datetime as dt
+import json
+import os
+import shutil
+import sys
+import time
+import urllib.request
+
+PORT = int(os.environ.get("BLACKLAB_DESKTOP_PORT", "8770"))
+URL = f"http://127.0.0.1:{PORT}/local/agentops"
+RESET, DIM, BOLD = "\x1b[0m", "\x1b[2m", "\x1b[1m"
+GREEN, ORANGE, BLUE, PURPLE, RED = "\x1b[38;5;79m", "\x1b[38;5;215m", "\x1b[38;5;75m", "\x1b[38;5;141m", "\x1b[38;5;203m"
+
+
+def fetch() -> dict:
+    req = urllib.request.Request(URL, headers={"Host": f"127.0.0.1:{PORT}", "X-BlackLab": "1"})
+    with urllib.request.urlopen(req, timeout=5) as r:
+        return json.loads(r.read().decode())
+
+
+def clip(s, n: int) -> str:
+    s = " ".join(str(s or "").split())
+    return s if len(s) <= n else s[: max(0, n - 1)] + "…"
+
+
+def bar(sharp: int, split: int, width: int) -> str:
+    n = sharp + split
+    full = round(width * sharp / n) if n else 0
+    return GREEN + "█" * full + DIM + "░" * (width - full) + RESET
+
+
+def clock(sec) -> str:
+    return dt.datetime.fromtimestamp(sec).strftime("%H:%M:%S") if sec else ""
+
+
+def section(title: str, w: int) -> str:
+    return f"\n{BOLD}{title}{RESET} {DIM}{'─' * max(0, w - len(title) - 1)}{RESET}"
+
+
+def render(d: dict, w: int) -> str:
+    a, f, cc, nr = d.get("advisor") or {}, d.get("forks") or {}, d.get("claude_code") or {}, d.get("nightly_review") or {}
+    tot = a.get("total") or {}
+    narrow = w < 70
+    out = [f"{BOLD}BLACKLAB AGENT OPS{RESET}  {DIM}{'' if narrow else 'companion ' + str(d.get('version', '?')) + ' · '}{dt.datetime.now():%H:%M:%S}{RESET}"]
+    worker = f"{ORANGE}■{RESET} worker {clip(d.get('model') or '—', 24)}"
+    adv = f"{PURPLE}■{RESET} advisor {clip('off' if a.get('mode') == 'off' else a.get('model'), w - 12)}"
+    out += [worker, adv] if narrow else [f"{worker}   {adv}"]
+    loaded = " · ".join(f"{m['name']} {m['vram_gb']} GB" for m in d.get("loaded") or [])
+    out.append(f"{DIM}GPUs: {clip(loaded or 'nothing loaded', w - 6)}{RESET}")
+
+    out.append(section("ADVISOR · on call", w))
+    out.append(f"plan {tot.get('plan', 0)} · repeat {tot.get('repeat', 0)} · done {tot.get('done', 0)}   {DIM}max {a.get('max_calls', 3)}/task{RESET}"
+               + (f"   {DIM}Claude jobs → {a['claude_jobs']}{RESET}" if a.get("claude_jobs") else ""))
+    for x in list(a.get("recent") or [])[-4:][::-1]:
+        tag = f"{RED}unavailable{RESET}" if x.get("error") else (f"{DIM}nothing to add{RESET}" if x.get("silent") else clip(x.get("advice") or "(private task)", w - 24))
+        out.append(f"{DIM}{clock(x.get('at'))}{RESET} {PURPLE}{x.get('stage', ''):<6}{RESET} {tag}")
+
+    out.append(section(f"FORK LAYER · {f.get('total', 0)} decisions", w))
+    bw = max(8, min(30, w - 34))
+    for k, v in (f.get("forks") or {}).items():
+        n = v["sharp"] + v["split"]
+        rate = v["sharp"] / n if n else 0
+        word = f"{GREEN}sharp{RESET}" if rate >= 0.8 else f"{ORANGE}split{RESET}"
+        out.append(f"{k.replace('_', ' '):<14}{bar(v['sharp'], v['split'], bw)} {rate:.2f} {word} {DIM}{n}{RESET}")
+    if not f.get("forks"):
+        out.append(f"{DIM}no decisions yet{RESET}")
+
+    live = d.get("live") or []
+    running = [j for j in d.get("jobs") or [] if j.get("status") in ("running", "queued")]
+    out.append(section(f"RUNNING · {len(live)} task(s), {len(running)} job(s)", w))
+    for t in live:
+        out.append(f"{BLUE}▸{RESET} {clip(t.get('request'), w - 4)}")
+        for st in (t.get("steps") or [])[-3:]:
+            out.append(f"   {DIM}{st.get('at')}{RESET} {st.get('kind', ''):<7} {clip(st.get('title'), w - 22)}")
+    for j in running:
+        out.append(f"{BLUE}▸{RESET} job {clip(j.get('title'), w - 22)} {DIM}{j.get('status')}{RESET}")
+    if not live and not running:
+        out.append(f"{DIM}idle{RESET}")
+
+    out.append(section("SESSION LOG", w))
+    for t in (d.get("tasks") or [])[:8]:
+        ok = GREEN if t.get("status") == "Done" else ORANGE
+        out.append(f"{DIM}{(t.get('started') or '')[11:19]}{RESET} {ok}{(t.get('status') or '')[:4]:<4}{RESET} {clip(t.get('request'), w - 15)}")
+
+    out.append(section("CLAUDE CODE · NIGHTLY REVIEW", w))
+    out.append(f"advisor {cc.get('advisor') or 'off'} · effort {cc.get('effort') or 'default'} · subagents {', '.join(cc.get('subagents') or []) or 'none'}")
+    if nr.get("at"):
+        out.append(f"{DIM}{dt.datetime.fromtimestamp(nr['at']):%a %H:%M}{RESET} {nr.get('status', '')}: {clip(nr.get('summary'), w - 22)}")
+    else:
+        out.append(f"{DIM}no nightly review yet (02:30, only on days with commits){RESET}")
+    return "\n".join(clip_ansi(line, w) for line in out)
+
+
+def clip_ansi(line: str, w: int) -> str:
+    """Cut a line to w visible columns without breaking colour codes."""
+    seen, i, outp = 0, 0, []
+    while i < len(line):
+        if line[i] == "\x1b":
+            j = line.find("m", i)
+            outp.append(line[i:j + 1])
+            i = j + 1
+            continue
+        if seen >= w:
+            i += 1
+            continue
+        outp.append(line[i])
+        seen += 1
+        i += 1
+    return "".join(outp) + RESET
+
+
+def main() -> int:
+    once = "--once" in sys.argv[1:]
+    if not sys.stdout.isatty():
+        once = True
+    try:
+        while True:
+            w = max(40, min(110, shutil.get_terminal_size((80, 24)).columns))
+            try:
+                screen = render(fetch(), w)
+            except Exception as e:  # noqa: BLE001 — show why, keep trying
+                screen = f"{RED}Can't reach the companion at {URL}{RESET}\n{e}\nStart it with ./daddyshome (or systemctl --user start blacklab-desktop)."
+            if once:
+                print(screen)
+                return 0
+            sys.stdout.write("\x1b[H\x1b[2J" + screen + f"\n\n{DIM}Ctrl+C to quit · refreshes every 2 s{RESET}")
+            sys.stdout.flush()
+            time.sleep(2)
+    except KeyboardInterrupt:
+        print(RESET)
+        return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

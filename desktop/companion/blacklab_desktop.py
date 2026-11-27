@@ -15,6 +15,8 @@ A small local server (Python standard library only) that
                      creates, edits, downloads, reads or opens.
   * keeps clinical and "off the record" requests out of every record, remembers recent turns so
     follow-ups work, keeps a long-term memory.md, and searches your documents with local embeddings.
+  * 1.15: an advisor on call for the tool loop (advisor.py: before long plans, on a repeated error, before "done"),
+    a fork layer that settles the obvious decisions in code (router.py), and the Agent Ops view (/local/agentops).
 
 Listens on 127.0.0.1 only. Secrets live in ~/.config/blacklab-desktop/secrets.json (chmod 600),
 never in the repository.
@@ -54,8 +56,10 @@ import audit  # noqa: E402  (the hash-chained activity ledger — unit tested)
 import ai_models  # noqa: E402  (Claude via the subscription CLI, Gemini, local models — one catalog)
 import vault_ai  # noqa: E402  (every Claude/Gemini conversation in the vault, glowing on the graph)
 import phone_ops  # noqa: E402  (Obsidian edits the phone carries out: tasks, commands, flashcards)
+import advisor  # noqa: E402  (the reviewer model on call: plan / repeated error / done — unit tested)
+import router  # noqa: E402  (the fork layer: which tool, retry or stop, decided in code — unit tested)
 
-VERSION = "1.14.0"
+VERSION = "1.15.0"
 HOST, PORT = "127.0.0.1", int(os.environ.get("BLACKLAB_DESKTOP_PORT", "8770"))
 HOME = Path.home()
 WEB_DIR = Path(__file__).resolve().parent.parent / "web"
@@ -136,8 +140,17 @@ def http_json(url: str, body=None, headers=None, timeout=30, method=None):
     req.add_header("Content-Type", "application/json")
     for k, v in (headers or {}).items():
         req.add_header(k, v)
-    with urllib.request.urlopen(req, timeout=timeout) as r:
-        return json.loads(r.read().decode() or "{}")
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as r:
+            return json.loads(r.read().decode() or "{}")
+    except urllib.error.HTTPError as e:  # keep the server's own reason (Ollama says *why* a chat failed)
+        try:
+            why = json.loads(e.read().decode() or "{}").get("error", "")
+        except Exception:
+            why = ""
+        if why:
+            e.msg = f"{e.msg}: {str(why)[:300]}"
+        raise
 
 
 def adb_path() -> str | None:
@@ -275,6 +288,7 @@ redact = guards.redact
 # "created", "edited", "downloaded", "deleted", "read", "opened". New tools must do the same.
 
 _TASK = threading.local()
+LIVE: dict[int, "TaskLog"] = {}  # tasks running right now, for the Agent Ops view
 _INDEX_LOCK = threading.Lock()
 LOG_EXCERPT = 2000  # characters of each tool result kept in the log
 
@@ -383,6 +397,7 @@ def task_log(request: str, origin: str, private=False):
         return
     log = TaskLog(request, origin, private)
     _TASK.log = log
+    LIVE[id(log)] = log
     try:
         yield log
     except Exception as e:
@@ -390,6 +405,7 @@ def task_log(request: str, origin: str, private=False):
         raise
     finally:
         _TASK.log = None
+        LIVE.pop(id(log), None)
         try:
             log.save()
         except Exception as e:  # a full disk or a bad folder must never break the assistant
@@ -1437,7 +1453,7 @@ TOOLS = [
                                       "parameters": {"type": "object", "properties": {"query": {"type": "string"}, "provider": {"type": "string", "enum": ["claude", "gemini", ""]}}, "required": ["query"]}}},
     {"type": "function", "function": {"name": "vault_write", "description": "Save a note into the user's Obsidian vault (00 Inbox unless a folder is named). Only when the user asks to save, note or log something there.",
                                       "parameters": {"type": "object", "properties": {"title": {"type": "string"}, "text": {"type": "string"}, "folder": {"type": "string"}}, "required": ["text"]}}},
-    {"type": "function", "function": {"name": "knowledge_search", "description": "Semantic search (meaning, not just words) across the user's notes AND the reference library of government standards and guides: OSHA 29 CFR 1910/1926/1904, CMS emergency preparedness (Appendix Z), Life Safety Code survey guidance (Appendix I), psychiatric hospital rules (Appendix AA, 42 CFR 482), FEMA P-1019 emergency power, EPA building air quality, VA mental-health facility design, NIST cybersecurity/OT/AI frameworks, IRS publications, the FAR, DOE O&M. Use it for compliance, code, safety, maintenance and 'what does the regulation say' questions; cite the document titles it returns.",
+    {"type": "function", "function": {"name": "knowledge_search", "description": "Semantic search (meaning, not just words) across the user's notes AND the reference library of government standards and guides: OSHA 29 CFR 1910/1926/1904, CMS emergency preparedness (Appendix Z), Life Safety Code survey guidance (Appendix I), psychiatric hospital rules (Appendix AA, 42 CFR 482), CMS hospital survey guidance (Appendix A), EPA refrigerant (40 CFR 82 Subpart F) and hazardous-waste generator (40 CFR 262) rules, ADA accessibility (36 CFR 1191), the user's own Arch Vista EOC reports, rounding tools, SOPs and equipment manuals, FEMA P-1019 emergency power, EPA building air quality, VA mental-health facility design, NIST cybersecurity/OT/AI frameworks, IRS publications, the FAR, DOE O&M. Use it for compliance, code, safety, maintenance and 'what does the regulation say' questions; cite the document titles it returns.",
                                       "parameters": {"type": "object", "properties": {"query": {"type": "string"}}, "required": ["query"]}}},
     {"type": "function", "function": {"name": "library_search", "description": "Search the offline reference library (~50 GB: Wikipedia, Stack Exchange, LibreTexts, Wikibooks, iFixit, MedlinePlus, Ready.gov, USDA canning, survival and field manuals) for facts and how-tos.",
                                       "parameters": {"type": "object", "properties": {"query": {"type": "string"}}, "required": ["query"]}}},
@@ -1509,8 +1525,65 @@ def _skill_seed(text: str) -> tuple:
         return ()
 
 
-def ollama_chat(text, model, phone, history=(), use_memory=True, rounds=4, seed=()):
+def _reference_seed(text: str, seed: tuple = ()) -> tuple:
+    """Code / safety / equipment / EOC questions: the model starts with the reference library and notes already searched,
+    so offline answers rest on the regulation or manual instead of model memory (guards.needs_sources)."""
+    if not guards.needs_sources(text) or any(s[0] == "knowledge_search" for s in seed):
+        return ()
+    try:
+        found = tool_knowledge_search({"query": text})
+    except Exception:
+        return ()
+    if not found or found.startswith(("Nothing in the notes", "No query")):
+        return ()
+    return (("knowledge_search", {"query": text}, found),)
+
+
+SOURCES_RULE = ("For code, regulation, survey, life-safety, electrical, chemical and equipment questions, answer from the knowledge_search "
+                "results (the reference library and the user's own documents): name the document each point comes from, and quote the "
+                "requirement when it matters. If the results don't cover the question, say so plainly, answer from general knowledge, and tell "
+                "the user to verify it. Never invent section numbers, tag numbers or limits. ")
+
+
+def _router_seed(text: str, seed: tuple, phone) -> tuple:
+    """The fork layer: when the request plainly names a read-only tool, run it now instead of spending a model round."""
+    d = router.which_tool(text)
+    if not d or not d["sharp"] or any(s[0] == d["tool"] for s in seed):
+        return ()
+    task_step("fork", f"Picked {d['tool']} in code (p={d['p']:.2f})", d["args"])
+    try:
+        return ((d["tool"], d["args"], str(run_tool(d["tool"], d["args"], phone))),)
+    except Exception:
+        return ()
+
+
+def make_advisor(main_model: str, private: bool = False, text: str = "") -> "advisor.Advisor | None":
+    """config "advisor" (see advisor.py). Claude is opt-in, and private or clinical work always stays on the local advisor."""
+    mode, which = advisor.parse_choice(CONFIG.get("advisor", "auto"))
+    if mode == "off":
+        return None
+    local_model = (which if mode == "local" else "") or main_model
+
+    def ask_local(p: str) -> str:
+        r = http_json(f"{OLLAMA}/api/chat", {"model": local_model, "stream": False, "think": True,
+                                            "keep_alive": keep_alive() if local_model == main_model else "2m",
+                                            "messages": [{"role": "system", "content": advisor.SYSTEM}, {"role": "user", "content": p}],
+                                            "options": {"temperature": 0.2, "num_ctx": num_ctx(), "num_predict": 2048}}, timeout=240)
+        return (r.get("message") or {}).get("content", "")
+
+    if mode == "claude" and not private and not CLINICAL_RE.search(text or "") and MODELS.claude_exe():
+        def ask_claude(p: str) -> str:
+            if CLINICAL_RE.search(p):  # a tool result brought clinical text in: this review stays here
+                return ask_local(p)
+            return MODELS.claude(which, redact(p), advisor.SYSTEM, timeout=150)[0]
+        return advisor.Advisor(ask_claude, f"Claude {which}", private=private)
+    return advisor.Advisor(ask_local, local_model + (" · fresh context" if local_model == main_model else ""), private=private)
+
+
+def ollama_chat(text, model, phone, history=(), use_memory=True, rounds=4, seed=(), plan_check=False, private=False):
     seed = tuple(seed) + _skill_seed(text)
+    seed += _reference_seed(text, seed)
+    seed += _router_seed(text, seed, phone)
     tools = [t for t in TOOLS if phone or t["function"]["name"] != "phone_command"]
     system = ("You are BlackLab, the user's laid-back, funny but sharp personal assistant, running offline on their Linux desktop. "
               "The user is a Director of Facility Operations who is also a student. "
@@ -1518,6 +1591,7 @@ def ollama_chat(text, model, phone, history=(), use_memory=True, rounds=4, seed=
               "Use a tool only when the request needs it, and only the kind of action the user asked for. "
               "Answer arithmetic, unit conversions and general questions directly, with no tools. "
               + ("Use phone_command only for things in the BlackLab phone app the user asked about (tasks, calendar, notes, journal, recordings, email, Drive). " if phone else "")
+              + SOURCES_RULE
               + "Use search_documents for questions about the user's own documents or files, and recall_chats when they refer to an earlier conversation. "
               "Every conversation the user has had with Claude and Gemini is saved in the vault: use recall_ai when they ask what Claude or Gemini said. "
               "For reverse engineering (binaries, apps, APKs, firmware, decompiling, 'what does this program do') use reverse_engineer: one step at a time, "
@@ -1540,17 +1614,44 @@ def ollama_chat(text, model, phone, history=(), use_memory=True, rounds=4, seed=
         outputs.append(result)
         tainted = tainted or name in READS_CONTENT
     task_step("model", f"Asked {model}", f"system prompt + {len(history or ())} earlier turn(s) + request; tools offered: {', '.join(t['function']['name'] for t in tools)}")
-    for _ in range(rounds):
+    adv = make_advisor(model, private, text)
+    forks = router.Forks()
+    steps = [tuple(s) for s in seed]  # what the advisor sees: every tool call and its result
+
+    def consult(stage: str, draft: str = "") -> str:
+        a = adv.consult(stage, text, steps, draft) if adv else ""
+        note = adv.notes[-1] if adv and adv.notes else {}
+        task_step("advisor", f"Advisor · {stage}: " + ("advice" if a else "unavailable" if note.get("error") else "nothing to add"),
+                  a or note.get("error", ""), note.get("seconds"))
+        return a
+
+    if adv and plan_check:
+        a = consult("plan")
+        if a:
+            msgs[0]["content"] += "\n\n" + advisor.framing("plan", a)
+    done_checked, extra, n = False, 0, 0
+    while n < rounds + extra:
+        n += 1
         r = http_json(f"{OLLAMA}/api/chat", {"model": model, "messages": msgs, "tools": tools, "stream": False, "think": False, "keep_alive": keep_alive(),
                                             "options": {"temperature": 0.3, "num_ctx": num_ctx()}}, timeout=180)
         msg = r.get("message", {})
         calls = msg.get("tool_calls") or []
         if not calls:
             content = re.sub(r"<think>.*?</think>", "", msg.get("content", ""), flags=re.S).strip()
+            if adv and not done_checked and adv.left and content and advisor.needs_done_check(used, n - 1):
+                done_checked = True
+                a = consult("done", content)
+                if a:  # one more round to apply the review
+                    msgs += [{"role": "assistant", "content": content}, {"role": "user", "content": advisor.framing("done", a)}]
+                    extra += 1
+                    continue
             if "reverse_engineer" in used or guards.RE_WORDS.search(text):
                 content = reverse.check_code(content, outputs)  # no invented "decompiled" code
-            return content or "Done.", f"Desktop AI · {model} (offline)" + (f" · used {', '.join(used)}" if used else "")
+            given = sum(1 for x in (adv.notes if adv else []) if not x["silent"] and not x["error"])
+            advised = f" · advisor ×{given}" if given else ""
+            return content or "Done.", f"Desktop AI · {model} (offline)" + (f" · used {', '.join(used)}" if used else "") + advised
         msgs.append(msg)
+        split = False
         for c in calls:
             fn = c.get("function", {})
             name, args = fn.get("name"), fn.get("arguments") or {}
@@ -1563,13 +1664,23 @@ def ollama_chat(text, model, phone, history=(), use_memory=True, rounds=4, seed=
             if name not in TOOL_NAMES:
                 task_step("model", f"{model} asked for an unknown tool: {name}", args)
             blocked = tool_guard(name, text + " " + " ".join(u for u, _ in (history or ())[-1:]), args, tainted, autonomous=CONFIG.get("autonomous_mode", True))
+            stop = None if blocked else forks.before(name, args)
             if blocked:
                 task_step("guard", f"Blocked {name}: {blocked}", args)
+            elif stop:
+                task_step("fork", f"Stopped a repeat of {name}", args)
             elif name in READS_CONTENT:
                 tainted = True
-            result = blocked or str(run_tool(name, args, phone))
+            result = blocked or stop or str(run_tool(name, args, phone))
             outputs.append(result)
+            steps.append((name, args, result))
             msgs.append({"role": "tool", "content": result[:4000], "tool_name": name})
+            if not stop and forks.after(name, args, result) == "split":
+                split = True
+        if split and adv and adv.left:
+            a = consult("repeat")
+            if a:
+                msgs.append({"role": "user", "content": advisor.framing("repeat", a)})
     return "I went in circles on that one — try rephrasing?", f"Desktop AI · {model}"
 
 
@@ -1622,8 +1733,9 @@ def _assistant(body):
         task_step("relay", "Sent to the phone's assistant")
         r = phone_call(phone, "/api/assistant", {"text": text})
         return {"text": r.get("text", ""), "source": "Phone · " + r.get("source", ""), "links": r.get("links", [])}
-    if ai_models.provider_of(chosen) in ("claude", "gemini"):
-        return cloud_turn(chosen, text, body.get("history") or (), body.get("origin") or "")
+    if ai_models.provider_of(chosen) in ("claude", "gemini"):  # long background jobs get the Claude advisor (config "claude_advisor")
+        return cloud_turn(chosen, text, body.get("history") or (), body.get("origin") or "",
+                          claude_advisor=CONFIG.get("claude_advisor") if body.get("plan_check") else None)
     if ai_models.provider_of(chosen) == "local":
         body = {**body, "model": ai_models.model_of(chosen)}
     models = ollama_models()
@@ -1636,7 +1748,8 @@ def _assistant(body):
                 args = {"action": "overview", "path": reverse.path_in(text)}
                 seed = [("reverse_engineer", args, str(tool_reverse_engineer(args)))]
         text_out, source = ollama_chat(text, model, phone, body.get("history") or (), use_memory=not body.get("private"),
-                                       rounds=min(rounds, 10), seed=seed)
+                                       rounds=min(rounds, 10), seed=seed, plan_check=bool(body.get("plan_check")) or rounds >= 7,
+                                       private=bool(body.get("private")))
         return {"text": text_out, "source": source}
     if phone:
         task_step("relay", "Ollama is offline: sent to the phone's assistant")
@@ -1650,15 +1763,66 @@ def _assistant(body):
             "source": "Desktop · rules"}
 
 
-def cloud_turn(model_id: str, text: str, history, origin: str) -> dict:
+def cloud_turn(model_id: str, text: str, history, origin: str, claude_advisor: str | None = None) -> dict:
     """One turn with Claude (the subscription CLI) or Gemini. An error comes back as the reply, never as silence."""
     label = MODELS.label(model_id)
-    task_step("model", f"Asked {label}", f"{len(history or ())} earlier turn(s) + request")
+    adv = ai_models.advisor_for(ai_models.model_of(model_id), claude_advisor) if ai_models.provider_of(model_id) == "claude" else None
+    task_step("model", f"Asked {label}" + (f" with Claude Code's advisor ({adv})" if adv else ""), f"{len(history or ())} earlier turn(s) + request")
     try:
-        r = MODELS.chat(model_id, text, history, surface=surface_of(origin))
+        r = MODELS.chat(model_id, text, history, surface=surface_of(origin), advisor=adv)
     except Exception as e:  # noqa: BLE001 — the reason is shown to Paul
         return {"text": f"{label} couldn't answer: {e}", "source": label, "error": True, "provider": ai_models.provider_of(model_id)}
     return {"text": r["text"], "source": r["source"], "provider": r["provider"], "model": r["model"], "label": label if r["provider"] == "gemini" else ai_models.pretty_claude(r["model"])}
+
+
+# ---------------------------------------------------------------- Agent Ops (1.15)
+
+def recent_tasks(n: int = 12) -> list[dict]:
+    """The newest rows of Task Logs/task-index.csv (private tasks are already "(private)" there)."""
+    index = TASK_LOG_DIR / "task-index.csv"
+    if not index.exists():
+        return []
+    try:
+        with open(index, newline="") as f:
+            rows = deque(csv.DictReader(f), maxlen=n)
+    except (OSError, csv.Error):
+        return []
+    keep = ("started", "seconds", "from", "request", "answered_by", "status", "tools")
+    return [{k: (row.get(k) or "")[:160] for k in keep} for row in reversed(rows)]
+
+
+def claude_code_setup() -> dict:
+    """What Claude Code on this computer is set to (read-only): main effort and its advisor."""
+    st = load_json(HOME / ".claude" / "settings.json", {})
+    effort = st.get("effortLevel") or next((v.get("effortLevel") for v in (st.get("modelSettings") or {}).values() if isinstance(v, dict) and v.get("effortLevel")), "")
+    agents_dir = HOME / ".claude" / "agents"
+    return {"advisor": st.get("advisorModel", ""), "effort": effort,
+            "subagents": sorted(p.stem for p in agents_dir.glob("*.md")) if agents_dir.is_dir() else [],
+            "advisor_disabled": bool(os.environ.get("CLAUDE_CODE_DISABLE_ADVISOR_TOOL"))}
+
+
+def agent_ops() -> dict:
+    """Everything the Agent Ops view and the blacklab-ops terminal dashboard show, in one read."""
+    models = ollama_models()
+    main = default_model(models) if models else ""
+    mode, which = advisor.parse_choice(CONFIG.get("advisor", "auto"))
+    try:
+        loaded = [{"name": m.get("name", ""), "vram_gb": round((m.get("size_vram") or 0) / 1e9, 1), "expires": m.get("expires_at", "")}
+                  for m in http_json(f"{OLLAMA}/api/ps", timeout=3).get("models", [])]
+    except Exception:
+        loaded = []
+    live = [{"request": "(private)" if log.private else " ".join(log.request.split())[:120], "origin": log.origin,
+             "started": log.started.isoformat(timespec="seconds"),
+             "steps": [{"kind": st["kind"], "title": st["title"][:100], "at": st["at"].strftime("%H:%M:%S")} for st in log.steps[-8:]]}
+            for log in list(LIVE.values())]
+    jobs = sorted(agents.JOBS.values(), key=lambda j: j["created"], reverse=True)[:10]
+    return {"version": VERSION, "at": time.time(), "model": main, "loaded": loaded,
+            "advisor": {"setting": str(CONFIG.get("advisor", "auto")), "mode": mode,
+                        "model": "" if mode == "off" else (f"Claude {which}" if mode == "claude" else (which or main) + ("" if which else " · fresh context")),
+                        "claude_jobs": str(CONFIG.get("claude_advisor") or ""), "max_calls": advisor.MAX_CALLS, **advisor.LOG.snapshot()},
+            "forks": router.STATS.snapshot(), "live": live, "jobs": [agents.public(j) for j in jobs],
+            "tasks": recent_tasks(), "nightly_review": load_json(CACHE_DIR / "nightly-review.json", {}),
+            "claude_code": claude_code_setup()}
 
 
 def gemini_text(prompt: str, temperature=0.3, max_tokens=400) -> str | None:
@@ -1845,6 +2009,10 @@ class Handler(SimpleHTTPRequestHandler):
             import vault_web
             return self.reply(200, {"html": vault_web.homelab_live(vault_web.collect_system()), "at": time.time(),
                                     "running": DASH_RUN["running"], "message": DASH_RUN["message"]})
+        if route == "/local/agentops":  # the Agent Ops view and desktop/autopilot/blacklab-ops (1.15)
+            if not self.guard():
+                return
+            return self.reply(200, agent_ops())
         if route in ("/local/jobs", "/local/equipment"):
             if not self.guard():
                 return
