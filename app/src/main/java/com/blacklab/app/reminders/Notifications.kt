@@ -17,6 +17,7 @@ object Notifications {
     const val CH_STUDY = "study"
     const val CH_LINK = "link"
     const val CH_DESKTOP = "desktop_jobs"
+    const val CH_WORKING = "computer_working"
 
     fun createChannels(context: Context) {
         val nm = context.getSystemService(NotificationManager::class.java)
@@ -38,6 +39,11 @@ object Notifications {
                 },
                 NotificationChannel(CH_DESKTOP, "Computer results", NotificationManager.IMPORTANCE_DEFAULT).apply {
                     description = "Meeting notes, equipment records and other work your computer finished"
+                },
+                NotificationChannel(CH_WORKING, "Computer working", NotificationManager.IMPORTANCE_LOW).apply {
+                    description = "Shown while your computer works on a task you started from the phone"
+                    setShowBadge(false)
+                    lockscreenVisibility = android.app.Notification.VISIBILITY_PRIVATE
                 },
                 NotificationChannel(CH_STUDY, "Study timer", NotificationManager.IMPORTANCE_HIGH).apply {
                     description = "Focus session and break alerts"
