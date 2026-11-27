@@ -44,11 +44,13 @@ object DesktopAi {
     fun init(container: AppContainer) {
         if (app != null) return
         app = container
+        com.blacklab.app.link.AgentOps.load(container.context)
         container.appScope.launch {
             while (true) {
                 val was = _status.value.state
                 probe()
                 if (_status.value.state == State.ONLINE) runCatching { DesktopJobs.sync(container) }
+                if (_status.value.state == State.ONLINE) runCatching { com.blacklab.app.link.AgentOps.refresh(container) }
                 if (was != State.ONLINE && _status.value.state == State.ONLINE) android.util.Log.i("DesktopAi", "computer reachable ${_status.value.note}")
                 val wait = if (_status.value.state == State.ONLINE) (if (DesktopJobs.jobs.value.isNotEmpty() || DesktopJobs.outbox.value > 0) 20_000L else 60_000L) else 12_000L
                 kotlinx.coroutines.withTimeoutOrNull(wait) { wake.receive() }
