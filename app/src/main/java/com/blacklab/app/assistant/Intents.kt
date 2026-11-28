@@ -24,7 +24,7 @@ object Intents {
         // LATE: everything after the domain routers
         WORK_ORDER_NEW, OPS_HANDOFF, TIMELINE, LIBRARY_SEARCH, SKILL_USE, SKILLS, VAULT_ASK, SHIFT_PREP, ROUNDS_START, PANEL_LOOKUP, SDS_LOOKUP, CREDENTIALS, PRIVATE_DRIVE_SAVE, VAULT_SAVE, VAULT_NODE_ADD, VAULT_LOG, VAULT_SEARCH, VAULT_STATUS, VAULT_SHOW, VAULT_OPEN, VAULT_SYNC,
         WEATHER, REMIND, ADD_TASK, ADD_TO_LIST, TODO_PREFIX, COMPLETE_TASK, LIST_TASKS, SUMMARIZE, MEETING_ACTIONS, NAMEPLATE,
-        NAV_NEXT, NAV_NEARBY, NAV_TO, CALL, TALK_ABOUT, KEEP, NOTE, TEMPLATE, JOURNAL_WRITE, JOURNAL_OPEN,
+        NAV_NEXT, NAV_NEARBY, NAV_TO, CALL, TALK_ABOUT, KEEP, MEMORY_ADD, MEMORY_FORGET, MEMORY_SHOW, NOTE, TEMPLATE, JOURNAL_WRITE, JOURNAL_OPEN,
         SCAN_DOCUMENT, SCAN_CODE, PHOTO, VIDEO, PANORAMA, FOCUS, LOG_CEU, GPA, SWITCH_PROFILE, THEME, SET_SETTING, TOGGLE_SETTING,
         GMAIL_UNREAD, GMAIL_SEARCH, EMAIL, DRIVE_SEARCH, DRIVE_UPLOAD, DEV_DOCS, NAVIGATE, ASK_FILES, ASK_FILES_QUESTION,
     }
@@ -121,6 +121,11 @@ object Intents {
         Rule(Id.CALL, Phase.LATE, "^(?:call|dial) (?:the )?(?:number )?([+\\d][\\d\\s().-]{6,})$", onText = true),
         Rule(Id.TALK_ABOUT, Phase.LATE, "^(?:let'?s talk(?: about)?|talk to me about|can we talk about|i want to talk about|let'?s chat about|let'?s discuss|start (?:a |an |the )?(.+?) (?:conversation|chat|talk))\\s*(.*)$", onText = true),
         Rule(Id.KEEP, Phase.LATE, "^(?:save|add|put|make|create|take)?\\s*(?:a )?(?:note )?(?:to|in|on) (?:google )?keep[:\\s]*(.*)$|^keep note[:\\s]+(.+)$|^(?:note|remember) (.+?) (?:in|to|on) (?:google )?keep$", onText = true),
+        // Shared memory (memory.md on the computer, read by every BlackLab AI) — after Keep so "remember … in keep" stays a Keep note
+        Rule(Id.MEMORY_ADD, Phase.LATE, "^(?:please )?remember(?: that|:)\\s+(.+)$", onText = true),
+        Rule(Id.MEMORY_FORGET, Phase.LATE, "^(?:please )?forget(?: that| about)?:?\\s+(.+?)\\.?$", onText = true,
+            guard = { _, m -> !Regex("^(?:it|that|this|about it|everything)$", RegexOption.IGNORE_CASE).matches(m.groupValues[1].trim()) }),
+        Rule(Id.MEMORY_SHOW, Phase.LATE, "^(?:what do you (?:remember|know) about me|show (?:me )?(?:my |your |the )?(?:shared )?memory)\\??$"),
         Rule(Id.NOTE, Phase.LATE, "^(?:take a note|make a note|note to self|note|jot(?: down)?|write down|save (?:a )?note|new note|create (?:a )?(?:note|document|doc))(?: that| about| saying)?[:\\s]+(.+)$", onText = true),
         Rule(Id.TEMPLATE, Phase.LATE, "^(?:create|new|start|write|draft) (?:an? )?(memo|work order|incident report|meeting minutes|sop|inspection|pm log|project brief|vendor evaluation|budget request|weekly status|status report|shift handover|letter|checklist|cornell notes|travel plan)\\b", onText = true),
         Rule(Id.JOURNAL_WRITE, Phase.LATE, "^(?:journal|dear diary|diary|log (?:in|to) (?:my )?journal|add (?:a )?journal entry|new journal entry)(?: that| about)?[:,\\s]+(.+)$", onText = true),

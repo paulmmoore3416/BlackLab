@@ -93,6 +93,13 @@ class IntentsTest {
         "call 555-201-3344" to Id.CALL,
         "let's talk about RAG" to Id.TALK_ABOUT,
         "save to keep: gate code changed" to Id.KEEP,
+        "remember that the chiller vendor is Trane" to Id.MEMORY_ADD,
+        "please remember: I prefer short answers" to Id.MEMORY_ADD,
+        "remember the gate code changed in keep" to Id.KEEP,
+        "forget that the chiller vendor is Trane" to Id.MEMORY_FORGET,
+        "forget about the old boiler vendor" to Id.MEMORY_FORGET,
+        "what do you remember about me" to Id.MEMORY_SHOW,
+        "show my memory" to Id.MEMORY_SHOW,
         "note to self: the chiller tech comes Thursday" to Id.NOTE,
         "draft a work order" to Id.TEMPLATE,
         "journal: long day, good outcome" to Id.JOURNAL_WRITE,
@@ -152,6 +159,8 @@ class IntentsTest {
 
     @Test fun nonCommandsMatchNothing() {
         assertNull(Intents.classify("the quick brown fox"))
+        assertNull(Intents.classify("forget it"))  // not a memory edit
+        assertNull(Intents.classify("remember when we replaced the roof"))  // a question for the model, not a fact
         assertNull(Intents.classify("explain how a VFD saves energy"))
     }
 

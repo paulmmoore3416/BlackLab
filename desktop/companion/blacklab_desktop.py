@@ -54,13 +54,14 @@ import reverse  # noqa: E402  (reverse engineering with REA + Ghidra, read-only 
 import vault as vaultlib  # noqa: E402  (the Obsidian vault: notes, timeline, AI registry, git)
 import audit  # noqa: E402  (the hash-chained activity ledger — unit tested)
 import ai_models  # noqa: E402  (Claude via the subscription CLI, Gemini, local models — one catalog)
+import chat_memory  # noqa: E402  (one memory for every BlackLab AI: memory.md + the cross-device thread — unit tested)
 import agentops  # noqa: E402  (Agent Ops counts that survive restarts, the nightly review's panel — unit tested)
 import vault_ai  # noqa: E402  (every Claude/Gemini conversation in the vault, glowing on the graph)
 import phone_ops  # noqa: E402  (Obsidian edits the phone carries out: tasks, commands, flashcards)
 import advisor  # noqa: E402  (the reviewer model on call: plan / repeated error / done — unit tested)
 import router  # noqa: E402  (the fork layer: which tool, retry or stop, decided in code — unit tested)
 
-VERSION = "1.15.2"
+VERSION = "1.16.0"
 HOST, PORT = "127.0.0.1", int(os.environ.get("BLACKLAB_DESKTOP_PORT", "8770"))
 HOME = Path.home()
 WEB_DIR = Path(__file__).resolve().parent.parent / "web"
@@ -455,9 +456,7 @@ def logged_tool(name: str):
 # recall_chats tool searches so the assistant can remember earlier conversations.
 
 _CHAT_LOCK = threading.Lock()
-CHAT_STOPWORDS = set("the and what did does about you your for that this with was were when have has said say ask asked tell "
-                     "talk talked chat chats chatted history conversation remember recall last time earlier before we us our me my "
-                     "today yesterday week any".split())
+CHAT_STOPWORDS = chat_memory.STOPWORDS
 
 
 def _private_dir(*dirs: Path):
@@ -472,7 +471,7 @@ def _append_private(path: Path, text: str):
         f.write(text)
 
 
-def archive_chat(request: str, reply: str, origin: str, source: str, when: dt.datetime, tools: list[str]):
+def archive_chat(request: str, reply: str, origin: str, source: str, when: dt.datetime, tools: list[str], vault_log: bool = True):
     if CONFIG.get("chat_history", True) is False or not (request or "").strip():
         return
     folder = CHAT_DIR / f"{when:%Y-%m}"
@@ -492,7 +491,7 @@ def archive_chat(request: str, reply: str, origin: str, source: str, when: dt.da
         _append_private(CHAT_DIR / "chat-history.jsonl", json.dumps(
             {"at": when.isoformat(timespec="seconds"), "from": origin, "you": request.strip(), "blacklab": reply, "by": source, "tools": tools},
             ensure_ascii=False) + "\n")
-    if VAULT_ON:  # private turns never reach archive_chat, so they never reach the vault either
+    if VAULT_ON and vault_log:  # private turns never reach archive_chat, so they never reach the vault either
         try:
             VAULT.log("ai", request.strip().splitlines()[0][:140], reply.strip()[:600], source=f"Desktop AI · {origin.split(' (')[0]}",
                       links=[f"{when:%Y-%m-%d}"], at=when.astimezone(VAULT.tz) if VAULT.tz else when)
@@ -537,69 +536,53 @@ def tool_recall_chats(args):
 # durable facts it learned from the day's chats (config.json "memory_auto": false stops that). Edit it freely.
 
 MEMORY_FILE = CHAT_DIR / "memory.md"
-MEMORY_HEAD = ("# What BlackLab remembers about you\n\nThe desktop AI reads this before every answer. Edit or delete lines freely; "
-               "\"forget …\" removes one.\n\n")
-MEMORY_MAX = 80
-_RECENT: dict[str, deque] = {}
-_MEMORY_LOCK = threading.Lock()
+MEMORY = chat_memory.Memory(MEMORY_FILE, on_write=lambda p: task_file("edited", p))
+THREAD = chat_memory.Thread()  # each surface's last 3 turns + the cross-device thread (start here, carry on from the phone)
 
 
 def recent_turns(origin: str) -> list[tuple[str, str]]:
-    return [(u, a) for t, u, a in _RECENT.get(origin, ()) if time.time() - t < 900]
+    return THREAD.recent(origin)
 
 
 def remember_turn(origin: str, user: str, reply: str):
-    _RECENT.setdefault(origin, deque(maxlen=3)).append((time.time(), user[:1500], reply[:1500]))
+    THREAD.remember(origin, user, reply, surface_of(origin))
 
 
 def memory_facts() -> list[str]:
-    try:
-        return [ln for ln in MEMORY_FILE.read_text().splitlines() if ln.startswith("- ")]
-    except OSError:
-        return []
-
-
-def _write_memory(facts: list[str]):
-    _private_dir(CHAT_DIR)
-    tmp = MEMORY_FILE.with_suffix(".tmp")
-    fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
-    with os.fdopen(fd, "w") as f:
-        f.write(MEMORY_HEAD + "\n".join(facts) + ("\n" if facts else ""))
-    os.replace(tmp, MEMORY_FILE)
-    task_file("edited", MEMORY_FILE)
+    return MEMORY.facts()
 
 
 def memory_add(facts: list[str], how="added") -> list[str]:
-    with _MEMORY_LOCK:
-        have = memory_facts()
-        known = {re.sub(r"\s*_\(.*?\)_$", "", f).lower() for f in have}
-        new = [f.strip().rstrip(".") for f in facts if f.strip() and "- " + f.strip().rstrip(".").lower() not in known]
-        if not new:
-            return []
-        have += [f"- {f} _({how} {dt.date.today():%Y-%m-%d})_" for f in new]
-        while len(have) > MEMORY_MAX:  # drop the oldest learned fact first, then the oldest of any kind
-            i = next((i for i, f in enumerate(have) if "_(learned" in f), 0)
-            have.pop(i)
-        _write_memory(have)
-        return new
+    return MEMORY.add(facts, how)
 
 
 def memory_forget(query: str) -> list[str]:
-    words = [w for w in re.findall(r"[a-z0-9]+", query.lower()) if len(w) > 2 and w not in CHAT_STOPWORDS]
-    if not words:
-        return []
-    with _MEMORY_LOCK:
-        have = memory_facts()
-        gone = [f for f in have if all(w in f.lower() for w in words)]
-        if gone:
-            _write_memory([f for f in have if f not in gone])
-        return gone
+    return MEMORY.forget(query)
 
 
 def memory_prompt() -> str:
-    facts = [re.sub(r"\s*_\(.*?\)_$", "", f) for f in memory_facts()]
-    text = "\n".join(facts)[-2500:]
-    return f"\n\nWhat you know about the user (their memory file; may be out of date):\n{text}" if text else ""
+    return MEMORY.prompt()
+
+
+def phone_memory() -> dict:
+    """GET /phone/memory: what the phone's own models (Gemini Nano, Gemini, Claude) read before answering."""
+    return chat_memory.payload(MEMORY, THREAD, safe=lambda t: not CLINICAL_RE.search(t or ""))
+
+
+def phone_turn(body: dict):
+    """A turn the phone answered itself (Gemini Nano, Gemini, or a model it picked) joins the desktop's chat history and the
+    cross-device thread, so recall_chats, the nightly memory update and the next answer on any device all know it.
+    The vault already has it (vault_ai.record), so the timeline line is skipped."""
+    request, reply = str(body.get("request") or "").strip(), str(body.get("reply") or "")
+    if not request or CLINICAL_RE.search(request) or CLINICAL_RE.search(reply):
+        return
+    who = PHONE.get("model") or "phone"
+    origin = f"Phone assistant ({who})"
+    remember_turn(origin, request, reply)
+    try:
+        archive_chat(request, reply, origin, str(body.get("label") or body.get("model") or "Phone"), dt.datetime.now(), [], vault_log=False)
+    except Exception as e:  # never let the archive break a save
+        print(f"phone chat not archived: {e}", file=sys.stderr, flush=True)
 
 
 def consolidate_memory(since: str | None, until: str) -> int:
@@ -2062,6 +2045,10 @@ class Handler(SimpleHTTPRequestHandler):
             if not self.guard():
                 return
             return self.reply(200, agent_ops())
+        if route == "/phone/memory":  # 1.16: memory.md + the cross-device thread, for the phone's own models
+            if not self.phone_guard():
+                return
+            return self.reply(200, phone_memory())
         if route == "/phone/agentops":  # the phone's Agent Ops screen, Home card, widget and tile (1.15.2)
             if not self.phone_guard():
                 return
@@ -2138,6 +2125,20 @@ class Handler(SimpleHTTPRequestHandler):
             except (OSError, ValueError) as e:  # damaged or half-written config.json: leave it alone, say so
                 return self.reply(500, {"error": f"Couldn't save the advisor setting: {e}"[:200]})
             return self.reply(200, {"ok": True, "advisor": v})
+        if route == "/phone/memory":  # 1.16: "remember that …" said on the phone while the computer was away (outbox)
+            if not self.phone_guard():
+                return
+            try:
+                body = json.loads(self.rfile.read(min(int(self.headers.get("Content-Length") or 0), 50_000)) or b"{}")
+            except ValueError:
+                return self.reply(400, {"error": "bad JSON"})
+            facts = [redact(str(f).strip())[:300] for f in (body.get("add") or [])[:10] if str(f).strip()]
+            if any(CLINICAL_RE.search(f) for f in facts):
+                return self.reply(200, {"ok": False, "error": "I don't keep patient or health details in memory. Nothing was saved."})
+            added = memory_add(facts) if facts else []
+            gone = memory_forget(str(body["forget"])) if body.get("forget") else []
+            LEDGER.record("Phone", "memory", source=PHONE.get("model") or "phone", metadata={"added": len(added), "forgot": len(gone)})
+            return self.reply(200, {"ok": True, "added": added, "forgot": gone, "memory": phone_memory()})
         if route == "/phone/ops/ack":
             if not self.phone_guard():
                 return
@@ -2369,8 +2370,10 @@ def _vault_op(op: str, body: dict, who: str) -> dict:
         private, _ = privacy_check(str(body.get("request") or ""), bool(body.get("private")))
         if private:
             return {"ok": False, "error": "private: not saved"}
-        return vault_ai.record(v, str(body.get("provider") or ""), str(body.get("model") or ""), str(body.get("surface") or who),
-                               str(body.get("request") or ""), str(body.get("reply") or ""), label=str(body.get("label") or ""))
+        r = vault_ai.record(v, str(body.get("provider") or ""), str(body.get("model") or ""), str(body.get("surface") or who),
+                            str(body.get("request") or ""), str(body.get("reply") or ""), label=str(body.get("label") or ""))
+        phone_turn(body)
+        return r
     elif op == "ai_search":
         return {"ok": True, "results": vault_ai.search(v, body.get("query", ""), body.get("provider") or "", int(body.get("limit") or 8))}
     elif op == "ask":  # "what do my notes say about …": semantic recall through kb-core, an answer from the local model

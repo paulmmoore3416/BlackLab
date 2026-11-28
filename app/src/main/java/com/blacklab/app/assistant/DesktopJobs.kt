@@ -123,6 +123,8 @@ object DesktopJobs {
             withContext(Dispatchers.IO) {
                 // queued saves go out whenever the link is on; the rest needs "Desktop jobs"
                 runCatching { sendOutbox(app) }.onFailure { android.util.Log.w(TAG, "outbox", it) }
+                // 5.20: the computer's memory.md + cross-device thread, for the phone's own models
+                runCatching { SharedMemory.refresh(app) }.onFailure { android.util.Log.w(TAG, "memory", it) }
                 if (!enabled(app)) return@withContext
                 runCatching { sendContext(app) }.onFailure { android.util.Log.w(TAG, "context", it) }
                 runCatching { collect(app) }.onFailure { android.util.Log.w(TAG, "collect", it) }
@@ -142,7 +144,7 @@ object DesktopJobs {
             } else null
             if (item.optString("kind") == "__call") {
                 val r = DesktopAi.request("POST", item.optString("call"), item.optJSONObject("params") ?: JSONObject(), 60_000)
-                Notifications.simple(c, 7200 + (item.optString("title").hashCode() and 0x3ff), Notifications.CH_DESKTOP, "Sent to your computer",
+                Notifications.simple(c, 7900 + (item.optString("title").hashCode() and 0xff), Notifications.CH_DESKTOP, "Sent to your computer",
                     item.optString("title") + (r.optString("message").takeIf { it.isNotBlank() }?.let { " — $it" } ?: ""), null)
             } else if (f == null || upload != null) {
                 DesktopAi.request("POST", "/phone/jobs", JSONObject().put("kind", item.optString("kind")).put("title", item.optString("title"))

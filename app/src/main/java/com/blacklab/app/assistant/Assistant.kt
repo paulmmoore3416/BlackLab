@@ -26,6 +26,7 @@ import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
@@ -258,6 +259,7 @@ class Assistant(private val app: AppContainer) {
         Intents.Id.CALL -> Reply("Calling ${m[1].trim()}.", dial = m[1].filter { it.isDigit() || it == '+' })
         Intents.Id.TALK_ABOUT -> startConversation(m.groups.drop(1).filter { it.isNotBlank() }.joinToString(" "), origin)
         Intents.Id.KEEP -> keep(m.firstGroup, origin)
+        Intents.Id.MEMORY_ADD, Intents.Id.MEMORY_FORGET, Intents.Id.MEMORY_SHOW -> memory(m, t)
         Intents.Id.NOTE -> note(m[1])
         Intents.Id.TEMPLATE -> template(m[1])
         Intents.Id.JOURNAL_WRITE -> journal(m[1])
@@ -357,6 +359,31 @@ class Assistant(private val app: AppContainer) {
         return Reply(done("saved for your computer — it goes into $what as soon as the link is back."), source = "Outbox")
     }
 
+    /**
+     * Shared memory (5.20): memory.md on the computer, which every BlackLab AI reads. While the computer is reachable the
+     * request goes to its assistant (the same rules and clinical guard as typing it there); while it's away, "remember"
+     * waits in the outbox and the cached memory answers "what do you remember".
+     */
+    private suspend fun memory(m: Intents.Match, text: String): Reply {
+        if (Intents.CLINICAL.containsMatchIn(text))
+            return Reply("I don't keep anyone's care information in memory — that stays in the Behavioral Health workspace. Nothing was saved.")
+        if (DesktopAi.usable) {
+            val r = runCatching { DesktopAi.request("POST", "/phone/ask", org.json.JSONObject().put("text", text), 30_000) }.getOrNull()
+            if (r != null && r.optString("text").isNotBlank()) {
+                app.appScope.launch { runCatching { withContext(Dispatchers.IO) { SharedMemory.refresh(app) } } }
+                return Reply(r.optString("text"), source = "Shared memory")
+            }
+        }
+        SharedMemory.load(app.context)
+        return when (m.id) {
+            Intents.Id.MEMORY_ADD -> { SharedMemory.rememberLocally(app, m[1]); Reply(done("got it — I'll remember that everywhere once your computer's back."), source = "Shared memory · outbox") }
+            Intents.Id.MEMORY_SHOW -> SharedMemory.state.facts.let { f ->
+                Reply(if (f.isEmpty()) "My memory's empty. Say “remember that …” to add something." else "Here's what I remember:\n" + f.joinToString("\n") { "- $it" }, source = "Shared memory · saved copy")
+            }
+            else -> Reply("Forgetting needs your computer — that's where the memory lives. Try again when the link is back.", source = "Shared memory")
+        }
+    }
+
     /** "save to my private drive: …" — the computer files it into Google Drive › BlackLab › Paul's Private. */
     private suspend fun privateDrive(said: String): Reply {
         if (Intents.CLINICAL.containsMatchIn(said))
@@ -417,6 +444,11 @@ class Assistant(private val app: AppContainer) {
             // So the model never guesses about the computer link (it used to say "offline" when it was up)
             val desk = DesktopAi.status.value
             append("Desktop AI (the user's computer): " + if (DesktopAi.usable) "connected, model ${desk.model.ifBlank { "local model" }} — you are running on it right now.\n" else desk.state.label.lowercase() + ".\n")
+            // 5.20: the memory every BlackLab AI shares, and what was just said on another device (Nano's context is small)
+            SharedMemory.load(app.context)
+            val now = Time.now()
+            val phoneIdle = messages.value.dropLast(1).none { now - it.time < SharedMemory.HANDOFF_MS }
+            append(SharedMemory.promptBlock(SharedMemory.state, now, if (cloud || DesktopAi.usable) 2500 else 600, includeRecent = cloud || DesktopAi.usable, phoneIdle = phoneIdle))
         }
         val persona = when (s.asstPersona) {
             "LAIDBACK" -> "You are ${s.asstName}, a laid-back, warm, funny personal assistant with an easygoing, chuckling vibe. Keep it short, friendly and a little playful, but always useful."
