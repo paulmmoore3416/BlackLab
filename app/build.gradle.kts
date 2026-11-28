@@ -21,7 +21,9 @@ android {
         includeInBundle = false
     }
     namespace = "com.blacklab.app"
-    compileSdk = 37
+    compileSdk {
+        version = release(37) { minorApiLevel = 2 }  // Compose 1.13 (BOM 2026.11) needs 37.1+
+    }
 
     defaultConfig {
         applicationId = "com.blacklab.app"

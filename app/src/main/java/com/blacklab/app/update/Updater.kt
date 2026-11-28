@@ -50,7 +50,7 @@ object Updater {
     private const val API = "https://api.github.com/repos/$REPO/releases/latest"
     private const val WORK = "blacklab-update-check"
     const val CH_UPDATES = "updates"
-    private const val NOTIFY_ID = 7_301
+    private const val NOTIFY_ID = 7_311  // 7301/7302 belong to bh/Rounds (they collided before 5.20)
 
     // ----------------------------------------------------------------- pure helpers (unit tested)
 
@@ -347,10 +347,10 @@ class UpdateReceiver : BroadcastReceiver() {
                 if (Updater.isForeground()) runCatching { context.startActivity(confirm) }
                 else {
                     // Can't pop a dialog from the background; leave a notification that opens the confirm screen
-                    val pi = PendingIntent.getActivity(context, 7_302, confirm, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
+                    val pi = PendingIntent.getActivity(context, 7_312, confirm, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
                     val n = NotificationCompat.Builder(context, Updater.CH_UPDATES).setSmallIcon(R.drawable.ic_notification)
                         .setContentTitle("Finish updating BlackLab").setContentText("Tap to confirm the install").setContentIntent(pi).setAutoCancel(true).build()
-                    try { NotificationManagerCompat.from(context).notify(7_302, n) } catch (_: SecurityException) {}
+                    try { NotificationManagerCompat.from(context).notify(7_312, n) } catch (_: SecurityException) {}
                 }
             }
             PackageInstaller.STATUS_SUCCESS -> Updater.state.value = Updater.State.Idle // the app is replaced and restarted
