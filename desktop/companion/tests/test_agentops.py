@@ -194,6 +194,15 @@ class PhonePayloadTest(unittest.TestCase):
         self.assertEqual((jobs[1]["title"], jobs[1]["progress"], jobs[1]["error"]), ("(private)", "", "failed"))
         self.assertNotIn("patient", json.dumps(jobs))
 
+    def test_on_demand_report_travels_too(self):
+        ops = ops_with([])
+        ops["review_now"] = {"status": "Reviewed", "summary": "1 finding(s)"}
+        out = O.phone_payload(ops, "nightly", "on demand " + "y" * 20_000)
+        self.assertEqual(out["nightly_review"]["report_md"], "nightly")
+        self.assertTrue(out["review_now"]["report_md"].startswith("on demand"))
+        self.assertTrue(out["review_now"]["report_md"].endswith("…(cut)"))
+        self.assertEqual(O.phone_payload(ops_with([]), "n")["review_now"], {})  # no on-demand run yet: stays empty
+
     def test_report_capped(self):
         out = O.phone_payload(ops_with([]), "x" * 20_000)
         md = out["nightly_review"]["report_md"]
@@ -215,6 +224,24 @@ class PhoneControlsTest(Tmp):
         self.assertEqual(O.write_config_key(self.p, "advisor", "off"), {"a": 1, "b": 2, "advisor": "off"})
         self.assertEqual(json.loads(self.p.read_text()), {"a": 1, "b": 2, "advisor": "off"})
         self.assertEqual(os.stat(self.p).st_mode & 0o777, 0o600)
+
+    def test_write_config_key_refuses_a_malformed_file(self):
+        self.p.write_text('{"vault_path": "/x", "google_cli')  # caught mid-write by ./daddyshome, or damaged
+        with self.assertRaises(ValueError):
+            O.write_config_key(self.p, "advisor", "off")
+        self.assertEqual(self.p.read_text(), '{"vault_path": "/x", "google_cli')
+        self.p.write_text("[1, 2]")
+        with self.assertRaises(ValueError):
+            O.write_config_key(self.p, "advisor", "off")
+
+    def test_write_config_key_creates_a_missing_file(self):
+        self.assertEqual(O.write_config_key(self.p, "advisor", "off"), {"advisor": "off"})
+
+    def test_write_config_key_reports_a_failed_write(self):
+        blocker = Path(self.dir.name) / "file"
+        blocker.write_text("x")
+        with self.assertRaises(OSError):
+            O.write_config_key(blocker / "config.json", "advisor", "off")  # parent is a file: can't write
 
     def test_report_path(self):
         vault = Path(self.dir.name) / "vault"

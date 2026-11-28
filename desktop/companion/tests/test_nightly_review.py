@@ -128,6 +128,22 @@ class NightlyReviewTest(unittest.TestCase):
         self.assertEqual(saved["summary"], "Nothing new since the last review")
         self.assertEqual(saved["heads"][Path(d).name], head)
 
+    def test_on_demand_nothing_new_still_notifies(self):
+        sent = []
+        with tempfile.TemporaryDirectory() as d, tempfile.TemporaryDirectory() as cache:
+            (head,) = self.repo(d, "only")
+            nightly, now = Path(cache, "nightly-review.json"), Path(cache, "review-now.json")
+            nightly.write_text(json.dumps({"heads": {Path(d).name: head}}))
+            orig = (N.load_conf, N.STATE, N.NOW_STATE, N.companion, sys.argv)
+            N.load_conf, N.STATE, N.NOW_STATE = (lambda: {"review_repos": [d]}), nightly, now
+            N.companion, sys.argv = (lambda path, body: sent.append((path, body))), ["nightly_review.py", "--on-demand"]
+            try:
+                N.main()
+            finally:
+                N.load_conf, N.STATE, N.NOW_STATE, N.companion, sys.argv = orig
+        self.assertEqual([p for p, _ in sent], ["/local/notify"])  # the phone said "you'll get a notification"
+        self.assertIn("Nothing new", sent[0][1]["text"])
+
     def test_heads_recorded_after_a_review(self):
         saved = {}
         with tempfile.TemporaryDirectory() as d:

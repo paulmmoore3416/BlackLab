@@ -33,8 +33,9 @@ def load(path, default):
     return data if isinstance(data, type(default)) else default
 
 
-def save(path, data) -> None:
-    """Write JSON atomically with owner-only permissions. Never raises: losing a count must not break a request."""
+def save(path, data) -> bool:
+    """Write JSON atomically with owner-only permissions. Never raises (losing a count must not break a request);
+    returns whether the write happened."""
     p = Path(path)
     try:
         p.parent.mkdir(parents=True, exist_ok=True)
@@ -48,7 +49,8 @@ def save(path, data) -> None:
             os.unlink(tmp)
             raise
     except OSError:
-        pass
+        return False
+    return True
 
 
 def day(ts: float) -> str:
@@ -106,7 +108,12 @@ PHONE_PRIVATE_KEYS = ("request", "origin", "started", "job", "private")
 JOB_KEYS = ("id", "kind", "title", "status", "progress", "created", "started", "finished", "origin", "private", "error")
 
 
-def phone_payload(ops: dict, report_md: str) -> dict:
+def cap_report(md: str) -> str:
+    md = md or ""
+    return md if len(md) <= REPORT_CAP else md[:REPORT_CAP] + "\n\n…(cut)"
+
+
+def phone_payload(ops: dict, report_md: str, now_report_md: str = "") -> dict:
     """The Agent Ops payload for the phone: a copy, with private live tasks reduced to who/when/how many steps (step
     titles can carry tool reasons or clinical-content notes, and the phone shows them on the lock screen), plus the
     latest review report so the phone can render it without another call."""
@@ -121,9 +128,10 @@ def phone_payload(ops: dict, report_md: str) -> dict:
     # jobs: what the phone shows and matches on, never the result (its own results already come via /phone/jobs)
     out["jobs"] = [{k: j.get(k) for k in JOB_KEYS} | ({"title": "(private)", "progress": "", "error": "failed" if j.get("error") else None} if j.get("private") else {})
                    for j in out.get("jobs") or [] if isinstance(j, dict)]
-    md = report_md or ""
     nr = out.get("nightly_review") if isinstance(out.get("nightly_review"), dict) else {}
-    out["nightly_review"] = {**nr, "report_md": md if len(md) <= REPORT_CAP else md[:REPORT_CAP] + "\n\n…(cut)"}
+    out["nightly_review"] = {**nr, "report_md": cap_report(report_md)}
+    rn = out.get("review_now") if isinstance(out.get("review_now"), dict) else {}
+    out["review_now"] = {**rn, "report_md": cap_report(now_report_md)} if rn else {}
     return out
 
 
@@ -133,10 +141,19 @@ def advisor_label(setting: str) -> str:
 
 
 def write_config_key(path, key: str, value) -> dict:
-    """Set one key in config.json, re-reading the file first (./daddyshome edits it too) and keeping every other key."""
-    cfg = load(path, {})
+    """Set one key in config.json, re-reading the file first (./daddyshome edits it too) and keeping every other key.
+    A file that exists but doesn't parse as an object (damaged, or caught mid-write) raises ValueError and is left
+    alone — writing {key: value} over it would lose every other setting. A failed write raises OSError."""
+    p = Path(path)
+    if p.exists():
+        cfg = json.loads(p.read_text())  # ValueError on a damaged or half-written file
+        if not isinstance(cfg, dict):
+            raise ValueError("config.json is not a JSON object")
+    else:
+        cfg = {}
     cfg[key] = value
-    save(path, cfg)
+    if not save(p, cfg):
+        raise OSError(f"couldn't write {p}")
     return cfg
 
 

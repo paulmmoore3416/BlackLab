@@ -37,6 +37,19 @@ class AgentOpsTest {
         assertEquals(now, s.at)
     }
 
+    @Test fun onDemandReportIsParsed() {
+        val s = AgentOps.parse(fixture(), now)
+        assertEquals("# On-demand review", s.review.now?.reportMd?.lineSequence()?.first())
+    }
+
+    @Test fun snapshotCacheIsNeverBackedUp() {
+        listOf("src/main/res/xml/backup_rules.xml", "src/main/res/xml/data_extraction_rules.xml").forEach { f ->
+            val xml = java.io.File(f).readText()
+            assertEquals("$f must exclude agent_ops.xml from every backup section", xml.split("blacklab_secrets.xml").size - 1,
+                xml.split("path=\"agent_ops.xml\"").size - 1)
+        }
+    }
+
     @Test fun parsesEmptyAndPartialPayloads() {
         val empty = AgentOps.parse(JSONObject(), now)
         assertEquals("", empty.worker); assertTrue(empty.forks.isEmpty()); assertTrue(empty.live.isEmpty())

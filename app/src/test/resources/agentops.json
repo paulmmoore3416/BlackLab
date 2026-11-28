@@ -19,5 +19,5 @@
    "setup": {"enabled": true, "model": "sonnet", "advisor": "opus", "time": "02:30", "repos": []}, "health": {"state": "ok", "note": ""},
    "report_md": "# Nightly review\n\n## Verdict\n\nNo findings."},
  "claude_code": {"advisor": "", "effort": "high", "subagents": [], "advisor_disabled": false},
- "review_now": {"at": 1795790000.0, "status": "Skipped", "summary": "Nothing new since the last review"},
+ "review_now": {"at": 1795790000.0, "status": "Skipped", "summary": "Nothing new since the last review", "report_md": "# On-demand review\n\nNo findings."},
  "controls": {"advisor": "auto", "advisor_label": "auto", "advisor_choices": ["auto", "off", "claude:opus"], "review_running": false}}

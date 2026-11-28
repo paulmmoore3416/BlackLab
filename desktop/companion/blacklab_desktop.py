@@ -1830,7 +1830,7 @@ def agent_ops() -> dict:
 
 
 REVIEW_UNITS = ("blacklab-nightly-review.service", "blacklab-review-now.service")
-_REPORT = {"path": None, "mtime": 0.0, "text": ""}
+_REPORTS: dict = {}  # path → (mtime, text)
 
 
 def review_running() -> bool:
@@ -1848,16 +1848,18 @@ def review_report_md(state: dict) -> str:
         return ""
     try:
         m = p.stat().st_mtime
-        if _REPORT["path"] != p or _REPORT["mtime"] != m:
-            _REPORT.update(path=p, mtime=m, text=p.read_text(errors="replace"))
+        if _REPORTS.get(p, (None,))[0] != m:
+            _REPORTS[p] = (m, p.read_text(errors="replace"))
+            while len(_REPORTS) > 4:
+                _REPORTS.pop(next(iter(_REPORTS)))
     except OSError:
         return ""
-    return _REPORT["text"]
+    return _REPORTS[p][1]
 
 
 def phone_agent_ops() -> dict:
     ops = agent_ops()
-    return agentops.phone_payload(ops, review_report_md(ops.get("nightly_review") or {}))
+    return agentops.phone_payload(ops, review_report_md(ops.get("nightly_review") or {}), review_report_md(ops.get("review_now") or {}))
 
 
 def nightly_review_panel() -> dict:
@@ -2131,7 +2133,10 @@ class Handler(SimpleHTTPRequestHandler):
             v = body.get("advisor") if isinstance(body, dict) else None
             if v not in agentops.ADVISOR_CHOICES:
                 return self.reply(400, {"error": "advisor must be one of " + ", ".join(agentops.ADVISOR_CHOICES)})
-            CONFIG["advisor"] = agentops.write_config_key(CONFIG_DIR / "config.json", "advisor", v)["advisor"]
+            try:
+                CONFIG["advisor"] = agentops.write_config_key(CONFIG_DIR / "config.json", "advisor", v)["advisor"]
+            except (OSError, ValueError) as e:  # damaged or half-written config.json: leave it alone, say so
+                return self.reply(500, {"error": f"Couldn't save the advisor setting: {e}"[:200]})
             return self.reply(200, {"ok": True, "advisor": v})
         if route == "/phone/ops/ack":
             if not self.phone_guard():

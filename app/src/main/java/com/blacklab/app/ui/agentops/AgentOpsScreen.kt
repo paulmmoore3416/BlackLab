@@ -95,7 +95,7 @@ fun AgentOpsScreen() {
     val desk by DesktopAi.status.collectAsStateWithLifecycle()
     val online = desk.state == DesktopAi.State.ONLINE
     val lifecycle = LocalLifecycleOwner.current.lifecycle
-    var showReport by remember { mutableStateOf(false) }
+    var showReport by remember { mutableStateOf<String?>(null) }
     var confirmReview by remember { mutableStateOf(false) }
     var confirmAdvisor by remember { mutableStateOf<String?>(null) }
     var busy by remember { mutableStateOf(false) }
@@ -253,7 +253,8 @@ fun AgentOpsScreen() {
                             color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 6.dp))
                     }
                     Row(Modifier.padding(top = 10.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        if (r.reportMd.isNotBlank()) FilledTonalButton(onClick = { showReport = true }) { Text("Open report") }
+                        if (r.reportMd.isNotBlank()) FilledTonalButton(onClick = { showReport = r.reportMd }) { Text("Open report") }
+                        r.now?.reportMd?.takeIf { it.isNotBlank() }?.let { md -> FilledTonalButton(onClick = { showReport = md }) { Text("On-demand report") } }
                         FilledTonalButton(onClick = { confirmReview = true }, enabled = online && r.enabled && !s.controls.reviewRunning && !busy) {
                             Text(if (s.controls.reviewRunning) "Review running…" else "Run review now")
                         }
@@ -300,9 +301,9 @@ fun AgentOpsScreen() {
             scope.launch { val (_, note) = AgentOps.setAdvisor(c); busy = false; shell.toast(note); AgentOps.refresh(app) }
         }
     }
-    if (showReport && s != null) ModalBottomSheet(onDismissRequest = { showReport = false }) {
+    showReport?.let { md -> ModalBottomSheet(onDismissRequest = { showReport = null }) {
         Text("Code review report", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(horizontal = 16.dp))
-        HtmlView(DesktopJobs.markdownToHtml(s.review.reportMd), Modifier.fillMaxWidth().heightIn(min = 240.dp, max = 640.dp).padding(16.dp))
-        TextButton(onClick = { showReport = false }, modifier = Modifier.align(Alignment.End).padding(end = 8.dp, bottom = 16.dp)) { Text("Close") }
-    }
+        HtmlView(DesktopJobs.markdownToHtml(md), Modifier.fillMaxWidth().heightIn(min = 240.dp, max = 640.dp).padding(16.dp))
+        TextButton(onClick = { showReport = null }, modifier = Modifier.align(Alignment.End).padding(end = 8.dp, bottom = 16.dp)) { Text("Close") }
+    } }
 }

@@ -38,6 +38,20 @@ class TaskWatcherTest {
         assertEquals(false, TaskWatcher.finished(job("a"), null, listOf(job("a")))) // still in the phone's running list
     }
 
+    @Test fun watcherIdsNeverCollideWithResultsOrOtherAlerts() {
+        (0 until 2000).map { job("job-$it") }.forEach { j ->
+            val id = TaskWatcher.id(j)
+            assertEquals(true, id in 8400..8655)
+            assertEquals(false, id == 7300 + (j.id.hashCode() and 0x3ff))  // DesktopJobs result notification
+            assertEquals(false, id in 7200..8323)                           // results, "sent to your computer", rounds, updater
+        }
+    }
+
+    @Test fun aJobThatTimedOutIsNotWatchedAgain() {
+        val jobs = listOf(job("a"), job("b"))
+        assertEquals(listOf("b"), TaskWatcher.startable(jobs, timedOut = setOf("a")).map { it.id })
+    }
+
     @Test fun titleIsShortened() {
         val long = job("a").copy(title = "x".repeat(80))
         assertEquals("Computer: " + "x".repeat(50) + "…", TaskWatcher.text(long, null).first)

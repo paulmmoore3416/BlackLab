@@ -240,6 +240,8 @@ def main() -> int:
         main_r = pick(results)
         heads.update({r["repo"]: r["head"] for r in results if r.get("head")})
         save_state(NOW_STATE if on_demand else STATE, **main_r, all=results, heads=heads, on_demand=on_demand)
+        if on_demand and main_r["status"] == "Skipped":  # the phone promised a notification either way
+            companion("/local/notify", {"title": f"On-demand code review · {main_r.get('repo', '')}", "text": main_r["summary"]})
         for r in results:
             if r["status"] == "Failed":
                 companion("/local/notify", {"title": f"{'On-demand' if on_demand else 'Nightly'} code review failed · {r['repo']}", "text": r["summary"]})

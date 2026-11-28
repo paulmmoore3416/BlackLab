@@ -22,9 +22,13 @@ object TaskWatcher {
     private const val MAX_MS = 30 * 60_000L
     private const val PUBLIC_TITLE = "Your computer is working"
     @Volatile private var loop: Job? = null
+    private val timedOut = java.util.Collections.synchronizedSet(HashSet<String>())
 
     /** The jobs worth a live notification: started from the phone and running now. */
     fun watched(jobs: List<DesktopJobs.Job>): List<DesktopJobs.Job> = jobs.filter { it.status == "running" && it.origin.startsWith("Phone") }
+
+    /** Watched jobs that haven't already used up their 30 minutes (a stuck job must not restart the polling forever). */
+    fun startable(jobs: List<DesktopJobs.Job>, timedOut: Set<String>): List<DesktopJobs.Job> = watched(jobs).filter { it.id !in timedOut }
 
     /** (title, text) for a job, from its live task log when the computer has one. */
     fun text(job: DesktopJobs.Job, live: AgentOps.LiveTask?): Pair<String, String> {
@@ -37,11 +41,12 @@ object TaskWatcher {
     fun finished(job: DesktopJobs.Job, row: AgentOps.JobRow?, active: List<DesktopJobs.Job>): Boolean =
         if (row != null) row.status != "running" else active.none { it.id == job.id }
 
-    fun id(job: DesktopJobs.Job) = 7300 + (job.id.hashCode() and 0xff)
+    /** 8400–8655: clear of the job results (7300 + 0x3ff), "sent to your computer" (7200 + 0x3ff), rounds and updater alerts. */
+    fun id(job: DesktopJobs.Job) = 8400 + (job.id.hashCode() and 0xff)
 
     /** Called after each jobs check-in: starts the watcher when a phone job is running (one loop at a time). */
     fun ensure(app: AppContainer, jobs: List<DesktopJobs.Job>) {
-        val start = watched(jobs)
+        val start = startable(jobs, timedOut.toSet())
         if (start.isEmpty() || loop?.isActive == true) return
         loop = app.appScope.launch {
             val tracked = start.associateBy { it.id }.toMutableMap()
@@ -51,7 +56,7 @@ object TaskWatcher {
                     AgentOps.refresh(app)
                     val s = AgentOps.snapshot.value
                     // newly started phone jobs join; finished ones leave
-                    watched(DesktopJobs.jobs.value).forEach { tracked.putIfAbsent(it.id, it) }
+                    startable(DesktopJobs.jobs.value, timedOut.toSet()).forEach { tracked.putIfAbsent(it.id, it) }
                     for (job in tracked.values.toList()) {
                         val row = s?.jobs?.firstOrNull { it.id == job.id }
                         if (finished(job, row, DesktopJobs.jobs.value)) { cancel(app.context, job); tracked.remove(job.id); continue }
@@ -60,6 +65,7 @@ object TaskWatcher {
                     }
                     delay(POLL_MS)
                 }
+                if (tracked.isNotEmpty()) timedOut.addAll(tracked.keys)  // hit the 30-minute cap: stay quiet for these jobs
             } finally {
                 tracked.values.forEach { cancel(app.context, it) }
             }
