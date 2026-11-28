@@ -4,8 +4,8 @@
 
 <h1>BlackLab</h1>
 
-**A private, all-in-one personal & professional workspace for Android.**
-Pro camera & photo editor · dictation · audio recorder · Word-class documents · journal · to-do · calendar · education & certification tracking — in one app, with every file saved to a real folder on your phone.
+**A private, all in one personal & professional workspace for Android.**
+Pro camera & photo editor · dictation · audio recorder · Word class documents · journal · to-do · calendar · education & certification tracking — in one app, with every file saved to a real folder on your phone.
 
 [![Version](https://img.shields.io/badge/version-5.14.0-2BD9A8)](CHANGELOG.md)
 [![Android](https://img.shields.io/badge/Android-15%2B-3DDC84?logo=android&logoColor=white)](#requirements)
@@ -44,14 +44,14 @@ Optimized for the **Google Pixel 10 Pro XL** and newer (Android 15+).
 - **Works offline**: an on-device command router runs tasks, calendar, briefings, notes, templates, journal, recorder, dictation, camera, scanners, focus timer, CEUs and every setting; **Gemini Nano** (on-device) handles free-form phrasing and questions
 - **Ask my files** — cited answers from your own documents, journal and transcripts, searched on the phone
 - **Meeting → Actions** — minutes, decisions and To-Do tasks from your latest dictation or recording
-- **Snap-to-Work-Order** — photograph an equipment nameplate and get a filled-in work order
+- **Snap to Work Order** — photograph an equipment nameplate and get a filled in work order
 - Online extras: Gmail, Google Drive, Google Keep, Google developer docs; ElevenLabs voice with an offline fallback
-- Keys are encrypted with a hardware-backed Keystore key and never backed up or synced
+- Keys are encrypted with a hardware backed Keystore key and never backed up or synced
 
 ### ✦ Claude & Gemini, your pick (5.17)
 - **A model menu everywhere:** phone, desktop and Obsidian. ★ **Claude** (Opus, Sonnet, Haiku, Fable) through your Claude subscription on the computer, with no API key. ★ **Gemini** straight from the phone. Plus your local Ollama models, Gemini Nano and Auto
 - **Every conversation is saved to your vault.** Claude notes glow **orange** and Gemini notes glow **red** on the graph, so you and your local AI find them at a glance (`recall_ai`: *"what did Claude say about the chiller?"*)
-- **Obsidian works with BlackLab both ways:** the BlackLab Assistant sidebar; `#task`, `#workorder`, `#event`, `#remind` and `#ask/claude` trigger tags; two-way Tasks; a Facility Command Center; a daily *Today at a glance*; meeting action items become tasks; a Study Hub with two-way flashcards; and a Kanban Project Board that shows on BlackLab's Home screen
+- **Obsidian works with BlackLab both ways:** the BlackLab Assistant sidebar; `#task`, `#workorder`, `#event`, `#remind` and `#ask/claude` trigger tags; two-way Tasks; a Facility Command Center; a daily *Today at a glance*; meeting action items become tasks; a Study Hub with two way flashcards; and a Kanban Project Board that shows on BlackLab's Home screen
 
 ### 🕸️ Second brain: Obsidian vault, agent skills & facility ops
 - **Living Obsidian vault** on your computer: everything you do on the phone and desktop (tasks, work orders, facility logs, meetings, journal, recordings) becomes linked notes. Nodes for every area of your life and work, a living graph, an offline reference library, and an Atlas of every file on the computer. Any AI with the vault MCP server can read and write it, under the same privacy rules
@@ -64,7 +64,7 @@ Optimized for the **Google Pixel 10 Pro XL** and newer (Android 15+).
 
 ### 🚗 Android Auto
 - **Ask BlackLab** hands-free through the car's microphone, with spoken replies — tasks, calendar, notes, email, summaries, knowledge questions, “navigate to my next meeting”
-- **Brief me** (daily briefing and spoken summaries), **Agenda** with Navigate and Call, **Tasks** with check-off and voice add, **Voice notes**
+- **Brief me** (daily briefing and spoken summaries), **Agenda** with Navigate and Call, **Tasks** with check off and voice add, **Voice notes**
 - **Talk** through any conversation knowledge base, hands-free
 - **New task** by voice from the home grid
 - Reminders pop up on the car display; music and recordings play from Android Auto's media launcher
