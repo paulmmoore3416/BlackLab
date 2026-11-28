@@ -38,6 +38,12 @@ class SshHostsTest {
         val desk = s.hosts[0]
         assertEquals(SshHosts.BUILT_IN.size + 1, SshHosts.commandsFor(s, desk).size)
         assertEquals(listOf(c), SshHosts.commandsFor(s, s.hosts[1]))
+    }
+
+    @Test fun textSizeIsRememberedAndClamped() {
+        assertEquals(SshHosts.DEFAULT_FONT, SshHosts.fromJson(org.json.JSONObject()).fontSize)  // 5.18.0 files have none
+        assertEquals(18, SshHosts.fromJson(SshHosts.toJson(SshHosts.State(fontSize = 18))).fontSize)
+        assertEquals(SshHosts.MAX_FONT, SshHosts.fromJson(org.json.JSONObject().put("fontSize", 99)).fontSize)
         // only the restart asks first; every built-in is read-only otherwise
         assertEquals(listOf("restart"), SshHosts.BUILT_IN.filter { it.confirm }.map { it.id })
         assertFalse(SshHosts.BUILT_IN.any { "sudo" in it.command || "rm " in it.command })

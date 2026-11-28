@@ -2,6 +2,24 @@
 
 All notable changes to BlackLab are documented here. The project follows [Semantic Versioning](https://semver.org/).
 
+## [5.18.1] — 2026-11-22
+
+Typing in the phone terminal: every key now arrives once, scrolling follows your finger, and the text is easier to read.
+
+### Fixed
+- **Phone keyboards repeated the whole line on every keystroke.** Gboard keeps the line it is typing "in progress" and rewrites it as you go, and the terminal sent the whole line again each time, so `hello` arrived as `h he hel hell hello`. The terminal now asks for a plain keyboard (no suggestions, autocorrect or composing, as Termux does), and the page reads the keyboard's text itself. It sends only what changed (a correction becomes backspaces plus the new letters) and keeps xterm.js from sending it a second time. Hardware keyboards and Enter/Backspace are unchanged. Covered by `desktop/web/tests/terminal_ime.test.mjs`, which replays Gboard's behaviour (also run in CI).
+
+- **Scrolling was jumpy and uneven.** xterm.js 6 has no touch scrolling of its own, so the WebView panned the terminal and the rows lagged or skipped. The terminal now scrolls itself: the text follows the finger 1:1 (leftover pixels carry over, so slow and fast drags go the same distance), a flick coasts and slows down evenly and stops at the top or bottom, and a tap after a scroll no longer pops the keyboard up. Full-screen apps get what a mouse wheel would send (tmux and htop get wheel events, less and man get arrow keys, without coasting). Sideways drags are left alone.
+- **Pinching resized the SSH session dozens of times.** The pinch now only scales the picture while your fingers move and sets the size once when they lift, so vim, htop and Claude Code redraw once. The keyboard sliding in or out also sends one resize instead of one per frame.
+- **Bigger/Smaller text could skip a step** when tapped quickly or right after a pinch. The size on screen updates at once and is saved in the background.
+
+### Added
+- **Compose box** (✎, first key on the key bar). Type with the full keyboard, with suggestions, autocorrect and voice typing, then send it to the terminal in one go with Return. Several lines go as one paste. This is the place for long messages, such as writing to Claude in the terminal.
+- **Pinch to change the text size.** The size is remembered across sessions and hosts (⋮ › Bigger/Smaller text saves it too). The default is now 14 px with a little more line spacing.
+- **^C key** on the key bar, and taller 44 dp keys with larger labels.
+- **Recently sent** (⟲ in the compose box): the last 20 lines you sent, to send again or fix. They stay in memory only, never on disk. The box keeps its text through a rotation or a trip to another app.
+- The screen stays on while a terminal is connected (and sleeps as usual once the session drops).
+
 ## [5.18.0] — 2026-11-22 (companion 1.14.0)
 
 A terminal in BlackLab on the phone and the desktop, plus remote check-ups, website-style dashboards in Obsidian and a reference library the desktop AI can quote.

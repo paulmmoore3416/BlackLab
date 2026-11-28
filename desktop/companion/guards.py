@@ -228,6 +228,24 @@ RE_WORDS = re.compile(r"\b(reverse[- ]?engineer\w*|decompil\w*|disassembl\w*|ghi
                       r"what does .{1,120} do|how does .{1,120} work|\.(?:so|bin|exe|dll|apk|elf|ko|pyc|wasm|jar|dex))\b|\.(?:so|bin|exe|dll|apk|elf|ko|pyc|wasm|jar|dex)\b", re.I)
 SIDE_EFFECT_ASKS["reverse_engineer"] = RE_WORDS
 
+# Code, regulation, safety, electrical, life-safety and equipment questions: offline, the model must answer from the
+# reference library (95 Library/*/Files via kb-core) rather than from memory, so these get it searched first.
+SOURCES_WORDS = re.compile(
+    r"\b(codes?|nfpa|nec|osha|cms|cfr|k-?tags?|a-?tags?|surveys?|surveyors?|joint commission|tjc|dhss|life safety|lsc|ligature|anti-?ligature|"
+    r"eoc|environment of care|ilsm|interim life safety|rounds checklist|plan of correction|2567|"
+    r"generators?|epss|transfer switch|ats|load (?:test|bank)|boilers?|chillers?|hvac|air handlers?|ahu|rtu|rooftop|refrigerants?|r-?\d{2,3}a?|epa 608|"
+    r"leak rate|breakers?|wire size|awg|thhn|amps?|amperage|mca|mocp|voltage|volts|arc flash|grounding|gfci|panel clearance|"
+    r"sprinklers?|fire (?:alarm|pump|door|damper|extinguisher|watch|drill)s?|extinguishers?|smoke (?:barrier|damper|detector)s?|egress|exit signs?|"
+    r"emergency (?:power|lighting|generator|eyewash|shower)|eyewash|lockout|tagout|loto|confined space|fall protection|ladders?|scaffold\w*|forklifts?|"
+    r"sds|msds|hazcom|hazard communication|chemicals?|hazardous (?:waste|materials?)|sqg|lqg|vsqg|satellite accumulation|biohazard|sharps|"
+    r"ppe|respirators?|osha 30[01]a?|recordable|ada|accessib\w*|legionella|anti-?scald|mixing valves?|backflow|medical gas|"
+    r"preventive maintenance|pm schedule|work orders?|nameplate|manuals?|inspections?|compliance|regulations?|standards?)\b", re.I)
+
+
+def needs_sources(text: str) -> bool:
+    """True when an answer should rest on the reference library (codes, safety, equipment, EOC), not model memory."""
+    return bool(text and SOURCES_WORDS.search(text))
+
 # Tools whose results carry text the user didn't write (files, documents, old chats, web docs, phone data, the vault).
 # Text like that can contain instructions aimed at the model ("open https://…?q=<your notes>").
 READS_CONTENT = {"read_file", "search_documents", "recall_chats", "recall_ai", "dev_docs", "phone_command", "find_files", "equipment", "vault_search", "library_search",

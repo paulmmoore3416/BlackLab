@@ -135,6 +135,22 @@ class GraphTest(unittest.TestCase):
         self.assertEqual(0, again["changed"])
         self.assertEqual(0, again["embedded"], "unchanged notes aren't embedded again")
 
+    def test_update_related_survives_a_related_note_being_moved_away(self):
+        body = "z" * 200
+        self.note("50 Notes/Chiller A.md", f"Chiller notes {body}")
+        self.note("50 Notes/Chiller B.md", f"Chiller B notes {body}")
+        self.note("50 Notes/Budget.md", f"Budget {body}")
+        fake = {"Chiller A": [1, 0, 0, 0], "Chiller B": [0.98, 0.1, 0, 0], "Budget": [0, 0, 1, 0]}
+        embed = lambda texts: [fake.get(t.split("\n")[0], [0, 0, 0, 1]) for t in texts]  # noqa: E731
+        state = {}
+        G.update_related(self.v, G.scan(self.v), embed, state)
+        self.assertIn("50 Notes/Chiller B.md", state["ours_rel"]["50 Notes/Chiller A.md"])
+        self.v.path("50 Notes/Chiller B.md").unlink()  # moved to the archive / deleted: no longer in the pool
+        r = G.update_related(self.v, G.scan(self.v), embed, state)  # used to raise KeyError on the old path
+        self.assertNotIn("50 Notes/Chiller B.md", state["ours_rel"])
+        self.assertNotIn("50 Notes/Chiller B.md", state["ours_rel"].get("50 Notes/Chiller A.md", []))
+        self.assertIn("notes", r)
+
     def test_same_titles_are_linked_by_path_and_never_paired(self):
         body = "y" * 200
         self.note("50 Notes/A/Untitled page.md", f"Pump notes {body}")

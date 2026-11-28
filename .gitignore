@@ -56,3 +56,13 @@ __pycache__/
 
 # Obsidian (this folder is also opened as a vault on the desktop; its settings are personal)
 .obsidian/
+
+# ---------------------------------------------------------------------------
+# Personal files that get dropped in this folder (not part of the app) — 5.18.1
+# ---------------------------------------------------------------------------
+/Veteran_Initiative/
+/*.pptx
+/*.xlsx
+/*.zip
+/*.jpg
+/Minecraft - Bedrock Edition/

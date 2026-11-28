@@ -23,6 +23,7 @@ object HomeLayout {
         Card("focus", "Focus tasks", "Tasks due today or added to My Day."),
         Card("learning", "Learning", "Next class, assignments due and certification dates."),
         Card("projects", "Projects", "Active and blocked projects from the Project Board in Obsidian (needs the computer link)."),
+        Card("agentops", "Desktop AI", "The computer's AI at a glance: working or idle, today's numbers and last night's code review (needs the computer link)."),
         Card("documents", "Recent documents", "Documents you edited recently."),
         Card("reflect", "Journal prompt", "Today's reflection prompt."),
     )

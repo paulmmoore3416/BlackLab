@@ -230,6 +230,7 @@ fun SettingsScreen() {
                     if (awm.isRequestPinAppWidgetSupported) androidx.compose.foundation.layout.FlowRow(Modifier.padding(top = 6.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         listOf(
                             "Today" to com.blacklab.app.widgets.TodayWidgetReceiver::class.java,
+                            "Desktop AI" to com.blacklab.app.widgets.AgentOpsWidgetReceiver::class.java,
                             "Checklist" to com.blacklab.app.widgets.ChecklistWidgetReceiver::class.java,
                             "Quick capture" to com.blacklab.app.widgets.CaptureWidgetReceiver::class.java,
                         ).forEach { (label, cls) ->

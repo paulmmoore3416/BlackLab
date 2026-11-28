@@ -130,3 +130,27 @@ class ConfigJs(unittest.TestCase):
     def test_keeps_a_client_id_already_in_the_file(self):
         text = self.TEXT.replace("''", "'111-pub.apps.googleusercontent.com'")
         self.assertEqual(guards.config_js_with_client_id(text, "222-mine.apps.googleusercontent.com"), text)
+
+
+class NeedsSources(unittest.TestCase):
+    """Code, safety, equipment and EOC questions get the reference library searched before the model answers."""
+    def test_technical_questions_need_sources(self):
+        for q in ["How often do we have to load test the emergency generator?",
+                  "What wire size for a 32 amp MCA rooftop unit?",
+                  "What does NFPA 101 say about corridor doors?",
+                  "Is a no-load generator run OK for CMS?",
+                  "How long can an SQG keep hazardous waste on site?",
+                  "Lockout tagout annual inspection requirements",
+                  "What K-tag covers fire dampers?",
+                  "Ligature risk in patient bathrooms",
+                  "R-410A leak rate threshold under EPA 608",
+                  "OSHA 1910.147 periodic inspection",
+                  "What should be on our EOC rounds checklist?",
+                  "anti-scald mixing valve water temperature limits",
+                  "SDS for d-limonene first aid"]:
+            self.assertTrue(guards.needs_sources(q), q)
+
+    def test_everyday_questions_do_not(self):
+        for q in ["What's 15% of 240?", "Tell me a joke", "What's on my calendar tomorrow?",
+                  "Open the downloads folder", "Convert 30 miles to km", "Who won the game last night?", ""]:
+            self.assertFalse(guards.needs_sources(q), q)

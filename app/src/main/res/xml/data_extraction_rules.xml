@@ -4,12 +4,14 @@
 <data-extraction-rules>
     <cloud-backup>
         <exclude domain="sharedpref" path="blacklab_secrets.xml" />
+        <exclude domain="sharedpref" path="agent_ops.xml" />
         <exclude domain="file" path="crashes/" />
         <exclude domain="file" path="signatures/" />
         <exclude domain="file" path="bh/" />
     </cloud-backup>
     <device-transfer>
         <exclude domain="sharedpref" path="blacklab_secrets.xml" />
+        <exclude domain="sharedpref" path="agent_ops.xml" />
         <exclude domain="file" path="crashes/" />
         <exclude domain="file" path="signatures/" />
         <exclude domain="file" path="bh/" />

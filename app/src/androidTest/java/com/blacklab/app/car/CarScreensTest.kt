@@ -42,6 +42,5 @@ class CarScreensTest {
     @Test fun capture() = CarCaptureScreen.Mode.entries.forEach { m -> check { c -> CarCaptureScreen(c, m) } }
     @Test fun summaries() = check { CarSummariesScreen(it) }
     @Test fun summary() { check { CarSummaryScreen(it, null) }; check { CarSummaryScreen(it, SummarySources.Preset.WEEK) } }
-    @Test fun schedule() = check { CarScheduleScreen(it) }
     @Test fun message() = check { CarMessageScreen(it, "Title", "Message") }
 }

@@ -78,6 +78,28 @@ class ModelsTest(unittest.TestCase):
         self.assertNotIn("ANTHROPIC_API_KEY", kw["env"])  # the subscription, never a key
         self.assertNotIn("--mcp-config", args)  # no vault access unless opted in
 
+    def test_advisor_pairing(self):
+        self.assertEqual(A.advisor_for("opus", "fable"), "fable")
+        self.assertEqual(A.advisor_for("sonnet", "opus"), "opus")
+        self.assertEqual(A.advisor_for("claude-opus-5-5", "opus"), "opus")
+        self.assertIsNone(A.advisor_for("opus", "sonnet"))  # below the main model
+        self.assertIsNone(A.advisor_for("opus", "haiku"))
+        self.assertIsNone(A.advisor_for("sonnet", ""))
+        self.assertIsNone(A.advisor_for("sonnet", "off"))
+        self.assertIsNone(A.advisor_for("sonnet", "--dangerously-skip-permissions"))
+
+    def test_claude_advisor_flag_only_when_asked(self):
+        run = FakeRun(ok_json("ok", "claude-sonnet-5-5"))
+        m = self.models(run=run)
+        r = m.chat("claude:sonnet", "long job", advisor="opus")
+        args, _ = run.calls[0]
+        self.assertEqual(args[args.index("--advisor") + 1], "opus")
+        self.assertIn("advisor Opus", r["source"])
+        m.chat("claude:sonnet", "quick question")
+        self.assertNotIn("--advisor", run.calls[1][0])
+        m.chat("claude:opus", "x", advisor="haiku")
+        self.assertNotIn("--advisor", run.calls[2][0])
+
     def test_claude_vault_tools_are_opt_in_and_read_only(self):
         run = FakeRun(ok_json("ok"))
         m = self.models(run=run, config={"claude_vault_tools": True})

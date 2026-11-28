@@ -42,7 +42,8 @@ import java.time.ZoneId
  * results arrive on the next check-in (every minute while connected) as notifications.
  */
 object DesktopJobs {
-    data class Job(val id: String, val kind: String, val title: String, val status: String, val progress: String, val error: String?)
+    data class Job(val id: String, val kind: String, val title: String, val status: String, val progress: String, val error: String?,
+                   val origin: String = "", val private: Boolean = false)
 
     private const val PREFS = "desktop_jobs"
     private const val TAG = "DesktopJobs"
@@ -171,13 +172,15 @@ object DesktopJobs {
         val done = ArrayList<String>()
         for (i in 0 until arr.length()) {
             val o = arr.getJSONObject(i)
-            val job = Job(o.optString("id"), o.optString("kind"), o.optString("title"), o.optString("status"), o.optString("progress"), o.optString("error").takeIf { it.isNotBlank() && it != "null" })
+            val job = Job(o.optString("id"), o.optString("kind"), o.optString("title"), o.optString("status"), o.optString("progress"), o.optString("error").takeIf { it.isNotBlank() && it != "null" },
+                o.optString("origin"), o.optBoolean("private"))
             if (job.status == "done" || job.status == "failed") {
                 runCatching { apply(app, job, o.optJSONObject("result") ?: JSONObject()) }.onFailure { android.util.Log.w(TAG, "apply ${job.kind}", it) }
                 done += job.id
             } else active += job
         }
         _jobs.value = active
+        TaskWatcher.ensure(app, active)
         if (done.isNotEmpty()) DesktopAi.request("POST", "/phone/jobs/ack", JSONObject().put("ids", JSONArray(done)), 15_000)
         j.optJSONArray("ops")?.let { if (it.length() > 0) applyOps(app, it) }
     }

@@ -387,6 +387,7 @@ private fun NavGraph(nav: androidx.navigation.NavHostController) {
         }
         screen("signatures") { com.blacklab.app.ui.signature.SignaturesScreen() }
         screen("ssh") { com.blacklab.app.ui.ssh.SshHostsScreen() }
+        screen("agentops") { com.blacklab.app.ui.agentops.AgentOpsScreen() }
         screen("ssh/{id}") { com.blacklab.app.ui.ssh.SshTerminalScreen(Uri.decode(it.arguments?.getString("id") ?: "")) }
         screen("player?path={path}", arguments = listOf(navArgument("path") { defaultValue = "" })) {
             com.blacklab.app.ui.music.PlayFileScreen(Uri.decode(it.arguments?.getString("path") ?: ""))

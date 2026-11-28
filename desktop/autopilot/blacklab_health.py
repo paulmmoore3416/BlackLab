@@ -39,8 +39,8 @@ OLLAMA = "http://127.0.0.1:11434"
 ADB = shutil.which("adb") or str(HOME / "Android/Sdk/platform-tools/adb")
 
 DEFAULT_PROFILE = {
-    # user units that make up BlackLab: the companion and what it calls (vault sync, recall memory, cameras)
-    "keep_user_units": ["blacklab-desktop.service", "blacklab-syncthing.service", "omnix-kb-core.service", "nightjar.service"],
+    # user units that make up BlackLab: the companion and what it calls (vault sync, recall memory)
+    "keep_user_units": ["blacklab-desktop.service", "blacklab-syncthing.service", "omnix-kb-core.service"],
     # system services BlackLab needs (checked, never stopped)
     "keep_system_services": ["ollama.service", "tailscaled.service"],
     # other projects: stopped and kept off at boot (user units / docker containers / system services)
@@ -365,14 +365,15 @@ def check_services(s: Scan):
                 s.add(A, WARN, f"{name} embedding error", str(r["embed_error"])[:200])
         except Exception as e:
             s.add(A, FAIL, f"{name} isn't answering", str(e)[:150])
-    try:
-        req = urllib.request.Request("http://127.0.0.1:8790/", method="HEAD")
-        urllib.request.urlopen(req, timeout=5)
-        s.add(A, OK, "Nightjar cameras (the assistant's camera tool) answering")
-    except urllib.error.HTTPError:
-        s.add(A, OK, "Nightjar cameras (the assistant's camera tool) answering")
-    except Exception as e:
-        s.add(A, WARN, "Nightjar isn't answering", str(e)[:150])
+    if "nightjar.service" in prof["keep_user_units"]:  # cameras are optional: only checked while part of BlackLab
+        try:
+            req = urllib.request.Request("http://127.0.0.1:8790/", method="HEAD")
+            urllib.request.urlopen(req, timeout=5)
+            s.add(A, OK, "Nightjar cameras (the assistant's camera tool) answering")
+        except urllib.error.HTTPError:
+            s.add(A, OK, "Nightjar cameras (the assistant's camera tool) answering")
+        except Exception as e:
+            s.add(A, WARN, "Nightjar isn't answering", str(e)[:150])
     check_syncthing_folders(s)
     # failed units anywhere
     for user in (False, True):
@@ -455,17 +456,22 @@ def check_system(s: Scan):
     rc, tree = sh(["busctl", "tree", "--list", "org.freedesktop.UDisks2"], 10)
     for d in sorted(set(re.findall(r"/org/freedesktop/UDisks2/drives/\w+", tree))):
         rc, out = sh(["busctl", "get-property", "org.freedesktop.UDisks2", d, "org.freedesktop.UDisks2.Drive.Ata",
-                      "SmartSupported", "SmartFailing", "SmartTemperature", "SmartNumBadSectors"], 10)
+                      "SmartSupported", "SmartFailing", "SmartTemperature", "SmartNumBadSectors", "SmartSelftestStatus"], 10)
         vals = [l.split(" ", 1)[1] if " " in l else l for l in out.strip().splitlines()]
         name = d.rsplit("/", 1)[1].replace("_", " ")
         if rc or len(vals) < 4 or vals[0] != "true":
             continue
         failing, kelvin, bad = vals[1] == "true", float(vals[2]), int(vals[3])
+        # last self-test (smartd runs a short one daily at 02:00 and a long one monthly): "success", "inprogress",
+        # "aborted", "interrupted", "fatal", "error_unknown", "error_electrical", "error_servo", "error_read", "error_handling"
+        test = vals[4].strip('"') if len(vals) > 4 else ""
+        test_bad = test == "fatal" or test.startswith("error")
         c = kelvin - 273.15 if kelvin > 200 else kelvin
-        status = FAIL if failing else WARN if bad > 0 or c > 55 else OK
+        status = FAIL if failing or test_bad else WARN if bad > 0 or c > 55 else OK
         s.add(A, status, f"Drive {name}: " + ("SMART says it is FAILING" if failing else "SMART healthy") + f" · {c:.0f} °C"
-              + (f" · {bad} bad sector(s)" if bad else ""),
-              fix="Back up now and replace the drive" if failing or bad else "")
+              + (f" · {bad} bad sector(s)" if bad else "")
+              + (f" · last self-test: {test.replace('_', ' ')}" if test and test != "inprogress" else ""),
+              fix="Back up now and replace the drive" if failing or bad or test_bad else "")
     rc, out = sh(["nvidia-smi", "--query-gpu=name,temperature.gpu,memory.used,memory.total", "--format=csv,noheader,nounits"], 15)
     if rc == 0:
         for line in out.strip().splitlines():
@@ -720,10 +726,34 @@ def save_and_publish(rep: dict, send: bool = True) -> Path:
     return path
 
 
+def check_backup(s: Scan):
+    """blacklab-backup.sh (03:30 nightly) leaves its result in STATE/backup.json."""
+    A = "Data"
+    b = load_json(STATE / "backup.json", None)
+    if not b:
+        s.add(A, WARN, "No backup has run yet", fix="desktop/autopilot/blacklab-backup.sh --init, then systemctl --user start blacklab-backup")
+        return
+    age = time.time() - b.get("at", 0)
+    repos = b.get("repos") or {}
+    bad = [r for r, v in repos.items() if not v.get("ok")]
+    if not b.get("ok") or bad:
+        s.add(A, FAIL, "Last backup failed" + (f" for {', '.join(bad)}" if bad else ""), b.get("message", ""),
+              "journalctl --user -u blacklab-backup -n 50")
+    elif age > 3 * 86400:
+        s.add(A, FAIL, f"Last backup was {ago(b['at'])}", fix="systemctl --user status blacklab-backup.timer")
+    else:
+        size = sum(v.get("bytes", 0) for v in repos.values()) / max(len(repos), 1)
+        s.add(A, OK if age < 36 * 3600 else WARN, f"Backed up {ago(b['at'])} to {len(repos)} place(s) · {human(size)}")
+    local_only = all(r.startswith("/") for r in repos)
+    if repos and local_only:
+        s.add(A, WARN, "Backups are only on this computer's own drive", "If the drive dies, the backups go with it.",
+              "Add an offsite repository to ~/.config/blacklab-backup/repos, then blacklab-backup.sh --init")
+
+
 def full_scan(deep=True) -> Scan:
     s = Scan()
     for area, fn in (("Desktop AI", check_companion), ("Desktop AI", check_ollama), ("Phone link", check_phone),
-                     ("Services", check_services), ("System", check_system), ("Data", check_data)):
+                     ("Services", check_services), ("System", check_system), ("Data", check_data), ("Data", check_backup)):
         s.guarded(area, fn)
     s.guarded("Storage", lambda sc: check_storage(sc, deep))
     return s
