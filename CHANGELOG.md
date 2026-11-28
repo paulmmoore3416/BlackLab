@@ -2,6 +2,17 @@
 
 All notable changes to BlackLab are documented here. The project follows [Semantic Versioning](https://semver.org/).
 
+## [5.20.0] — 2026-11-28
+
+One memory shared by every BlackLab AI, so the assistant remembers you the same on the phone, on the computer and in Obsidian.
+
+### Added
+- **Shared memory across your devices.** The phone's own models (Gemini Nano, Gemini and Claude) now read what your computer has learned about you before they answer, and anything the phone answers on its own is added to the computer's memory and chat history. Say "remember that the chiller vendor is Trane" or "forget the old gate code" on either device and it sticks everywhere; ask "what do you remember about me" to see it. If the computer is asleep, a new memory waits and syncs when it is back.
+- **Pick up a conversation on another device.** If you were just talking to BlackLab on the computer and switch to the phone (within ten minutes), it still has the thread, so "and the second one?" works.
+
+### Fixed
+- **App-update notifications no longer replaced a Behavioral Health rounds reminder** (they shared a notification slot), and background "Sent to your computer" messages no longer overwrite each other.
+
 ## [5.18.1] — 2026-11-22
 
 Typing in the phone terminal: every key now arrives once, scrolling follows your finger, and the text is easier to read.
